@@ -203,7 +203,8 @@ const pitchTypes = {
 };
 
 // 表示球速はそのままに、実際の到達時間だけを調整する係数。
-const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * 0.8;
+const actualPitchSpeedReductionScale = 0.8;
+const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * actualPitchSpeedReductionScale;
 const pitcherAbilityTuning = {
   globalMultiplier: 1.1,
   stuffBoost: 0,
@@ -256,6 +257,29 @@ const stealTuning = {
 const battingFeedbackDisplayPenalty = 0.1;
 const battingPracticeHomerBoostMultiplier = 2.56;
 const oppositeHandedBattingAdvantageMultiplier = 1.2;
+const buntTuning = {
+  goodQuality: 0.68,
+  goodTiming: 0.58,
+  goodSweetSpot: 0.58,
+  goodLineChance: 0.88,
+  badLineBase: 0.1,
+  badLineQualityScale: 0.32,
+  badLineSweetSpotScale: 0.16,
+  badLineMin: 0.08,
+  badLineMax: 0.48,
+  foulBase: 0.055,
+  foulQualityScale: 0.2,
+  foulTimingScale: 0.075,
+  foulBadContactScale: 0.08,
+  foulMin: 0.055,
+  foulMax: 0.3,
+  popupBase: 0.14,
+  popupBadContactScale: 0.68,
+  popupTimingScale: 0.12,
+  popupMin: 0.14,
+  popupMax: 0.82,
+  forcePopupBadScore: 0.68
+};
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
 const pitchBendEffect = 1.15;
@@ -5323,23 +5347,42 @@ function buildBattedBallProfile(contact) {
   });
   if (getCurrentSwingType() === "bunt") {
     const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12, 0, 1);
-    const goodBunt = buntQuality >= 0.68 && timingScore >= 0.58 && sweetSpotScore >= 0.58;
+    const goodBunt = buntQuality >= buntTuning.goodQuality
+      && timingScore >= buntTuning.goodTiming
+      && sweetSpotScore >= buntTuning.goodSweetSpot;
     const badBuntScore = goodBunt
       ? 0
       : clamp(
           (0.66 - buntQuality) / 0.66
-            + Math.max(0, 0.58 - timingScore) * 0.55
-            + Math.max(0, 0.58 - sweetSpotScore) * 0.45,
+            + Math.max(0, buntTuning.goodTiming - timingScore) * 0.55
+            + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.45,
           0,
           1
         );
-    const lineChance = goodBunt ? 0.88 : clamp(0.1 + buntQuality * 0.32 + sweetSpotScore * 0.16, 0.08, 0.48);
+    const lineChance = goodBunt
+      ? buntTuning.goodLineChance
+      : clamp(
+          buntTuning.badLineBase + buntQuality * buntTuning.badLineQualityScale + sweetSpotScore * buntTuning.badLineSweetSpotScale,
+          buntTuning.badLineMin,
+          buntTuning.badLineMax
+        );
     const roll = Math.random();
     const side = Math.random() < 0.5 ? -1 : 1;
-    const buntFoulChance = clamp(0.055 + (1 - buntQuality) * 0.2 + Math.abs(timingPull) * 0.075 + badBuntScore * 0.08, 0.055, 0.3);
+    const buntFoulChance = clamp(
+      buntTuning.foulBase
+        + (1 - buntQuality) * buntTuning.foulQualityScale
+        + Math.abs(timingPull) * buntTuning.foulTimingScale
+        + badBuntScore * buntTuning.foulBadContactScale,
+      buntTuning.foulMin,
+      buntTuning.foulMax
+    );
     const buntIsFoul = isFoul || Math.random() < buntFoulChance;
-    const pitcherBuntPopupChance = clamp(0.14 + badBuntScore * 0.68 + Math.abs(timingPull) * 0.12, 0.14, 0.82);
-    const pitcherBuntPopup = !goodBunt && !buntIsFoul && (badBuntScore >= 0.68 || Math.random() < pitcherBuntPopupChance);
+    const pitcherBuntPopupChance = clamp(
+      buntTuning.popupBase + badBuntScore * buntTuning.popupBadContactScale + Math.abs(timingPull) * buntTuning.popupTimingScale,
+      buntTuning.popupMin,
+      buntTuning.popupMax
+    );
+    const pitcherBuntPopup = !goodBunt && !buntIsFoul && (badBuntScore >= buntTuning.forcePopupBadScore || Math.random() < pitcherBuntPopupChance);
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance

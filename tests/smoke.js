@@ -3689,10 +3689,11 @@ assert(Math.abs(runnerSpeedState.effectiveRun10 - 7.975) < 0.001, "effective run
 
 const pitchSpeedChangeState = JSON.parse(runInGame(
   context,
-  "JSON.stringify({ actualSpeedBoost: actualPitchSpeedBoost, bendEffect: pitchBendEffect, effect: pitchSpeedChangeEffect, amount: maxPitchSpeedChangeAmount })"
+  "JSON.stringify({ actualSpeedBoost: actualPitchSpeedBoost, actualSpeedReductionScale: actualPitchSpeedReductionScale, bendEffect: pitchBendEffect, effect: pitchSpeedChangeEffect, amount: maxPitchSpeedChangeAmount })"
 ));
 
-assert(Math.abs(pitchSpeedChangeState.actualSpeedBoost - (1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * 0.8)) < 0.000001, "actual pitch speed should be reduced to eighty percent without changing displayed speed");
+assert(Math.abs(pitchSpeedChangeState.actualSpeedReductionScale - 0.8) < 0.000001, "actual pitch speed reduction scale should stay at eighty percent");
+assert(Math.abs(pitchSpeedChangeState.actualSpeedBoost - (1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * pitchSpeedChangeState.actualSpeedReductionScale)) < 0.000001, "actual pitch speed should be reduced without changing displayed speed");
 assert(Math.abs(pitchSpeedChangeState.bendEffect - 1.15) < 0.000001, "pitch bend effect should be boosted by fifteen percent");
 assert(Math.abs(pitchSpeedChangeState.effect - (1.05 * 1.15)) < 0.000001, "pitch speed-change effect should be boosted another fifteen percent");
 assert(Math.abs(pitchSpeedChangeState.amount - ((0.0018 + 10 * 0.00072) * 9 * 1.05 * 1.15)) < 0.000001, "pitch speed-change amount should use the boosted effect");
