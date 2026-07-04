@@ -203,7 +203,7 @@ const pitchTypes = {
 };
 
 // 表示球速はそのままに、実際の到達時間だけを調整する係数。
-const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2;
+const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * 0.8;
 const pitcherAbilityTuning = {
   globalMultiplier: 1.1,
   stuffBoost: 0,
@@ -3415,11 +3415,12 @@ function handleGamepadButtonPresses(gamepad, team) {
       swingBat("strong");
     }
     if (justPressed(gamepadButtons.B)) {
+      swingBat("weak");
+    }
+    if (justPressed(gamepadButtons.Y)) {
       const directions = getGamepadDirections(gamepad);
       if (directions.size > 0) {
         tryStartSteal(getGamepadThrowTarget(directions));
-      } else {
-        swingBat("weak");
       }
     }
     if (justPressed(gamepadButtons.X)) {
@@ -5335,10 +5336,10 @@ function buildBattedBallProfile(contact) {
     const lineChance = goodBunt ? 0.88 : clamp(0.1 + buntQuality * 0.32 + sweetSpotScore * 0.16, 0.08, 0.48);
     const roll = Math.random();
     const side = Math.random() < 0.5 ? -1 : 1;
-    const buntFoulChance = clamp(0.035 + (1 - buntQuality) * 0.12 + Math.abs(timingPull) * 0.045, 0.035, 0.18);
+    const buntFoulChance = clamp(0.055 + (1 - buntQuality) * 0.2 + Math.abs(timingPull) * 0.075 + badBuntScore * 0.08, 0.055, 0.3);
     const buntIsFoul = isFoul || Math.random() < buntFoulChance;
-    const pitcherBuntPopupChance = clamp(0.08 + badBuntScore * 0.56 + Math.abs(timingPull) * 0.08, 0.08, 0.68);
-    const pitcherBuntPopup = !goodBunt && !buntIsFoul && (badBuntScore >= 0.76 || Math.random() < pitcherBuntPopupChance);
+    const pitcherBuntPopupChance = clamp(0.14 + badBuntScore * 0.68 + Math.abs(timingPull) * 0.12, 0.14, 0.82);
+    const pitcherBuntPopup = !goodBunt && !buntIsFoul && (badBuntScore >= 0.68 || Math.random() < pitcherBuntPopupChance);
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance
@@ -8388,14 +8389,20 @@ function getBattedBallRouteArrivalTime(point, battedBall) {
 }
 
 function getEligibleDefenseFielders(fielders, battedBall) {
+  const routeReactionInfielders = battedBall?.isGrounder
+    ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
+    : [];
+  if (routeReactionInfielders.length) return routeReactionInfielders;
   if (isOutfieldFrontLandingBall(battedBall)) {
     return fielders.filter((fielder) => !isInfielderRole(fielder.role));
   }
   if (isSlowInfieldDropBall(battedBall)) {
     return fielders.filter((fielder) => isInfielderRole(fielder.role));
   }
-  const routeReactionInfielders = fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall));
-  if (routeReactionInfielders.length) return routeReactionInfielders;
+  const linerRouteReactionInfielders = battedBall?.isLiner && !battedBall.isLineLiner
+    ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
+    : [];
+  if (linerRouteReactionInfielders.length) return linerRouteReactionInfielders;
   if (battedBall?.isGrounder && isHardGrounder(battedBall)) {
     const activeInfielders = fielders.filter((fielder) => isInfielderAttemptRouteBall(fielder, battedBall));
     if (activeInfielders.length) return activeInfielders;
@@ -8419,6 +8426,7 @@ function getEligibleDefenseFielders(fielders, battedBall) {
 function isInfielderReactionRouteBall(fielder, battedBall) {
   if (!fielder || !isInfielderRole(fielder.role)) return false;
   if (!battedBall || (!battedBall.isGrounder && !battedBall.isLiner)) return false;
+  if (battedBall.isLineLiner) return false;
   if (battedBall.isHardOutfieldBounce && !isHardGrounderInfieldPlayable(battedBall)) return false;
   if (isDeepLineLinerPastInfield(battedBall)) return false;
   if (battedBall.wallHit || battedBall.groundRuleDouble || battedBall.fenceOver) return false;
@@ -8429,13 +8437,13 @@ function isInfielderReactionRouteBall(fielder, battedBall) {
   if (getInfielderRouteBodyCatch(fielder, battedBall, point).caught) return true;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
   const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const routeRadius = defenseRangeTuning.closeHardBallRadius + fielding * 10 + (isTemporaryInfielderRole(fielder.role) ? 54 : 24);
-  const linerRouteScale = battedBall.isLiner && isTemporaryInfielderRole(fielder.role) ? 0.78 : 1;
+  const routeRadius = defenseRangeTuning.closeHardBallRadius + fielding * 13 + (isTemporaryInfielderRole(fielder.role) ? 88 : 36);
+  const linerRouteScale = battedBall.isLiner && isTemporaryInfielderRole(fielder.role) ? 0.92 : 1;
   const gapGrounderRouteScale = battedBall.grounderGap && isTemporaryInfielderRole(fielder.role)
     ? clamp(0.72 + fielding * 0.035, 0.78, 1.08)
     : 1;
   const hardGrounderRouteScale = isHardGrounder(battedBall) && isTemporaryInfielderRole(fielder.role)
-    ? 1.86
+    ? 2.18
     : 1;
   const infieldBounceScale = isTemporaryInfielderRole(fielder.role)
     ? isSlowInfieldBounceGrounder(battedBall)
@@ -8443,7 +8451,7 @@ function isInfielderReactionRouteBall(fielder, battedBall) {
       : isMiddleInfieldBounceGrounder(battedBall)
         ? 1.72
         : isSoftInfieldGrounder(battedBall)
-          ? 1.62
+          ? 1.82
           : 1
     : 1;
   return distance <= routeRadius * linerRouteScale * gapGrounderRouteScale * hardGrounderRouteScale * infieldBounceScale;
@@ -8452,11 +8460,13 @@ function isInfielderReactionRouteBall(fielder, battedBall) {
 function isInfielderAttemptRouteBall(fielder, battedBall) {
   if (!fielder || !isInfielderRole(fielder.role)) return false;
   if (!battedBall || (!battedBall.isGrounder && !battedBall.isLiner)) return false;
+  if (battedBall.isLineLiner) return false;
   if (battedBall.isHardOutfieldBounce && !isHardGrounderInfieldPlayable(battedBall)) return false;
   if (isDeepLineLinerPastInfield(battedBall)) return false;
   if (battedBall.wallHit || battedBall.groundRuleDouble || battedBall.fenceOver) return false;
   const landingDistance = battedBall.landingDistance ?? battedBall.flightDistance ?? getFenceDistance(battedBall.target);
-  if (battedBall.isGrounder && landingDistance > defenseField.fenceDistance * 0.64) return false;
+  if (fielder.role === "P" && landingDistance > defenseField.fenceDistance * 0.52) return false;
+  if (battedBall.isGrounder && landingDistance > defenseField.fenceDistance * (isHardGrounder(battedBall) ? 0.78 : 0.64)) return false;
   const point = getClosestPointOnBattedBallRoute(fielder, battedBall);
   const progress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (progress < 0.1 || progress > 0.97) return false;
@@ -8465,10 +8475,10 @@ function isInfielderAttemptRouteBall(fielder, battedBall) {
   const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
   const hardGrounder = isHardGrounder(battedBall);
   const attemptRadius = defenseRangeTuning.closeHardBallRadius
-    + fielding * (hardGrounder ? 24 : 14)
-    + (isTemporaryInfielderRole(fielder.role) ? (hardGrounder ? 238 : 128) : 82)
-    + (battedBall.grounderGap ? 90 : 0)
-    + (hardGrounder && isTemporaryInfielderRole(fielder.role) ? 210 : 0)
+    + fielding * (hardGrounder ? 30 : 18)
+    + (isTemporaryInfielderRole(fielder.role) ? (hardGrounder ? 286 : 158) : 104)
+    + (battedBall.grounderGap ? 126 : 0)
+    + (hardGrounder && isTemporaryInfielderRole(fielder.role) ? 260 : 0)
     + (isMiddleInfieldBounceGrounder(battedBall) && isTemporaryInfielderRole(fielder.role) ? 132 : 0)
     + (isSlowInfieldBounceGrounder(battedBall) && isTemporaryInfielderRole(fielder.role) ? 132 : 0)
     + (isSoftInfieldGrounder(battedBall) && isTemporaryInfielderRole(fielder.role) ? 104 : 0);

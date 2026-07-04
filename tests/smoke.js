@@ -631,6 +631,16 @@ const weakSwingState = JSON.parse(runInGame(
     }, "away");
     const button1Type = swingState.type;
     resetSwing();
+    bases = createEmptyBases();
+    stealState = createStealState();
+    gamepadState.previousButtons.away = new Set();
+    handleGamepadButtonPresses({
+      buttons: [{ pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
+      axes: [0, -1]
+    }, "away");
+    const button1WithStickType = swingState.type;
+    const button1WithStickStealActive = stealState.active;
+    resetSwing();
     gamepadState.previousButtons.away = new Set();
     handleGamepadButtonPresses({
       buttons: [{ pressed: false }, { pressed: false }, { pressed: true }, { pressed: false }],
@@ -644,7 +654,21 @@ const weakSwingState = JSON.parse(runInGame(
       axes: [0, 0]
     }, "away");
     const button3Type = swingState.type;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, twoStrikeBuntFoul, button1Type, button2Type, button3Type });
+    resetSwing();
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner(findById(batters, "shuto"));
+    stealState = createStealState();
+    isPitching = true;
+    pendingPitch = { releaseTime: performance.now() + 200, typeKey: "normal" };
+    currentPitchType = "normal";
+    gamepadState.previousButtons.away = new Set();
+    handleGamepadButtonPresses({
+      buttons: [{ pressed: true }, { pressed: false }, { pressed: false }, { pressed: false }],
+      axes: [0, -1]
+    }, "away");
+    const button0StealActive = stealState.active;
+    const button0StealTarget = stealState.targetBase;
+    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, twoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
   })()`
 ));
 
@@ -660,14 +684,16 @@ assert(weakSwingState.buntProfile.buntLineChance >= 0.85 && weakSwingState.buntP
 assert(weakSwingState.buntBall.isBunt === true && weakSwingState.buntBall.landingDistance >= 180 && weakSwingState.buntBall.landingDistance < 560 && weakSwingState.buntBall.distance < 590, "bunt batted balls should roll longer for pitcher fielding while staying inside the infield");
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
 assert(weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first", "bunts should always become an infield throw play instead of leaking to the outfield");
-assert(weakSwingState.buntProfile.buntFoulChance >= 0.03 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
+assert(weakSwingState.buntProfile.buntFoulChance >= 0.055 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
 assert(weakSwingState.badBuntProfile.buntLineChance < weakSwingState.buntProfile.buntLineChance, "bad bunt contact should reduce first-base and third-base line placement");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "bad bunt contact should often become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
+assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1WithStickStealActive === false, "gamepad button 1 should stay a weak swing even with a direction held");
 assert(weakSwingState.button2Type === "strong", "gamepad button 2 should keep starting the existing strong swing");
 assert(weakSwingState.button3Type === "bunt", "gamepad button 3 should start a bunt swing");
+assert(weakSwingState.button0StealActive === true && weakSwingState.button0StealTarget === "second", "gamepad button 0 plus a direction should start steals instead of weak swings");
 
 const hbpAfterSwingState = JSON.parse(runInGame(
   context,
@@ -3666,7 +3692,7 @@ const pitchSpeedChangeState = JSON.parse(runInGame(
   "JSON.stringify({ actualSpeedBoost: actualPitchSpeedBoost, bendEffect: pitchBendEffect, effect: pitchSpeedChangeEffect, amount: maxPitchSpeedChangeAmount })"
 ));
 
-assert(Math.abs(pitchSpeedChangeState.actualSpeedBoost - (1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2)) < 0.000001, "actual pitch speed should be boosted another twenty percent without changing displayed speed");
+assert(Math.abs(pitchSpeedChangeState.actualSpeedBoost - (1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * 0.8)) < 0.000001, "actual pitch speed should be reduced to eighty percent without changing displayed speed");
 assert(Math.abs(pitchSpeedChangeState.bendEffect - 1.15) < 0.000001, "pitch bend effect should be boosted by fifteen percent");
 assert(Math.abs(pitchSpeedChangeState.effect - (1.05 * 1.15)) < 0.000001, "pitch speed-change effect should be boosted another fifteen percent");
 assert(Math.abs(pitchSpeedChangeState.amount - ((0.0018 + 10 * 0.00072) * 9 * 1.05 * 1.15)) < 0.000001, "pitch speed-change amount should use the boosted effect");
