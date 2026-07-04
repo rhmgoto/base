@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPLEST BASEBALL</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="top-panel">
+      <div>
+        <h1>SIMPLEST BASEBALL</h1>
+        <p>投げる、打つ、守る。少人数制のシンプルな2D野球ゲーム。</p>
+      </div>
+    </header>
+
+    <section class="play-area">
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" width="1280" height="860" aria-label="SIMPLEST BASEBALL ゲーム画面"></canvas>
+
+        <section id="startMenu" class="start-menu" aria-label="ゲーム開始メニュー">
+          <div class="menu-card">
+            <h2>SIMPLEST BASEBALL</h2>
+            <div class="menu-grid">
+              <label class="team-preset-field team-preset-away">
+                <span>チームA 初期チーム</span>
+                <select id="awayPresetSelect">
+                  <option value="tigers" selected>タイガース</option>
+                  <option value="dodgers">ドジャース</option>
+                  <option value="dendos">デンドーズ</option>
+                </select>
+              </label>
+
+              <label class="team-preset-field team-preset-home">
+                <span>チームB 初期チーム</span>
+                <select id="homePresetSelect">
+                  <option value="tigers">タイガース</option>
+                  <option value="dodgers" selected>ドジャース</option>
+                  <option value="dendos">デンドーズ</option>
+                </select>
+              </label>
+
+              <label>
+                モード
+                <select id="modeSelect">
+                  <option value="single">1人用</option>
+                  <option value="versus" selected>2人用</option>
+                  <option value="practice">打撃練習</option>
+                </select>
+              </label>
+
+              <label>
+                先攻
+                <select id="firstBatSelect">
+                  <option value="away" selected>チームA（1P）</option>
+                  <option value="home">チームB（2P）</option>
+                </select>
+              </label>
+
+              <label>
+                試合回数
+                <select id="inningsSelect">
+                  <option value="1" selected>1回</option>
+                  <option value="2">2回</option>
+                  <option value="3">3回</option>
+                  <option value="5">5回</option>
+                </select>
+              </label>
+
+              <label>
+                チームA（1P）守備・走塁
+                <select id="p1DefenseSelect">
+                  <option value="auto" selected>オート</option>
+                  <option value="semiauto">セミオート</option>
+                  <option value="manual">マニュアル</option>
+                </select>
+              </label>
+
+              <label>
+                チームB（2P）守備・走塁
+                <select id="p2DefenseSelect">
+                  <option value="auto" selected>オート</option>
+                  <option value="semiauto">セミオート</option>
+                  <option value="manual">マニュアル</option>
+                </select>
+              </label>
+
+              <label>
+                練習投手
+                <select id="practicePitcherControlSelect">
+                  <option value="auto" selected>オート</option>
+                  <option value="manual">マニュアル</option>
+                </select>
+              </label>
+            </div>
+
+            <section class="practice-select-panel" aria-label="打撃練習の選手選択">
+              <label>
+                練習打者
+                <select id="practiceBatterSelect"></select>
+              </label>
+              <label>
+                練習投手
+                <select id="practicePitcherSelect"></select>
+              </label>
+            </section>
+
+            <div class="menu-status-row">
+              <button id="playerEditorButton" class="player-editor-open-button" type="button">能力値変更</button>
+              <div class="audio-controls menu-audio-controls" aria-label="メニュー音声設定">
+                <button id="menuSoundToggleButton" class="audio-toggle" type="button" aria-pressed="true">効果音 ON</button>
+                <button id="menuBgmToggleButton" class="audio-toggle" type="button" aria-pressed="true">BGM ON</button>
+              </div>
+            </div>
+
+            <div class="team-grid">
+              <section class="team-panel">
+                <div class="team-header">
+                  <h3>チームA（1P）</h3>
+                  <div class="team-header-actions">
+                    <button id="awayTeamAutoButton" class="team-auto-button" type="button">おまかせ</button>
+                    <button id="awayTeamResetButton" class="team-reset-button" type="button">リセット</button>
+                  </div>
+                </div>
+                <div class="team-point-row">
+                  <div id="awayPitcherPointStatus" class="point-status team-point-status pitcher-point-status"></div>
+                  <div id="awayFielderPointStatus" class="point-status team-point-status fielder-point-status"></div>
+                </div>
+                <div class="ability-board">
+                  <article id="awayPitcherCard" class="ability-panel pitcher-panel menu-player-card" data-team="away" data-role="pitcher" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">先発</button><strong id="awayPitcherName"></strong></div>
+                    <div id="awayPitcherStats" class="stat-list"></div>
+                  </article>
+                  <article id="awayPitcher2Card" class="ability-panel pitcher-panel menu-player-card" data-team="away" data-role="pitcher2" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">控え1</button><strong id="awayPitcher2Name"></strong></div>
+                    <div id="awayPitcher2Stats" class="stat-list"></div>
+                  </article>
+                  <article id="awayPitcher3Card" class="ability-panel pitcher-panel menu-player-card" data-team="away" data-role="pitcher3" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">控え2</button><strong id="awayPitcher3Name"></strong></div>
+                    <div id="awayPitcher3Stats" class="stat-list"></div>
+                  </article>
+                  <article id="awayBatterSSCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="SS" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">ショート</button><strong id="awayBatterSSName"></strong></div>
+                    <div id="awayBatterSSStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatter2BCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="2B" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">セカンド</button><strong id="awayBatter2BName"></strong></div>
+                    <div id="awayBatter2BStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatterLCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="L" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">レフト</button><strong id="awayBatterLName"></strong></div>
+                    <div id="awayBatterLStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatterCCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="C" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">センター</button><strong id="awayBatterCName"></strong></div>
+                    <div id="awayBatterCStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatterRCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="R" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">ライト</button><strong id="awayBatterRName"></strong></div>
+                    <div id="awayBatterRStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatterCACard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="CA" data-kind="catcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">捕手</button><strong id="awayBatterCAName"></strong></div>
+                    <div id="awayBatterCAStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="awayBatterDHCard" class="ability-panel batter-panel menu-player-card" data-team="away" data-role="DH" data-kind="hitter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">DH</button><strong id="awayBatterDHName"></strong></div>
+                    <div id="awayBatterDHStats" class="stat-list compact-stats"></div>
+                  </article>
+                </div>
+              </section>
+
+              <section class="team-panel">
+                <div class="team-header">
+                  <h3>チームB（2P）</h3>
+                  <div class="team-header-actions">
+                    <button id="homeTeamAutoButton" class="team-auto-button" type="button">おまかせ</button>
+                    <button id="homeTeamResetButton" class="team-reset-button" type="button">リセット</button>
+                  </div>
+                </div>
+                <div class="team-point-row">
+                  <div id="homePitcherPointStatus" class="point-status team-point-status pitcher-point-status"></div>
+                  <div id="homeFielderPointStatus" class="point-status team-point-status fielder-point-status"></div>
+                </div>
+                <div class="ability-board">
+                  <article id="homePitcherCard" class="ability-panel pitcher-panel menu-player-card" data-team="home" data-role="pitcher" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">先発</button><strong id="homePitcherName"></strong></div>
+                    <div id="homePitcherStats" class="stat-list"></div>
+                  </article>
+                  <article id="homePitcher2Card" class="ability-panel pitcher-panel menu-player-card" data-team="home" data-role="pitcher2" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">控え1</button><strong id="homePitcher2Name"></strong></div>
+                    <div id="homePitcher2Stats" class="stat-list"></div>
+                  </article>
+                  <article id="homePitcher3Card" class="ability-panel pitcher-panel menu-player-card" data-team="home" data-role="pitcher3" data-kind="pitcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">控え2</button><strong id="homePitcher3Name"></strong></div>
+                    <div id="homePitcher3Stats" class="stat-list"></div>
+                  </article>
+                  <article id="homeBatterSSCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="SS" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">ショート</button><strong id="homeBatterSSName"></strong></div>
+                    <div id="homeBatterSSStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatter2BCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="2B" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">セカンド</button><strong id="homeBatter2BName"></strong></div>
+                    <div id="homeBatter2BStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatterLCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="L" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">レフト</button><strong id="homeBatterLName"></strong></div>
+                    <div id="homeBatterLStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatterCCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="C" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">センター</button><strong id="homeBatterCName"></strong></div>
+                    <div id="homeBatterCStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatterRCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="R" data-kind="batter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">ライト</button><strong id="homeBatterRName"></strong></div>
+                    <div id="homeBatterRStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatterCACard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="CA" data-kind="catcher" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">捕手</button><strong id="homeBatterCAName"></strong></div>
+                    <div id="homeBatterCAStats" class="stat-list compact-stats"></div>
+                  </article>
+                  <article id="homeBatterDHCard" class="ability-panel batter-panel menu-player-card" data-team="home" data-role="DH" data-kind="hitter" role="button" tabindex="0">
+                    <div class="ability-title"><button class="position-picker" type="button">DH</button><strong id="homeBatterDHName"></strong></div>
+                    <div id="homeBatterDHStats" class="stat-list compact-stats"></div>
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <div class="menu-actions">
+              <button id="startButton" type="button">試合開始</button>
+              <button id="practiceStartButton" type="button">打撃練習開始</button>
+            </div>
+            <section id="playerChooser" class="player-chooser hidden" aria-label="選手一覧">
+              <div class="chooser-header">
+                <h3 id="chooserTitle">選手を選ぶ</h3>
+                <button id="chooserClose" type="button">閉じる</button>
+              </div>
+              <div id="chooserOptions" class="chooser-options"></div>
+            </section>
+            <section id="playerEditor" class="player-editor hidden" aria-label="能力値変更">
+              <div class="editor-header">
+                <h3 id="playerEditorTitle">能力値変更</h3>
+                <button id="playerEditorClose" type="button">閉じる</button>
+              </div>
+              <div class="editor-toolbar">
+                <label>
+                  種類
+                  <select id="playerEditorKind">
+                    <option value="batter" selected>野手</option>
+                    <option value="pitcher">投手</option>
+                  </select>
+                </label>
+                <button id="playerEditorNewButton" type="button">新規選手</button>
+                <button id="playerEditorResetButton" type="button">初期値に戻す</button>
+              </div>
+              <div class="editor-body">
+                <div id="playerEditorList" class="editor-player-list"></div>
+                <form id="playerEditorForm" class="editor-form"></form>
+              </div>
+              <div id="playerEditorStatus" class="editor-status" aria-live="polite"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <aside class="side-panel">
+        <section class="side-actions">
+          <button id="menuButton" class="menu-button" type="button">メインメニューに戻る</button>
+          <div id="pitcherChangeControls" class="pitcher-change-controls"></div>
+          <div class="audio-controls" aria-label="音声設定">
+            <button id="soundToggleButton" class="audio-toggle" type="button" aria-pressed="true">効果音 ON</button>
+            <button id="bgmToggleButton" class="audio-toggle" type="button" aria-pressed="true">BGM ON</button>
+          </div>
+          <div class="mode-note">O: 1人用 / T: 2人用 / R: メニューへ</div>
+        </section>
+
+        <section class="sidebar-abilities" aria-label="試合中の能力表示">
+          <article class="ability-panel pitcher-panel">
+            <div class="ability-title"><span>投手能力</span><strong id="activePitcherName"></strong></div>
+            <div id="activePitcherStats" class="stat-list"></div>
+          </article>
+
+          <article class="ability-panel batter-panel">
+            <div class="ability-title"><span>打者能力</span><strong id="activeBatterName"></strong></div>
+            <div id="activeBatterStats" class="stat-list"></div>
+          </article>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
