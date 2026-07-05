@@ -255,7 +255,7 @@ const stealTuning = {
   earlyJumpPenalty: 0.42
 };
 const battingFeedbackDisplayPenalty = 0.1;
-const battingPracticeHomerBoostMultiplier = 2.56;
+const battingPracticeHomerBoostMultiplier = 4.2;
 const oppositeHandedBattingAdvantageMultiplier = 1.2;
 const buntTuning = {
   goodQuality: 0.68,
@@ -274,11 +274,11 @@ const buntTuning = {
   foulMin: 0.055,
   foulMax: 0.3,
   popupBase: 0.14,
-  popupBadContactScale: 0.68,
-  popupTimingScale: 0.12,
-  popupMin: 0.14,
-  popupMax: 0.82,
-  forcePopupBadScore: 0.68
+  popupBadContactScale: 0.82,
+  popupTimingScale: 0.18,
+  popupMin: 0.22,
+  popupMax: 0.9,
+  forcePopupBadScore: 0.56
 };
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
@@ -376,6 +376,13 @@ const defenseField = {
     second: { x: field.plateX, y: -208 },
     third: { x: -72, y: 290 }
   }
+};
+
+const realFieldMetrics = {
+  pitcherToPlateMeters: 18.44,
+  leftRightFieldFenceMeters: 95,
+  centerFieldFenceMeters: 118,
+  fairLineAngleDegrees: 55
 };
 
 const battedBallSpeedMultiplier = {
@@ -4308,9 +4315,10 @@ function applyOutfieldHitGrounderReduction(result, profile, roll = Math.random()
 function shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll = Math.random()) {
   if (gameMode !== "practice" || !activePitcher?.practiceOnly || getCurrentSwingType() === "bunt") return false;
   if (!contact?.inGoodContactZone || contact.outsideStrikeZone || profile?.isFoul) return false;
-  if ((contact.quality ?? 0) < 0.42 || (contact.timingScore ?? 0) < 0.52 || (contact.sweetSpotScore ?? 0) < 0.48 || (contact.barrelScore ?? 0) < 0.48) return false;
+  if ((contact.quality ?? 0) < 0.34 || (contact.timingScore ?? 0) < 0.42 || (contact.sweetSpotScore ?? 0) < 0.38 || (contact.barrelScore ?? 0) < 0.38) return false;
   const powerDrive = getPowerDriveScore(getEffectiveBatterPower(activeBatter));
-  const chance = clamp(0.34 + feedbackScore * 0.62 + powerDrive * 0.18, 0.42, 0.94);
+  const practicePower = clamp(((profile?.power ?? 1) - 1.1) / 1.1, 0, 1) * 0.12;
+  const chance = clamp(0.58 + feedbackScore * 0.42 + powerDrive * 0.18 + practicePower, 0.68, 0.98);
   return roll < chance;
 }
 
@@ -4318,13 +4326,13 @@ function makeBattingPracticeHomeRunResult(profile, feedbackScore = profile?.feed
   const boostedProfile = {
     ...profile,
     battingPracticeHomerCandidate: true,
-    feedbackScore: Math.max(feedbackScore, profile.feedbackScore ?? 0, 0.74),
-    power: Math.max(profile.power ?? 1, 1.86),
-    exitVelocity: Math.max(profile.exitVelocity ?? 0.9, 1.28),
-    carry: Math.max(profile.carry ?? 0.9, 1.42),
-    launchAngle: clamp(profile.launchAngle ?? 30, 24, 38),
-    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 0.94),
-    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.64)
+    feedbackScore: Math.max(feedbackScore, profile.feedbackScore ?? 0, 0.86),
+    power: Math.max(profile.power ?? 1, 2.35),
+    exitVelocity: Math.max(profile.exitVelocity ?? 0.9, 1.52),
+    carry: Math.max(profile.carry ?? 0.9, 1.72),
+    launchAngle: clamp(profile.launchAngle ?? 32, 26, 42),
+    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 1),
+    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.78)
   };
   return makeDeepDriveResultFromProfile(boostedProfile);
 }
@@ -5382,7 +5390,8 @@ function buildBattedBallProfile(contact) {
       buntTuning.popupMin,
       buntTuning.popupMax
     );
-    const pitcherBuntPopup = !goodBunt && !buntIsFoul && (badBuntScore >= buntTuning.forcePopupBadScore || Math.random() < pitcherBuntPopupChance);
+    const pitcherBuntPopup = !goodBunt && !isFoul && (badBuntScore >= buntTuning.forcePopupBadScore || Math.random() < pitcherBuntPopupChance);
+    const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance
@@ -5417,7 +5426,7 @@ function buildBattedBallProfile(contact) {
       outsideZoneDrag,
       pitchQualityBoost,
       yellowZoneBoost,
-      isFoul: buntIsFoul,
+      isFoul: finalBuntIsFoul,
       buntQuality,
       buntLineChance: lineChance,
       buntFoulChance,
@@ -6583,9 +6592,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
 
 function appendPracticeBattedBallFeedback(battedBall) {
   if (gameMode !== "practice" || !battingFeedback.active || !battedBall) return;
-  const launchAngle = Number.isFinite(battedBall.battedProfile?.launchAngle)
-    ? Math.round(battedBall.battedProfile.launchAngle)
-    : Math.round(getBattedBallApproxLaunchAngle(battedBall));
+  const launchAngle = getDisplayLaunchAngleDegrees(battedBall);
   const exitSpeed = battedBall.exitSpeedKmh ?? getDisplayExitSpeedKmh({
     power: battedBall.power,
     profile: battedBall.battedProfile,
@@ -6595,12 +6602,25 @@ function appendPracticeBattedBallFeedback(battedBall) {
     isDeepDrive: battedBall.isDeepDrive,
     isFenceLiner: battedBall.isFenceLiner,
     isLineEdgeGrounder: battedBall.isLineEdgeGrounder,
-    fenceOver: battedBall.fenceOver
+    fenceOver: battedBall.fenceOver,
+    flightDistanceMeters: battedBall.flightDistanceMeters,
+    ballTime: battedBall.ballTime,
+    launchAngle
   });
   battingFeedback.lines = [
     ...(battingFeedback.lines || []),
     `打球速度: ${exitSpeed}km/h / 打球角度: ${launchAngle}° / 飛距離: ${Math.round(battedBall.flightDistanceMeters ?? getBattedBallDistanceMeters(battedBall.flightDistance ?? 0))}m`
   ];
+}
+
+function getDisplayLaunchAngleDegrees(battedBall) {
+  if (Number.isFinite(battedBall?.launchAngleDegrees)) {
+    return Math.round(battedBall.launchAngleDegrees);
+  }
+  if (Number.isFinite(battedBall?.battedProfile?.launchAngle)) {
+    return Math.round(clamp(battedBall.battedProfile.launchAngle, -20, 70));
+  }
+  return Math.round(getBattedBallApproxLaunchAngle(battedBall));
 }
 
 function getBattedBallApproxLaunchAngle(battedBall) {
@@ -7952,6 +7972,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const isFenceEdgeFly = label === hitLabels.fenceEdgeFly;
   const isSuperDeepDrive = label === superDeepDriveLabel || (label === deepDriveLabel && power >= 2.45);
   const isDeepDrive = label === deepDriveLabel || isSuperDeepDrive;
+  const isBattingPracticeHomerCandidate = Boolean(battedProfile?.battingPracticeHomerCandidate);
   if (isLineLiner) {
     direction = getLineLinerDirection({ ...(battedProfile || {}), direction });
   }
@@ -8004,9 +8025,13 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isRoutineFly
     ? randomBetween(1200, 1700)
     : 180 + Math.pow(Math.max(power, 0.08), 0.86) * 1040;
+  const battingPracticeHomerDistanceBonus = isBattingPracticeHomerCandidate && isDeepDrive
+    ? fenceDistance * 0.24 + Math.max(0, profileExitVelocity - 1.1) * 260 + Math.max(0, profileCarry - 1.05) * 260
+    : 0;
+  const boostedRawDistance = rawDistance + battingPracticeHomerDistanceBonus;
   const distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
-    ? rawDistance * bigOutfieldFlyDistanceScale
-    : rawDistance;
+    ? boostedRawDistance * (isBattingPracticeHomerCandidate ? 1.04 : bigOutfieldFlyDistanceScale)
+    : boostedRawDistance;
   const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (label === hitLabels.grounder || power < 0.38));
   const isLiner = isHardOutfieldBounce || isCenterReturnLiner || isLineEdge || isLineLiner || isLineDrop || isFenceLiner || (isDeepDrive && !isSuperDeepDrive) || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
   const trajectory = isGrounder ? "grounder" : isLiner ? "liner" : "fly";
@@ -8122,7 +8147,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     maxHeight: possibleHomerHeight,
     trajectory
   }) >= defenseField.fenceHeight;
-  if (battedProfile?.battingPracticeHomerCandidate && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 24) {
+  if (isBattingPracticeHomerCandidate && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 180) {
     fenceOver = true;
   }
   const reducedPowerHitterHomer = shouldReducePowerHitterHomeRunToWallHit({
@@ -8197,9 +8222,37 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       }, 42)
     : null;
   const ballTime = baseBallTime / (ballSpeedMultiplier * battedBallPaceMultiplier) + flightDistance / baseBallSpeed;
-  const exitSpeedKmh = getDisplayExitSpeedKmh({ power, profile: battedProfile, trajectory, isGrounder, isLiner, isDeepDrive, isFenceLiner, isLineEdgeGrounder, fenceOver });
-  const flightDistanceMeters = getBattedBallDistanceMeters(flightDistance);
-  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble: false, ballTime, maxHeight, wallImpactHeight };
+  const flightDistanceMeters = getBattedBallDistanceMeters(flightDistance, {
+    direction,
+    fenceTravelDistance
+  });
+  const maxHeightMeters = getBattedBallDistanceMeters(maxHeight, {
+    direction,
+    fenceTravelDistance
+  });
+  const launchAngleDegrees = getBattedBallLaunchAngleDegrees({
+    trajectory,
+    isGrounder,
+    isLineEdgeGrounder,
+    maxHeightMeters,
+    flightDistanceMeters,
+    profileLaunchAngle: battedProfile?.launchAngle
+  });
+  const exitSpeedKmh = getDisplayExitSpeedKmh({
+    power,
+    profile: battedProfile,
+    trajectory,
+    isGrounder,
+    isLiner,
+    isDeepDrive,
+    isFenceLiner,
+    isLineEdgeGrounder,
+    fenceOver,
+    flightDistanceMeters,
+    ballTime,
+    launchAngle: launchAngleDegrees
+  });
+  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, maxHeightMeters, launchAngleDegrees, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble: false, ballTime, maxHeight, wallImpactHeight };
 }
 
 function getSolidContactSpeedLift(contactScore = 0.5, exitVelocity = 0.6) {
@@ -8254,7 +8307,7 @@ function getHomeRunBallSpeedScale({ contactScore = 0.5, profileExitVelocity = 1,
   return clamp(0.72 + quality * 0.22 + clearance * 0.14, 0.72, 1.08);
 }
 
-function getDisplayExitSpeedKmh({ power = 0.5, profile = null, trajectory = "liner", isGrounder = false, isLiner = false, isDeepDrive = false, isFenceLiner = false, isLineEdgeGrounder = false, fenceOver = false } = {}) {
+function getDisplayExitSpeedKmh({ power = 0.5, profile = null, trajectory = "liner", isGrounder = false, isLiner = false, isDeepDrive = false, isFenceLiner = false, isLineEdgeGrounder = false, fenceOver = false, flightDistanceMeters = null, ballTime = null, launchAngle = null } = {}) {
   const exitVelocity = clamp(profile?.exitVelocity ?? power, 0.08, 1.85);
   const feedbackScore = clamp(profile?.feedbackScore ?? profile?.quality ?? 0.5, 0, 1);
   const trajectoryBonus = isLineEdgeGrounder ? 6 : isGrounder ? -4 : isLiner ? 8 : 0;
@@ -8263,13 +8316,68 @@ function getDisplayExitSpeedKmh({ power = 0.5, profile = null, trajectory = "lin
   const homeRunFloatPenalty = fenceOver && trajectory === "fly"
     ? 12 * (1 - getHomeRunQuality({ contactScore: feedbackScore, profileExitVelocity: exitVelocity, power }))
     : 0;
-  const speed = 72 + exitVelocity * 54 + feedbackScore * 28 + trajectoryBonus + strongBonus + solidContactBonus - homeRunFloatPenalty;
-  return Math.round(clamp(isDeepDrive ? speed * deepDriveBallSpeedScale : speed, 70, 210));
+  const contactSpeed = 72 + exitVelocity * 54 + feedbackScore * 28 + trajectoryBonus + strongBonus + solidContactBonus - homeRunFloatPenalty;
+  const measuredSpeed = getMeasuredExitSpeedKmh({
+    flightDistanceMeters,
+    ballTime,
+    launchAngle: Number.isFinite(launchAngle) ? launchAngle : profile?.launchAngle,
+    isGrounder,
+    isLiner,
+    fenceOver
+  });
+  const speed = Number.isFinite(measuredSpeed)
+    ? measuredSpeed * 0.82 + contactSpeed * 0.18
+    : contactSpeed;
+  const displaySpeed = Number.isFinite(measuredSpeed) ? speed : isDeepDrive ? speed * deepDriveBallSpeedScale : speed;
+  return Math.round(clamp(displaySpeed, 55, 195));
 }
 
-function getBattedBallDistanceMeters(distance) {
-  const metersPerFieldUnit = 120 / defenseField.fenceDistance;
-  return Math.round(Math.max(0, distance) * metersPerFieldUnit * 0.9);
+function getMeasuredExitSpeedKmh({ flightDistanceMeters = null, ballTime = null, launchAngle = null, isGrounder = false, isLiner = false, fenceOver = false } = {}) {
+  if (!Number.isFinite(flightDistanceMeters) || flightDistanceMeters <= 0) return null;
+  if (isGrounder) return null;
+  const angle = clamp(Math.abs(Number.isFinite(launchAngle) ? launchAngle : isLiner ? 16 : 26), 4, 48);
+  const sin2Theta = Math.sin(degreesToRadians(angle * 2));
+  const projectileSpeed = sin2Theta > 0.12
+    ? Math.sqrt((flightDistanceMeters * 9.80665) / sin2Theta) * 3.6
+    : null;
+  if (!Number.isFinite(projectileSpeed)) return null;
+  const trajectoryFactor = fenceOver ? 1.18 : isLiner ? 1.32 : 1.12;
+  return projectileSpeed * trajectoryFactor;
+}
+
+function getBattedBallDistanceMeters(distance, options = {}) {
+  const metersPerFieldUnit = getMetersPerBattedBallFieldUnit(options);
+  return Math.round(Math.max(0, distance) * metersPerFieldUnit);
+}
+
+function getBattedBallLaunchAngleDegrees({ trajectory = "liner", isGrounder = false, isLineEdgeGrounder = false, maxHeightMeters = null, flightDistanceMeters = null, profileLaunchAngle = null } = {}) {
+  if (isGrounder || isLineEdgeGrounder || trajectory === "grounder") {
+    return Math.round(clamp(Number.isFinite(profileLaunchAngle) ? profileLaunchAngle : -2, -8, 5));
+  }
+  if (Number.isFinite(maxHeightMeters) && maxHeightMeters > 0 && Number.isFinite(flightDistanceMeters) && flightDistanceMeters > 0) {
+    const visualAngle = radiansToDegrees(Math.atan((4 * maxHeightMeters) / flightDistanceMeters));
+    return Math.round(clamp(visualAngle, 4, 58));
+  }
+  return Math.round(clamp(Number.isFinite(profileLaunchAngle) ? profileLaunchAngle : 16, -8, 58));
+}
+
+function getMetersPerBattedBallFieldUnit({ direction = null, fenceTravelDistance = null } = {}) {
+  const actualFenceMeters = getActualFenceDistanceMetersForDirection(direction);
+  const fieldFenceUnits = Number.isFinite(fenceTravelDistance) && fenceTravelDistance > 0
+    ? fenceTravelDistance
+    : defenseField.fenceDistance;
+  return actualFenceMeters / fieldFenceUnits;
+}
+
+function getActualFenceDistanceMetersForDirection(direction = null) {
+  if (!direction || !Number.isFinite(direction.x) || !Number.isFinite(direction.y)) {
+    return realFieldMetrics.centerFieldFenceMeters;
+  }
+  const lateralRatio = clamp(Math.abs(direction.x), 0, Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)));
+  const foulRatio = Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees));
+  const towardLine = Math.pow(clamp(lateralRatio / foulRatio, 0, 1), 1.15);
+  return realFieldMetrics.centerFieldFenceMeters
+    - (realFieldMetrics.centerFieldFenceMeters - realFieldMetrics.leftRightFieldFenceMeters) * towardLine;
 }
 
 function getBattedBallMetricText(battedBall) {
@@ -12756,6 +12864,10 @@ function normalize(vector) {
 
 function degreesToRadians(degrees) {
   return degrees * Math.PI / 180;
+}
+
+function radiansToDegrees(radians) {
+  return radians * 180 / Math.PI;
 }
 
 function batterAngleToCanvasRadians(degreesFromUp) {

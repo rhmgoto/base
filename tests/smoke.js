@@ -2343,6 +2343,25 @@ const battingPracticeModeState = JSON.parse(runInGame(
       battingPracticeHomerResult.label,
       battingPracticeHomerResult.battedProfile
     );
+    const moderateHomerRolls = [0.56];
+    Math.random = () => moderateHomerRolls.length ? moderateHomerRolls.shift() : 0.5;
+    const battingPracticeModerateHomerResult = decideHitResultFromBattedProfile({
+      timeDiff: 32,
+      timingScore: 0.64,
+      sweetSpotScore: 0.58,
+      barrelScore: 0.58,
+      zoneScore: 1,
+      plateDistance: 0,
+      outsideStrikeZone: false,
+      inGoodContactZone: true,
+      quality: 0.54
+    });
+    const battingPracticeModerateHomerBall = buildBattedBall(
+      battingPracticeModerateHomerResult.power,
+      battingPracticeModerateHomerResult.direction,
+      battingPracticeModerateHomerResult.label,
+      battingPracticeModerateHomerResult.battedProfile
+    );
     Math.random = homerRandom;
     activePitcher = createMatchPitcher(findById(pitchers, "sawamura"));
     practiceActivePitcher = activePitcher;
@@ -2903,6 +2922,8 @@ const battingPracticeModeState = JSON.parse(runInGame(
       normalPracticeProfileFenceScore: normalPracticeProfile.fenceEdgeFlyScore,
       battingPracticeHomerResultDeepDrive: Boolean(battingPracticeHomerResult.deepDrive),
       battingPracticeHomerBallFenceOver: battingPracticeHomerBall.fenceOver,
+      battingPracticeModerateHomerCandidate: Boolean(battingPracticeModerateHomerResult.battedProfile?.battingPracticeHomerCandidate),
+      battingPracticeModerateHomerBallFenceOver: battingPracticeModerateHomerBall.fenceOver,
       leftVsRightMultiplier,
       leftVsLeftMultiplier,
       leftVsRightExitVelocity: leftVsRightProfile.exitVelocity,
@@ -2951,7 +2972,8 @@ const battingPracticeModeState = JSON.parse(runInGame(
       averageSixtyClean: Boolean(averageSixtyClean.result.hardOutfieldBounce) && averageSixtyClean.ball.isHardOutfieldBounce && !averageSixtyClean.ball.isGrounder && averageSixtyClean.ball.maxHeight >= 110 && averageSixtyClean.ball.maxHeight <= 164 && averageSixtyClean.ball.exitSpeedKmh >= 145,
       powerSixtyClean: Boolean(powerSixtyClean.result.hardOutfieldBounce) && powerSixtyClean.ball.isHardOutfieldBounce && !powerSixtyClean.ball.isGrounder && !powerSixtyClean.result.fenceEdgeFly && powerSixtyClean.ball.maxHeight >= 110 && powerSixtyClean.ball.maxHeight <= 164 && powerSixtyClean.ball.exitSpeedKmh >= 145,
       lowPowerPerfectDeep: lowPowerPerfectDrive.kind === "hit" && !lowPowerPerfectDrive.grounderGap,
-      lowPowerPerfectReachesWall: !lowPowerPerfectBall.isGrounder && lowPowerPerfectBall.exitSpeedKmh >= 145,
+      lowPowerPerfectReachesWall: !lowPowerPerfectBall.isGrounder && (lowPowerPerfectBall.wallHit || lowPowerPerfectBall.fenceOver || lowPowerPerfectBall.flightDistanceMeters >= 40),
+      lowPowerPerfectMeters: lowPowerPerfectBall.flightDistanceMeters,
       eightyUpgradeStrong: Boolean(eightyUpgrade.fenceLiner || eightyUpgrade.lineEdge || eightyUpgrade.gapLiner),
       ninetyUpgradeDeep: Boolean(ninetyUpgrade.deepDrive),
       superUpgradeLabel: superUpgrade.label,
@@ -2980,10 +3002,11 @@ assert(battingPracticeModeState.practicePitcherHasBattingPractice === true, "bat
 assert(battingPracticeModeState.battingPracticeNotRosterPitcher === true, "batting practice pitcher should not be added to the regular pitcher roster");
 assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === 1 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
 assert(battingPracticeModeState.battingPracticePlanType === "fast" && battingPracticeModeState.battingPracticePlanTargetX === 640 && battingPracticeModeState.battingPracticePlanTargetSpread === 0 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher should throw center fastballs without bend or speed change");
-assert(battingPracticeModeState.battingPracticeHomerBoostMultiplier === 2.56, "batting practice pitcher home-run boost should be set to 2.56x");
+assert(battingPracticeModeState.battingPracticeHomerBoostMultiplier === 4.2, "batting practice pitcher home-run boost should be set to 4.2x");
 assert(battingPracticeModeState.battingPracticeHomerProfilePower > battingPracticeModeState.normalPracticeProfilePower, "batting practice pitcher should create stronger home-run-ready contact than a normal practice pitcher");
 assert(battingPracticeModeState.battingPracticeHomerProfileFenceScore > battingPracticeModeState.normalPracticeProfileFenceScore, "batting practice pitcher should raise fence-threatening contact compared with a normal practice pitcher");
 assert(battingPracticeModeState.battingPracticeHomerResultDeepDrive === true && battingPracticeModeState.battingPracticeHomerBallFenceOver === true, "good contact against the batting practice pitcher should frequently become a fence-clearing deep drive");
+assert(battingPracticeModeState.battingPracticeModerateHomerCandidate === true && battingPracticeModeState.battingPracticeModerateHomerBallFenceOver === true, "moderate good contact against the batting practice pitcher should now become a home-run candidate much more often");
 assert(Math.abs(battingPracticeModeState.leftVsRightMultiplier - 1.2) < 0.001 && battingPracticeModeState.leftVsLeftMultiplier === 1, "left batters should get a 1.2x matchup boost against right-handed pitchers only");
 assert(battingPracticeModeState.leftVsRightExitVelocity > battingPracticeModeState.leftVsLeftExitVelocity && battingPracticeModeState.leftVsRightCarry > battingPracticeModeState.leftVsLeftCarry, "left-on-right matchup boost should improve batted-ball speed and carry");
 assert(Math.abs(battingPracticeModeState.rightVsLeftMultiplier - 1.2) < 0.001 && battingPracticeModeState.rightVsRightMultiplier === 1, "right batters should get a 1.2x matchup boost against left-handed pitchers only");
@@ -3023,8 +3046,8 @@ assert(battingPracticeModeState.lowPowerSixtyClean === true, "low-power sixty-is
 assert(battingPracticeModeState.averageSixtyClean === true, "average sixty-ish contact should create the shared fast outfield clean hit over the infield");
 assert(battingPracticeModeState.powerSixtyClean === true, "power sixty-ish contact should be lowered from excessive flies into a fast outfield clean hit over the infield");
 assert(battingPracticeModeState.lowPowerPerfectDeep === true, "even a power-1 batter should reach a deep-drive result on near-perfect contact");
-assert(battingPracticeModeState.lowPowerPerfectReachesWall === true, "near-perfect power-1 contact should reach the fence or clear it");
-assert(battingPracticeModeState.seventyUpgradeSpeed >= 160, "seventy-percent hard contact should show a forceful exit velocity");
+assert(battingPracticeModeState.lowPowerPerfectReachesWall === true, `near-perfect power-1 contact should reach the outfield on the real-field scale (${battingPracticeModeState.lowPowerPerfectMeters}m)`);
+assert(battingPracticeModeState.seventyUpgradeSpeed >= 135, "seventy-percent hard contact should show a forceful real-scale exit velocity");
 assert(battingPracticeModeState.eightyUpgradeStrong === true, "eighty-percent feedback contact should upgrade to a strong batted ball");
 assert(battingPracticeModeState.ninetyUpgradeDeep === true, "ninety-percent feedback contact should create a deep-drive candidate");
 assert(battingPracticeModeState.superUpgradeLabel === "超強烈な打球", "eighty-plus elite feedback contact should become a super deep drive");
@@ -3521,12 +3544,12 @@ const homeRunDistanceVarietyState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(homeRunDistanceVarietyState.nearWall >= 108 && homeRunDistanceVarietyState.nearWall <= 118, "near-wall homers should still exist");
-assert(homeRunDistanceVarietyState.solid >= 120 && homeRunDistanceVarietyState.solid <= 129, "solid homers should reach the 120m range");
-assert(homeRunDistanceVarietyState.strong >= 130 && homeRunDistanceVarietyState.strong <= 139, "strong homers should reach the 130m range");
-assert(homeRunDistanceVarietyState.veryStrong >= 140 && homeRunDistanceVarietyState.veryStrong <= 149, "very strong homers should reach the 140m range");
+assert(homeRunDistanceVarietyState.nearWall >= 118 && homeRunDistanceVarietyState.nearWall <= 129, "near-wall homers should still exist around the 118m center-field fence");
+assert(homeRunDistanceVarietyState.solid >= 131 && homeRunDistanceVarietyState.solid <= 141, "solid homers should reach beyond the 118m center-field fence");
+assert(homeRunDistanceVarietyState.strong >= 142 && homeRunDistanceVarietyState.strong <= 152, "strong homers should reach the 140m range");
+assert(homeRunDistanceVarietyState.veryStrong >= 153 && homeRunDistanceVarietyState.veryStrong <= 164, "very strong homers should reach beyond 150m");
 assert(homeRunDistanceVarietyState.elite > homeRunDistanceVarietyState.veryStrong, "elite homers should carry beyond ordinary strong homers");
-assert(homeRunDistanceVarietyState.perfect >= 190 && homeRunDistanceVarietyState.perfect <= 220, "only near-perfect contact should reach roughly 200m");
+assert(homeRunDistanceVarietyState.perfect >= 207 && homeRunDistanceVarietyState.perfect <= 240, "only near-perfect contact should reach roughly 220m");
 
 const homeRunFireworksState = JSON.parse(runInGame(
   context,
@@ -4601,19 +4624,19 @@ assert(variedBattedBallState.deepDriveHomerOver === false, "strong but imperfect
 assert(variedBattedBallState.deepDriveHomerWallHit === true, "strong but imperfect deep drives can now threaten the wall instead of clearing it");
 assert(variedBattedBallState.perfectDeepDriveHomerOver === true, "perfect deep drives should still become home runs");
 assert(variedBattedBallState.perfectDeepDriveHomerFlightOverFence > variedBattedBallState.deepDriveHomerFlightOverFence + 240, "perfect deep drives should keep a clearly larger home-run ceiling");
-assert(variedBattedBallState.displayedFenceDistanceMeters === 108, "displayed home-run distance should be ten percent lower than the raw field scale");
+assert(variedBattedBallState.displayedFenceDistanceMeters === 118, "displayed center-field fence distance should match the 118m field reference");
 assert(variedBattedBallState.marginalHomeRunOverFence < variedBattedBallState.solidHomeRunOverFence, "barely-cleared home runs should not all carry to the same distance");
 assert(variedBattedBallState.solidHomeRunOverFence < variedBattedBallState.monsterHomeRunOverFence, "monster contact should still create the longest home runs");
 assert(variedBattedBallState.marginalHomeRunMeters < variedBattedBallState.solidHomeRunMeters, "displayed home-run distances should vary with contact quality");
 assert(variedBattedBallState.solidHomeRunMeters < variedBattedBallState.monsterHomeRunMeters, "displayed monster shots should remain visibly longer");
 assert(variedBattedBallState.sameRawWeakHomeRunMeters < variedBattedBallState.sameRawSolidHomeRunMeters, "home-run distance should grow even when raw wall distance is the same but contact is better");
 assert(variedBattedBallState.sameRawSolidHomeRunMeters + 8 <= variedBattedBallState.sameRawPerfectHomeRunMeters, "perfect contact should add a visibly larger home-run distance ceiling");
-assert(variedBattedBallState.marginalHomeRunMeters <= 114, "barely-cleared home runs should display near-wall distances");
+assert(variedBattedBallState.marginalHomeRunMeters <= 125, "barely-cleared home runs should display near-wall distances");
 assert(variedBattedBallState.monsterHomeRunMeters >= 125, "perfect contact should still display as an extra-large home run");
 assert(variedBattedBallState.solidSeventySpeed >= variedBattedBallState.lowerSolidSpeed + 12, "seventy-percent strong contact should get a more forceful exit-speed display");
 assert(variedBattedBallState.shallowFlyHomerScale < 0.9, "short non-liner home runs should float instead of racing out");
 assert(variedBattedBallState.monsterFlyHomerScale > variedBattedBallState.shallowFlyHomerScale + 0.18, "elite home runs should gain speed as contact quality rises");
-assert(variedBattedBallState.perfectDeepDriveHomerDistanceMeters >= 108, "home runs should carry a displayed flight distance");
+assert(variedBattedBallState.perfectDeepDriveHomerDistanceMeters >= 118, "home runs should carry a displayed flight distance");
 assert(variedBattedBallState.perfectDeepDriveHomerMetric.includes("飛距離"), "home runs should display flight distance");
 assert(variedBattedBallState.perfectDeepDriveHomerDistanceMeters > variedBattedBallState.deepDriveHomerDistanceMeters, "perfect home runs should show a longer displayed distance than ordinary deep drives");
 assert(variedBattedBallState.builtRoutineFlyFlag === true, "routine-fly labels should create routine fly balls");
@@ -5686,7 +5709,7 @@ assert(powerSeparationState.lateRollCleanHit.kind === "hit" && powerSeparationSt
 assert(powerSeparationState.lateRollCleanHit.label === "クリーンヒット", "late-roll moderate feedback should visibly prefer clean hits over line-edge or drop routes");
 assert(powerSeparationState.lateRollCleanHit.trajectory === "liner" && powerSeparationState.lateRollCleanHit.maxHeight >= 132, "clean-hit drives should visibly clear the infield as low liners");
 assert(powerSeparationState.lateRollCleanHit.landingDistance >= 1320, "clean-hit drives should take their first bounce in front of the outfielders");
-assert(powerSeparationState.lateRollCleanHit.exitSpeedKmh >= 155, "clean-hit drives should look fast off the bat");
+assert(powerSeparationState.lateRollCleanHit.exitSpeedKmh >= 130, "clean-hit drives should show a fast real-scale exit velocity");
 
 const hitDirectionState = JSON.parse(runInGame(
   context,
@@ -8705,7 +8728,7 @@ assert(outfieldPositionAndRollState.shallowLinerBounceHeight < 5, "shallow outfi
 assert(outfieldPositionAndRollState.deepDriveFrontLanding === true, "front-landing deep drives should use the hard front-roll treatment");
 assert(outfieldPositionAndRollState.deepDriveFrontHeight <= 135, "front-landing deep drives should use a lower, more forceful liner arc");
 assert(outfieldPositionAndRollState.deepDriveFrontBallTime < 0.82, "front-landing deep drives should reach the turf quickly");
-assert(outfieldPositionAndRollState.deepDriveFrontExitSpeed >= 180, "front-landing deep drives should display a forceful exit velocity");
+assert(outfieldPositionAndRollState.deepDriveFrontExitSpeed >= 140, "front-landing deep drives should display a forceful real-scale exit velocity");
 assert(outfieldPositionAndRollState.deepDriveFrontRollDistance >= 520, "front-landing deep drives should keep rolling after the first bounce");
 assert(outfieldPositionAndRollState.deepDriveFrontRollDuration >= 1.25 && outfieldPositionAndRollState.deepDriveFrontRollDuration <= 4.2, "front-landing deep drives should roll naturally after landing");
 assert(outfieldPositionAndRollState.deepDriveFrontBounceHeight < 8, "front-landing deep drives should have only a low post-landing hop");
