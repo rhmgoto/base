@@ -278,7 +278,11 @@ const buntTuning = {
   popupTimingScale: 0.18,
   popupMin: 0.22,
   popupMax: 0.9,
-  forcePopupBadScore: 0.56
+  forcePopupBadScore: 0.56,
+  solidContactQuality: 0.48,
+  solidContactTiming: 0.46,
+  solidContactSweetSpot: 0.44,
+  solidContactPopupReduction: 0.76
 };
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
@@ -5390,7 +5394,21 @@ function buildBattedBallProfile(contact) {
       buntTuning.popupMin,
       buntTuning.popupMax
     );
-    const pitcherBuntPopup = !goodBunt && !isFoul && (badBuntScore >= buntTuning.forcePopupBadScore || Math.random() < pitcherBuntPopupChance);
+    const solidBuntContact = buntQuality >= buntTuning.solidContactQuality
+      && timingScore >= buntTuning.solidContactTiming
+      && sweetSpotScore >= buntTuning.solidContactSweetSpot;
+    const popupProtection = solidBuntContact
+      ? clamp(
+          ((buntQuality - buntTuning.solidContactQuality) / 0.28)
+            + ((timingScore - buntTuning.solidContactTiming) / 0.42) * 0.5
+            + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.5,
+          0,
+          1
+        )
+      : 0;
+    const protectedPopupChance = pitcherBuntPopupChance * (1 - popupProtection * buntTuning.solidContactPopupReduction);
+    const forcePopup = badBuntScore >= buntTuning.forcePopupBadScore && !solidBuntContact;
+    const pitcherBuntPopup = !goodBunt && !isFoul && (forcePopup || Math.random() < protectedPopupChance);
     const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
@@ -5432,6 +5450,8 @@ function buildBattedBallProfile(contact) {
       buntFoulChance,
       badBuntScore,
       pitcherBuntPopupChance,
+      protectedPopupChance,
+      solidBuntContact,
       pitcherBuntPopup,
       isBunt: true
     };
@@ -7990,7 +8010,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     && profileExitVelocity >= 0.9
     && profileCarry >= 0.86;
   const isHardOutfieldBounce = isHardOutfieldBounceProfile;
-  const rawDistance = isBunt
+  const rawDistance = isBunt && isPopupFly
+    ? randomBetween(180, 340)
+    : isBunt
     ? randomBetween(210, 455) + clamp(battedProfile?.buntQuality ?? 0.4, 0, 1) * 90
     : isPopupFly
     ? randomBetween(300, 500)
@@ -8070,7 +8092,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isToweringFly
     ? distance * randomBetween(0.94, 1.04)
     : distance * carryScale;
-  if (isBunt) {
+  if (isBunt && !isPopupFly) {
     landingDistance = Math.min(landingDistance, randomBetween(180, 405) + clamp(battedProfile?.buntQuality ?? 0.4, 0, 1) * 80);
   }
   const isHardOutfieldHit = isHardOutfieldBounce || (isLiner && power >= 0.78 && landingDistance > 620);
@@ -9109,6 +9131,18 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
   if (battedBall.wallHit) return { kind: "double", label: "フェンス直撃", scoreType: "double", caught: false };
 
   const fieldingPoint = fielder.fieldingPoint || battedBall.target;
+  if (battedBall.isBunt && battedBall.isPopupFly && (fielder.role === "P" || isTemporaryInfielderRole(fielder.role))) {
+    const routeGap = Math.hypot((fielder.x ?? 0) - fieldingPoint.x, (fielder.y ?? 0) - fieldingPoint.y);
+    const fielderTime = getFielderReactionDelay(fielder) * 0.72 + Math.max(0, routeGap - 54) / Math.max(1, getFielderSpeed(fielder));
+    return {
+      kind: "out",
+      label: `${fielder.role} バントフライ捕球`,
+      caught: true,
+      needsThrow: false,
+      fieldingTime: Math.max(battedBall.ballTime ?? 0.9, fielderTime),
+      fieldingPoint
+    };
+  }
   if (battedBall.isBunt && (fielder.role === "P" || isTemporaryInfielderRole(fielder.role))) {
     const routeGap = Math.hypot((fielder.x ?? 0) - fieldingPoint.x, (fielder.y ?? 0) - fieldingPoint.y);
     const fielderTime = getFielderReactionDelay(fielder) * 0.72 + Math.max(0, routeGap - 70) / Math.max(1, getFielderSpeed(fielder));

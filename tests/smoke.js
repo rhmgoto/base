@@ -598,6 +598,22 @@ const weakSwingState = JSON.parse(runInGame(
     const buntBall = buildBattedBall(buntProfile.power, buntProfile.direction, hitLabels.grounder, buntProfile);
     const buntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), buntBall);
     const buntOutcome = resolveDefenseOutcome(buntFielder, buntBall, createBatterRunner(activeBatter));
+    const solidBuntRandom = Math.random;
+    const solidBuntRolls = [0.5, 0.5, 0.5, 0.18, 0.01, 0.5, 0.5];
+    Math.random = () => solidBuntRolls.length ? solidBuntRolls.shift() : 0.5;
+    const solidBuntProfile = buildBattedBallProfile({
+      timeDiff: 52,
+      quality: 0.62,
+      timingScore: 0.6,
+      barrelScore: 0.56,
+      zoneScore: 0.88,
+      plateDistance: 10,
+      outsideStrikeZone: false,
+      sweetSpotScore: 0.58,
+      inGoodContactZone: true,
+      yellowZoneBoost: 0
+    });
+    Math.random = solidBuntRandom;
     const badBuntRandom = Math.random;
     const badBuntRolls = [0.5, 0.5, 0.9, 0.02, 0.5, 0.5];
     Math.random = () => badBuntRolls.length ? badBuntRolls.shift() : 0.5;
@@ -616,6 +632,7 @@ const weakSwingState = JSON.parse(runInGame(
     Math.random = badBuntRandom;
     const badBuntBall = buildBattedBall(badBuntProfile.power, badBuntProfile.direction, hitLabels.popup, badBuntProfile);
     const badBuntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), badBuntBall);
+    const badBuntOutcome = resolveDefenseOutcome(badBuntFielder, badBuntBall, createBatterRunner(activeBatter));
     count = { strikes: 2, balls: 0, outs: 0 };
     finishPitch(hitLabels.foul, "foul", 0.2, 0, badBuntProfile.direction, badBuntProfile);
     const twoStrikeBuntFoul = {
@@ -668,7 +685,7 @@ const weakSwingState = JSON.parse(runInGame(
     }, "away");
     const button0StealActive = stealState.active;
     const button0StealTarget = stealState.targetBase;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, twoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
+    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
   })()`
 ));
 
@@ -685,9 +702,12 @@ assert(weakSwingState.buntBall.isBunt === true && weakSwingState.buntBall.landin
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
 assert(weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first", "bunts should always become an infield throw play instead of leaking to the outfield");
 assert(weakSwingState.buntProfile.buntFoulChance >= 0.055 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
+assert(weakSwingState.solidBuntProfile.solidBuntContact === true && weakSwingState.solidBuntProfile.pitcherBuntPopup === false, "solid bunt contact should be protected from becoming pitcher popup flies too often");
+assert(weakSwingState.solidBuntProfile.protectedPopupChance < weakSwingState.solidBuntProfile.pitcherBuntPopupChance, "solid bunt contact should lower the popup-fly chance");
 assert(weakSwingState.badBuntProfile.buntLineChance < weakSwingState.buntProfile.buntLineChance, "bad bunt contact should reduce first-base and third-base line placement");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "bad bunt contact should often become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
+assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, "pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
 assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1WithStickStealActive === false, "gamepad button 1 should stay a weak swing even with a direction held");
