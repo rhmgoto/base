@@ -8939,20 +8939,38 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
     bases = createEmptyBases();
     Math.random = () => 0.02;
     const specialPlan = chooseComputerPitchPlan();
-    const strikeIntents = new Set(["awayEdge", "edge", "showCenter", "backdoor", "frontdoor"]);
+    const strikeIntents = new Set(["awayEdge", "edge", "showCenter", "backdoor", "frontdoor", "acceleratingStrike"]);
     const ballIntents = new Set(["awayBall", "awayEscape", "strikeToBall", "speedEscape"]);
     Math.random = () => 0.59;
     const fastStrikeCourse = getComputerPitchCornerCourse("fast");
     Math.random = () => 0.6;
     const fastBallCourse = getComputerPitchCornerCourse("fast");
-    Math.random = () => 0.39;
+    Math.random = () => 0.15;
     const slowBallCourse = getComputerPitchCornerCourse("slow");
-    Math.random = () => 0.4;
+    Math.random = () => 0.32;
+    const slowAcceleratingStrikeCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.32;
+    const normalAcceleratingStrikePlan = buildComputerPitchShape({ type: "normal", course: slowAcceleratingStrikeCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
+    Math.random = () => 0.32;
+    const slowAcceleratingStrikePlan = buildComputerPitchShape({ type: "slow", course: slowAcceleratingStrikeCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
+    Math.random = () => 0.53;
     const slowBackdoorStrikeCourse = getComputerPitchCornerCourse("slow");
     Math.random = () => 0.93;
     const slowEdgeStrikeCourse = getComputerPitchCornerCourse("slow");
     Math.random = () => 0.94;
     const slowCenterStrikeCourse = getComputerPitchCornerCourse("slow");
+    count = { strikes: 0, balls: 2, outs: 0 };
+    Math.random = () => 0.24;
+    const hitterCountBackdoorCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.52;
+    const hitterCountFrontdoorCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.78;
+    const hitterCountEdgeCourse = getComputerPitchCornerCourse("fast");
+    count = { strikes: 1, balls: 3, outs: 0 };
+    Math.random = () => 0.99;
+    const threeBallFastCourse = getComputerPitchCornerCourse("fast");
+    Math.random = () => 0.99;
+    const threeBallSlowCourse = getComputerPitchCornerCourse("slow");
     Math.random = originalRandom;
 
     gameMode = "single";
@@ -9037,15 +9055,29 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       fastStrikeIntent: fastStrikeCourse.intent,
       fastBallIntent: fastBallCourse.intent,
       slowBallIntent: slowBallCourse.intent,
+      slowAcceleratingStrikeIntent: slowAcceleratingStrikeCourse.intent,
+      normalAcceleratingStrikeSpeedDirection: normalAcceleratingStrikePlan.speedChangeDirection,
+      slowAcceleratingStrikeSpeedDirection: slowAcceleratingStrikePlan.speedChangeDirection,
       slowBackdoorStrikeIntent: slowBackdoorStrikeCourse.intent,
       slowEdgeStrikeIntent: slowEdgeStrikeCourse.intent,
       slowCenterStrikeIntent: slowCenterStrikeCourse.intent,
+      hitterCountBackdoorIntent: hitterCountBackdoorCourse.intent,
+      hitterCountFrontdoorIntent: hitterCountFrontdoorCourse.intent,
+      hitterCountEdgeIntent: hitterCountEdgeCourse.intent,
+      threeBallFastIntent: threeBallFastCourse.intent,
+      threeBallSlowIntent: threeBallSlowCourse.intent,
       fastStrikeCourseIsStrike: strikeIntents.has(fastStrikeCourse.intent),
       fastBallCourseIsBall: ballIntents.has(fastBallCourse.intent),
       slowBallCourseIsBall: ballIntents.has(slowBallCourse.intent),
+      slowAcceleratingCourseIsStrike: strikeIntents.has(slowAcceleratingStrikeCourse.intent),
       slowBackdoorCourseIsStrike: strikeIntents.has(slowBackdoorStrikeCourse.intent),
       slowEdgeCourseIsStrike: strikeIntents.has(slowEdgeStrikeCourse.intent),
       slowCenterCourseIsStrike: strikeIntents.has(slowCenterStrikeCourse.intent),
+      hitterCountBackdoorIsStrike: strikeIntents.has(hitterCountBackdoorCourse.intent),
+      hitterCountFrontdoorIsStrike: strikeIntents.has(hitterCountFrontdoorCourse.intent),
+      hitterCountEdgeIsStrike: strikeIntents.has(hitterCountEdgeCourse.intent),
+      threeBallFastIsStrike: strikeIntents.has(threeBallFastCourse.intent),
+      threeBallSlowIsStrike: strikeIntents.has(threeBallSlowCourse.intent),
       shapedTargetNearBatter: Math.abs((shapedPlan.targetX ?? field.plateX) - batter.x) < 44,
       shapedCurvePower,
       shapedSpeedScale,
@@ -9078,6 +9110,9 @@ assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.5) < 0.0001,
 assert(computerPitchAndSwingState.specialPlanType === "special" && computerPitchAndSwingState.specialPlanSpread === 12, "computer pitchers should select special pitches when the special roll wins");
 assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerPitchAndSwingState.fastBallCourseIsBall === true, "fast/special computer courses should split at sixty-percent strike intent");
 assert(computerPitchAndSwingState.slowBallCourseIsBall === true && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should treat ball-to-strike bend as part of the sixty-percent strike intent");
+assert(computerPitchAndSwingState.slowAcceleratingCourseIsStrike === true && computerPitchAndSwingState.normalAcceleratingStrikeSpeedDirection === 1 && computerPitchAndSwingState.slowAcceleratingStrikeSpeedDirection === 1, "normal and slow computer pitches should include ball-to-strike accelerating pitches");
+assert(computerPitchAndSwingState.hitterCountBackdoorIsStrike === true && computerPitchAndSwingState.hitterCountFrontdoorIsStrike === true && computerPitchAndSwingState.hitterCountEdgeIsStrike === true, "computer pitchers should avoid waste balls and target edges/frontdoor/backdoor in 2-0 counts");
+assert(computerPitchAndSwingState.threeBallFastIsStrike === true && computerPitchAndSwingState.threeBallSlowIsStrike === true, "computer pitchers should not intentionally waste pitches in any three-ball count");
 assert(computerPitchAndSwingState.shapedTargetNearBatter === false, "computer pitchers should rarely choose targets near the batter body");
 assert(computerPitchAndSwingState.shapedCurvePower > 0.25, "computer pitch shaping should visibly bend the live pitch");
 assert(computerPitchAndSwingState.shapedSpeedScale > 1.008, "computer pitch shaping should visibly change live pitch speed");
