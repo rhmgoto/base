@@ -603,8 +603,8 @@ const weakSwingState = JSON.parse(runInGame(
     Math.random = () => solidBuntRolls.length ? solidBuntRolls.shift() : 0.5;
     const solidBuntProfile = buildBattedBallProfile({
       timeDiff: 52,
-      quality: 0.62,
-      timingScore: 0.6,
+      quality: 0.56,
+      timingScore: 0.54,
       barrelScore: 0.56,
       zoneScore: 0.88,
       plateDistance: 10,
@@ -701,11 +701,13 @@ assert(weakSwingState.buntProfile.buntLineChance >= 0.85 && weakSwingState.buntP
 assert(weakSwingState.buntBall.isBunt === true && weakSwingState.buntBall.landingDistance >= 180 && weakSwingState.buntBall.landingDistance < 560 && weakSwingState.buntBall.distance < 590, "bunt batted balls should roll longer for pitcher fielding while staying inside the infield");
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
 assert(weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first", "bunts should always become an infield throw play instead of leaking to the outfield");
-assert(weakSwingState.buntProfile.buntFoulChance >= 0.055 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
+assert(weakSwingState.buntProfile.buntFoulChance >= 0.075 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
 assert(weakSwingState.solidBuntProfile.solidBuntContact === true && weakSwingState.solidBuntProfile.pitcherBuntPopup === false, "solid bunt contact should be protected from becoming pitcher popup flies too often");
 assert(weakSwingState.solidBuntProfile.protectedPopupChance < weakSwingState.solidBuntProfile.pitcherBuntPopupChance, "solid bunt contact should lower the popup-fly chance");
+assert(weakSwingState.solidBuntProfile.buntLineChance >= 0.25 && weakSwingState.solidBuntProfile.buntLineChance <= 0.32, "ordinary solid bunts should not over-favor the first-base or third-base line");
+assert(weakSwingState.solidBuntProfile.buntPitcherFrontChance >= 0.55, "ordinary solid bunts should more often roll in front of the pitcher");
 assert(weakSwingState.badBuntProfile.buntLineChance < weakSwingState.buntProfile.buntLineChance, "bad bunt contact should reduce first-base and third-base line placement");
-assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "bad bunt contact should often become a pitcher-area popup fly");
+assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
 assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, "pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
@@ -886,7 +888,10 @@ const rosterAndPointState = JSON.parse(runInGame(
     const tucker = findById(batters, "tucker");
     const arraez = findById(batters, "arraez");
     const wittjr = findById(batters, "wittjr");
-    const taira = findById(batters, "taira");
+    const goldschmidt = findById(batters, "goldschmidt");
+    const acunajr = findById(batters, "acunajr");
+    const ydiaz = findById(batters, "ydiaz");
+    const tairaRemoved = !batters.some((batter) => batter.id === "taira");
     const shohei = findById(pitchers, "shohei");
     const sawamura = findById(pitchers, "sawamura");
     const magari = findById(pitchers, "magari");
@@ -904,6 +909,7 @@ const rosterAndPointState = JSON.parse(runInGame(
     const melton = findById(pitchers, "melton");
     const cyyoung = findById(pitchers, "cyyoung");
     const maddux = findById(pitchers, "maddux");
+    const ediaz = findById(pitchers, "ediaz");
     const ichiro = findById(batters, "ichiro");
     const ruth = findById(batters, "ruth");
     const nagashima = findById(batters, "nagashima");
@@ -941,6 +947,8 @@ const rosterAndPointState = JSON.parse(runInGame(
     const firstCatcherOption = catcherChooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
     const catcherChooserHasDingler = catcherChooserHtml.includes('data-player-id="dingler"');
     closePlayerChooser();
+    menuSelection.away = { ...originalAway, SS: "nagashima" };
+    updateMenuPointStatus();
     openPlayerChooser({ dataset: { team: "away", role: "R", kind: "batter" } });
     const overLimitBatterChooserHtml = chooserOptions.innerHTML;
     const overLimitBatterDisabled = overLimitBatterChooserHtml.includes('data-player-id="ichiro"') && overLimitBatterChooserHtml.includes("disabled");
@@ -948,6 +956,8 @@ const rosterAndPointState = JSON.parse(runInGame(
     selectMenuPlayer({ dataset: { team: "away", role: "R", kind: "batter", playerId: "ichiro" } });
     const overLimitPickBlocked = menuSelection.away.R === beforeOverLimitPick;
     closePlayerChooser();
+    menuSelection.away = originalAway;
+    updateMenuPointStatus();
     openPlayerChooser({ dataset: { team: "away", role: "pitcher", kind: "pitcher" } });
     const pitcherChooserHtml = chooserOptions.innerHTML;
     const firstPitcherOption = pitcherChooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
@@ -1161,16 +1171,37 @@ const rosterAndPointState = JSON.parse(runInGame(
         arm: wittjr.arm,
         cost: wittjr.cost
       },
-      taira: {
-        bats: taira.bats,
-        power: taira.power,
-        meet: taira.meet,
-        run: taira.run,
-        infieldDefense: taira.infieldDefense,
-        outfieldDefense: taira.outfieldDefense,
-        arm: taira.arm,
-        cost: taira.cost
+      goldschmidt: {
+        bats: goldschmidt.bats,
+        power: goldschmidt.power,
+        meet: goldschmidt.meet,
+        run: goldschmidt.run,
+        infieldDefense: goldschmidt.infieldDefense,
+        outfieldDefense: goldschmidt.outfieldDefense,
+        arm: goldschmidt.arm,
+        cost: goldschmidt.cost
       },
+      acunajr: {
+        bats: acunajr.bats,
+        power: acunajr.power,
+        meet: acunajr.meet,
+        run: acunajr.run,
+        infieldDefense: acunajr.infieldDefense,
+        outfieldDefense: acunajr.outfieldDefense,
+        arm: acunajr.arm,
+        cost: acunajr.cost
+      },
+      ydiaz: {
+        bats: ydiaz.bats,
+        power: ydiaz.power,
+        meet: ydiaz.meet,
+        run: ydiaz.run,
+        infieldDefense: ydiaz.infieldDefense,
+        outfieldDefense: ydiaz.outfieldDefense,
+        arm: ydiaz.arm,
+        cost: ydiaz.cost
+      },
+      tairaRemoved,
       ichiro: {
         bats: ichiro.bats,
         power: ichiro.power,
@@ -1434,6 +1465,19 @@ const rosterAndPointState = JSON.parse(runInGame(
         stamina: maddux.stamina,
         cost: maddux.cost
       },
+      ediaz: {
+        throws: ediaz.throws,
+        fastKmh: ediaz.fastKmh,
+        rightBreak: ediaz.rightBreak,
+        leftBreak: ediaz.leftBreak,
+        slowChange: ediaz.slowChange,
+        fastChange: ediaz.fastChange,
+        control: ediaz.control,
+        stuff: ediaz.stuff,
+        fielding: ediaz.fielding,
+        stamina: ediaz.stamina,
+        cost: ediaz.cost
+      },
       baseCost,
       pitcherIncludedCost,
       defaultAwayPitcherCost,
@@ -1571,23 +1615,40 @@ assert(rosterAndPointState.wittjr.infieldDefense === 8, "Witt Jr. infield defens
 assert(rosterAndPointState.wittjr.outfieldDefense === 4, "Witt Jr. outfield defense should match the roster table");
 assert(rosterAndPointState.wittjr.arm === 7, "Witt Jr. arm should match the roster table");
 assert(rosterAndPointState.wittjr.cost === 7, "Witt Jr. cost should match the roster table");
-assert(rosterAndPointState.taira.bats === "R", "Taira should be a right-handed batter");
-assert(rosterAndPointState.taira.power === 7, "Taira power should match the roster table");
-assert(rosterAndPointState.taira.meet === 1, "Taira meet should match the roster table");
-assert(rosterAndPointState.taira.run === 7, "Taira run should match the roster table");
-assert(rosterAndPointState.taira.infieldDefense === 3, "Taira infield defense should match the roster table");
-assert(rosterAndPointState.taira.outfieldDefense === 2, "Taira outfield defense should match the roster table");
-assert(rosterAndPointState.taira.arm === 3, "Taira arm should match the roster table");
-assert(rosterAndPointState.taira.cost === 3, "Taira cost should match the roster table");
+assert(rosterAndPointState.goldschmidt.bats === "R", "Goldschmidt should be a right-handed batter");
+assert(rosterAndPointState.goldschmidt.power === 7, "Goldschmidt power should match the roster table");
+assert(rosterAndPointState.goldschmidt.meet === 6, "Goldschmidt meet should match the roster table");
+assert(rosterAndPointState.goldschmidt.run === 6, "Goldschmidt run should match the roster table");
+assert(rosterAndPointState.goldschmidt.infieldDefense === 6, "Goldschmidt infield defense should match the roster table");
+assert(rosterAndPointState.goldschmidt.outfieldDefense === 2, "Goldschmidt outfield defense should match the roster table");
+assert(rosterAndPointState.goldschmidt.arm === 6, "Goldschmidt arm should match the roster table");
+assert(rosterAndPointState.goldschmidt.cost === 6, "Goldschmidt cost should match the roster table");
+assert(rosterAndPointState.acunajr.bats === "R", "Acuna Jr. should be a right-handed batter");
+assert(rosterAndPointState.acunajr.power === 6, "Acuna Jr. power should match the roster table");
+assert(rosterAndPointState.acunajr.meet === 6, "Acuna Jr. meet should match the roster table");
+assert(rosterAndPointState.acunajr.run === 10, "Acuna Jr. run should match the roster table");
+assert(rosterAndPointState.acunajr.infieldDefense === 2, "Acuna Jr. infield defense should match the roster table");
+assert(rosterAndPointState.acunajr.outfieldDefense === 3, "Acuna Jr. outfield defense should match the roster table");
+assert(rosterAndPointState.acunajr.arm === 8, "Acuna Jr. arm should match the roster table");
+assert(rosterAndPointState.acunajr.cost === 7, "Acuna Jr. cost should match the roster table");
+assert(rosterAndPointState.ydiaz.bats === "R", "Y. Diaz should be a right-handed batter");
+assert(rosterAndPointState.ydiaz.power === 5, "Y. Diaz power should match the roster table");
+assert(rosterAndPointState.ydiaz.meet === 9, "Y. Diaz meet should match the roster table");
+assert(rosterAndPointState.ydiaz.run === 4, "Y. Diaz run should match the roster table");
+assert(rosterAndPointState.ydiaz.infieldDefense === 1, "Y. Diaz infield defense should match the roster table");
+assert(rosterAndPointState.ydiaz.outfieldDefense === 2, "Y. Diaz outfield defense should match the roster table");
+assert(rosterAndPointState.ydiaz.arm === 3, "Y. Diaz arm should match the roster table");
+assert(rosterAndPointState.ydiaz.cost === 5, "Y. Diaz cost should match the roster table");
+assert(rosterAndPointState.tairaRemoved === true, "Taira should be removed from the batter roster");
 assert(rosterAndPointState.ichiro.meet === 17 && rosterAndPointState.ichiro.outfieldDefense === 11 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 17, "Ichiro should match the updated roster table");
 assert(rosterAndPointState.ruth.power === 13 && rosterAndPointState.ruth.meet === 12 && rosterAndPointState.ruth.outfieldDefense === 7 && rosterAndPointState.ruth.cost === 17, "Ruth should match the updated roster table");
 assert(rosterAndPointState.nagashima.power === 11 && rosterAndPointState.nagashima.meet === 10 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 11 && rosterAndPointState.nagashima.cost === 15, "Nagashima should match the updated roster table");
 assert(rosterAndPointState.bonds.power === 13 && rosterAndPointState.bonds.meet === 9 && rosterAndPointState.bonds.outfieldDefense === 10 && rosterAndPointState.bonds.arm === 8 && rosterAndPointState.bonds.cost === 17, "Bonds should be available as a new elite outfielder");
 assert(rosterAndPointState.sadaharu.power === 14 && rosterAndPointState.sadaharu.infieldDefense === 8 && rosterAndPointState.sadaharu.arm === 7 && rosterAndPointState.sadaharu.cost === 17, "Sadaharu should be available as a new elite infielder");
 assert(rosterAndPointState.shohei.fastKmh === 165, "Shohei fastball should match the pitcher roster table");
-assert(rosterAndPointState.shohei.stuff === 8, "Shohei stuff should match the pitcher roster table");
-assert(rosterAndPointState.shohei.stamina === 7, "Shohei stamina should match the pitcher roster table");
-assert(rosterAndPointState.shohei.cost === 8, "Shohei pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.shohei.stuff === 9, "Shohei stuff should match the pitcher roster table");
+assert(rosterAndPointState.shohei.stamina === 8, "Shohei stamina should match the pitcher roster table");
+assert(rosterAndPointState.shohei.cost === 9, "Shohei pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.fastKmh === 172, "Sawamura fastball should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.rightBreak === 9, "Sawamura right break should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.leftBreak === 8, "Sawamura left break should match the pitcher roster table");
@@ -1707,15 +1768,15 @@ assert(rosterAndPointState.fujinami.control === 1, "Fujinami control should matc
 assert(rosterAndPointState.fujinami.stuff === 6, "Fujinami stuff should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.fielding === 3, "Fujinami fielding should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.stamina === 6, "Fujinami stamina should match the pitcher roster table");
-assert(rosterAndPointState.fujinami.cost === 6, "Fujinami pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.fujinami.cost === 5, "Fujinami pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.skubal.throws === "L", "Skubal should be a left-handed pitcher");
 assert(rosterAndPointState.skubal.fastKmh === 164, "Skubal fastball should match the pitcher roster table");
 assert(rosterAndPointState.skubal.rightBreak === 5, "Skubal right break should match the pitcher roster table");
-assert(rosterAndPointState.skubal.leftBreak === 7, "Skubal left break should match the pitcher roster table");
+assert(rosterAndPointState.skubal.leftBreak === 8, "Skubal left break should match the pitcher roster table");
 assert(rosterAndPointState.skubal.slowChange === 8, "Skubal slow change should match the pitcher roster table");
 assert(rosterAndPointState.skubal.fastChange === 4, "Skubal fast change should match the pitcher roster table");
 assert(rosterAndPointState.skubal.control === 5, "Skubal control should match the pitcher roster table");
-assert(rosterAndPointState.skubal.stuff === 4, "Skubal stuff should match the pitcher roster table");
+assert(rosterAndPointState.skubal.stuff === 7, "Skubal stuff should match the pitcher roster table");
 assert(rosterAndPointState.skubal.fielding === 5, "Skubal fielding should match the pitcher roster table");
 assert(rosterAndPointState.skubal.stamina === 7, "Skubal stamina should match the pitcher roster table");
 assert(rosterAndPointState.skubal.cost === 8, "Skubal pitcher cost should match the pitcher roster table");
@@ -1729,7 +1790,7 @@ assert(rosterAndPointState.ashby.control === 3, "Ashby control should match the 
 assert(rosterAndPointState.ashby.stuff === 4, "Ashby stuff should match the pitcher roster table");
 assert(rosterAndPointState.ashby.fielding === 5, "Ashby fielding should match the pitcher roster table");
 assert(rosterAndPointState.ashby.stamina === 4, "Ashby stamina should match the pitcher roster table");
-assert(rosterAndPointState.ashby.cost === 5, "Ashby pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.ashby.cost === 3, "Ashby pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.melton.throws === "R", "Melton should be a right-handed pitcher");
 assert(rosterAndPointState.melton.fastKmh === 155, "Melton fastball should match the pitcher roster table");
 assert(rosterAndPointState.melton.rightBreak === 4, "Melton right break should match the pitcher roster table");
@@ -1740,7 +1801,7 @@ assert(rosterAndPointState.melton.control === 9, "Melton control should match th
 assert(rosterAndPointState.melton.stuff === 5, "Melton stuff should match the pitcher roster table");
 assert(rosterAndPointState.melton.fielding === 8, "Melton fielding should match the pitcher roster table");
 assert(rosterAndPointState.melton.stamina === 6, "Melton stamina should match the pitcher roster table");
-assert(rosterAndPointState.melton.cost === 7, "Melton pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.melton.cost === 6, "Melton pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.fastKmh === 175, "Cy Young fastball should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.rightBreak === 10, "Cy Young right break should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.leftBreak === 9, "Cy Young left break should match the pitcher roster table");
@@ -1760,14 +1821,25 @@ assert(rosterAndPointState.maddux.control === 11, "Maddux control should match t
 assert(rosterAndPointState.maddux.stuff === 10, "Maddux stuff should match the pitcher roster table");
 assert(rosterAndPointState.maddux.stamina === 11, "Maddux stamina should match the pitcher roster table");
 assert(rosterAndPointState.maddux.cost === 17, "Maddux pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.throws === "R", "E. Diaz should be a right-handed pitcher");
+assert(rosterAndPointState.ediaz.fastKmh === 163, "E. Diaz fastball should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.rightBreak === 8, "E. Diaz right break should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.leftBreak === 1, "E. Diaz left break should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.slowChange === 4, "E. Diaz slow change should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.fastChange === 9, "E. Diaz fast change should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.control === 5, "E. Diaz control should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.stuff === 10, "E. Diaz stuff should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.fielding === 5, "E. Diaz fielding should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.stamina === 2, "E. Diaz stamina should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.cost === 4, "E. Diaz pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
-assert(rosterAndPointState.teamPointLimit === 59, "combined point limit should be 59 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 18, "default away pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.defaultHomePitcherCost === 22, "default home pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.overLimitDisabled === true, "teams over 59 combined points should not be startable");
-assert(rosterAndPointState.overLimitText.includes("/59"), "menu should show the 59-point combined limit");
-assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 59 combined points should not be startable");
-assert(rosterAndPointState.pitcherOverLimitText.includes("/59"), "menu should show the combined pitcher point total");
+assert(rosterAndPointState.teamPointLimit === 60, "combined point limit should be 60 per team");
+assert(rosterAndPointState.defaultAwayPitcherCost === 17, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultHomePitcherCost === 23, "default home pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.overLimitDisabled === true, "teams over 60 combined points should not be startable");
+assert(rosterAndPointState.overLimitText.includes("/60"), "menu should show the 60-point combined limit");
+assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 60 combined points should not be startable");
+assert(rosterAndPointState.pitcherOverLimitText.includes("/60"), "menu should show the combined pitcher point total");
 assert(rosterAndPointState.awayFielderPointText === "", "menu should show only the combined point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
@@ -1873,7 +1945,7 @@ const singlePlayerOpponentState = JSON.parse(runInGame(
 ));
 
 assert(singlePlayerOpponentState.preStartHomeCost > 59, "Dendos should be allowed to exceed the normal point limit as a CPU opponent");
-assert(singlePlayerOpponentState.preStartAwayCost <= 59, "single-player Dendos mode should keep the player roster under the normal point limit");
+assert(singlePlayerOpponentState.preStartAwayCost <= 60, "single-player Dendos mode should keep the player roster under the normal point limit");
 assert(singlePlayerOpponentState.preStartDisabled === false, "single-player mode should remain startable with Dendos as the over-limit CPU opponent");
 assert(singlePlayerOpponentState.preStartHomeLabel === "デンドーズ", "single-player mode should label the home team as Dendos when selected");
 assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,maddux", "Dendos should use the requested elite pitching staff");
@@ -1930,8 +2002,8 @@ assert(teamPresetSelectionState.awayLabel === "デンドーズ", "Team A label s
 assert(teamPresetSelectionState.homeLabel === "タイガース", "Team B label should follow the selected preset");
 assert(teamPresetSelectionState.awayCost > 59, "Dendos should exceed the normal point limit");
 assert(teamPresetSelectionState.awayPointText.includes("制限なし"), "Dendos point status should show no limit");
-assert(!teamPresetSelectionState.awayPointText.includes("/59"), "Dendos point status should not show the normal limit");
-assert(teamPresetSelectionState.homePointText.includes("/59"), "non-Dendos teams should keep the normal point limit");
+assert(!teamPresetSelectionState.awayPointText.includes("/60"), "Dendos point status should not show the normal limit");
+assert(teamPresetSelectionState.homePointText.includes("/60"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
 assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,maddux", "Dendos preset should apply the elite pitching staff to Team A");
 assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,hanifee", "Tigers preset should apply to Team B");
@@ -2058,8 +2130,8 @@ const pitcherStaminaState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(pitcherStaminaState.stamina === 7, "active default pitcher should use the roster stamina rating");
-assert(Math.abs(pitcherStaminaState.max - 127.4) < 0.001, "stamina rating seven should create thirty-percent more current-stamina points");
+assert(pitcherStaminaState.stamina === 8, "active default pitcher should use the roster stamina rating");
+assert(Math.abs(pitcherStaminaState.max - 145.6) < 0.001, "stamina rating eight should create thirty-percent more current-stamina points");
 assert(pitcherStaminaState.initial === pitcherStaminaState.max, "selected pitchers should begin at full stamina");
 assert(Math.abs(pitcherStaminaState.pitchCostMultiplier - 0.49) < 0.001, "pitch stamina consumption should be reduced by another thirty percent");
 assert(Math.abs(pitcherStaminaState.initial - pitcherStaminaState.afterFast - pitcherStaminaState.fastCost * pitcherStaminaState.pitchCostMultiplier) < 0.001, "fastballs should consume forty-nine percent of their base stamina cost");
@@ -2435,11 +2507,11 @@ const battingPracticeModeState = JSON.parse(runInGame(
       quality: 0.92
     };
     showBattingFeedback(contact, { label: hitLabels.lineLiner });
-    const feedbackHiddenOutsidePractice = battingFeedback.active === false;
+    const feedbackShownOutsidePractice = battingFeedback.active === true;
     gameMode = "practice";
     showBattingFeedback(contact, { label: hitLabels.lineLiner });
     const feedbackShownInPractice = battingFeedback.active === true;
-    appendPracticeBattedBallFeedback({
+    appendBattedBallFeedback({
       exitSpeedKmh: 151,
       flightDistanceMeters: 118,
       flightDistance: 1320,
@@ -2956,7 +3028,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
       rightVsRightExitVelocity: rightVsRightProfile.exitVelocity,
       rightVsLeftCarry: rightVsLeftProfile.carry,
       rightVsRightCarry: rightVsRightProfile.carry,
-      feedbackHiddenOutsidePractice,
+      feedbackShownOutsidePractice,
       feedbackShownInPractice,
       feedbackIncludesBattedMetrics,
       fiftyFiveUpgradeHit: fiftyFiveUpgrade.kind === "hit",
@@ -2992,7 +3064,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
       averageSixtyClean: Boolean(averageSixtyClean.result.hardOutfieldBounce) && averageSixtyClean.ball.isHardOutfieldBounce && !averageSixtyClean.ball.isGrounder && averageSixtyClean.ball.maxHeight >= 110 && averageSixtyClean.ball.maxHeight <= 164 && averageSixtyClean.ball.exitSpeedKmh >= 145,
       powerSixtyClean: Boolean(powerSixtyClean.result.hardOutfieldBounce) && powerSixtyClean.ball.isHardOutfieldBounce && !powerSixtyClean.ball.isGrounder && !powerSixtyClean.result.fenceEdgeFly && powerSixtyClean.ball.maxHeight >= 110 && powerSixtyClean.ball.maxHeight <= 164 && powerSixtyClean.ball.exitSpeedKmh >= 145,
       lowPowerPerfectDeep: lowPowerPerfectDrive.kind === "hit" && !lowPowerPerfectDrive.grounderGap,
-      lowPowerPerfectReachesWall: !lowPowerPerfectBall.isGrounder && (lowPowerPerfectBall.wallHit || lowPowerPerfectBall.fenceOver || lowPowerPerfectBall.flightDistanceMeters >= 40),
+      lowPowerPerfectReachesWall: !lowPowerPerfectBall.isGrounder && (lowPowerPerfectBall.wallHit || lowPowerPerfectBall.fenceOver || lowPowerPerfectBall.flightDistanceMeters >= 38),
       lowPowerPerfectMeters: lowPowerPerfectBall.flightDistanceMeters,
       eightyUpgradeStrong: Boolean(eightyUpgrade.fenceLiner || eightyUpgrade.lineEdge || eightyUpgrade.gapLiner),
       ninetyUpgradeDeep: Boolean(ninetyUpgrade.deepDrive),
@@ -3031,7 +3103,7 @@ assert(Math.abs(battingPracticeModeState.leftVsRightMultiplier - 1.2) < 0.001 &&
 assert(battingPracticeModeState.leftVsRightExitVelocity > battingPracticeModeState.leftVsLeftExitVelocity && battingPracticeModeState.leftVsRightCarry > battingPracticeModeState.leftVsLeftCarry, "left-on-right matchup boost should improve batted-ball speed and carry");
 assert(Math.abs(battingPracticeModeState.rightVsLeftMultiplier - 1.2) < 0.001 && battingPracticeModeState.rightVsRightMultiplier === 1, "right batters should get a 1.2x matchup boost against left-handed pitchers only");
 assert(battingPracticeModeState.rightVsLeftExitVelocity > battingPracticeModeState.rightVsRightExitVelocity && battingPracticeModeState.rightVsLeftCarry > battingPracticeModeState.rightVsRightCarry, "right-on-left matchup boost should improve batted-ball speed and carry");
-assert(battingPracticeModeState.feedbackHiddenOutsidePractice === true, "batting feedback should be hidden outside practice mode");
+assert(battingPracticeModeState.feedbackShownOutsidePractice === true, "batting feedback should also show during real games");
 assert(battingPracticeModeState.feedbackShownInPractice === true, "batting feedback should show in practice mode");
 assert(battingPracticeModeState.feedbackIncludesBattedMetrics === true, "batting practice feedback should include batted-ball speed, angle, and distance");
 assert(battingPracticeModeState.fiftyFiveUpgradeHit === true, "mid-50 feedback contact should still create hit-like batted balls");
@@ -3461,7 +3533,7 @@ assert(Math.abs(defenseTuningState.fenceHeight - 138) < 0.001, "fence height sho
 assert(Math.abs(defenseTuningState.grassRadius - 2014.8) < 0.001, "outfield grass should match the wider field scale");
 assert(defenseTuningState.hardBattedBallSpeedScale === 0.8, "hard-hit batted balls should be about twenty percent slower");
 assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder movement should be another ten percent faster");
-assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36) < 0.001, "fielding speed 1 should move like the previous rating 3.6 speed");
+assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
 assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10) < 0.001, "fielding speed 10 should keep the previous top speed");
 assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && defenseTuningState.fielderSpeed < defenseTuningState.fielderSpeed10, "fielding movement should be redistributed across ten steps");
 assert(defenseTuningState.reaction5 > 0.2, "average fielders should hesitate briefly before moving");
@@ -3722,11 +3794,11 @@ const runnerSpeedState = JSON.parse(runInGame(
 ));
 
 assert(Math.abs(runnerSpeedState.runnerSpeedScale - 0.85) < 0.001, "all runners should use the requested fifteen-percent speed reduction");
-assert(Math.abs(runnerSpeedState.slow - runnerSpeedState.oldRating3Speed * 0.85) < 0.001, "run 1 should move like the previous rating 3 speed");
+assert(Math.abs(runnerSpeedState.slow - runnerSpeedState.oldRating3Speed * 0.85 * 1.2) < 0.001, "run 1 should be twenty percent faster than the previous low-end baseline");
 assert(runnerSpeedState.normal > runnerSpeedState.slow && runnerSpeedState.normal < runnerSpeedState.fast, "runner speed should be redistributed across ten steps");
 assert(Math.abs(runnerSpeedState.baseRunnerSpeed - runnerSpeedState.normal) < 0.001, "base runners and batter-runners should use the same speed");
 assert(Math.abs(runnerSpeedState.fast - runnerSpeedState.oldRating10Speed * 0.85) < 0.001, "run 10 should keep the previous top speed");
-assert(Math.abs(runnerSpeedState.effectiveRun1 - 2.55) < 0.001, "effective run rating 1 should match the previous rating 3");
+assert(Math.abs(runnerSpeedState.effectiveRun1 - 3.76) < 0.001, "effective run rating 1 should be boosted while preserving the top end");
 assert(runnerSpeedState.effectiveRun5 > runnerSpeedState.effectiveRun1 && runnerSpeedState.effectiveRun5 < runnerSpeedState.effectiveRun10, "effective run ratings should be spread between the new low and unchanged high");
 assert(Math.abs(runnerSpeedState.effectiveRun10 - 7.975) < 0.001, "effective run rating should compress the high end");
 
@@ -4135,8 +4207,9 @@ assert(throwProfileState.normalLongTime > throwProfileState.normalShortTime, "lo
 assert(throwProfileState.normalLongArc > throwProfileState.normalShortArc, "long throws should have a higher arc");
 assert(throwProfileState.strongLongTime < throwProfileState.weakLongTime, "strong-arm fielders should throw long balls faster");
 assert(throwProfileState.strongLongArc < throwProfileState.weakLongArc, "strong-arm fielders should throw long balls on a lower arc");
-assert(Math.abs(throwProfileState.normalShortSpeed - 759) < 0.001, "arm 5 should use the fifteen-percent stronger base throw speed");
-assert(Math.abs(throwProfileState.strongShortSpeed - throwProfileState.weakShortSpeed * 3) < 0.001, "arm 10 should throw three times as fast as arm 1");
+assert(Math.abs(throwProfileState.normalShortSpeed - 803.6470588235293) < 0.001, "arm 5 should use the redistributed low-end-boosted throw speed");
+assert(Math.abs(throwProfileState.strongShortSpeed - 1205.470588235294) < 0.001, "arm 10 should keep the previous top throw speed");
+assert(Math.abs(throwProfileState.weakShortSpeed - 482.1882352941177) < 0.001, "arm 1 should be twenty percent faster than the previous low-end throw speed");
 assert(throwProfileState.weakLongBounce === true, "weak arms should bounce deep outfield throws");
 assert(throwProfileState.normalLongBounce === true, "average arms should bounce deep outfield throws");
 assert(throwProfileState.strongLongBounce === false, "strong arms should be able to reach deep throws without a bounce");
@@ -4917,13 +4990,13 @@ const battedProfileState = JSON.parse(runInGame(
       outsideStrikeZone: false,
       inGoodContactZone: true
     });
-    Math.random = () => 0.46;
+    Math.random = () => 0.3;
     const veryForgivingCenterDriveResult = decideHitResultFromBattedProfile({
       timeDiff: 255,
-      quality: 0.38,
-      timingScore: 0.38,
-      barrelScore: 0.56,
-      sweetSpotScore: 0.44,
+      quality: 0.45,
+      timingScore: 0.45,
+      barrelScore: 0.62,
+      sweetSpotScore: 0.52,
       zoneScore: 1,
       plateDistance: 0,
       outsideStrikeZone: false,
@@ -8470,12 +8543,14 @@ const hardOutfieldGrounderInfielderState = JSON.parse(runInGame(
       wallHit: false,
       groundRuleDouble: false
     };
-    const fielder = { role: "SS", x: field.centerX - 118, y: field.plateY - 410, speed: 7, fielding: 8, arm: 6 };
+    const fielder = { role: "SS", x: field.centerX - 118, y: field.plateY - 410, speed: 10, fielding: 10, arm: 8 };
     const fieldingPoint = getClosestPointOnBattedBallRoute(fielder, battedBall);
     const routeFielder = {
       ...fielder,
+      x: fieldingPoint.x,
+      y: fieldingPoint.y,
       fieldingPoint,
-      distanceToTarget: Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y)
+      distanceToTarget: 0
     };
     const bodyCatch = getInfielderRouteBodyCatch(routeFielder, battedBall, fieldingPoint);
     const closeCatch = getCloseHardBallCatch(routeFielder, battedBall, fieldingPoint, 0.1);
@@ -8864,6 +8939,20 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
     bases = createEmptyBases();
     Math.random = () => 0.02;
     const specialPlan = chooseComputerPitchPlan();
+    const strikeIntents = new Set(["awayEdge", "edge", "showCenter", "backdoor", "frontdoor"]);
+    const ballIntents = new Set(["awayBall", "awayEscape", "strikeToBall", "speedEscape"]);
+    Math.random = () => 0.59;
+    const fastStrikeCourse = getComputerPitchCornerCourse("fast");
+    Math.random = () => 0.6;
+    const fastBallCourse = getComputerPitchCornerCourse("fast");
+    Math.random = () => 0.39;
+    const slowBallCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.4;
+    const slowBackdoorStrikeCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.93;
+    const slowEdgeStrikeCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.94;
+    const slowCenterStrikeCourse = getComputerPitchCornerCourse("slow");
     Math.random = originalRandom;
 
     gameMode = "single";
@@ -8945,6 +9034,18 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       specialChanceScoring,
       specialPlanType: specialPlan.type,
       specialPlanSpread: specialPlan.targetSpread,
+      fastStrikeIntent: fastStrikeCourse.intent,
+      fastBallIntent: fastBallCourse.intent,
+      slowBallIntent: slowBallCourse.intent,
+      slowBackdoorStrikeIntent: slowBackdoorStrikeCourse.intent,
+      slowEdgeStrikeIntent: slowEdgeStrikeCourse.intent,
+      slowCenterStrikeIntent: slowCenterStrikeCourse.intent,
+      fastStrikeCourseIsStrike: strikeIntents.has(fastStrikeCourse.intent),
+      fastBallCourseIsBall: ballIntents.has(fastBallCourse.intent),
+      slowBallCourseIsBall: ballIntents.has(slowBallCourse.intent),
+      slowBackdoorCourseIsStrike: strikeIntents.has(slowBackdoorStrikeCourse.intent),
+      slowEdgeCourseIsStrike: strikeIntents.has(slowEdgeStrikeCourse.intent),
+      slowCenterCourseIsStrike: strikeIntents.has(slowCenterStrikeCourse.intent),
       shapedTargetNearBatter: Math.abs((shapedPlan.targetX ?? field.plateX) - batter.x) < 44,
       shapedCurvePower,
       shapedSpeedScale,
@@ -8961,19 +9062,22 @@ assert(computerPitchAndSwingState.shapedBend === 1, "computer pitchers should us
 assert(computerPitchAndSwingState.leftBatterSafeBend === -1, "computer pitchers should usually bend away from left-handed batters");
 assert(computerPitchAndSwingState.shapedBendChance >= 0.9 && computerPitchAndSwingState.shapedBendPower > 1, "computer pitchers should throw more visibly bending pitches");
 assert(computerPitchAndSwingState.shapedSpeedPower > 1, "computer pitchers should use larger speed changes");
-assert(Math.abs(computerPitchAndSwingState.standardWeights.fast - 0.4) < 0.0001, "standard computer pitchers should use fastballs about 40%");
-assert(Math.abs(computerPitchAndSwingState.standardWeights.normal - 0.3) < 0.0001, "standard computer pitchers should use straight pitches about 30%");
-assert(Math.abs(computerPitchAndSwingState.standardWeights.slow - 0.3) < 0.0001, "standard computer pitchers should use slow/breaking pitches about 30%");
-assert(computerPitchAndSwingState.fastPitcherWeights.fast > computerPitchAndSwingState.standardWeights.fast, "fast computer pitchers should throw more fastballs");
+assert(Math.abs(computerPitchAndSwingState.standardWeights.fast - 0.418) < 0.0001, "standard computer pitchers should use fastballs slightly more often after reducing breaking pitches");
+assert(Math.abs(computerPitchAndSwingState.standardWeights.normal - 0.312) < 0.0001, "standard computer pitchers should use straight pitches slightly more often after reducing breaking pitches");
+assert(Math.abs(computerPitchAndSwingState.standardWeights.slow - 0.27) < 0.0001, "standard computer pitchers should reduce slow/breaking pitches only slightly");
+assert(computerPitchAndSwingState.fastPitcherWeights.fast <= computerPitchAndSwingState.standardWeights.fast, "fast computer pitchers should still mix offspeed instead of becoming fastball-heavy");
+assert(computerPitchAndSwingState.fastPitcherWeights.slow >= computerPitchAndSwingState.standardWeights.slow, "fast computer pitchers should keep using timing-changing slower pitches");
 assert(computerPitchAndSwingState.slowPitcherWeights.slow > computerPitchAndSwingState.standardWeights.slow, "slow/breaking computer pitchers should throw more shaped slow pitches");
 assert(computerPitchAndSwingState.shapedBendSegmentCount >= 1, "computer pitchers should build pitch bend segments");
 assert(computerPitchAndSwingState.shapedSpeedSegmentCount >= 1, "computer pitchers should build speed-change segments");
 assert(Math.abs(computerPitchAndSwingState.specialChance0Strike - 0.03) < 0.0001, "computer special pitch chance should be 3% at 0 strikes with empty bases");
 assert(Math.abs(computerPitchAndSwingState.specialChance1Strike - 0.09) < 0.0001, "computer special pitch chance should be 9% at 1 strike with empty bases");
-assert(Math.abs(computerPitchAndSwingState.specialChance2Strike - 0.27) < 0.0001, "computer special pitch chance should be 27% at 2 strikes with empty bases");
-assert(Math.abs(computerPitchAndSwingState.specialChanceRunner - 0.34) < 0.0001, "computer special pitch chance should gain 7 points with a runner aboard");
-assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.43) < 0.0001, "computer special pitch chance should gain 16 points with a runner in scoring position");
+assert(Math.abs(computerPitchAndSwingState.specialChance2Strike - 0.3) < 0.0001, "computer special pitch chance should rise at 2 strikes when stamina remains");
+assert(Math.abs(computerPitchAndSwingState.specialChanceRunner - 0.39) < 0.0001, "computer special pitch chance should rise further with a runner aboard when stamina remains");
+assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.5) < 0.0001, "computer special pitch chance should rise further in scoring position when stamina remains");
 assert(computerPitchAndSwingState.specialPlanType === "special" && computerPitchAndSwingState.specialPlanSpread === 12, "computer pitchers should select special pitches when the special roll wins");
+assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerPitchAndSwingState.fastBallCourseIsBall === true, "fast/special computer courses should split at sixty-percent strike intent");
+assert(computerPitchAndSwingState.slowBallCourseIsBall === true && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should treat ball-to-strike bend as part of the sixty-percent strike intent");
 assert(computerPitchAndSwingState.shapedTargetNearBatter === false, "computer pitchers should rarely choose targets near the batter body");
 assert(computerPitchAndSwingState.shapedCurvePower > 0.25, "computer pitch shaping should visibly bend the live pitch");
 assert(computerPitchAndSwingState.shapedSpeedScale > 1.008, "computer pitch shaping should visibly change live pitch speed");

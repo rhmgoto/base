@@ -125,11 +125,11 @@ const batterMoveTuning = {
 const showHbpHitBox = false;
 
 const batters = [
-  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 7, run: 8, infieldDefense: 4, outfieldDefense: 8, arm: 8, cost: 9 },
+  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
   { id: "ichiro", name: "イチロー", bats: "L", power: 3, meet: 17, run: 10, infieldDefense: 3, outfieldDefense: 11, arm: 11, cost: 17 },
   { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 5, cost: 5 },
   { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 7, run: 4, infieldDefense: 7, outfieldDefense: 2, arm: 5, cost: 6 },
-  { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
+  { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
   { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 3, run: 10, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 5 },
   { id: "shinjo", name: "シンジョウ", bats: "R", power: 3, meet: 2, run: 6, infieldDefense: 3, outfieldDefense: 9, arm: 9, cost: 4 },
   { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 5, arm: 7, cost: 5 },
@@ -144,18 +144,20 @@ const batters = [
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 8, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
   { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 7, cost: 8 },
+  { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
+  { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
+  { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
+  { id: "bonds", name: "ボンズ", bats: "L", power: 13, meet: 9, run: 8, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 17 },
   { id: "outman", name: "アウトマン", bats: "L", power: 6, meet: 2, run: 5, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 4 },
   { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 2 },
   { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
-  { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
-  { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
-  { id: "taira", name: "タイラ", bats: "R", power: 7, meet: 1, run: 7, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 3 },
-  { id: "bonds", name: "ボンズ", bats: "L", power: 13, meet: 9, run: 8, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 17 },
   { id: "sadaharu", name: "サダハル", bats: "L", power: 14, meet: 9, run: 5, infieldDefense: 8, outfieldDefense: 2, arm: 7, cost: 17 },
   { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 3, cost: 4 },
   { id: "tucker", name: "タッカー", bats: "L", power: 6, meet: 5, run: 7, infieldDefense: 2, outfieldDefense: 6, arm: 7, cost: 5 },
   { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 5, cost: 5 },
-  { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 }
+  { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 },
+  { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
+  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 }
 ];
 
 const catchers = [
@@ -170,14 +172,14 @@ const catchers = [
 ];
 
 const pitchers = [
-  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 4, slowChange: 8, fastChange: 7, control: 5, stuff: 8, fielding: 6, stamina: 7, cost: 8 },
+  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 9, fastChange: 8, control: 6, stuff: 9, fielding: 7, stamina: 8, cost: 9 },
   { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 7, control: 8, stuff: 7, fielding: 6, stamina: 7, cost: 8 },
   { id: "saiki", name: "サイキ", throws: "R", fastKmh: 155, rightBreak: 5, leftBreak: 2, slowChange: 10, fastChange: 6, control: 6, stuff: 6, fielding: 5, stamina: 7, cost: 6 },
   { id: "kershaw", name: "カーショウ", throws: "L", fastKmh: 148, rightBreak: 4, leftBreak: 10, slowChange: 6, fastChange: 4, control: 8, stuff: 5, fielding: 4, stamina: 5, cost: 6 },
   { id: "hikari", name: "ヒカリ", throws: "L", fastKmh: 220, rightBreak: 1, leftBreak: 1, slowChange: 9, fastChange: 1, control: 3, stuff: 6, fielding: 4, stamina: 6, cost: 5 },
   { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 5 },
   { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
-  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 6, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 4, cost: 7 },
+  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 6, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 7 },
   { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 9, control: 7, stuff: 11, fielding: 8, stamina: 12, cost: 15 },
   { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 8, fielding: 6, stamina: 2, cost: 4 },
   { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
@@ -187,12 +189,15 @@ const pitchers = [
   { id: "sasaki", name: "ササキ", throws: "R", fastKmh: 165, rightBreak: 5, leftBreak: 2, slowChange: 6, fastChange: 4, control: 4, stuff: 7, fielding: 4, stamina: 5, cost: 6 },
   { id: "matsui", name: "マツイ", throws: "L", fastKmh: 150, rightBreak: 2, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 5, fielding: 5, stamina: 2, cost: 3 },
   { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 2, cost: 3 },
-  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 6, leftBreak: 3, slowChange: 5, fastChange: 5, control: 1, stuff: 6, fielding: 3, stamina: 6, cost: 6 },
-  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 5, leftBreak: 7, slowChange: 8, fastChange: 4, control: 5, stuff: 4, fielding: 5, stamina: 7, cost: 8 },
-  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 5 },
-  { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 7 },
+  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 6, leftBreak: 3, slowChange: 5, fastChange: 5, control: 1, stuff: 6, fielding: 3, stamina: 6, cost: 5 },
+  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 5, leftBreak: 8, slowChange: 8, fastChange: 4, control: 5, stuff: 7, fielding: 5, stamina: 7, cost: 8 },
+  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
+  { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 10, leftBreak: 9, slowChange: 9, fastChange: 10, control: 9, stuff: 11, fielding: 8, stamina: 12, cost: 18 },
-  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 14, leftBreak: 12, slowChange: 11, fastChange: 10, control: 11, stuff: 10, fielding: 7, stamina: 11, cost: 17 }
+  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 14, leftBreak: 12, slowChange: 11, fastChange: 10, control: 11, stuff: 10, fielding: 7, stamina: 11, cost: 17 },
+  { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 152, rightBreak: 9, leftBreak: 3, slowChange: 7, fastChange: 3, control: 5, stuff: 7, fielding: 6, stamina: 7, cost: 6 },
+  { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 163, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 5, stuff: 10, fielding: 5, stamina: 2, cost: 4 }
 ];
 
 const pitchTypes = {
@@ -205,6 +210,8 @@ const pitchTypes = {
 // 表示球速はそのままに、実際の到達時間だけを調整する係数。
 const actualPitchSpeedReductionScale = 0.8;
 const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * actualPitchSpeedReductionScale;
+const computerPitchShapeRateScale = 0.9;
+const computerPitchStrikeZoneRateScale = 1.3;
 const pitcherAbilityTuning = {
   globalMultiplier: 1.1,
   stuffBoost: 0,
@@ -267,22 +274,24 @@ const buntTuning = {
   badLineSweetSpotScale: 0.16,
   badLineMin: 0.08,
   badLineMax: 0.48,
-  foulBase: 0.055,
-  foulQualityScale: 0.2,
-  foulTimingScale: 0.075,
-  foulBadContactScale: 0.08,
-  foulMin: 0.055,
-  foulMax: 0.3,
-  popupBase: 0.14,
-  popupBadContactScale: 0.82,
-  popupTimingScale: 0.18,
-  popupMin: 0.22,
+  foulBase: 0.075,
+  foulQualityScale: 0.24,
+  foulTimingScale: 0.09,
+  foulBadContactScale: 0.12,
+  foulMin: 0.075,
+  foulMax: 0.36,
+  popupBase: 0.018,
+  popupBadContactScale: 0.72,
+  popupTimingScale: 0.08,
+  popupMin: 0.018,
   popupMax: 0.9,
-  forcePopupBadScore: 0.56,
+  forcePopupBadScore: 0.72,
   solidContactQuality: 0.48,
   solidContactTiming: 0.46,
   solidContactSweetSpot: 0.44,
-  solidContactPopupReduction: 0.76
+  solidContactPopupReduction: 0.98,
+  solidLineChance: 0.28,
+  solidPitcherFrontChance: 0.58
 };
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
@@ -325,7 +334,7 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 59;
+const teamPointLimit = 60;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
@@ -461,6 +470,7 @@ const runnerSpeedScale = 0.85;
 const runnerSpeedBaseRun = 3.5;
 const runnerSpeedUnit = 27.84375;
 const abilitySpeedBaseRating = 3.5;
+const lowAbilityActualBoost = 1.2;
 const fielderSpeedUnit = 21.176470588235293;
 const defenseFielderMoveSpeedScale = 0.880308;
 const throwSpeedUnit = 89.29411764705881;
@@ -2704,6 +2714,9 @@ function startPitch(typeKey, options = {}) {
     message = "球種は 5/8/2/0 から選んでください";
     return;
   }
+  if (Number.isFinite(options.pitcherX)) {
+    pitcher.x = clamp(options.pitcherX, pitcher.minX, pitcher.maxX);
+  }
   const now = performance.now();
   if (gameMode === "practice") battingFeedback.active = false;
   const startX = pitcher.x;
@@ -2967,18 +2980,21 @@ function getComputerPitchTypeWeights(player = activePitcher) {
   const breakSkill = Math.max(player?.rightBreak ?? 5, player?.leftBreak ?? 5);
   const slowSkill = player?.slowChange ?? 5;
   const fastChangeSkill = player?.fastChange ?? 5;
-  const velocityBias = clamp((fastKmh - 150) / 38, -1, 1);
   const slowPitcherBias = clamp((148 - fastKmh) / 42, 0, 1);
   const breakingBias = clamp((breakSkill + slowSkill + fastChangeSkill - 15) / 18, 0, 1);
+  const powerPitcherBreakingBias = clamp((fastKmh - 158) / 26, 0, 1) * clamp((slowSkill + fastChangeSkill - 9) / 10, 0, 1);
   const weights = {
-    fast: 0.4 + velocityBias * 0.18 - slowPitcherBias * 0.14,
-    normal: 0.3 - Math.max(velocityBias, 0) * 0.04 + slowPitcherBias * 0.03,
-    slow: 0.3 - Math.max(velocityBias, 0) * 0.1 + slowPitcherBias * 0.11 + breakingBias * 0.1
+    fast: 0.4 - slowPitcherBias * 0.1 - powerPitcherBreakingBias * 0.08,
+    normal: 0.3 + slowPitcherBias * 0.03 + powerPitcherBreakingBias * 0.03,
+    slow: 0.3 + slowPitcherBias * 0.1 + breakingBias * 0.1 + powerPitcherBreakingBias * 0.05
   };
+  const clampedSlow = clamp(weights.slow, 0.16, 0.58);
+  const reducedSlow = clampedSlow * computerPitchShapeRateScale;
+  const redistributedSlow = clampedSlow - reducedSlow;
   return normalizePitchTypeWeights({
-    fast: clamp(weights.fast, 0.16, 0.68),
-    normal: clamp(weights.normal, 0.18, 0.46),
-    slow: clamp(weights.slow, 0.16, 0.58)
+    fast: clamp(weights.fast, 0.16, 0.68) + redistributedSlow * 0.6,
+    normal: clamp(weights.normal, 0.18, 0.46) + redistributedSlow * 0.4,
+    slow: clamp(reducedSlow, 0.12, 0.48)
   });
 }
 
@@ -3012,26 +3028,50 @@ function syncComputerPitchPlanLegacyFields(plan) {
   return plan;
 }
 
-function getComputerPitchCornerCourse(type) {
+function getPreferredComputerBendDirection(player = activePitcher, fallbackDirection = 0, roll = Math.random()) {
+  const rightBreak = clamp(player?.rightBreak ?? 5, 0, 20);
+  const leftBreak = clamp(player?.leftBreak ?? 5, 0, 20);
+  if (Math.abs(rightBreak - leftBreak) < 1) return fallbackDirection || (roll < 0.5 ? -1 : 1);
+  const preferredDirection = rightBreak > leftBreak ? 1 : -1;
+  const advantage = Math.abs(rightBreak - leftBreak);
+  const preferredChance = clamp(0.58 + advantage * 0.035, 0.58, 0.86);
+  return roll < preferredChance ? preferredDirection : (fallbackDirection || -preferredDirection);
+}
+
+function getPreferredComputerSpeedChangeDirection(player = activePitcher, fallbackDirection = -1, roll = Math.random()) {
+  const slowSkill = clamp(player?.slowChange ?? 5, 0, 20);
+  const fastSkill = clamp(player?.fastChange ?? 5, 0, 20);
+  if (Math.abs(fastSkill - slowSkill) < 1) return fallbackDirection;
+  const preferredDirection = fastSkill > slowSkill ? 1 : -1;
+  const advantage = Math.abs(fastSkill - slowSkill);
+  const preferredChance = clamp(0.56 + advantage * 0.04, 0.56, 0.88);
+  return roll < preferredChance ? preferredDirection : fallbackDirection;
+}
+
+function getComputerPitchCornerCourse(type, player = activePitcher) {
   const dangerousDirection = getDangerousBendDirectionForBatter();
   const awayFromBatter = -dangerousDirection;
   const roll = Math.random();
+  const strikeOffsetScale = 1 / computerPitchStrikeZoneRateScale;
   if (type === "fast" || type === "special") {
-    if (roll < 0.5) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(44, 62), intent: "awayEdge" };
-    if (roll < 0.82) {
+    if (roll < 0.34) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(44, 62) * strikeOffsetScale, intent: "awayEdge" };
+    if (roll < 0.54) {
       const side = Math.random() < 0.5 ? -1 : 1;
-      return { direction: side === dangerousDirection && Math.random() > 0.08 ? awayFromBatter : side, offset: side * randomBetween(42, 60), intent: "edge" };
+      return { direction: side === dangerousDirection && Math.random() > 0.08 ? awayFromBatter : side, offset: side * randomBetween(42, 60) * strikeOffsetScale, intent: "edge" };
     }
-    if (roll < 0.96) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(66, 88), intent: "awayBall" };
-    return { direction: 0, offset: randomBetween(-12, 12), intent: "showCenter" };
+    if (roll < 0.6) return { direction: 0, offset: randomBetween(-12, 12), intent: "showCenter" };
+    if (roll < 0.82) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(54, 74) * strikeOffsetScale, intent: "awayEscape" };
+    return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(66, 88) * strikeOffsetScale, intent: "awayBall" };
   }
-  if (roll < 0.32) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(34, 58), intent: "strikeToBall" };
-  if (roll < 0.62) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(32, 54), intent: "backdoor" };
-  if (roll < 0.88) {
-    const side = Math.random() < 0.5 ? -1 : 1;
-    return { direction: side, offset: side * randomBetween(26, 52), intent: "edge" };
+  if (roll < 0.24) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(34, 58) * strikeOffsetScale, intent: "strikeToBall" };
+  if (roll < 0.4) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(44, 70) * strikeOffsetScale, intent: "speedEscape" };
+  if (roll < 0.56) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(32, 54) * strikeOffsetScale, intent: "backdoor" };
+  if (roll < 0.72) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 50) * strikeOffsetScale, intent: "frontdoor" };
+  if (roll < 0.94) {
+    const side = getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
+    return { direction: side, offset: side * randomBetween(26, 52) * strikeOffsetScale, intent: "edge" };
   }
-  return { direction: 0, offset: randomBetween(-16, 16), intent: "showCenter" };
+  return { direction: 0, offset: randomBetween(-12, 12), intent: "showCenter" };
 }
 
 function buildComputerPitchShape(plan, player = activePitcher) {
@@ -3050,27 +3090,37 @@ function buildComputerPitchShape(plan, player = activePitcher) {
   const shapeSkill = clamp((breakSkill + slowSkill + fastChangeSkill) / 30, 0.1, 1.25);
   const bendSegments = [];
   const speedChangeSegments = [];
+  const preferredBendDirection = getSafeBendDirectionForBatter(getPreferredComputerBendDirection(player, awayFromBatter), 0.5);
+  const preferredSpeedChangeDirection = getPreferredComputerSpeedChangeDirection(player, type === "slow" ? -1 : 1);
 
   if (type === "fast") {
-    if (Math.random() < 0.42) {
-      bendSegments.push(createComputerBendSegment(getSafeBendDirectionForBatter(awayFromBatter), 0.68, 0.94, 0.86, 0.58 + shapeSkill * 0.38));
+    const isAwayEscape = course.intent === "awayEscape";
+    if (isAwayEscape || Math.random() < 0.42) {
+      const bendDirection = isAwayEscape ? awayFromBatter : preferredBendDirection;
+      bendSegments.push(createComputerBendSegment(bendDirection, 0.64, 0.96, isAwayEscape ? 0.96 : 0.86, (isAwayEscape ? 0.72 : 0.58) + shapeSkill * 0.38));
     }
-    if (Math.random() < 0.32) {
-      speedChangeSegments.push(createComputerSpeedChangeSegment(1, 0.72, 0.96, 0.86, 0.72 + (fastChangeSkill ?? 5) * 0.045));
+    if (isAwayEscape || Math.random() < 0.32) {
+      const speedDirection = isAwayEscape ? -1 : getPreferredComputerSpeedChangeDirection(player, 1);
+      speedChangeSegments.push(createComputerSpeedChangeSegment(speedDirection, 0.7, 0.98, isAwayEscape ? 0.94 : 0.86, (isAwayEscape ? 1.02 : 0.72) + (fastChangeSkill ?? 5) * 0.045));
     }
   } else {
-    const firstDirection = course.intent === "backdoor" ? getSafeBendDirectionForBatter(course.direction) : getSafeBendDirectionForBatter(awayFromBatter);
+    const escapeIntent = course.intent === "strikeToBall" || course.intent === "speedEscape";
+    const firstDirection = course.intent === "backdoor" || course.intent === "frontdoor" || escapeIntent
+      ? getSafeBendDirectionForBatter(course.direction, 0.5)
+      : preferredBendDirection;
     bendSegments.push(createComputerBendSegment(firstDirection, randomBetween(0.52, 0.66), randomBetween(0.78, 0.9), 0.94, 0.88 + shapeSkill * 0.42));
-    if (type === "slow" && Math.random() < 0.56 + slowSkill * 0.035) {
+    if (type === "slow" && Math.random() < 0.62 + slowSkill * 0.038) {
       bendSegments.push(createComputerBendSegment(-firstDirection, randomBetween(0.68, 0.78), randomBetween(0.86, 0.98), 0.88, 0.56 + shapeSkill * 0.32));
     }
-    if (type === "slow" && Math.random() < 0.24 + breakSkill * 0.025) {
+    if (type === "slow" && Math.random() < 0.32 + breakSkill * 0.028) {
       bendSegments.push(createComputerBendSegment(firstDirection, randomBetween(0.8, 0.86), 0.99, 0.82, 0.42 + shapeSkill * 0.24));
     }
-    if (Math.random() < (type === "slow" ? 0.72 : 0.58)) {
+    if (course.intent === "speedEscape" || Math.random() < (type === "slow" ? 0.72 : 0.58)) {
       const slowBias = type === "slow" ? 0.68 : 0.48;
-      const direction = Math.random() < slowBias ? -1 : 1;
-      speedChangeSegments.push(createComputerSpeedChangeSegment(direction, randomBetween(0.64, 0.76), randomBetween(0.86, 0.98), 0.9, 0.82 + Math.max(slowSkill, fastChangeSkill) * 0.055));
+      const fallbackDirection = Math.random() < slowBias ? -1 : 1;
+      const direction = course.intent === "speedEscape" && type === "slow" ? 1 : getPreferredComputerSpeedChangeDirection(player, fallbackDirection);
+      const powerBonus = course.intent === "speedEscape" ? 0.34 : 0;
+      speedChangeSegments.push(createComputerSpeedChangeSegment(direction, randomBetween(0.64, 0.76), randomBetween(0.86, 0.98), 0.92, 0.82 + powerBonus + Math.max(slowSkill, fastChangeSkill) * 0.055));
     }
   }
 
@@ -3113,11 +3163,12 @@ function chooseComputerPitchPlan() {
     const regularRoll = (typeRoll - specialChance) / Math.max(0.01, 1 - specialChance);
     type = chooseWeightedComputerPitchType(getComputerPitchTypeWeights(activePitcher), regularRoll);
   }
-  const course = getComputerPitchCornerCourse(type);
+  const course = getComputerPitchCornerCourse(type, activePitcher);
 
   const plan = {
     type,
     course,
+    pitcherX: getComputerPitcherPlateX(course, activePitcher),
     targetSpread: type === "special" ? 12 : type === "slow" ? 24 : type === "fast" ? 12 : 18,
     bendSegments: [],
     speedChangeSegments: []
@@ -3131,13 +3182,23 @@ function chooseComputerPitchPlan() {
   return buildComputerPitchShape(plan, activePitcher);
 }
 
+function getComputerPitcherPlateX(course, player = activePitcher) {
+  const side = course?.direction || getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
+  const edgeBias = course?.intent === "awayBall" || course?.intent === "strikeToBall" ? 1.1 : course?.intent === "showCenter" ? 0.45 : 0.8;
+  return clamp(field.centerX - side * randomBetween(18, 58) * edgeBias, pitcher.minX, pitcher.maxX);
+}
+
 function getComputerSpecialPitchChance() {
   const strikes = clamp(count?.strikes ?? 0, 0, 2);
   const baseChance = strikes >= 2 ? 0.27 : strikes === 1 ? 0.09 : 0.03;
   const scoringRunner = Boolean(bases?.second || bases?.third);
   const anyRunner = scoringRunner || Boolean(bases?.first);
   const runnerBonus = scoringRunner ? 0.16 : anyRunner ? 0.07 : 0;
-  return clamp(baseChance + runnerBonus, 0, 0.95);
+  const staminaPercent = getPitcherStaminaPercent(activePitcher);
+  const enoughStamina = staminaPercent >= 0.42;
+  const tiredPenalty = staminaPercent < 0.22 ? 0.12 : staminaPercent < 0.34 ? 0.06 : 0;
+  const pinchBonus = enoughStamina ? ((scoringRunner ? 0.04 : anyRunner ? 0.02 : 0) + (strikes >= 2 ? 0.03 : 0)) : 0;
+  return clamp(baseChance + runnerBonus + pinchBonus - tiredPenalty, 0, 0.95);
 }
 
 function computerBendPitch() {
@@ -3148,7 +3209,7 @@ function computerBendPitch() {
     : [{ direction: computerPitchPlan.bendDirection, start: computerPitchPlan.bendStart, end: computerPitchPlan.bendEnd, chance: computerPitchPlan.bendChance, power: computerPitchPlan.bendPower }];
   bendSegments.forEach((segment) => {
     if (segment.direction !== 0 && progress > segment.start && progress < segment.end) {
-      applyPitchBend(segment.direction, 1.08 * (segment.chance ?? 1) * (segment.power ?? 1), progress);
+      applyPitchBend(segment.direction, 1.08 * computerPitchShapeRateScale * (segment.chance ?? 1) * (segment.power ?? 1), progress);
     }
   });
   const speedChangeSegments = computerPitchPlan.speedChangeSegments?.length
@@ -3156,7 +3217,7 @@ function computerBendPitch() {
     : [{ direction: computerPitchPlan.speedChangeDirection, start: computerPitchPlan.speedChangeStart, end: computerPitchPlan.speedChangeEnd, chance: computerPitchPlan.speedChangeChance, power: computerPitchPlan.speedChangePower }];
   speedChangeSegments.forEach((segment) => {
     if (segment.direction !== 0 && progress > segment.start && progress < segment.end) {
-      applyPitchSpeedChange(segment.direction, 1.02 * (segment.chance ?? 1) * (segment.power ?? 1));
+      applyPitchSpeedChange(segment.direction, 1.02 * computerPitchShapeRateScale * (segment.chance ?? 1) * (segment.power ?? 1));
     }
   });
 }
@@ -3929,7 +3990,6 @@ function nudgeGoodContactDirectionFair(direction, contact, result = {}) {
 }
 
 function showBattingFeedback(contact, result = {}) {
-  if (gameMode !== "practice") return;
   battingFeedback = {
     active: true,
     startTime: performance.now(),
@@ -5371,13 +5431,23 @@ function buildBattedBallProfile(contact) {
           0,
           1
         );
+    const solidBuntContact = buntQuality >= buntTuning.solidContactQuality
+      && timingScore >= buntTuning.solidContactTiming
+      && sweetSpotScore >= buntTuning.solidContactSweetSpot;
     const lineChance = goodBunt
       ? buntTuning.goodLineChance
+      : solidBuntContact
+      ? buntTuning.solidLineChance
       : clamp(
           buntTuning.badLineBase + buntQuality * buntTuning.badLineQualityScale + sweetSpotScore * buntTuning.badLineSweetSpotScale,
           buntTuning.badLineMin,
           buntTuning.badLineMax
         );
+    const pitcherFrontChance = goodBunt
+      ? 0.08
+      : solidBuntContact
+      ? buntTuning.solidPitcherFrontChance
+      : 0.34;
     const roll = Math.random();
     const side = Math.random() < 0.5 ? -1 : 1;
     const buntFoulChance = clamp(
@@ -5394,9 +5464,6 @@ function buildBattedBallProfile(contact) {
       buntTuning.popupMin,
       buntTuning.popupMax
     );
-    const solidBuntContact = buntQuality >= buntTuning.solidContactQuality
-      && timingScore >= buntTuning.solidContactTiming
-      && sweetSpotScore >= buntTuning.solidContactSweetSpot;
     const popupProtection = solidBuntContact
       ? clamp(
           ((buntQuality - buntTuning.solidContactQuality) / 0.28)
@@ -5414,7 +5481,7 @@ function buildBattedBallProfile(contact) {
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance
       ? normalize({ x: side * randomBetween(0.58, 0.86), y: -randomBetween(0.72, 0.94) })
-      : roll < lineChance + (goodBunt ? 0.08 : 0.34)
+      : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92, 1.18), y: -randomBetween(0.38, 0.68) });
     const buntPower = clamp(0.12 + buntQuality * 0.22, 0.1, 0.34);
@@ -5447,6 +5514,7 @@ function buildBattedBallProfile(contact) {
       isFoul: finalBuntIsFoul,
       buntQuality,
       buntLineChance: lineChance,
+      buntPitcherFrontChance: pitcherFrontChance,
       buntFoulChance,
       badBuntScore,
       pitcherBuntPopupChance,
@@ -6380,18 +6448,25 @@ function getBaseCompressedMovementRating(rating) {
   return 1 + (value - 1) * highRunCompression;
 }
 
+function boostLowActualAbilityRating(currentRating, maxRating) {
+  const boostedRatingOne = Math.min(maxRating, (abilitySpeedBaseRating + currentRating) * lowAbilityActualBoost - abilitySpeedBaseRating);
+  return { boostedRatingOne, maxRating };
+}
+
 function getRedistributedMovementRating(rating) {
   const value = clamp(rating ?? 5, 1, 10);
   const oldRatingThree = getBaseCompressedMovementRating(3);
   const oldRatingTen = getBaseCompressedMovementRating(10);
-  return oldRatingThree + ((value - 1) / 9) * (oldRatingTen - oldRatingThree);
+  const boosted = boostLowActualAbilityRating(oldRatingThree, oldRatingTen);
+  return boosted.boostedRatingOne + ((value - 1) / 9) * (boosted.maxRating - boosted.boostedRatingOne);
 }
 
 function getRedistributedFieldingMovementRating(rating) {
   const value = clamp(rating ?? 5, 1, 10);
   const oldRatingFloor = getBaseCompressedMovementRating(3.6);
   const oldRatingTen = getBaseCompressedMovementRating(10);
-  return oldRatingFloor + ((value - 1) / 9) * (oldRatingTen - oldRatingFloor);
+  const boosted = boostLowActualAbilityRating(oldRatingFloor, oldRatingTen);
+  return boosted.boostedRatingOne + ((value - 1) / 9) * (boosted.maxRating - boosted.boostedRatingOne);
 }
 
 function shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome) {
@@ -6496,7 +6571,7 @@ function getPendingHomeRunRuns() {
 function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, battedProfile = null) {
   const direction = hitDirection || getHitDirection(timeDiff, false);
   const battedBall = buildBattedBall(power, direction, label, battedProfile);
-  appendPracticeBattedBallFeedback(battedBall);
+  appendBattedBallFeedback(battedBall);
   const fielders = getDefensiveLineup(fieldingTeam()).map((fielder) => ({ ...fielder, currentX: fielder.x, currentY: fielder.y }));
   const manualFielding = isManualDefenseControl() && !shouldAutoFieldFlyInManualDefense(battedBall) && !battedBall.fenceOver && !battedBall.wallHit;
   let chosenFielder = battedBall.isBunt ? chooseBuntDefenseFielder(fielders, battedBall) : chooseDefenseFielder(fielders, battedBall);
@@ -6610,8 +6685,8 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
 }
 
-function appendPracticeBattedBallFeedback(battedBall) {
-  if (gameMode !== "practice" || !battingFeedback.active || !battedBall) return;
+function appendBattedBallFeedback(battedBall) {
+  if (!battingFeedback.active || !battedBall) return;
   const launchAngle = getDisplayLaunchAngleDegrees(battedBall);
   const exitSpeed = battedBall.exitSpeedKmh ?? getDisplayExitSpeedKmh({
     power: battedBall.power,
@@ -7751,7 +7826,10 @@ function getThrowBouncePoint(throwState) {
 }
 
 function getArmThrowSpeed(armRating) {
-  return (abilitySpeedBaseRating + clamp(armRating ?? 5, 1, 10)) * throwSpeedUnit;
+  const value = clamp(armRating ?? 5, 1, 10);
+  const boosted = boostLowActualAbilityRating(1, 10);
+  const effectiveArm = boosted.boostedRatingOne + ((value - 1) / 9) * (boosted.maxRating - boosted.boostedRatingOne);
+  return (abilitySpeedBaseRating + effectiveArm) * throwSpeedUnit;
 }
 
 function resolveGrounderPickupThrow(fielder, battedBall, outcome, fieldingTarget, runner) {
@@ -12615,8 +12693,8 @@ function drawBattingFeedback() {
   const alpha = gameMode === "practice" ? 1 : age > 4300 ? clamp(1 - (age - 4300) / 900, 0, 1) : 1;
   const width = 410;
   const height = 132;
-  const x = clamp(field.centerX - width / 2, 20, canvas.width - width - 20);
-  const y = 96;
+  const x = 18;
+  const y = canvas.height - height - 18;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = "rgba(20, 30, 44, 0.88)";
