@@ -2049,6 +2049,13 @@ function chooserStatRow(label, value, sortKey, options = {}) {
   return statRow(label, value, { ...options, sortKey, className });
 }
 
+function chooserHandRow(label, value, handValue) {
+  const className = ["sortable-stat", chooserSortState.key === "hand" && chooserSortState.hand === handValue ? "sort-active" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return statRow(label, value, { sortKey: "hand", sortHand: handValue, className });
+}
+
 function chooserSpeedRow(label, value, sortKey) {
   return speedRow(label, value, { sortKey, className: chooserSortState.key === sortKey ? "sortable-stat sort-active" : "sortable-stat" });
 }
@@ -2061,7 +2068,7 @@ function getChooserPlayerStats(player, kind, role = null) {
   if (kind === "pitcher") {
     return [
       chooserSpeedRow("球速", player.fastKmh, "fastKmh"),
-      statRow("投", handLabel(player.throws)),
+      chooserHandRow("投", handLabel(player.throws), player.throws),
       pitchCross(player, true),
       chooserStatRow("制球", player.control, "control"),
       chooserStatRow("球威", player.stuff, "stuff"),
@@ -2071,7 +2078,7 @@ function getChooserPlayerStats(player, kind, role = null) {
   }
   if (kind === "catcher" || isCatcherRole(role) || isCatcherLikePlayer(player)) {
     return [
-      statRow("打", handLabel(player.bats)),
+      chooserHandRow("打", handLabel(player.bats), player.bats),
       chooserStatRow("パワー", player.power, "power"),
       chooserStatRow("ミート", player.meet, "meet"),
       chooserStatRow("走塁", player.run, "run"),
@@ -2081,7 +2088,7 @@ function getChooserPlayerStats(player, kind, role = null) {
   const infield = player.infieldDefense ?? player.fielding ?? 5;
   const outfield = player.outfieldDefense ?? player.fielding ?? 5;
   return [
-    statRow("打", handLabel(player.bats)),
+    chooserHandRow("打", handLabel(player.bats), player.bats),
     chooserStatRow("パワー", player.power, "power"),
     chooserStatRow("ミート", player.meet, "meet"),
     chooserStatRow("走塁", player.run, "run"),
@@ -2097,7 +2104,7 @@ function renderChooserOption(player, team, role, kind) {
   const side = kind === "pitcher" ? handLabel(player.throws) : handLabel(player.bats);
   return `
     <button class="chooser-option${selectedClass}${unavailableClass}" type="button" data-team="${escapeHtml(team)}" data-role="${escapeHtml(role)}" data-player-id="${escapeHtml(player.id)}" data-kind="${escapeHtml(kind)}" ${unavailable ? "disabled" : ""}>
-      <strong class="chooser-player-title"><span>${escapeHtml(player.name)} ${escapeHtml(side)}</span><em>${player.cost ?? 5}P</em></strong>
+      <strong class="chooser-player-title"><span>${escapeHtml(player.name)} <span class="chooser-hand-sort sortable-stat${chooserSortState.key === "hand" && chooserSortState.hand === (kind === "pitcher" ? player.throws : player.bats) ? " sort-active" : ""}" data-sort-key="hand" data-sort-hand="${escapeHtml(kind === "pitcher" ? player.throws : player.bats)}">${escapeHtml(side)}</span></span><em class="sortable-stat${chooserSortState.key === "cost" ? " sort-active" : ""}" data-sort-key="cost">${player.cost ?? 5}P</em></strong>
       <div class="chooser-card-stats compact-stats">${getChooserPlayerStats(player, kind, role)}</div>
     </button>
   `;
@@ -2120,10 +2127,14 @@ function renderPlayerChooserOptions() {
 }
 
 function getChooserSortValue(player, key) {
-  if (!key) return player.cost ?? 5;
+  if (!key || key === "cost") return player.cost ?? 5;
   if (key === "infieldDefense") return player.infieldDefense ?? player.fielding ?? 5;
   if (key === "outfieldDefense") return player.outfieldDefense ?? player.fielding ?? 5;
   return Number(player[key] ?? 0);
+}
+
+function getChooserPlayerHand(player, kind = chooserSortState.kind) {
+  return kind === "pitcher" ? player.throws : player.bats;
 }
 
 function getChooserPlayerList(kind) {
@@ -2132,6 +2143,12 @@ function getChooserPlayerList(kind) {
   return source
     .map((player, index) => ({ player, index }))
     .sort((a, b) => {
+      if (sortKey === "hand") {
+        const hand = chooserSortState.hand;
+        return (getChooserPlayerHand(b.player, kind) === hand ? 1 : 0) - (getChooserPlayerHand(a.player, kind) === hand ? 1 : 0)
+          || ((b.player.cost ?? 5) - (a.player.cost ?? 5))
+          || (a.index - b.index);
+      }
       if (sortKey) {
         return (getChooserSortValue(b.player, sortKey) - getChooserSortValue(a.player, sortKey))
           || ((b.player.cost ?? 5) - (a.player.cost ?? 5))
@@ -2142,9 +2159,10 @@ function getChooserPlayerList(kind) {
     .map((entry) => entry.player);
 }
 
-function sortPlayerChooserBy(key) {
+function sortPlayerChooserBy(key, options = {}) {
   if (!key || playerChooser.classList.contains("hidden")) return;
   chooserSortState.key = key;
+  chooserSortState.hand = options.hand || "";
   renderPlayerChooserOptions();
 }
 
@@ -13434,7 +13452,7 @@ chooserOptions.addEventListener("dblclick", (event) => {
   if (!sortTarget) return;
   event.preventDefault();
   event.stopPropagation();
-  sortPlayerChooserBy(sortTarget.dataset.sortKey);
+  sortPlayerChooserBy(sortTarget.dataset.sortKey, { hand: sortTarget.dataset.sortHand || "" });
 });
 pitcherChangeControls?.addEventListener("click", (event) => {
   const button = event.target.closest(".pitcher-change-button");

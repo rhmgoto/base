@@ -930,12 +930,14 @@ canvas {
 }
 
 .stat-row.sortable-stat,
-.cross-cell.sortable-stat {
+.cross-cell.sortable-stat,
+.chooser-player-title .sortable-stat {
   cursor: pointer;
 }
 
 .stat-row.sortable-stat:hover,
-.cross-cell.sortable-stat:hover {
+.cross-cell.sortable-stat:hover,
+.chooser-player-title .sortable-stat:hover {
   border-color: #bf4331;
   box-shadow: 0 0 0 2px rgba(191, 67, 49, 0.16);
 }
@@ -961,7 +963,8 @@ canvas {
 }
 
 .stat-row.sort-active,
-.cross-cell.sort-active {
+.cross-cell.sort-active,
+.chooser-player-title .sort-active {
   border-color: #bf4331;
   background: #fff0b8;
 }
@@ -1191,6 +1194,13 @@ canvas {
   background: #bf4331;
   border-radius: 6px;
 }
+
+.chooser-hand-sort {
+  display: inline-block;
+  padding: 1px 3px;
+  border-radius: 5px;
+}
+
 
 .chooser-card-stats {
   display: grid;
