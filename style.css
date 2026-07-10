@@ -299,12 +299,17 @@ canvas {
   align-items: end;
 }
 
+.team-setup-field {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.36);
+  border: 2px solid rgba(46, 75, 91, 0.22);
+  border-radius: 8px;
+}
+
 .team-preset-field {
   gap: 7px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.52);
-  border: 2px solid rgba(46, 75, 91, 0.24);
-  border-radius: 8px;
 }
 
 .team-preset-field span {
@@ -324,13 +329,6 @@ canvas {
 
 .team-preset-home {
   border-color: rgba(174, 231, 255, 0.72);
-}
-
-.defense-run-settings {
-  grid-column: span 2;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 .defense-run-field {
@@ -1607,6 +1605,11 @@ button {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.practice-pitcher-settings {
+  display: grid;
+  gap: 8px;
+}
+
 .menu-card > button {
   min-height: 34px;
   margin-top: 10px;
@@ -1658,7 +1661,8 @@ button {
   .menu-grid,
   .menu-status-row,
   .team-grid,
-  .defense-run-settings,
+  .team-setup-field,
+  .practice-select-panel,
   .player-picks,
   .ability-board {
     grid-template-columns: 1fr;

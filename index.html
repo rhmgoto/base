@@ -23,23 +23,43 @@
           <div class="menu-card">
             <h2>SIMPLEST BASEBALL</h2>
             <div class="menu-grid">
-              <label class="team-preset-field team-preset-away">
-                <span>チームA 初期チーム</span>
-                <select id="awayPresetSelect">
-                  <option value="tigers" selected>タイガース</option>
-                  <option value="dodgers">ドジャース</option>
-                  <option value="dendos">デンドーズ</option>
-                </select>
-              </label>
+              <div class="team-setup-field team-preset-away">
+                <label class="team-preset-field">
+                  <span>チームA 初期チーム</span>
+                  <select id="awayPresetSelect">
+                    <option value="tigers" selected>タイガース</option>
+                    <option value="dodgers">ドジャース</option>
+                    <option value="dendos">デンドーズ</option>
+                  </select>
+                </label>
+                <label class="defense-run-field defense-run-away">
+                  <span>チームA（1P）守備・走塁</span>
+                  <select id="p1DefenseSelect">
+                    <option value="auto" selected>オート</option>
+                    <option value="semiauto">セミオート</option>
+                    <option value="manual">マニュアル</option>
+                  </select>
+                </label>
+              </div>
 
-              <label class="team-preset-field team-preset-home">
-                <span>チームB 初期チーム</span>
-                <select id="homePresetSelect">
-                  <option value="tigers">タイガース</option>
-                  <option value="dodgers" selected>ドジャース</option>
-                  <option value="dendos">デンドーズ</option>
-                </select>
-              </label>
+              <div class="team-setup-field team-preset-home">
+                <label class="team-preset-field">
+                  <span>チームB 初期チーム</span>
+                  <select id="homePresetSelect">
+                    <option value="tigers">タイガース</option>
+                    <option value="dodgers" selected>ドジャース</option>
+                    <option value="dendos">デンドーズ</option>
+                  </select>
+                </label>
+                <label class="defense-run-field defense-run-home">
+                  <span>チームB（2P）守備・走塁</span>
+                  <select id="p2DefenseSelect">
+                    <option value="auto" selected>オート</option>
+                    <option value="semiauto">セミオート</option>
+                    <option value="manual">マニュアル</option>
+                  </select>
+                </label>
+              </div>
 
               <label>
                 モード
@@ -67,33 +87,6 @@
                   <option value="5">5回</option>
                 </select>
               </label>
-              <div class="defense-run-settings" aria-label="守備・走塁設定">
-                <label class="defense-run-field defense-run-away">
-                  <span>チームA（1P）守備・走塁</span>
-                  <select id="p1DefenseSelect">
-                    <option value="auto" selected>オート</option>
-                    <option value="semiauto">セミオート</option>
-                    <option value="manual">マニュアル</option>
-                  </select>
-                </label>
-
-                <label class="defense-run-field defense-run-home">
-                  <span>チームB（2P）守備・走塁</span>
-                  <select id="p2DefenseSelect">
-                    <option value="auto" selected>オート</option>
-                    <option value="semiauto">セミオート</option>
-                    <option value="manual">マニュアル</option>
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                練習投手
-                <select id="practicePitcherControlSelect">
-                  <option value="auto" selected>オート</option>
-                  <option value="manual">マニュアル</option>
-                </select>
-              </label>
             </div>
 
             <section class="practice-select-panel" aria-label="打撃練習の選手選択">
@@ -101,10 +94,19 @@
                 練習打者
                 <select id="practiceBatterSelect"></select>
               </label>
-              <label>
-                練習投手
-                <select id="practicePitcherSelect"></select>
-              </label>
+              <div class="practice-pitcher-settings">
+                <label>
+                  練習投手
+                  <select id="practicePitcherSelect"></select>
+                </label>
+                <label>
+                  練習投手モード
+                  <select id="practicePitcherControlSelect">
+                    <option value="auto" selected>オート</option>
+                    <option value="manual">マニュアル</option>
+                  </select>
+                </label>
+              </div>
             </section>
 
             <div class="menu-status-row">
