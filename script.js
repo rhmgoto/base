@@ -2874,8 +2874,8 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
     wildness,
     edgeDirection: options.courseDirection || 0,
     edgeFastballPressure,
-    spread: clamp((0.42 + wildness * 4.05 + edgeFastballPressure * 0.68) * fatigueSpread, 0.42, 6.8),
-    verticalSpread: clamp((0.62 + wildness * 3.45 + edgeFastballPressure * 0.38) * (1 + staminaFatigue * 0.82), 0.62, 6.1),
+    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.46) * fatigueSpread, 0.38, 5.45),
+    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.28) * (1 + staminaFatigue * 0.72), 0.58, 4.85),
     wildMissChance: totalMajorMissChance * 0.5,
     mistakeChance: totalMajorMissChance * 0.5
   };
@@ -2970,7 +2970,7 @@ function getPitchControlMiss(controlProfile, intendedX, intendedY) {
     };
   }
   if (roll < controlProfile.mistakeChance + controlProfile.wildMissChance) {
-    const missDistance = randomBetween(54 + controlProfile.wildness * 24, 140 + controlProfile.wildness * 170);
+    const missDistance = randomBetween(42 + controlProfile.wildness * 18, 108 + controlProfile.wildness * 116);
     const angle = randomBetween(0, Math.PI * 2);
     if (controlProfile.edgeDirection) {
       const verticalMiss = randomBetween(-missDistance * 0.55, missDistance * 0.45);
@@ -3146,49 +3146,50 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
   const avoidWasteBall = shouldComputerAvoidWasteBall();
   if (type === "fast" || type === "special") {
     if (prioritizeStrike) {
-      if (roll < 0.36) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(38, 56) * strikeOffsetScale, intent: "awayEdge" };
-      if (roll < 0.64) {
+      if (roll < 0.24) return { direction: 0, offset: randomBetween(-10, 10), intent: "earlyBrakeStrike" };
+      if (roll < 0.5) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "awayEdge" };
+      if (roll < 0.68) {
         const side = Math.random() < 0.5 ? -1 : 1;
-        return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(36, 54) * strikeOffsetScale, intent: "edge" };
+        return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(30, 48) * strikeOffsetScale, intent: "edge" };
       }
-      if (roll < 0.76) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(30, 48) * strikeOffsetScale, intent: "backdoor" };
-      if (roll < 0.88) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 46) * strikeOffsetScale, intent: "frontdoor" };
-      if (roll < 0.96) return { direction: 0, offset: randomBetween(-10, 10), intent: "showCenter" };
-      if (avoidWasteBall) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(38, 54) * strikeOffsetScale, intent: "awayEdge" };
-      return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(48, 64) * strikeOffsetScale, intent: "awayEscape" };
+      if (roll < 0.8) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "backdoor" };
+      if (roll < 0.92) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(26, 42) * strikeOffsetScale, intent: "frontdoor" };
+      return { direction: 0, offset: randomBetween(-8, 8), intent: "showCenter" };
     }
-    if (roll < 0.34) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(44, 62) * strikeOffsetScale, intent: "awayEdge" };
-    if (roll < 0.54) {
+    if (roll < 0.2) return { direction: 0, offset: randomBetween(-12, 12), intent: "earlyBrakeStrike" };
+    if (roll < 0.43) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(38, 56) * strikeOffsetScale, intent: "awayEdge" };
+    if (roll < 0.6) {
       const side = Math.random() < 0.5 ? -1 : 1;
-      return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(42, 60) * strikeOffsetScale, intent: "edge" };
+      return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(36, 54) * strikeOffsetScale, intent: "edge" };
     }
-    if (roll < 0.6) return { direction: 0, offset: randomBetween(-12, 12), intent: "showCenter" };
-    if (roll < 0.82) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(54, 74) * strikeOffsetScale, intent: "awayEscape" };
-    return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(66, 88) * strikeOffsetScale, intent: "awayBall" };
+    if (roll < 0.9) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(48, 66) * strikeOffsetScale, intent: "awayEscape" };
+    return avoidWasteBall
+      ? { direction: awayFromBatter, offset: awayFromBatter * randomBetween(36, 52) * strikeOffsetScale, intent: "awayEdge" }
+      : { direction: awayFromBatter, offset: awayFromBatter * randomBetween(56, 72) * strikeOffsetScale, intent: "awayBall" };
   }
   if (prioritizeStrike) {
-    if (roll < 0.26) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(28, 48) * strikeOffsetScale, intent: "backdoor" };
-    if (roll < 0.52) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(26, 46) * strikeOffsetScale, intent: "frontdoor" };
-    if (roll < 0.7) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(34, 56) * strikeOffsetScale, intent: "acceleratingStrike" };
-    if (roll < 0.88) {
+    if (roll < 0.2) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(26, 44) * strikeOffsetScale, intent: "backdoor" };
+    if (roll < 0.4) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(24, 42) * strikeOffsetScale, intent: "frontdoor" };
+    if (roll < 0.62) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(28, 48) * strikeOffsetScale, intent: "acceleratingStrike" };
+    if (roll < 0.8) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 48) * strikeOffsetScale, intent: "frontdoor" };
+    if (roll < 0.94) {
       const side = getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
       const safeSide = side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side;
-      return { direction: safeSide, offset: safeSide * randomBetween(24, 44) * strikeOffsetScale, intent: "edge" };
+      return { direction: safeSide, offset: safeSide * randomBetween(22, 40) * strikeOffsetScale, intent: "edge" };
     }
-    if (roll < 0.96) return { direction: 0, offset: randomBetween(-10, 10), intent: "showCenter" };
-    if (avoidWasteBall) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "acceleratingStrike" };
-    return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(34, 52) * strikeOffsetScale, intent: "strikeToBall" };
+    return { direction: 0, offset: randomBetween(-8, 8), intent: "showCenter" };
   }
-  if (roll < 0.18) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(34, 58) * strikeOffsetScale, intent: "strikeToBall" };
-  if (roll < 0.4) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(34, 58) * strikeOffsetScale, intent: "acceleratingStrike" };
-  if (roll < 0.52) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(44, 70) * strikeOffsetScale, intent: "speedEscape" };
-  if (roll < 0.64) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(32, 54) * strikeOffsetScale, intent: "backdoor" };
-  if (roll < 0.76) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 50) * strikeOffsetScale, intent: "frontdoor" };
-  if (roll < 0.94) {
+  if (roll < 0.18) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 52) * strikeOffsetScale, intent: "strikeToBall" };
+  if (roll < 0.4) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(30, 52) * strikeOffsetScale, intent: "acceleratingStrike" };
+  if (roll < 0.48) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(36, 58) * strikeOffsetScale, intent: "speedEscape" };
+  if (roll < 0.52) return { direction: dangerousDirection, offset: dangerousDirection * randomBetween(20, 36) * strikeOffsetScale, intent: "hbpBackdoor" };
+  if (roll < 0.64) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(30, 50) * strikeOffsetScale, intent: "backdoor" };
+  if (roll < 0.76) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 46) * strikeOffsetScale, intent: "frontdoor" };
+  if (roll < 0.98) {
     const side = getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
-    return { direction: side, offset: side * randomBetween(26, 52) * strikeOffsetScale, intent: "edge" };
+    return { direction: side, offset: side * randomBetween(24, 46) * strikeOffsetScale, intent: "edge" };
   }
-  return { direction: 0, offset: randomBetween(-12, 12), intent: "showCenter" };
+  return { direction: 0, offset: randomBetween(-10, 10), intent: "showCenter" };
 }
 
 function buildComputerPitchShape(plan, player = activePitcher) {
@@ -3209,60 +3210,81 @@ function buildComputerPitchShape(plan, player = activePitcher) {
   const speedChangeSegments = [];
   const preferredBendDirection = getSafeBendDirectionForBatter(getPreferredComputerBendDirection(player, awayFromBatter), 0.5);
   const preferredSpeedChangeDirection = getPreferredComputerSpeedChangeDirection(player, type === "slow" ? -1 : 1);
+  const addEarlyBrake = (power = 1) => speedChangeSegments.push(createComputerSpeedChangeSegment(-1, randomBetween(0.08, 0.18), randomBetween(0.32, 0.48), 0.98, power + slowSkill * 0.055));
+  const addLateBurst = (power = 1) => speedChangeSegments.push(createComputerSpeedChangeSegment(1, randomBetween(0.58, 0.74), randomBetween(0.88, 0.99), 0.98, power + fastChangeSkill * 0.06));
+  const addMiddleChange = (direction, power = 1) => bendSegments.push(createComputerBendSegment(direction, randomBetween(0.34, 0.48), randomBetween(0.72, 0.9), 0.96, power + shapeSkill * 0.42));
 
   if (type === "fast") {
     const isAwayEscape = course.intent === "awayEscape";
-    if (isAwayEscape || Math.random() < 0.42) {
-      const bendDirection = isAwayEscape ? awayFromBatter : preferredBendDirection;
-      bendSegments.push(createComputerBendSegment(bendDirection, isAwayEscape ? 0.52 : 0.6, 0.94, isAwayEscape ? 0.96 : 0.86, (isAwayEscape ? 0.72 : 0.58) + shapeSkill * 0.38));
-    }
-    if (isAwayEscape || Math.random() < 0.32) {
-      const speedDirection = isAwayEscape ? -1 : getPreferredComputerSpeedChangeDirection(player, 1);
-      speedChangeSegments.push(createComputerSpeedChangeSegment(speedDirection, isAwayEscape ? 0.46 : 0.5, isAwayEscape ? 0.86 : 0.9, isAwayEscape ? 0.96 : 0.88, (isAwayEscape ? 1.08 : 0.78) + (fastChangeSkill ?? 5) * 0.045));
+    const earlyBrakeStrike = course.intent === "earlyBrakeStrike";
+    if (earlyBrakeStrike) {
+      addEarlyBrake(1.18);
+      if (Math.random() < 0.48) addMiddleChange(preferredBendDirection, 0.46);
+      if (Math.random() < 0.58) addLateBurst(1.08);
+    } else {
+      if (isAwayEscape || Math.random() < 0.46) {
+        const bendDirection = isAwayEscape ? awayFromBatter : preferredBendDirection;
+        bendSegments.push(createComputerBendSegment(bendDirection, isAwayEscape ? 0.5 : 0.56, 0.94, isAwayEscape ? 0.96 : 0.88, (isAwayEscape ? 0.76 : 0.6) + shapeSkill * 0.38));
+      }
+      if (isAwayEscape || Math.random() < 0.42) {
+        const speedDirection = isAwayEscape ? -1 : getPreferredComputerSpeedChangeDirection(player, 1);
+        const start = speedDirection < 0 ? randomBetween(0.18, 0.42) : randomBetween(0.38, 0.68);
+        speedChangeSegments.push(createComputerSpeedChangeSegment(speedDirection, start, randomBetween(Math.max(start + 0.16, 0.68), 0.96), isAwayEscape ? 0.96 : 0.9, (isAwayEscape ? 1.08 : 0.82) + Math.max(slowSkill, fastChangeSkill) * 0.05));
+      }
     }
   } else {
-    const escapeIntent = course.intent === "strikeToBall" || course.intent === "speedEscape";
-    const accelerateIntoZone = course.intent === "acceleratingStrike";
-    const firstDirection = course.intent === "backdoor" || course.intent === "frontdoor" || escapeIntent || accelerateIntoZone
-      ? getSafeBendDirectionForBatter(course.direction, 0.5)
-      : preferredBendDirection;
-    const bendStart = escapeIntent || accelerateIntoZone ? randomBetween(0.38, 0.52) : randomBetween(0.48, 0.62);
-    bendSegments.push(createComputerBendSegment(firstDirection, bendStart, randomBetween(0.76, 0.9), 0.94, 0.88 + shapeSkill * 0.42));
-    if (type === "slow" && Math.random() < 0.62 + slowSkill * 0.038) {
-      bendSegments.push(createComputerBendSegment(-firstDirection, randomBetween(0.68, 0.78), randomBetween(0.86, 0.98), 0.88, 0.56 + shapeSkill * 0.32));
+    const escapeIntent = course.intent === "strikeToBall" || course.intent === "strikeToBallBurst" || course.intent === "speedEscape";
+    const accelerateIntoZone = course.intent === "acceleratingStrike" || course.intent === "ballToStrikeBurst";
+    const brakeThenBurst = course.intent === "brakeThenBurst";
+    const hbpBackdoor = course.intent === "hbpBackdoor";
+    const firstDirection = hbpBackdoor
+      ? awayFromBatter
+      : course.intent === "backdoor" || course.intent === "frontdoor" || escapeIntent || accelerateIntoZone
+        ? getSafeBendDirectionForBatter(course.direction, 0.5)
+        : preferredBendDirection;
+    const bendStart = escapeIntent || accelerateIntoZone || hbpBackdoor ? randomBetween(0.28, 0.46) : randomBetween(0.44, 0.6);
+    bendSegments.push(createComputerBendSegment(firstDirection, bendStart, randomBetween(0.76, 0.92), 0.96, (hbpBackdoor ? 1.18 : 0.9) + shapeSkill * 0.46));
+    if (type === "slow" && Math.random() < 0.64 + slowSkill * 0.04) {
+      bendSegments.push(createComputerBendSegment(-firstDirection, randomBetween(0.64, 0.78), randomBetween(0.86, 0.99), 0.9, 0.58 + shapeSkill * 0.34));
     }
-    if (type === "slow" && Math.random() < 0.32 + breakSkill * 0.028) {
-      bendSegments.push(createComputerBendSegment(firstDirection, randomBetween(0.8, 0.86), 0.99, 0.82, 0.42 + shapeSkill * 0.24));
+    if (type === "slow" && Math.random() < 0.34 + breakSkill * 0.03) {
+      bendSegments.push(createComputerBendSegment(firstDirection, randomBetween(0.78, 0.86), 0.99, 0.84, 0.44 + shapeSkill * 0.25));
     }
-    if (accelerateIntoZone || course.intent === "speedEscape" || Math.random() < (type === "slow" ? 0.72 : 0.58)) {
+    if (brakeThenBurst || (type === "normal" && Math.random() < 0.22) || (type === "slow" && Math.random() < 0.3)) {
+      addEarlyBrake(brakeThenBurst ? 1.08 : 0.86);
+      addLateBurst(brakeThenBurst ? 1.16 : 0.94);
+    }
+    if (accelerateIntoZone || course.intent === "speedEscape" || escapeIntent || Math.random() < (type === "slow" ? 0.78 : 0.64)) {
       const slowBias = type === "slow" ? 0.68 : 0.48;
       const fallbackDirection = Math.random() < slowBias ? -1 : 1;
-      const direction = (course.intent === "speedEscape" && type === "slow") || accelerateIntoZone ? 1 : getPreferredComputerSpeedChangeDirection(player, fallbackDirection);
-      const powerBonus = course.intent === "speedEscape" ? 0.34 : 0;
+      const direction = (course.intent === "speedEscape" && type === "slow") || accelerateIntoZone || escapeIntent ? 1 : getPreferredComputerSpeedChangeDirection(player, fallbackDirection);
+      const powerBonus = course.intent === "speedEscape" || escapeIntent ? 0.34 : accelerateIntoZone ? 0.26 : 0;
       if (course.intent === "speedEscape" && type === "slow") {
-        speedChangeSegments.push(createComputerSpeedChangeSegment(-1, randomBetween(0.16, 0.24), randomBetween(0.46, 0.58), 0.96, 0.94 + slowSkill * 0.055));
-        speedChangeSegments.push(createComputerSpeedChangeSegment(1, randomBetween(0.48, 0.58), randomBetween(0.84, 0.96), 0.96, 1.02 + fastChangeSkill * 0.055));
-      } else if (accelerateIntoZone) {
-        speedChangeSegments.push(createComputerSpeedChangeSegment(1, randomBetween(0.34, 0.46), randomBetween(0.76, 0.9), 0.96, 1.02 + fastChangeSkill * 0.06));
+        speedChangeSegments.push(createComputerSpeedChangeSegment(-1, randomBetween(0.14, 0.24), randomBetween(0.44, 0.6), 0.96, 0.96 + slowSkill * 0.058));
+        addLateBurst(1.06);
+      } else if (accelerateIntoZone || escapeIntent) {
+        speedChangeSegments.push(createComputerSpeedChangeSegment(1, randomBetween(0.28, 0.54), randomBetween(0.76, 0.96), 0.98, 1.04 + powerBonus + fastChangeSkill * 0.06));
       } else {
-        const start = direction < 0 ? randomBetween(0.36, 0.5) : randomBetween(0.42, 0.56);
-        speedChangeSegments.push(createComputerSpeedChangeSegment(direction, start, randomBetween(0.78, 0.94), 0.92, 0.82 + powerBonus + Math.max(slowSkill, fastChangeSkill) * 0.055));
+        const start = direction < 0 ? randomBetween(0.24, 0.52) : randomBetween(0.36, 0.72);
+        speedChangeSegments.push(createComputerSpeedChangeSegment(direction, start, randomBetween(Math.max(start + 0.16, 0.72), 0.96), 0.94, 0.84 + powerBonus + Math.max(slowSkill, fastChangeSkill) * 0.056));
       }
     }
   }
 
   if (type === "special") {
-    if (!bendSegments.length) bendSegments.push(createComputerBendSegment(getSafeBendDirectionForBatter(awayFromBatter), 0.56, 0.94, 0.98, 1.28));
+    if (!bendSegments.length) bendSegments.push(createComputerBendSegment(getSafeBendDirectionForBatter(awayFromBatter), 0.52, 0.94, 0.98, 1.3));
     else bendSegments.forEach((segment) => { segment.power *= 1.18; segment.chance = Math.max(segment.chance, 0.96); });
-    if (!speedChangeSegments.length || Math.random() < 0.65) {
-      speedChangeSegments.push(createComputerSpeedChangeSegment(Math.random() < 0.48 ? -1 : 1, 0.68, 0.97, 0.94, 1.22));
+    if (!speedChangeSegments.length || Math.random() < 0.74) {
+      const direction = Math.random() < 0.4 ? -1 : 1;
+      const start = direction < 0 ? randomBetween(0.16, 0.42) : randomBetween(0.46, 0.72);
+      speedChangeSegments.push(createComputerSpeedChangeSegment(direction, start, randomBetween(Math.max(start + 0.18, 0.8), 0.98), 0.95, 1.24));
     }
   }
 
   const dangerousSegments = bendSegments.filter((segment) => segment.direction === dangerousDirection);
   dangerousSegments.forEach((segment) => {
-    segment.chance *= 0.22;
-    segment.power *= 0.48;
+    segment.chance *= 0.28;
+    segment.power *= 0.52;
   });
   plan.bendSegments = bendSegments;
   plan.speedChangeSegments = speedChangeSegments;
@@ -3291,27 +3313,44 @@ function chooseComputerPitchPlan() {
     type = chooseWeightedComputerPitchType(getComputerPitchTypeWeights(activePitcher), regularRoll);
   }
   const course = getComputerPitchCornerCourse(type, activePitcher);
+  const awayFromBatter = -getDangerousBendDirectionForBatter();
+  const dangerousDirection = getDangerousBendDirectionForBatter();
 
   const plan = {
     type,
     course,
     pitcherX: getComputerPitcherPlateX(course, activePitcher),
-    targetSpread: type === "special" ? 12 : type === "slow" ? 24 : type === "fast" ? 12 : 18,
+    targetSpread: type === "special" ? 12 : type === "slow" ? 18 : type === "fast" ? 10 : 14,
     bendSegments: [],
     speedChangeSegments: []
   };
   if (course.intent === "awayBall") {
-    const awayFromBatter = -getDangerousBendDirectionForBatter();
-    plan.targetX = field.plateX + awayFromBatter * randomBetween(58, 82);
-    plan.targetY = field.plateY + randomBetween(-16, 18);
-    plan.targetSpread = type === "fast" ? 10 : 14;
+    plan.targetX = field.plateX + awayFromBatter * randomBetween(48, 64);
+    plan.targetY = field.plateY + randomBetween(-12, 14);
+    plan.targetSpread = type === "fast" ? 8 : 10;
+  } else if (course.intent === "ballToStrikeBurst" || course.intent === "acceleratingStrike") {
+    plan.targetX = field.plateX + course.direction * randomBetween(20, 38);
+    plan.targetY = field.plateY + randomBetween(-10, 12);
+    plan.targetSpread = 8;
+  } else if (course.intent === "strikeToBallBurst" || course.intent === "strikeToBall") {
+    plan.targetX = field.plateX + course.direction * randomBetween(42, 58);
+    plan.targetY = field.plateY + randomBetween(-12, 14);
+    plan.targetSpread = 8;
+  } else if (course.intent === "hbpBackdoor") {
+    plan.targetX = field.plateX + dangerousDirection * randomBetween(22, 38);
+    plan.targetY = field.plateY + randomBetween(-8, 12);
+    plan.targetSpread = 6;
+  } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
+    plan.targetX = field.plateX + randomBetween(-18, 18);
+    plan.targetY = field.plateY + randomBetween(-10, 10);
+    plan.targetSpread = 7;
   }
   return buildComputerPitchShape(plan, activePitcher);
 }
 
 function getComputerPitcherPlateX(course, player = activePitcher) {
   const side = course?.direction || getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
-  const edgeBias = course?.intent === "awayBall" || course?.intent === "strikeToBall" ? 1.1 : course?.intent === "showCenter" ? 0.45 : 0.8;
+  const edgeBias = course?.intent === "awayBall" || course?.intent === "strikeToBall" || course?.intent === "strikeToBallBurst" ? 1.0 : course?.intent === "hbpBackdoor" ? 1.18 : course?.intent === "showCenter" || course?.intent === "earlyBrakeStrike" ? 0.45 : 0.78;
   return clamp(field.centerX - side * randomBetween(18, 58) * edgeBias, pitcher.minX, pitcher.maxX);
 }
 
@@ -13465,6 +13504,11 @@ updateAudioToggleButtons();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
+
+
+
+
+
 
 
 
