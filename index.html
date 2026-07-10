@@ -21,8 +21,34 @@
 
         <section id="startMenu" class="start-menu" aria-label="ゲーム開始メニュー">
           <div class="menu-card">
-            <h2>SIMPLEST BASEBALL</h2>
             <div class="menu-grid">
+              <label class="mode-setting-field">
+                モード
+                <select id="modeSelect">
+                  <option value="single">1人用</option>
+                  <option value="versus" selected>2人用</option>
+                  <option value="practice">打撃練習</option>
+                </select>
+              </label>
+
+              <label class="mode-setting-field">
+                先攻
+                <select id="firstBatSelect">
+                  <option value="away" selected>チームA（1P）</option>
+                  <option value="home">チームB（2P）</option>
+                </select>
+              </label>
+
+              <label class="mode-setting-field">
+                試合回数
+                <select id="inningsSelect">
+                  <option value="1" selected>1回</option>
+                  <option value="2">2回</option>
+                  <option value="3">3回</option>
+                  <option value="5">5回</option>
+                </select>
+              </label>
+
               <div class="team-setup-field team-preset-away">
                 <label class="team-preset-field">
                   <span>チームA 初期チーム</span>
@@ -60,33 +86,6 @@
                   </select>
                 </label>
               </div>
-
-              <label>
-                モード
-                <select id="modeSelect">
-                  <option value="single">1人用</option>
-                  <option value="versus" selected>2人用</option>
-                  <option value="practice">打撃練習</option>
-                </select>
-              </label>
-
-              <label>
-                先攻
-                <select id="firstBatSelect">
-                  <option value="away" selected>チームA（1P）</option>
-                  <option value="home">チームB（2P）</option>
-                </select>
-              </label>
-
-              <label>
-                試合回数
-                <select id="inningsSelect">
-                  <option value="1" selected>1回</option>
-                  <option value="2">2回</option>
-                  <option value="3">3回</option>
-                  <option value="5">5回</option>
-                </select>
-              </label>
             </div>
 
             <section class="practice-select-panel" aria-label="打撃練習の選手選択">

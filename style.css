@@ -279,7 +279,7 @@ canvas {
   width: min(2260px, 99%);
   max-height: calc(100% - 16px);
   overflow: auto;
-  padding: 10px;
+  padding: 6px 10px 8px;
 }
 
 .menu-card h2 {
@@ -288,10 +288,20 @@ canvas {
   font-size: 24px;
 }
 
+.menu-card label {
+  gap: 4px;
+  font-size: 13px;
+}
+
+.menu-card select {
+  min-height: 30px;
+  padding: 1px 5px;
+}
+
 .menu-grid,
 .team-grid {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .menu-grid {
@@ -299,22 +309,26 @@ canvas {
   align-items: end;
 }
 
+.mode-setting-field {
+  grid-column: span 1;
+}
+
 .team-setup-field {
   display: grid;
-  gap: 8px;
-  padding: 8px;
+  gap: 5px;
+  padding: 5px 7px;
   background: rgba(255, 255, 255, 0.36);
   border: 2px solid rgba(46, 75, 91, 0.22);
   border-radius: 8px;
 }
 
 .team-preset-field {
-  gap: 7px;
+  gap: 4px;
 }
 
 .team-preset-field span {
   color: #233047;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -332,15 +346,15 @@ canvas {
 }
 
 .defense-run-field {
-  gap: 7px;
-  padding: 8px;
-  border: 3px solid rgba(46, 75, 91, 0.28);
+  gap: 4px;
+  padding: 5px 7px;
+  border: 2px solid rgba(46, 75, 91, 0.28);
   border-radius: 8px;
 }
 
 .defense-run-field span {
   color: #233047;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
 }
 
@@ -356,16 +370,16 @@ canvas {
 
 .team-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 8px;
+  margin-top: 5px;
 }
 
 .menu-status-row {
   display: grid;
   grid-template-columns: minmax(150px, 180px) minmax(220px, 260px);
-  gap: 10px;
+  gap: 8px;
   justify-content: end;
   align-items: stretch;
-  margin-top: 8px;
+  margin-top: 5px;
 }
 
 .menu-status-row .point-status {
@@ -442,7 +456,7 @@ canvas {
 
 .ability-board {
   position: relative;
-  min-height: clamp(330px, 47vh, 440px);
+  min-height: clamp(495px, 70vh, 660px);
   padding: 7px;
   overflow: visible;
   background:
@@ -1597,9 +1611,9 @@ button {
 .practice-select-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-  padding: 12px;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
   border: 2px solid rgba(46, 75, 91, 0.22);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
@@ -1607,7 +1621,7 @@ button {
 
 .practice-pitcher-settings {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .menu-card > button {
