@@ -326,6 +326,36 @@ canvas {
   border-color: rgba(174, 231, 255, 0.72);
 }
 
+.defense-run-settings {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.defense-run-field {
+  gap: 7px;
+  padding: 8px;
+  border: 3px solid rgba(46, 75, 91, 0.28);
+  border-radius: 8px;
+}
+
+.defense-run-field span {
+  color: #233047;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.defense-run-away {
+  background: rgba(255, 227, 116, 0.48);
+  border-color: rgba(191, 67, 49, 0.52);
+}
+
+.defense-run-home {
+  background: rgba(174, 231, 255, 0.48);
+  border-color: rgba(57, 116, 155, 0.52);
+}
+
 .team-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 8px;
@@ -897,6 +927,43 @@ canvas {
   height: 100%;
   background: linear-gradient(90deg, #62a05c, #ffcf70);
   border-radius: inherit;
+}
+
+.stat-row.sortable-stat,
+.cross-cell.sortable-stat {
+  cursor: pointer;
+}
+
+.stat-row.sortable-stat:hover,
+.cross-cell.sortable-stat:hover {
+  border-color: #bf4331;
+  box-shadow: 0 0 0 2px rgba(191, 67, 49, 0.16);
+}
+
+.stat-row.defense-strong-infield {
+  background: #e7f4ff;
+  border-color: #3f8fc6;
+}
+
+.stat-row.defense-strong-infield .stat-name,
+.stat-row.defense-strong-infield .stat-value {
+  color: #1f638f;
+}
+
+.stat-row.defense-strong-outfield {
+  background: #eaf8e7;
+  border-color: #58a85c;
+}
+
+.stat-row.defense-strong-outfield .stat-name,
+.stat-row.defense-strong-outfield .stat-value {
+  color: #347839;
+}
+
+.stat-row.sort-active,
+.cross-cell.sort-active {
+  border-color: #bf4331;
+  background: #fff0b8;
 }
 
 .stamina-row {
@@ -1581,6 +1648,7 @@ button {
   .menu-grid,
   .menu-status-row,
   .team-grid,
+  .defense-run-settings,
   .player-picks,
   .ability-board {
     grid-template-columns: 1fr;
@@ -1595,3 +1663,4 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+

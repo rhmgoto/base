@@ -1,4 +1,4 @@
-﻿const canvas = byId("gameCanvas");
+const canvas = byId("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 function byId(id) {
@@ -369,6 +369,7 @@ const practiceOnlyPitchers = [
   { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: 1, fielding: 5, stamina: 99, cost: 0, practiceOnly: true }
 ];
 let playerEditorState = { kind: "batter", playerId: batters[0]?.id ?? "", isNew: false };
+let chooserSortState = { team: "", role: "", kind: "", key: "" };
 
 const scoringHitTypes = new Set(["single", "double", "triple", "homer"]);
 const defenseFieldDistanceScale = 0.8 * 1.15;
@@ -2032,38 +2033,63 @@ function getChooserPlayerSummary(player, kind, role = null) {
   return `パ ${player.power} / ミ ${player.meet} / 走 ${player.run} / 内 ${player.infieldDefense ?? 5} / 外 ${player.outfieldDefense ?? 5} / 肩 ${player.arm ?? 5}`;
 }
 
+function getChooserDefenseClass(player, key) {
+  const infield = player.infieldDefense ?? player.fielding ?? 5;
+  const outfield = player.outfieldDefense ?? player.fielding ?? 5;
+  if (infield === outfield) return "";
+  if (key === "infieldDefense" && infield > outfield) return "defense-strong-infield";
+  if (key === "outfieldDefense" && outfield > infield) return "defense-strong-outfield";
+  return "";
+}
+
+function chooserStatRow(label, value, sortKey, options = {}) {
+  const className = [options.className, sortKey ? "sortable-stat" : "", chooserSortState.key === sortKey ? "sort-active" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return statRow(label, value, { ...options, sortKey, className });
+}
+
+function chooserSpeedRow(label, value, sortKey) {
+  return speedRow(label, value, { sortKey, className: chooserSortState.key === sortKey ? "sortable-stat sort-active" : "sortable-stat" });
+}
+
+function chooserStaminaStatRow(value, sortKey) {
+  return staminaStatRow(value, { sortKey, className: chooserSortState.key === sortKey ? "sortable-stat sort-active" : "sortable-stat" });
+}
+
 function getChooserPlayerStats(player, kind, role = null) {
   if (kind === "pitcher") {
     return [
-      speedRow("球速", player.fastKmh),
+      chooserSpeedRow("球速", player.fastKmh, "fastKmh"),
       statRow("投", handLabel(player.throws)),
-      pitchCross(player),
-      statRow("制球", player.control),
-      statRow("球威", player.stuff),
-      statRow("守備", player.fielding ?? 5),
-      staminaStatRow(player.stamina ?? 6)
+      pitchCross(player, true),
+      chooserStatRow("制球", player.control, "control"),
+      chooserStatRow("球威", player.stuff, "stuff"),
+      chooserStatRow("守備", player.fielding ?? 5, "fielding"),
+      chooserStaminaStatRow(player.stamina ?? 6, "stamina")
     ].join("");
   }
   if (kind === "catcher" || isCatcherRole(role) || isCatcherLikePlayer(player)) {
     return [
       statRow("打", handLabel(player.bats)),
-      statRow("パワー", player.power),
-      statRow("ミート", player.meet),
-      statRow("走塁", player.run),
-      statRow("肩", player.arm ?? 5)
+      chooserStatRow("パワー", player.power, "power"),
+      chooserStatRow("ミート", player.meet, "meet"),
+      chooserStatRow("走塁", player.run, "run"),
+      chooserStatRow("肩", player.arm ?? 5, "arm")
     ].join("");
   }
+  const infield = player.infieldDefense ?? player.fielding ?? 5;
+  const outfield = player.outfieldDefense ?? player.fielding ?? 5;
   return [
     statRow("打", handLabel(player.bats)),
-    statRow("パワー", player.power),
-    statRow("ミート", player.meet),
-    statRow("走塁", player.run),
-    statRow("内野", player.infieldDefense ?? player.fielding ?? 5),
-    statRow("外野", player.outfieldDefense ?? player.fielding ?? 5),
-    statRow("肩", player.arm ?? 5)
+    chooserStatRow("パワー", player.power, "power"),
+    chooserStatRow("ミート", player.meet, "meet"),
+    chooserStatRow("走塁", player.run, "run"),
+    chooserStatRow("内野", infield, "infieldDefense", { className: getChooserDefenseClass(player, "infieldDefense") }),
+    chooserStatRow("外野", outfield, "outfieldDefense", { className: getChooserDefenseClass(player, "outfieldDefense") }),
+    chooserStatRow("肩", player.arm ?? 5, "arm")
   ].join("");
 }
-
 function renderChooserOption(player, team, role, kind) {
   const unavailable = isMenuPlayerUnavailable(team, role, kind, player.id);
   const selectedClass = player.id === menuSelection[team][role] ? " selected" : "";
@@ -2081,18 +2107,45 @@ function openPlayerChooser(card) {
   const team = card.dataset.team;
   const role = card.dataset.role;
   const kind = getChooserKindForRole(role) || card.dataset.kind;
-  const list = getChooserPlayerList(kind);
+  chooserSortState = { team, role, kind, key: "" };
   chooserTitle.textContent = `${teamLabel(team)} ${getMenuRoleLabel(role)}`;
-  chooserOptions.innerHTML = list.map((player) => renderChooserOption(player, team, role, kind)).join("");
+  renderPlayerChooserOptions();
   playerChooser.classList.remove("hidden");
+}
+
+function renderPlayerChooserOptions() {
+  const { team, role, kind } = chooserSortState;
+  const list = getChooserPlayerList(kind);
+  chooserOptions.innerHTML = list.map((player) => renderChooserOption(player, team, role, kind)).join("");
+}
+
+function getChooserSortValue(player, key) {
+  if (!key) return player.cost ?? 5;
+  if (key === "infieldDefense") return player.infieldDefense ?? player.fielding ?? 5;
+  if (key === "outfieldDefense") return player.outfieldDefense ?? player.fielding ?? 5;
+  return Number(player[key] ?? 0);
 }
 
 function getChooserPlayerList(kind) {
   const source = getPlayerListForKind(kind);
+  const sortKey = chooserSortState.kind === kind ? chooserSortState.key : "";
   return source
     .map((player, index) => ({ player, index }))
-    .sort((a, b) => ((b.player.cost ?? 5) - (a.player.cost ?? 5)) || (a.index - b.index))
+    .sort((a, b) => {
+      if (sortKey) {
+        return (getChooserSortValue(b.player, sortKey) - getChooserSortValue(a.player, sortKey))
+          || ((b.player.cost ?? 5) - (a.player.cost ?? 5))
+          || (a.index - b.index);
+      }
+      return ((b.player.cost ?? 5) - (a.player.cost ?? 5)) || (a.index - b.index);
+    })
     .map((entry) => entry.player);
+}
+
+function sortPlayerChooserBy(key) {
+  if (!key || playerChooser.classList.contains("hidden")) return;
+  chooserSortState.key = key;
+  renderPlayerChooserOptions();
 }
 
 function isMenuPlayerUnavailable(team, role, kind, playerId) {
@@ -2310,9 +2363,11 @@ function renderPitcherChangeControls() {
   `;
 }
 
-function statRow(label, value) {
+function statRow(label, value, options = {}) {
   const numericValue = Number(value);
   const showAbilityBar = Number.isFinite(numericValue) && numericValue >= 1 && numericValue <= 10;
+  const sortAttr = options.sortKey ? ` data-sort-key="${escapeHtml(options.sortKey)}"` : "";
+  const className = ["stat-row", options.className].filter(Boolean).join(" ");
   const valueHtml = showAbilityBar
     ? `
       <span class="stat-value-main">${value}</span>
@@ -2322,16 +2377,18 @@ function statRow(label, value) {
     `
     : value;
   return `
-    <div class="stat-row">
+    <div class="${className}"${sortAttr}>
       <span class="stat-name">${label}</span>
       <span class="stat-value${showAbilityBar ? " stat-value-with-bar" : ""}">${valueHtml}</span>
     </div>
   `;
 }
 
-function staminaStatRow(value) {
+function staminaStatRow(value, options = {}) {
+  const sortAttr = options.sortKey ? ` data-sort-key="${escapeHtml(options.sortKey)}"` : "";
+  const className = ["stat-row", "stamina-stat-row", options.className].filter(Boolean).join(" ");
   return `
-    <div class="stat-row stamina-stat-row">
+    <div class="${className}"${sortAttr}>
       <span class="stat-name">スタミナ</span>
       <span class="stat-value stat-value-with-bar">
         <span class="stat-value-main">${value}</span>
@@ -2353,9 +2410,11 @@ function costBadge(value) {
   `;
 }
 
-function speedRow(label, value) {
+function speedRow(label, value, options = {}) {
+  const sortAttr = options.sortKey ? ` data-sort-key="${escapeHtml(options.sortKey)}"` : "";
+  const className = ["stat-row", "speed-row", options.className].filter(Boolean).join(" ");
   return `
-    <div class="stat-row speed-row">
+    <div class="${className}"${sortAttr}>
       <span class="stat-name">${label}</span>
       <span class="stat-value">${value} km/h</span>
     </div>
@@ -2389,14 +2448,16 @@ function getStaminaClass(percent) {
   return "empty";
 }
 
-function pitchCross(player) {
+function pitchCross(player, sortable = false) {
+  const sortAttr = (key) => sortable ? ` data-sort-key="${key}"` : "";
+  const cellClass = (baseClass, key) => ["cross-cell", baseClass, sortable ? "sortable-stat" : "", sortable && chooserSortState.key === key ? "sort-active" : ""].filter(Boolean).join(" ");
   return `
     <div class="pitch-cross" aria-label="変化能力">
-      <div class="cross-cell cross-up"><span data-short-label="減">減速</span><strong>${player.slowChange}</strong></div>
-      <div class="cross-cell cross-left"><span>左</span><strong>${player.leftBreak}</strong></div>
+      <div class="${cellClass("cross-up", "slowChange")}"${sortAttr("slowChange")}><span data-short-label="減">減速</span><strong>${player.slowChange}</strong></div>
+      <div class="${cellClass("cross-left", "leftBreak")}"${sortAttr("leftBreak")}><span>左</span><strong>${player.leftBreak}</strong></div>
       <div class="cross-core">変化</div>
-      <div class="cross-cell cross-right"><span>右</span><strong>${player.rightBreak}</strong></div>
-      <div class="cross-cell cross-down"><span data-short-label="加">加速</span><strong>${player.fastChange}</strong></div>
+      <div class="${cellClass("cross-right", "rightBreak")}"${sortAttr("rightBreak")}><span>右</span><strong>${player.rightBreak}</strong></div>
+      <div class="${cellClass("cross-down", "fastChange")}"${sortAttr("fastChange")}><span data-short-label="加">加速</span><strong>${player.fastChange}</strong></div>
     </div>
   `;
 }
@@ -13363,9 +13424,17 @@ menuPlayerCards.forEach((card) => {
 });
 chooserClose.addEventListener("click", closePlayerChooser);
 chooserOptions.addEventListener("click", (event) => {
+  if (event.target.closest("[data-sort-key]")) return;
   const option = event.target.closest(".chooser-option");
   if (!option || option.disabled) return;
   selectMenuPlayer(option);
+});
+chooserOptions.addEventListener("dblclick", (event) => {
+  const sortTarget = event.target.closest("[data-sort-key]");
+  if (!sortTarget) return;
+  event.preventDefault();
+  event.stopPropagation();
+  sortPlayerChooserBy(sortTarget.dataset.sortKey);
 });
 pitcherChangeControls?.addEventListener("click", (event) => {
   const button = event.target.closest(".pitcher-change-button");
@@ -13378,4 +13447,6 @@ updateAudioToggleButtons();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
+
+
 

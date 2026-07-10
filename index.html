@@ -67,24 +67,25 @@
                   <option value="5">5回</option>
                 </select>
               </label>
+              <div class="defense-run-settings" aria-label="守備・走塁設定">
+                <label class="defense-run-field defense-run-away">
+                  <span>チームA（1P）守備・走塁</span>
+                  <select id="p1DefenseSelect">
+                    <option value="auto" selected>オート</option>
+                    <option value="semiauto">セミオート</option>
+                    <option value="manual">マニュアル</option>
+                  </select>
+                </label>
 
-              <label>
-                チームA（1P）守備・走塁
-                <select id="p1DefenseSelect">
-                  <option value="auto" selected>オート</option>
-                  <option value="semiauto">セミオート</option>
-                  <option value="manual">マニュアル</option>
-                </select>
-              </label>
-
-              <label>
-                チームB（2P）守備・走塁
-                <select id="p2DefenseSelect">
-                  <option value="auto" selected>オート</option>
-                  <option value="semiauto">セミオート</option>
-                  <option value="manual">マニュアル</option>
-                </select>
-              </label>
+                <label class="defense-run-field defense-run-home">
+                  <span>チームB（2P）守備・走塁</span>
+                  <select id="p2DefenseSelect">
+                    <option value="auto" selected>オート</option>
+                    <option value="semiauto">セミオート</option>
+                    <option value="manual">マニュアル</option>
+                  </select>
+                </label>
+              </div>
 
               <label>
                 練習投手
@@ -294,3 +295,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
