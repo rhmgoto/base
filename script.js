@@ -2810,7 +2810,8 @@ function startPitch(typeKey, options = {}) {
   const effectiveControl = getStaminaAdjustedControl(activePitcher) * pitchAbilityMultiplier * pitcherAbilityTuning.globalMultiplier;
   const controlProfile = getPitchControlProfile(effectiveControl, staminaFatigue, {
     pitchType: typeKey,
-    courseDirection: course.direction
+    courseDirection: course.direction,
+    countPressure: options.countPressure ?? 0
   });
   const intendedX = options.targetX ?? getPitchCourseTargetX(course, pitchRadius, typeKey);
   const intendedY = options.targetY ?? field.plateY;
@@ -2869,14 +2870,20 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const edgeFastballPressure = options.pitchType === "fast" && options.courseDirection !== 0 ? wildness : 0;
   const fatigueSpread = 1 + staminaFatigue * staminaTuning.controlSpreadBonus;
   const severeWildness = Math.pow(wildness, 1.18);
-  const totalMajorMissChance = clamp(severeWildness * 0.55 + edgeFastballPressure * 0.13 + staminaFatigue * 0.065, 0, 0.73);
+  const countPressure = clamp(options.countPressure ?? 0, 0, 1);
+  const commandTightening = 1 - countPressure * 0.58;
+  const verticalTightening = 1 - countPressure * 0.64;
+  const missTightening = 1 - countPressure * 0.74;
+  const wildMissTightening = 1 - countPressure * 0.82;
+  const totalMajorMissChance = clamp((severeWildness * 0.55 + edgeFastballPressure * 0.13 + staminaFatigue * 0.065) * missTightening, 0, 0.73);
   return {
     wildness,
     edgeDirection: options.courseDirection || 0,
     edgeFastballPressure,
-    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.46) * fatigueSpread, 0.38, 5.45),
-    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.28) * (1 + staminaFatigue * 0.72), 0.58, 4.85),
-    wildMissChance: totalMajorMissChance * 0.5,
+    countPressure,
+    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.46) * fatigueSpread * commandTightening, 0.34, 5.45),
+    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.28) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.85),
+    wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
   };
 }
@@ -3127,10 +3134,17 @@ function getPreferredComputerSpeedChangeDirection(player = activePitcher, fallba
   return roll < preferredChance ? preferredDirection : fallbackDirection;
 }
 
-function shouldComputerPrioritizeStrike() {
+function getComputerCountStrikePressure() {
   const balls = clamp(count?.balls ?? 0, 0, 3);
   const strikes = clamp(count?.strikes ?? 0, 0, 2);
-  return balls >= 3 || (balls >= 2 && strikes === 0);
+  if (balls >= 3) return 1;
+  if (balls > strikes) return clamp(0.42 + (balls - strikes) * 0.2, 0, 0.82);
+  if (balls >= 2) return 0.32;
+  return 0;
+}
+
+function shouldComputerPrioritizeStrike() {
+  return getComputerCountStrikePressure() >= 0.32;
 }
 
 function shouldComputerAvoidWasteBall() {
@@ -3316,9 +3330,11 @@ function chooseComputerPitchPlan() {
   const awayFromBatter = -getDangerousBendDirectionForBatter();
   const dangerousDirection = getDangerousBendDirectionForBatter();
 
+  const countPressure = getComputerCountStrikePressure();
   const plan = {
     type,
     course,
+    countPressure,
     pitcherX: getComputerPitcherPlateX(course, activePitcher),
     targetSpread: type === "special" ? 12 : type === "slow" ? 18 : type === "fast" ? 10 : 14,
     bendSegments: [],
