@@ -91,6 +91,7 @@ function createGameContext() {
     "firstBatSelect",
     "inningsSelect",
     "practicePitcherControlSelect",
+    "practicePitcherTypeSelect",
     "practiceBatterSelect",
     "practicePitcherSelect",
     "awayBatterLName",
@@ -204,6 +205,7 @@ function assertHtmlShell() {
     'value="semiauto"',
     'value="practice"',
     'id="practicePitcherControlSelect"',
+    'id="practicePitcherTypeSelect"',
     'id="practiceBatterSelect"',
     'id="practicePitcherSelect"',
     'id="firstBatSelect"',
@@ -220,8 +222,8 @@ function assertHtmlShell() {
   assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
   assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
   assertNoMojibake(html, "index.html");
-  assert(css.includes(".pitcher-role-pitcher {\n  top: 35%;"), "starting pitcher card should sit higher to avoid catcher overlap");
-  assert(css.includes(".pitcher-role-pitcher3 {\n  top: 65%;"), "third pitcher card should stay above the catcher card");
+  assert(/\.pitcher-role-pitcher\s*\{\s*top:\s*35%;/.test(css), "starting pitcher card should sit higher to avoid catcher overlap");
+  assert(/\.pitcher-role-pitcher3\s*\{\s*top:\s*65%;/.test(css), "third pitcher card should stay above the catcher card");
 }
 
 assertHtmlShell();
@@ -1551,7 +1553,7 @@ assert(rosterAndPointState.freeman.meet === 7, "Freeman meet should match the ro
 assert(rosterAndPointState.freeman.run === 4, "Freeman run should match the roster table");
 assert(rosterAndPointState.freeman.infieldDefense === 7, "Freeman infield defense should match the roster table");
 assert(rosterAndPointState.freeman.outfieldDefense === 2, "Freeman outfield defense should match the roster table");
-assert(rosterAndPointState.freeman.arm === 5, "Freeman arm should match the roster table");
+assert(rosterAndPointState.freeman.arm === 7, "Freeman arm should match the roster table");
 assert(rosterAndPointState.freeman.cost === 6, "Freeman cost should match the roster table");
 assert(rosterAndPointState.leejunghoo.bats === "L", "Lee Jung-hoo should be a left-handed batter");
 assert(rosterAndPointState.leejunghoo.power === 4, "Lee Jung-hoo power should match the roster table");
@@ -1827,7 +1829,7 @@ assert(rosterAndPointState.ediaz.rightBreak === 8, "E. Diaz right break should m
 assert(rosterAndPointState.ediaz.leftBreak === 1, "E. Diaz left break should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.slowChange === 4, "E. Diaz slow change should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.fastChange === 9, "E. Diaz fast change should match the pitcher roster table");
-assert(rosterAndPointState.ediaz.control === 5, "E. Diaz control should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.control === 6, "E. Diaz control should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.stuff === 10, "E. Diaz stuff should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.fielding === 5, "E. Diaz fielding should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.stamina === 2, "E. Diaz stamina should match the pitcher roster table");
@@ -2315,6 +2317,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
   `(() => {
     modeSelect.value = "practice";
     practicePitcherControlSelect.value = "auto";
+    practicePitcherTypeSelect.value = "A";
     renderPracticePlayerSelects();
     practiceBatterSelect.value = "ruth";
     practicePitcherSelect.value = "sawamura";
@@ -2349,6 +2352,21 @@ const battingPracticeModeState = JSON.parse(runInGame(
       const delay = autoPitchTimer - performance.now();
       return delay > 1900 && delay <= 2050 && Boolean(computerPitchPlan);
     })();
+    const practiceAutoJudgmentSchedulesNextPitch = (() => {
+      modeSelect.value = "practice";
+      practicePitcherControlSelect.value = "auto";
+      practicePitcherTypeSelect.value = "A";
+      practicePitcherSelect.value = "battingpractice";
+      readMenu();
+      startGame();
+      resetBall();
+      finishPitch("ストライク", "strike");
+      const delay = autoPitchTimer - performance.now();
+      return delay > 1900 && delay <= 2050 && Boolean(computerPitchPlan);
+    })();
+    practicePitcherSelect.value = "sawamura";
+    practiceBatterSelect.value = "ruth";
+    readMenu();
     startGame();
     const selectedPracticeBatter = activeBatter.id;
     const selectedPracticePitcher = activePitcher.id;
@@ -2389,6 +2407,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
     const practicePitcherHasBattingPractice = practicePitcherSelect.innerHTML.includes('value="battingpractice"') && practicePitcherSelect.innerHTML.includes("打撃投手");
     const battingPracticeNotRosterPitcher = !pitchers.some((pitcher) => pitcher.id === "battingpractice");
     practicePitcherSelect.value = "battingpractice";
+    practicePitcherTypeSelect.value = "A";
     readMenu();
     startGame();
     const battingPracticePitcher = {
@@ -2401,6 +2420,14 @@ const battingPracticeModeState = JSON.parse(runInGame(
       practiceOnly: activePitcher.practiceOnly === true
     };
     const battingPracticePlan = chooseComputerPitchPlan();
+    practicePitcherType = "B";
+    const battingPracticeTypeBPlan = chooseComputerPitchPlan();
+    const practicePitchTypeRandom = Math.random;
+    practicePitcherType = "C";
+    Math.random = () => 0.5;
+    const battingPracticeTypeCPlan = chooseComputerPitchPlan();
+    Math.random = practicePitchTypeRandom;
+    practicePitcherType = "A";
     activeBatter = { ...findById(batters, "otani"), power: 9, meet: 7 };
     resetSwing();
     startSwing(performance.now(), "strong");
@@ -2945,6 +2972,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
     );
     Math.random = originalRandom;
     activeBatter = { ...findById(batters, "ichiro"), power: 1, meet: 10 };
+    Math.random = () => 0.5;
     const lowPowerPerfectDrive = applyFeedbackQualityHitUpgrade({ label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.72 }, {
       launchAngle: 27,
       exitVelocity: 0.9,
@@ -2985,6 +3013,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
       autoSchedulesPitch,
       autoStartsPitch,
       singleCpuJudgmentSchedulesTwoSeconds,
+      practiceAutoJudgmentSchedulesNextPitch,
       selectedPracticeBatter,
       selectedPracticePitcher,
       practiceStaminaBeforePitch,
@@ -3007,6 +3036,11 @@ const battingPracticeModeState = JSON.parse(runInGame(
       battingPracticePlanTargetX: battingPracticePlan.targetX,
       battingPracticePlanTargetSpread: battingPracticePlan.targetSpread,
       battingPracticePlanHasShape: Boolean(battingPracticePlan.bendSegments?.length || battingPracticePlan.speedChangeSegments?.length),
+      battingPracticeTypeBType: battingPracticeTypeBPlan.type,
+      battingPracticeTypeBTargetAwayFromCenter: Math.abs(battingPracticeTypeBPlan.targetX - field.plateX),
+      battingPracticeTypeBHasShape: Boolean(battingPracticeTypeBPlan.bendSegments?.length || battingPracticeTypeBPlan.speedChangeSegments?.length),
+      battingPracticeTypeCType: battingPracticeTypeCPlan.type,
+      battingPracticeTypeCHasShape: Boolean(battingPracticeTypeCPlan.bendSegments?.length || battingPracticeTypeCPlan.speedChangeSegments?.length),
       battingPracticeHomerBoostMultiplier,
       battingPracticeHomerProfilePower: battingPracticeHomerProfile.power,
       normalPracticeProfilePower: normalPracticeProfile.power,
@@ -3088,12 +3122,15 @@ assert(battingPracticeModeState.versusStaminaBeforeHomer - battingPracticeModeSt
 assert(battingPracticeModeState.practiceSameBatterAfterReset === true, "practice mode should keep the same batter after each plate appearance");
 assert(battingPracticeModeState.practiceSamePitcherAfterReset === true, "practice mode should keep the same pitcher after each plate appearance");
 assert(battingPracticeModeState.practiceCountReset === true, "practice mode should reset the count and bases between repeated matchups");
+assert(battingPracticeModeState.practiceAutoJudgmentSchedulesNextPitch === true, "auto batting practice should schedule the next CPU pitch after the previous result is judged");
 assert(battingPracticeModeState.practiceManualPlayerPitching === true, "practice manual pitcher should be player-controlled");
 assert(battingPracticeModeState.practiceRodgersVsRodgers === true, "batting practice should allow Rodgers to bat against pitcher Rodgers");
 assert(battingPracticeModeState.practicePitcherHasBattingPractice === true, "batting practice pitcher should appear only in the practice pitcher select");
 assert(battingPracticeModeState.battingPracticeNotRosterPitcher === true, "batting practice pitcher should not be added to the regular pitcher roster");
 assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === 1 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
-assert(battingPracticeModeState.battingPracticePlanType === "fast" && battingPracticeModeState.battingPracticePlanTargetX === 640 && battingPracticeModeState.battingPracticePlanTargetSpread === 0 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher should throw center fastballs without bend or speed change");
+assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticePlanType) && Math.abs(battingPracticeModeState.battingPracticePlanTargetX - 640) <= 8 && battingPracticeModeState.battingPracticePlanTargetSpread === 3 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher type A should throw simple center-zone fastballs or straight balls");
+assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticeTypeBType) && battingPracticeModeState.battingPracticeTypeBTargetAwayFromCenter >= 32 && battingPracticeModeState.battingPracticeTypeBHasShape === false, "batting practice pitcher type B should attack the edges without breaking balls");
+assert(battingPracticeModeState.battingPracticeTypeCHasShape === true, "batting practice pitcher type C should use normal CPU pitch variation with movement");
 assert(battingPracticeModeState.battingPracticeHomerBoostMultiplier === 4.2, "batting practice pitcher home-run boost should be set to 4.2x");
 assert(battingPracticeModeState.battingPracticeHomerProfilePower > battingPracticeModeState.normalPracticeProfilePower, "batting practice pitcher should create stronger home-run-ready contact than a normal practice pitcher");
 assert(battingPracticeModeState.battingPracticeHomerProfileFenceScore > battingPracticeModeState.normalPracticeProfileFenceScore, "batting practice pitcher should raise fence-threatening contact compared with a normal practice pitcher");
@@ -8939,19 +8976,19 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
     bases = createEmptyBases();
     Math.random = () => 0.02;
     const specialPlan = chooseComputerPitchPlan();
-    const strikeIntents = new Set(["awayEdge", "edge", "showCenter", "backdoor", "frontdoor", "acceleratingStrike"]);
+    const strikeIntents = new Set(["awayEdge", "edge", "showCenter", "backdoor", "frontdoor", "acceleratingStrike", "ballToStrikeBurst", "brakeThenBurst", "plainEdge"]);
     const ballIntents = new Set(["awayBall", "awayEscape", "strikeToBall", "speedEscape"]);
     Math.random = () => 0.59;
     const fastStrikeCourse = getComputerPitchCornerCourse("fast");
-    Math.random = () => 0.6;
+    Math.random = () => 0.9;
     const fastBallCourse = getComputerPitchCornerCourse("fast");
-    Math.random = () => 0.15;
+    Math.random = () => 0.1;
     const slowBallCourse = getComputerPitchCornerCourse("slow");
-    Math.random = () => 0.32;
+    Math.random = () => 0.42;
     const slowAcceleratingStrikeCourse = getComputerPitchCornerCourse("slow");
-    Math.random = () => 0.32;
+    Math.random = () => 0.42;
     const normalAcceleratingStrikePlan = buildComputerPitchShape({ type: "normal", course: slowAcceleratingStrikeCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
-    Math.random = () => 0.32;
+    Math.random = () => 0.42;
     const slowAcceleratingStrikePlan = buildComputerPitchShape({ type: "slow", course: slowAcceleratingStrikeCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
     Math.random = () => 0.53;
     const slowBackdoorStrikeCourse = getComputerPitchCornerCourse("slow");
@@ -8971,6 +9008,9 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
     const threeBallFastCourse = getComputerPitchCornerCourse("fast");
     Math.random = () => 0.99;
     const threeBallSlowCourse = getComputerPitchCornerCourse("slow");
+    const plainFastCourse = { direction: 1, offset: 40, intent: "plainEdge" };
+    const plainFastPlan = buildComputerPitchShape({ type: "fast", course: plainFastCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
+    const plainNormalPlan = buildComputerPitchShape({ type: "normal", course: plainFastCourse, bendSegments: [], speedChangeSegments: [] }, activePitcher);
     Math.random = originalRandom;
 
     gameMode = "single";
@@ -9058,6 +9098,8 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       slowAcceleratingStrikeIntent: slowAcceleratingStrikeCourse.intent,
       normalAcceleratingStrikeSpeedDirection: normalAcceleratingStrikePlan.speedChangeDirection,
       slowAcceleratingStrikeSpeedDirection: slowAcceleratingStrikePlan.speedChangeDirection,
+      normalAcceleratingStrikeHasBurst: normalAcceleratingStrikePlan.speedChangeSegments?.some((segment) => segment.direction === 1) ?? false,
+      slowAcceleratingStrikeHasBurst: slowAcceleratingStrikePlan.speedChangeSegments?.some((segment) => segment.direction === 1) ?? false,
       slowBackdoorStrikeIntent: slowBackdoorStrikeCourse.intent,
       slowEdgeStrikeIntent: slowEdgeStrikeCourse.intent,
       slowCenterStrikeIntent: slowCenterStrikeCourse.intent,
@@ -9066,6 +9108,10 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       hitterCountEdgeIntent: hitterCountEdgeCourse.intent,
       threeBallFastIntent: threeBallFastCourse.intent,
       threeBallSlowIntent: threeBallSlowCourse.intent,
+      plainFastBendSegments: plainFastPlan.bendSegments?.length ?? 0,
+      plainFastSpeedSegments: plainFastPlan.speedChangeSegments?.length ?? 0,
+      plainNormalBendSegments: plainNormalPlan.bendSegments?.length ?? 0,
+      plainNormalSpeedSegments: plainNormalPlan.speedChangeSegments?.length ?? 0,
       fastStrikeCourseIsStrike: strikeIntents.has(fastStrikeCourse.intent),
       fastBallCourseIsBall: ballIntents.has(fastBallCourse.intent),
       slowBallCourseIsBall: ballIntents.has(slowBallCourse.intent),
@@ -9103,16 +9149,17 @@ assert(computerPitchAndSwingState.slowPitcherWeights.slow > computerPitchAndSwin
 assert(computerPitchAndSwingState.shapedBendSegmentCount >= 1, "computer pitchers should build pitch bend segments");
 assert(computerPitchAndSwingState.shapedSpeedSegmentCount >= 1, "computer pitchers should build speed-change segments");
 assert(Math.abs(computerPitchAndSwingState.specialChance0Strike - 0.03) < 0.0001, "computer special pitch chance should be 3% at 0 strikes with empty bases");
-assert(Math.abs(computerPitchAndSwingState.specialChance1Strike - 0.09) < 0.0001, "computer special pitch chance should be 9% at 1 strike with empty bases");
-assert(Math.abs(computerPitchAndSwingState.specialChance2Strike - 0.3) < 0.0001, "computer special pitch chance should rise at 2 strikes when stamina remains");
-assert(Math.abs(computerPitchAndSwingState.specialChanceRunner - 0.39) < 0.0001, "computer special pitch chance should rise further with a runner aboard when stamina remains");
-assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.5) < 0.0001, "computer special pitch chance should rise further in scoring position when stamina remains");
+assert(Math.abs(computerPitchAndSwingState.specialChance1Strike - 0.05) < 0.0001, "computer special pitch chance should be reduced to 5% at 1 strike with empty bases");
+assert(Math.abs(computerPitchAndSwingState.specialChance2Strike - 0.15) < 0.0001, "computer special pitch chance should be reduced to 15% at 2 strikes with empty bases");
+assert(Math.abs(computerPitchAndSwingState.specialChanceRunner - 0.18) < 0.0001, "computer special pitch chance should rise only slightly with a runner aboard");
+assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.22) < 0.0001, "computer special pitch chance should rise only modestly in scoring position");
 assert(computerPitchAndSwingState.specialPlanType === "special" && computerPitchAndSwingState.specialPlanSpread === 12, "computer pitchers should select special pitches when the special roll wins");
-assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerPitchAndSwingState.fastBallCourseIsBall === true, "fast/special computer courses should split at sixty-percent strike intent");
-assert(computerPitchAndSwingState.slowBallCourseIsBall === true && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should treat ball-to-strike bend as part of the sixty-percent strike intent");
-assert(computerPitchAndSwingState.slowAcceleratingCourseIsStrike === true && computerPitchAndSwingState.normalAcceleratingStrikeSpeedDirection === 1 && computerPitchAndSwingState.slowAcceleratingStrikeSpeedDirection === 1, "normal and slow computer pitches should include ball-to-strike accelerating pitches");
+assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerPitchAndSwingState.fastBallCourseIsBall === false, "fast/special computer courses should reduce obvious waste balls");
+assert(computerPitchAndSwingState.slowBallCourseIsBall === false && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should reduce obvious balls and favor strike-threatening pitches with two strikes");
+assert(computerPitchAndSwingState.slowAcceleratingCourseIsStrike === true && computerPitchAndSwingState.normalAcceleratingStrikeHasBurst === true && computerPitchAndSwingState.slowAcceleratingStrikeHasBurst === true, "normal and slow computer pitches should include ball-to-strike accelerating or brake-then-burst pitches");
 assert(computerPitchAndSwingState.hitterCountBackdoorIsStrike === true && computerPitchAndSwingState.hitterCountFrontdoorIsStrike === true && computerPitchAndSwingState.hitterCountEdgeIsStrike === true, "computer pitchers should avoid waste balls and target edges/frontdoor/backdoor in 2-0 counts");
 assert(computerPitchAndSwingState.threeBallFastIsStrike === true && computerPitchAndSwingState.threeBallSlowIsStrike === true, "computer pitchers should not intentionally waste pitches in any three-ball count");
+assert(computerPitchAndSwingState.plainFastBendSegments === 0 && computerPitchAndSwingState.plainFastSpeedSegments === 0 && computerPitchAndSwingState.plainNormalBendSegments === 0 && computerPitchAndSwingState.plainNormalSpeedSegments === 0, "plain edge fastballs and straight pitches should stay unshaped");
 assert(computerPitchAndSwingState.shapedTargetNearBatter === false, "computer pitchers should rarely choose targets near the batter body");
 assert(computerPitchAndSwingState.shapedCurvePower > 0.25, "computer pitch shaping should visibly bend the live pitch");
 assert(computerPitchAndSwingState.shapedSpeedScale > 1.008, "computer pitch shaping should visibly change live pitch speed");
