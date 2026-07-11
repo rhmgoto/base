@@ -334,13 +334,14 @@ const batThicknessMultiplier = 1.5;
 const meetZoneWidthScale = 0.8;
 const sweetSpotWidthScale = 0.85 * 0.8;
 const sweetSpotScoreEaseScale = 1.3;
+const sweetSpotScoreDistanceEaseScale = 1.4;
 const sweetSpotTuning = {
   visualBaseHalfWidth: 0.003125 * 0.9 * sweetSpotWidthScale,
   visualMeetStep: 0.000208375 * 0.9 * sweetSpotWidthScale,
-  scoreBaseHalfWidth: 0.003125 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
-  scoreMeetStep: 0.000208375 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
+  scoreBaseHalfWidth: 0.003125 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale * sweetSpotScoreDistanceEaseScale,
+  scoreMeetStep: 0.000208375 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale * sweetSpotScoreDistanceEaseScale,
   visualMinHalfWidth: 0.0025 * 0.9 * sweetSpotWidthScale,
-  minHalfWidth: 0.0025 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
+  minHalfWidth: 0.0025 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale * sweetSpotScoreDistanceEaseScale,
   maxHalfWidth: 0.14 * 0.9 * sweetSpotWidthScale
 };
 
@@ -3470,6 +3471,11 @@ function shouldComputerAvoidWasteBall() {
   return clamp(count?.balls ?? 0, 0, 3) >= 3;
 }
 
+function getComputerPitchStrikeOffsetScale() {
+  const threeBallStrikeBias = shouldComputerAvoidWasteBall() ? 1.24 : 1;
+  return 1 / (computerPitchStrikeZoneRateScale * threeBallStrikeBias);
+}
+
 function getComputerPressurePitchFactor() {
   const strikes = clamp(count?.strikes ?? 0, 0, 2);
   const scoringRunner = Boolean(bases?.second || bases?.third);
@@ -3481,10 +3487,24 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
   const dangerousDirection = getDangerousBendDirectionForBatter();
   const awayFromBatter = -dangerousDirection;
   const roll = Math.random();
-  const strikeOffsetScale = 1 / computerPitchStrikeZoneRateScale;
+  const strikeOffsetScale = getComputerPitchStrikeOffsetScale();
   const prioritizeStrike = shouldComputerPrioritizeStrike();
   const avoidWasteBall = shouldComputerAvoidWasteBall();
   const pressure = getComputerPressurePitchFactor();
+  if (avoidWasteBall) {
+    if ((type === "fast" || type === "special") && roll < 0.28) {
+      return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 42) * strikeOffsetScale, intent: "plainEdge" };
+    }
+    if (roll < 0.25) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(24, 40) * strikeOffsetScale, intent: "backdoor" };
+    if (roll < 0.5) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(22, 38) * strikeOffsetScale, intent: "frontdoor" };
+    if (roll < 0.74) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(24, 42) * strikeOffsetScale, intent: "ballToStrikeBurst" };
+    if (roll < 0.9) {
+      const side = getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
+      const safeSide = side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side;
+      return { direction: safeSide, offset: safeSide * randomBetween(22, 38) * strikeOffsetScale, intent: "edge" };
+    }
+    return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(24, 38) * strikeOffsetScale, intent: "plainEdge" };
+  }
   if (type === "fast" || type === "special") {
     const allowPlainEdge = type === "fast";
     if (prioritizeStrike) {
@@ -3858,7 +3878,14 @@ function computerSwingBat() {
   const chaseChance = timingWindow * clamp((activeBatter.meet - 6) / 220, 0.002, 0.02);
   if (strikeConfidence < 0.36 && Math.random() >= chaseChance) return;
   const swingChance = 0.006 + timingWindow * (0.04 + strikeConfidence * 0.31 + activeBatter.meet * 0.004);
-  if (Math.random() < swingChance) startSwing();
+  if (Math.random() < swingChance) startSwing(performance.now(), chooseComputerSwingType());
+}
+
+function chooseComputerSwingType(roll = Math.random()) {
+  const strikes = clamp(count?.strikes ?? 0, 0, 2);
+  if (strikes >= 2) return "weak";
+  if (strikes === 1) return roll < 0.5 ? "strong" : "weak";
+  return "strong";
 }
 
 function pollGamepadInput() {
@@ -7262,6 +7289,12 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
       };
     }
   }
+  const infieldInterception = resolveInfieldInterceptionBeforeOutfield(fielders, battedBall, outcome, runner);
+  if (infieldInterception) {
+    chosenFielder = infieldInterception.fielder;
+    outcome = infieldInterception.outcome;
+    fieldingTarget = infieldInterception.target;
+  }
   const fenceOutcome = resolveFenceBoundaryOutcome(battedBall, outcome, fieldingTarget);
   if (fenceOutcome) {
     outcome = fenceOutcome.outcome;
@@ -9345,7 +9378,7 @@ function chooseBuntDefenseFielder(fielders, battedBall) {
 }
 
 function getDefenseFielderRouteTarget(fielder, battedBall) {
-  if (isInfielderRole(fielder?.role) && (isPotentialInfieldRouteBall(battedBall) || isInfielderReactionRouteBall(fielder, battedBall))) {
+  if (isInfielderRole(fielder?.role) && (isPotentialInfieldRouteBall(battedBall) || isInfielderReactionRouteBall(fielder, battedBall) || isInfielderAwareOfRouteBall(fielder, battedBall))) {
     return getClosestPointOnBattedBallRoute(fielder, battedBall);
   }
   return battedBall?.target || { x: fielder?.x ?? field.centerX, y: fielder?.y ?? 250 };
@@ -9386,6 +9419,9 @@ function getEligibleDefenseFielders(fielders, battedBall) {
     ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
     : [];
   if (routeReactionInfielders.length) return routeReactionInfielders;
+  if (battedBall?.isPopupFly) {
+    return fielders.filter((fielder) => fielder.role === "P" || isTemporaryInfielderRole(fielder.role));
+  }
   if (isOutfieldFrontLandingBall(battedBall)) {
     return fielders.filter((fielder) => !isInfielderRole(fielder.role));
   }
@@ -9408,12 +9444,44 @@ function getEligibleDefenseFielders(fielders, battedBall) {
     : [];
   if (routeAttemptInfielders.length) return routeAttemptInfielders;
   if (isDeepOutfieldBall(battedBall)) {
-    return fielders.filter((fielder) => !isInfielderRole(fielder.role));
+    const awareInfielders = fielders.filter((fielder) => isInfielderAwareOfRouteBall(fielder, battedBall));
+    return fielders.filter((fielder) => !isInfielderRole(fielder.role) || awareInfielders.some((infielder) => infielder.role === fielder.role));
   }
   if (battedBall?.isGrounder) {
     return fielders.filter((fielder) => isInfielderRole(fielder.role));
   }
   return fielders;
+}
+
+function isInfielderAwareOfRouteBall(fielder, battedBall) {
+  if (!fielder || !isTemporaryInfielderRole(fielder.role)) return false;
+  if (!battedBall || (!battedBall.isGrounder && !battedBall.isLiner)) return false;
+  if (battedBall.isLineLiner || battedBall.isPopupFly || battedBall.wallHit || battedBall.groundRuleDouble || battedBall.fenceOver) return false;
+  if (battedBall.isHardOutfieldBounce && !isHardGrounderInfieldPlayable(battedBall)) return false;
+  const point = getClosestPointOnBattedBallRoute(fielder, battedBall);
+  const progress = getBattedBallRouteProgressForPoint(point, battedBall);
+  if (progress < 0.12 || progress > 0.82) return false;
+  const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
+  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 6)) return false;
+  const awarenessRadius = 96 + fielding * 18 + speed * 10 + (battedBall.isGrounder ? 80 : 28) + (isHardGrounder(battedBall) ? 120 : 0);
+  return distance <= awarenessRadius;
+}
+
+function isInfielderPlayableRouteHeight(fielder, battedBall, point, bonus = 0) {
+  if (!battedBall || battedBall.isGrounder) return true;
+  const fielding = clamp(fielder?.fielding ?? fielder?.speed ?? 5, 1, 10);
+  const ballHeight = getBattedBallRouteHeightAtPoint(point, battedBall);
+  const playableHeight = 58 + fielding * 5 + bonus;
+  return ballHeight <= playableHeight;
+}
+
+function getBattedBallRouteHeightAtPoint(point, battedBall) {
+  if (!battedBall || battedBall.isGrounder) return 0;
+  const defaultHeight = battedBall.isLiner ? 36 : 0;
+  const maxHeight = Number.isFinite(battedBall.maxHeight) ? battedBall.maxHeight : defaultHeight;
+  return getParabolicArcHeight(getBattedBallRouteProgressForPoint(point, battedBall), maxHeight);
 }
 
 function isInfielderReactionRouteBall(fielder, battedBall) {
@@ -9427,6 +9495,7 @@ function isInfielderReactionRouteBall(fielder, battedBall) {
   const point = getClosestPointOnBattedBallRoute(fielder, battedBall);
   const progress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (progress < 0.1 || progress > 0.96) return false;
+  if (!isInfielderPlayableRouteHeight(fielder, battedBall, point)) return false;
   if (getInfielderRouteBodyCatch(fielder, battedBall, point).caught) return true;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
   const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
@@ -9463,6 +9532,7 @@ function isInfielderAttemptRouteBall(fielder, battedBall) {
   const point = getClosestPointOnBattedBallRoute(fielder, battedBall);
   const progress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (progress < 0.1 || progress > 0.97) return false;
+  if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 10)) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
   const lateralMove = Math.abs(point.x - fielder.x);
   const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
@@ -9639,6 +9709,58 @@ function getDefenseRoleFit(fielder, battedBall) {
   return 0;
 }
 
+function resolveInfieldInterceptionBeforeOutfield(fielders, battedBall, outcome, runner) {
+  if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return null;
+  if (!battedBall.isGrounder && !battedBall.isLiner && !battedBall.isPopupFly) return null;
+  const originalFieldingTime = outcome?.fieldingTime ?? battedBall.ballTime ?? Infinity;
+  const currentIsOutfielder = outcome && !outcome.caught ? true : false;
+  const candidates = (fielders || [])
+    .filter((fielder) => battedBall.isPopupFly
+      ? fielder.role === "P" || isTemporaryInfielderRole(fielder.role)
+      : isTemporaryInfielderRole(fielder.role))
+    .map((fielder) => {
+      if (battedBall.isPopupFly) {
+        const popupCatch = getInfieldPopupFlyCatch(fielder, battedBall, battedBall.target);
+        if (!popupCatch.caught) return null;
+        const popupFielder = {
+          ...fielder,
+          fieldingPoint: battedBall.target,
+          distanceToTarget: popupCatch.routeGap
+        };
+        return {
+          fielder: popupFielder,
+          outcome: makeInfieldPopupFlyOutcome(popupFielder, battedBall, popupCatch.fieldingTime, battedBall.target),
+          target: battedBall.target,
+          fieldingTime: popupCatch.fieldingTime
+        };
+      }
+      if (!isInfielderReactionRouteBall(fielder, battedBall)
+        && !isInfielderAttemptRouteBall(fielder, battedBall)
+        && !isInfielderAwareOfRouteBall(fielder, battedBall)) {
+        return null;
+      }
+      const target = getClosestPointOnBattedBallRoute(fielder, battedBall);
+      const distanceToTarget = Math.hypot(target.x - fielder.x, target.y - fielder.y);
+      const routeFielder = {
+        ...fielder,
+        fieldingPoint: target,
+        distanceToTarget
+      };
+      const routeOutcome = resolveDefenseOutcome(routeFielder, battedBall, runner);
+      if (!routeOutcome?.caught && !routeOutcome?.needsThrow) return null;
+      if (!currentIsOutfielder && (routeOutcome.fieldingTime ?? Infinity) > originalFieldingTime + 0.08) return null;
+      return {
+        fielder: routeFielder,
+        outcome: routeOutcome,
+        target,
+        fieldingTime: routeOutcome.fieldingTime ?? originalFieldingTime
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.fieldingTime - b.fieldingTime);
+  return candidates[0] || null;
+}
+
 function getFielderSpeed(fielder) {
   return getFieldingMoveSpeed(fielder?.speed ?? fielder?.fielding ?? 5);
 }
@@ -9752,6 +9874,45 @@ function makeFieldingErrorOutcome(fielder, battedBall, fieldingTime, fieldingPoi
     fieldingTime,
     fieldingPoint,
     errorPoint: fieldingPoint
+  };
+}
+
+function getInfieldPopupFlyCatch(fielder, battedBall, fieldingPoint = null) {
+  if (!fielder || !battedBall?.isPopupFly || !(fielder.role === "P" || isTemporaryInfielderRole(fielder.role))) {
+    return { caught: false, fieldingTime: Infinity, routeGap: Infinity };
+  }
+  const target = fieldingPoint || battedBall.target;
+  if (!target) return { caught: false, fieldingTime: Infinity, routeGap: Infinity };
+  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const routeGap = Math.hypot((fielder.x ?? 0) - target.x, (fielder.y ?? 0) - target.y);
+  const infieldRange = 150 + fielding * 28 + speed * 16 + (fielder.role === "P" ? 62 : 32);
+  if (routeGap > infieldRange) {
+    return { caught: false, fieldingTime: Infinity, routeGap };
+  }
+  const reactionDelay = getFielderReactionDelay(fielder) * 0.68;
+  const fielderTime = reactionDelay + Math.max(0, routeGap - (76 + fielding * 12)) / Math.max(1, getFielderSpeed(fielder));
+  const ballTime = Math.max(0.72, battedBall.ballTime ?? 1.1);
+  const catchWindow = 0.55 + fielding * 0.04 + speed * 0.02;
+  if (fielderTime > ballTime + catchWindow) {
+    return { caught: false, fieldingTime: Infinity, routeGap, fielderTime };
+  }
+  return {
+    caught: true,
+    fieldingTime: Math.max(ballTime, fielderTime),
+    routeGap,
+    fielderTime
+  };
+}
+
+function makeInfieldPopupFlyOutcome(fielder, battedBall, fieldingTime, fieldingPoint) {
+  return {
+    kind: "out",
+    label: `${fielder.role} ${hitLabels.popup}`,
+    caught: true,
+    needsThrow: false,
+    fieldingTime: Math.max(battedBall.ballTime ?? 0.9, fieldingTime ?? 0),
+    fieldingPoint
   };
 }
 
@@ -9923,6 +10084,7 @@ function getInfielderRouteBodyCatch(fielder, battedBall, fieldingPoint) {
   const point = fieldingPoint || getClosestPointOnBattedBallRoute(fielder, battedBall);
   const routeProgress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (routeProgress < 0.12 || routeProgress > 0.94) return { caught: false, routeGap: Infinity, timeGrace: 0 };
+  if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 4)) return { caught: false, routeGap: Infinity, timeGrace: 0 };
   const routeGap = Math.hypot(point.x - fielder.x, point.y - fielder.y);
   const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
   const speed = clamp(fielder.speed ?? fielding, 1, 10);
@@ -9951,6 +10113,12 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
   if (battedBall.wallHit) return { kind: "double", label: "フェンス直撃", scoreType: "double", caught: false };
 
   const fieldingPoint = fielder.fieldingPoint || battedBall.target;
+  if (!battedBall.isBunt && battedBall.isPopupFly && (fielder.role === "P" || isTemporaryInfielderRole(fielder.role))) {
+    const popupCatch = getInfieldPopupFlyCatch(fielder, battedBall, fieldingPoint);
+    if (popupCatch.caught) {
+      return makeInfieldPopupFlyOutcome(fielder, battedBall, popupCatch.fieldingTime, fieldingPoint);
+    }
+  }
   if (battedBall.isBunt && battedBall.isPopupFly && (fielder.role === "P" || isTemporaryInfielderRole(fielder.role))) {
     const routeGap = Math.hypot((fielder.x ?? 0) - fieldingPoint.x, (fielder.y ?? 0) - fieldingPoint.y);
     const fielderTime = getFielderReactionDelay(fielder) * 0.72 + Math.max(0, routeGap - 54) / Math.max(1, getFielderSpeed(fielder));
@@ -13570,7 +13738,8 @@ function drawPitcherGameRecordColumn(x, y, width, entries, rowHeight) {
   entries.forEach((record, index) => {
     const rowY = y + index * rowHeight;
     ctx.fillStyle = record.win || record.save || record.hold ? "#fff2a8" : "#ffffff";
-    drawFittedBoardText(`${record.name}投手 ${record.innings}イニング${formatPitcherDecisionLabels(record)}`, x, rowY + 15, width, 15, "bold");
+    drawFittedBoardText(`${record.name}投手 ${record.innings}イニング${formatPitcherDecisionLabels(record)}`, x, rowY + 15, width - 88, 15, "bold");
+    drawFittedBoardText(`投球数${record.pitchCount || 0}`, x + width - 84, rowY + 15, 84, 13, "bold");
     ctx.fillStyle = "#dfeaf2";
     drawFittedBoardText(`奪三振${record.strikeouts || 0}  被安打${record.hitsAllowed || 0}  失点${record.runsAllowed || 0}  四死球${record.walksAllowed || 0}`, x, rowY + 35, width, 13, "normal");
   });

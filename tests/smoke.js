@@ -2628,8 +2628,8 @@ assert(battingTighteningState.topExtension >= 10, "good-contact yellow zone shou
 assert(battingTighteningState.topWidth > 60, "good-contact yellow zone should keep its horizontal reach");
 assert(Math.abs(battingTighteningState.effectivePower10 - 9) < 0.001, "effective batter power should be reduced by ten percent");
 assert(Math.abs(battingTighteningState.effectivePower1 - 0.9) < 0.001, "low effective batter power should also be reduced by ten percent");
-assert(battingTighteningState.scoreSweetSpotHalfWidth > battingTighteningState.visualSweetSpotHalfWidth * 5.4, "scored sweet spot should be thirty percent more forgiving than the previous scoring width");
-assert(Math.abs(battingTighteningState.scoreSweetSpotHalfWidth - 0.01208) < 0.001, "sweet spot scoring should be boosted by thirty percent from the current narrowed width");
+assert(battingTighteningState.scoreSweetSpotHalfWidth > battingTighteningState.visualSweetSpotHalfWidth * 7.5, "scored sweet spot should be forty percent more forgiving than the previous scoring width");
+assert(Math.abs(battingTighteningState.scoreSweetSpotHalfWidth - 0.01691) < 0.001, "sweet spot scoring should be boosted by forty percent from the current scoring width");
 assert(Math.abs(battingTighteningState.meetZoneWidthScale - 0.8) < 0.001, "meet zone width should use the requested eighty-percent scale");
 assert(Math.abs(battingTighteningState.outsideVisibleHitWidth - battingTighteningState.unscaledOutsideVisibleHitWidth * 0.8) < 0.001, "visible meet zone should be narrowed to eighty percent");
 assert(battingTighteningState.scoreAtVisibleEdge > 0.78, "visible sweet-spot edge should still receive useful sweet-spot scoring");
@@ -8795,6 +8795,77 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       deepRollingGrounder,
       runner
     );
+    const deepOutfieldGrounderNearSecond = {
+      ...hardGrounder,
+      origin: linerOrigin,
+      target: {
+        x: linerOrigin.x + deepRollingDirection.x * 1900,
+        y: linerOrigin.y + deepRollingDirection.y * 1900
+      },
+      direction: deepRollingDirection,
+      landingDistance: defenseField.fenceDistance * 0.88,
+      flightDistance: defenseField.fenceDistance * 0.88,
+      ballTime: 0.82,
+      isGrounder: true,
+      isLiner: false,
+      isDeep: true,
+      trajectory: "grounder",
+      power: 0.82,
+      wallHit: false,
+      fenceOver: false,
+      groundRuleDouble: false
+    };
+    const deepOutfieldGrounderEligibleRoles = getEligibleDefenseFielders(fielders, deepOutfieldGrounderNearSecond).map((fielder) => fielder.role);
+    const deepOutfieldGrounderChoice = chooseDefenseFielder(fielders, deepOutfieldGrounderNearSecond);
+    const deepOutfieldGrounderRoutePoint = getDefenseFielderRouteTarget(second, deepOutfieldGrounderNearSecond);
+    const outfieldPlannedInfieldOverride = resolveInfieldInterceptionBeforeOutfield(
+      fielders,
+      deepOutfieldGrounderNearSecond,
+      { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: 1.4 },
+      runner
+    );
+    const infieldPopupFly = {
+      ...deepOutfieldGrounderNearSecond,
+      target: { x: second.x + 42, y: second.y + 24 },
+      direction: normalize({ x: 0.22, y: -1 }),
+      landingDistance: defenseField.fenceDistance * 0.28,
+      flightDistance: defenseField.fenceDistance * 0.28,
+      ballTime: 1.55,
+      isGrounder: false,
+      isLiner: false,
+      isPopupFly: true,
+      isDeep: false,
+      trajectory: "fly",
+      power: 0.42,
+      maxHeight: 210
+    };
+    const popupEligibleRoles = getEligibleDefenseFielders(fielders, infieldPopupFly).map((fielder) => fielder.role);
+    const popupChoice = chooseDefenseFielder(fielders, infieldPopupFly);
+    const popupOutcome = resolveDefenseOutcome(
+      {
+        ...popupChoice,
+        fieldingPoint: infieldPopupFly.target,
+        distanceToTarget: Math.hypot(infieldPopupFly.target.x - popupChoice.x, infieldPopupFly.target.y - popupChoice.y)
+      },
+      infieldPopupFly,
+      runner
+    );
+    const popupOutfieldPlannedOverride = resolveInfieldInterceptionBeforeOutfield(
+      fielders,
+      infieldPopupFly,
+      { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: 1.8 },
+      runner
+    );
+    const highLinerOverSecond = {
+      ...deepOutfieldGrounderNearSecond,
+      isGrounder: false,
+      isLiner: true,
+      trajectory: "liner",
+      ballTime: 0.9,
+      power: 1.04,
+      maxHeight: 260
+    };
+    const highLinerEligibleRoles = getEligibleDefenseFielders(fielders, highLinerOverSecond).map((fielder) => fielder.role);
     Math.random = originalRandom;
     return JSON.stringify({
       infieldChoice: infieldChoice.role,
@@ -8891,7 +8962,20 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       deepRollingChoiceIsInfielder: isInfielderRole(deepRollingChoice.role),
       deepRollingFieldingPointBeforeStop: getBattedBallRouteProgressForPoint(deepRollingChoice.fieldingPoint, deepRollingGrounder) < 0.98,
       deepRollingCaught: deepRollingOutcome.caught,
-      deepRollingNeedsThrow: deepRollingOutcome.needsThrow
+      deepRollingNeedsThrow: deepRollingOutcome.needsThrow,
+      deepOutfieldGrounderEligibleRoles,
+      deepOutfieldGrounderChoiceIsInfielder: isInfielderRole(deepOutfieldGrounderChoice.role),
+      deepOutfieldGrounderFieldingPointBeforeStop: getBattedBallRouteProgressForPoint(deepOutfieldGrounderRoutePoint, deepOutfieldGrounderNearSecond) < 0.9,
+      outfieldPlannedInfieldOverrideRole: outfieldPlannedInfieldOverride?.fielder?.role,
+      outfieldPlannedInfieldOverrideIsInfielder: isInfielderRole(outfieldPlannedInfieldOverride?.fielder?.role),
+      outfieldPlannedInfieldOverrideCaught: outfieldPlannedInfieldOverride?.outcome?.caught,
+      outfieldPlannedInfieldOverrideNeedsThrow: outfieldPlannedInfieldOverride?.outcome?.needsThrow,
+      popupEligibleOnlyInfield: popupEligibleRoles.every((role) => role === "P" || isTemporaryInfielderRole(role)),
+      popupChoiceIsInfield: popupChoice.role === "P" || isTemporaryInfielderRole(popupChoice.role),
+      popupOutcomeCaught: popupOutcome.kind === "out" && popupOutcome.caught === true && popupOutcome.needsThrow === false,
+      popupOutfieldPlannedOverrideIsInfield: popupOutfieldPlannedOverride?.fielder?.role === "P" || isTemporaryInfielderRole(popupOutfieldPlannedOverride?.fielder?.role),
+      popupOutfieldPlannedOverrideCaught: popupOutfieldPlannedOverride?.outcome?.kind === "out" && popupOutfieldPlannedOverride?.outcome?.caught === true,
+      highLinerIncludesInfielder: highLinerEligibleRoles.some((role) => isInfielderRole(role))
     });
   })()`
 ));
@@ -8963,6 +9047,16 @@ assert(infieldTakeoverAndCatchState.deepRouteLinerCaught === true && infieldTake
 assert(infieldTakeoverAndCatchState.deepRollingChoiceIsInfielder === true, "deep rolling grounders should still be checked by infielders before outfielders");
 assert(infieldTakeoverAndCatchState.deepRollingFieldingPointBeforeStop === true, "infielders should react along the route of deep rolling grounders");
 assert(infieldTakeoverAndCatchState.deepRollingCaught === true && infieldTakeoverAndCatchState.deepRollingNeedsThrow === true, "reachable deep rolling grounders should become infield throw plays");
+assert(infieldTakeoverAndCatchState.deepOutfieldGrounderEligibleRoles.includes("2B"), "deep outfield-bound grounders should still let nearby infielders react to the route");
+assert(infieldTakeoverAndCatchState.deepOutfieldGrounderChoiceIsInfielder === true, "nearby infielders should be able to beat outfielders to reachable deep grounder routes");
+assert(infieldTakeoverAndCatchState.deepOutfieldGrounderFieldingPointBeforeStop === true, "nearby infielders should move to a cutoff point on deep outfield-bound grounders");
+assert(infieldTakeoverAndCatchState.outfieldPlannedInfieldOverrideIsInfielder === true, "infielders reaching the route should override an initially outfield-planned play");
+assert(infieldTakeoverAndCatchState.outfieldPlannedInfieldOverrideCaught === true && infieldTakeoverAndCatchState.outfieldPlannedInfieldOverrideNeedsThrow === true, "infield override plays should become real infield pickup throw plays");
+assert(infieldTakeoverAndCatchState.popupEligibleOnlyInfield === true, "infield popup flies should only assign pitcher and infielders as eligible fielders");
+assert(infieldTakeoverAndCatchState.popupChoiceIsInfield === true, "reachable infield popup flies should choose a pitcher or infielder");
+assert(infieldTakeoverAndCatchState.popupOutcomeCaught === true, "reachable infield popup flies should be caught in the air instead of drifting through to the outfield");
+assert(infieldTakeoverAndCatchState.popupOutfieldPlannedOverrideIsInfield === true && infieldTakeoverAndCatchState.popupOutfieldPlannedOverrideCaught === true, "infield popup flies should override any initially outfield-planned play");
+assert(infieldTakeoverAndCatchState.highLinerIncludesInfielder === false, "infielders should not chase high liners that clearly pass over their heads");
 
 const fenceInPlayState = JSON.parse(runInGame(
   context,
@@ -9086,7 +9180,10 @@ const hardOutfieldGrounderInfielderState = JSON.parse(runInGame(
     };
     const bodyCatch = getInfielderRouteBodyCatch(routeFielder, battedBall, fieldingPoint);
     const closeCatch = getCloseHardBallCatch(routeFielder, battedBall, fieldingPoint, 0.1);
+    const originalRandom = Math.random;
+    Math.random = () => 0.99;
     const outcome = resolveDefenseOutcome(routeFielder, battedBall, createBatterRunner(activeBatter));
+    Math.random = originalRandom;
     return JSON.stringify({
       playable: isHardGrounderInfieldPlayable(battedBall),
       bodyCaught: bodyCatch.caught,
@@ -9499,6 +9596,14 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
     Math.random = () => 0.78;
     const hitterCountEdgeCourse = getComputerPitchCornerCourse("fast");
     count = { strikes: 1, balls: 3, outs: 0 };
+    const threeBallOffsetScale = getComputerPitchStrikeOffsetScale();
+    const normalStrikeOffsetScale = 1 / computerPitchStrikeZoneRateScale;
+    Math.random = () => 0.2;
+    const threeBallBackdoorCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.4;
+    const threeBallFrontdoorCourse = getComputerPitchCornerCourse("slow");
+    Math.random = () => 0.7;
+    const threeBallBallToStrikeCourse = getComputerPitchCornerCourse("slow");
     Math.random = () => 0.99;
     const threeBallFastCourse = getComputerPitchCornerCourse("fast");
     Math.random = () => 0.99;
@@ -9601,6 +9706,11 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       hitterCountBackdoorIntent: hitterCountBackdoorCourse.intent,
       hitterCountFrontdoorIntent: hitterCountFrontdoorCourse.intent,
       hitterCountEdgeIntent: hitterCountEdgeCourse.intent,
+      threeBallOffsetScale,
+      normalStrikeOffsetScale,
+      threeBallBackdoorIntent: threeBallBackdoorCourse.intent,
+      threeBallFrontdoorIntent: threeBallFrontdoorCourse.intent,
+      threeBallBallToStrikeIntent: threeBallBallToStrikeCourse.intent,
       threeBallFastIntent: threeBallFastCourse.intent,
       threeBallSlowIntent: threeBallSlowCourse.intent,
       plainFastBendSegments: plainFastPlan.bendSegments?.length ?? 0,
@@ -9624,7 +9734,11 @@ const computerPitchAndSwingState = JSON.parse(runInGame(
       shapedSpeedScale,
       strikeConfidence,
       ballConfidence,
-      swungAtObviousBall: swingState.didSwingThisPitch
+      swungAtObviousBall: swingState.didSwingThisPitch,
+      cpuSwing0Strike: (() => { count = { strikes: 0, balls: 0, outs: 0 }; return chooseComputerSwingType(0.99); })(),
+      cpuSwing1StrikeStrong: (() => { count = { strikes: 1, balls: 0, outs: 0 }; return chooseComputerSwingType(0.49); })(),
+      cpuSwing1StrikeWeak: (() => { count = { strikes: 1, balls: 0, outs: 0 }; return chooseComputerSwingType(0.5); })(),
+      cpuSwing2Strike: (() => { count = { strikes: 2, balls: 0, outs: 0 }; return chooseComputerSwingType(0); })()
     });
   })()`
 ));
@@ -9653,6 +9767,8 @@ assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerP
 assert(computerPitchAndSwingState.slowBallCourseIsBall === false && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should reduce obvious balls and favor strike-threatening pitches with two strikes");
 assert(computerPitchAndSwingState.slowAcceleratingCourseIsStrike === true && computerPitchAndSwingState.normalAcceleratingStrikeHasBurst === true && computerPitchAndSwingState.slowAcceleratingStrikeHasBurst === true, "normal and slow computer pitches should include ball-to-strike accelerating or brake-then-burst pitches");
 assert(computerPitchAndSwingState.hitterCountBackdoorIsStrike === true && computerPitchAndSwingState.hitterCountFrontdoorIsStrike === true && computerPitchAndSwingState.hitterCountEdgeIsStrike === true, "computer pitchers should avoid waste balls and target edges/frontdoor/backdoor in 2-0 counts");
+assert(computerPitchAndSwingState.threeBallOffsetScale < computerPitchAndSwingState.normalStrikeOffsetScale, "three-ball computer pitches should aim closer to the zone");
+assert(computerPitchAndSwingState.threeBallBackdoorIntent === "backdoor" && computerPitchAndSwingState.threeBallFrontdoorIntent === "frontdoor" && computerPitchAndSwingState.threeBallBallToStrikeIntent === "ballToStrikeBurst", "three-ball computer pitchers should strongly favor strike-threatening edge and ball-to-strike pitches");
 assert(computerPitchAndSwingState.threeBallFastIsStrike === true && computerPitchAndSwingState.threeBallSlowIsStrike === true, "computer pitchers should not intentionally waste pitches in any three-ball count");
 assert(computerPitchAndSwingState.plainFastBendSegments === 0 && computerPitchAndSwingState.plainFastSpeedSegments === 0 && computerPitchAndSwingState.plainNormalBendSegments === 0 && computerPitchAndSwingState.plainNormalSpeedSegments === 0, "plain edge fastballs and straight pitches should stay unshaped");
 assert(computerPitchAndSwingState.shapedTargetNearBatter === false, "computer pitchers should rarely choose targets near the batter body");
@@ -9660,6 +9776,9 @@ assert(computerPitchAndSwingState.shapedCurvePower > 0.25, "computer pitch shapi
 assert(computerPitchAndSwingState.shapedSpeedScale > 1.008, "computer pitch shaping should visibly change live pitch speed");
 assert(computerPitchAndSwingState.strikeConfidence > computerPitchAndSwingState.ballConfidence + 0.45, "computer batting should strongly prefer pitches projected near the plate");
 assert(computerPitchAndSwingState.swungAtObviousBall === false, "computer batting should usually take obvious balls");
+assert(computerPitchAndSwingState.cpuSwing0Strike === "strong", "computer batters should use strong swings with no strikes");
+assert(computerPitchAndSwingState.cpuSwing1StrikeStrong === "strong" && computerPitchAndSwingState.cpuSwing1StrikeWeak === "weak", "computer batters should split strong and weak swings evenly at one strike");
+assert(computerPitchAndSwingState.cpuSwing2Strike === "weak", "computer batters should use weak swings with two strikes");
 
 const homerCandidateGrounderState = JSON.parse(runInGame(
   context,
