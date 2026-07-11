@@ -203,6 +203,7 @@ function assertHtmlShell() {
     'value="dodgers"',
     'value="dendos"',
     'value="semiauto"',
+    'value="watch"',
     'value="practice"',
     'id="practicePitcherControlSelect"',
     'id="practicePitcherTypeSelect"',
@@ -211,7 +212,12 @@ function assertHtmlShell() {
     'id="firstBatSelect"',
     'id="inningsSelect"',
     'value="5"',
+    'value="9"',
     'id="awayPitcherCard"',
+    'id="awayPitcher4Card"',
+    'id="awayPitcher5Card"',
+    'id="homePitcher4Card"',
+    'id="homePitcher5Card"',
     'id="homeBatterRCard"',
     'id="homeBatterCACard"',
     'id="activeBatterStats"'
@@ -223,8 +229,8 @@ function assertHtmlShell() {
   assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
   assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
   assertNoMojibake(html, "index.html");
-  assert(/\.pitcher-role-pitcher\s*\{\s*top:\s*35%;/.test(css), "starting pitcher card should sit higher to avoid catcher overlap");
-  assert(/\.pitcher-role-pitcher3\s*\{\s*top:\s*65%;/.test(css), "third pitcher card should stay above the catcher card");
+  assert(/\.pitcher-role-pitcher\s*\{\s*top:\s*25%;/.test(css), "starting pitcher card should sit at the top of the five-pitcher stack");
+  assert(/\.pitcher-role-pitcher5\s*\{\s*top:\s*73%;/.test(css), "fifth pitcher card should stay above the catcher card");
 }
 
 assertHtmlShell();
@@ -476,10 +482,10 @@ const lineupState = JSON.parse(runInGame(
 assert(lineupState.teams.length === 2, "game should have two teams");
 assert(lineupState.awayRoles.join(",") === "2B,CA,R,L,SS,C,DH", "away lineup should use the requested batting order");
 assert(lineupState.homeRoles.join(",") === "R,L,2B,CA,C,SS,DH", "home lineup should use the requested batting order");
-assert(lineupState.awayPitchers.length === 3 && lineupState.homePitchers.length === 3, "each team should carry three pitchers");
+assert(lineupState.awayPitchers.length === 5 && lineupState.homePitchers.length === 5, "each team should carry five pitchers");
 assert(lineupState.awayActivePitcher === lineupState.awayPitchers[0], "the first pitcher slot should be the starter");
-assert(lineupState.awayPitchers.join(",") === "skubal,melton,jansen", "away default pitchers should match the requested regular roster");
-assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz", "home default pitchers should match the requested regular roster");
+assert(lineupState.awayPitchers.join(",") === "skubal,melton,jansen,hanifee,summers", "away default pitchers should match the requested regular roster");
+assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,rojas", "home default pitchers should match the requested regular roster");
 assert(lineupState.awayBatters.join(",") === "mcgonigle,dingler,carpenter,greene,torkelson,outman,jones", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
@@ -910,7 +916,7 @@ assert(teamResetState.autoPitcher === "skubal", "auto fill should restore the de
 assert(teamResetState.autoShortstop === "torkelson", "auto fill should restore the default fielder selections");
 assert(teamResetState.autoLineup === "2B,CA,R,L,SS,C,DH", "auto fill should restore the default batting order");
 assert(teamResetState.autoComplete === true, "auto fill should make the team complete");
-assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 55, "auto fill should restore a valid point total");
+assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 65, "auto fill should restore a valid point total");
 
 const rosterAndPointState = JSON.parse(runInGame(
   context,
@@ -1970,13 +1976,13 @@ assert(rosterAndPointState.jansen.fielding === 5, "Jansen fielding should match 
 assert(rosterAndPointState.jansen.stamina === 2, "Jansen stamina should match the pitcher roster table");
 assert(rosterAndPointState.jansen.cost === 4, "Jansen pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
-assert(rosterAndPointState.teamPointLimit === 60, "combined point limit should be 60 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 18, "default away pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.defaultHomePitcherCost === 21, "default home pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.overLimitDisabled === true, "teams over 60 combined points should not be startable");
-assert(rosterAndPointState.overLimitText.includes("/60"), "menu should show the 60-point combined limit");
-assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 60 combined points should not be startable");
-assert(rosterAndPointState.pitcherOverLimitText.includes("/60"), "menu should show the combined pitcher point total");
+assert(rosterAndPointState.teamPointLimit === 65, "combined point limit should be 65 per team");
+assert(rosterAndPointState.defaultAwayPitcherCost === 22, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultHomePitcherCost === 28, "default home pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.overLimitDisabled === true, "teams over 65 combined points should not be startable");
+assert(rosterAndPointState.overLimitText.includes("/65"), "menu should show the 65-point combined limit");
+assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 65 combined points should not be startable");
+assert(rosterAndPointState.pitcherOverLimitText.includes("/65"), "menu should show the combined pitcher point total");
 assert(rosterAndPointState.awayFielderPointText === "", "menu should show only the combined point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
@@ -2013,7 +2019,7 @@ assert(rosterAndPointState.pitcherChooserHtml.includes("stamina-stat-row"), "pit
 assert(rosterAndPointState.firstBatterOption === "ichiro", "batter chooser should sort candidates by cost descending");
 assert(rosterAndPointState.firstCatcherOption === "johnnybench", "catcher chooser should sort candidates by cost descending");
 assert(rosterAndPointState.firstPitcherOption === "cyyoung", "pitcher chooser should sort candidates by cost descending");
-assert(rosterAndPointState.selectedPitcherIds.length === 3, "selected teams should include three pitchers");
+assert(rosterAndPointState.selectedPitcherIds.length === 5, "selected teams should include five pitchers");
 assert(rosterAndPointState.chooserHtml.includes("内野"), "batter chooser should use the short infield label");
 assert(rosterAndPointState.chooserHtml.includes("外野"), "batter chooser should use the short outfield label");
 assert(!rosterAndPointState.catcherChooserHtml.includes("内野"), "catcher chooser should not show infield defense");
@@ -2092,10 +2098,10 @@ const singlePlayerOpponentState = JSON.parse(runInGame(
 ));
 
 assert(singlePlayerOpponentState.preStartHomeCost > 59, "Dendos should be allowed to exceed the normal point limit as a CPU opponent");
-assert(singlePlayerOpponentState.preStartAwayCost <= 60, "single-player Dendos mode should keep the player roster under the normal point limit");
+assert(singlePlayerOpponentState.preStartAwayCost <= 65, "single-player Dendos mode should keep the player roster under the normal point limit");
 assert(singlePlayerOpponentState.preStartDisabled === false, "single-player mode should remain startable with Dendos as the over-limit CPU opponent");
 assert(singlePlayerOpponentState.preStartHomeLabel === "デンドーズ", "single-player mode should label the home team as Dendos when selected");
-assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,maddux", "Dendos should use the requested elite pitching staff");
+assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,maddux,hikari,magari", "Dendos should use the requested elite pitching staff");
 assert(singlePlayerOpponentState.preStartBatters.R === "ichiro", "Dendos right fielder should be Ichiro");
 assert(singlePlayerOpponentState.preStartBatters.C === "bonds", "Dendos center fielder should be Bonds");
 assert(singlePlayerOpponentState.preStartBatters.L === "ruth", "Dendos left fielder should be Ruth");
@@ -2108,6 +2114,110 @@ assert(singlePlayerOpponentState.cpuPitchingPlayerControlled === false, "Dendos 
 assert(singlePlayerOpponentState.cpuBattingPlayerControlled === false, "Dendos should bat automatically");
 assert(singlePlayerOpponentState.playerPitchingVsCpu === true, "player should pitch when defending against Dendos");
 assert(singlePlayerOpponentState.dendosCpuAutoPitchStarted === true, "CPU pitcher should start pitching automatically against Dendos");
+
+const watchModeState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    modeSelect.value = "watch";
+    awayPresetSelect.value = "tigers";
+    homePresetSelect.value = "dodgers";
+    firstBatSelect.value = "home";
+    inningsSelect.value = "9";
+    p1DefenseSelect.value = "manual";
+    p2DefenseSelect.value = "semiauto";
+    selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
+    menuSelection = cloneMenuSelection(defaultMenuSelection);
+    readMenu();
+    const readState = {
+      gameMode,
+      firstBatTeam,
+      maxInnings,
+      awayPreset: getSelectedTeamPresetId("away"),
+      homePreset: getSelectedTeamPresetId("home"),
+      awayDefenseControl: defenseControlMode.away,
+      homeDefenseControl: defenseControlMode.home,
+      awayDefenseSelect: p1DefenseSelect.value,
+      homeDefenseSelect: p2DefenseSelect.value
+    };
+    battingTeam = "away";
+    const awayBattingPlayerControlled = isPlayerBatting();
+    const homePitchingPlayerControlled = isPlayerPitching();
+    const manualHomeDefense = isManualDefenseControl();
+    const manualAwayRun = isManualBaserunningControl("away");
+    battingTeam = "home";
+    const homeBattingPlayerControlled = isPlayerBatting();
+    const awayPitchingPlayerControlled = isPlayerPitching();
+    const manualAwayDefense = isManualDefenseControl();
+    const manualHomeRun = isManualBaserunningControl("home");
+    startGame();
+    const startedPhase = gamePhase;
+    const startedBattingTeam = battingTeam;
+    const startedPitchers = {
+      away: selected.away.pitchers.length,
+      home: selected.home.pitchers.length
+    };
+    const autoScheduleAllowed = shouldAutoScheduleComputerPitch();
+    autoPitchTimer = performance.now() - 1;
+    update(16);
+    const autoPitchStarted = Boolean(isPitching || pendingPitch);
+    modeSelect.value = "versus";
+    awayPresetSelect.value = "tigers";
+    homePresetSelect.value = "dodgers";
+    firstBatSelect.value = "away";
+    inningsSelect.value = "1";
+    p1DefenseSelect.value = "auto";
+    p2DefenseSelect.value = "auto";
+    gameMode = "versus";
+    selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
+    menuSelection = cloneMenuSelection(defaultMenuSelection);
+    selected = createSelectedTeams(menuSelection);
+    battingTeam = "away";
+    gamePhase = "menu";
+    isPitching = false;
+    pendingPitch = null;
+    autoPitchTimer = Number.POSITIVE_INFINITY;
+    computerPitchPlan = null;
+    keysDown.clear();
+    pitchControlLockoutKeys.clear();
+    resetBall();
+    resetSwing();
+    resetDefenseState();
+    setMatchup();
+    return JSON.stringify({
+      readState,
+      awayBattingPlayerControlled,
+      homePitchingPlayerControlled,
+      manualHomeDefense,
+      manualAwayRun,
+      homeBattingPlayerControlled,
+      awayPitchingPlayerControlled,
+      manualAwayDefense,
+      manualHomeRun,
+      startedPhase,
+      startedBattingTeam,
+      startedPitchers,
+      autoScheduleAllowed,
+      autoPitchStarted
+    });
+  })()`
+));
+
+assert(watchModeState.readState.gameMode === "watch", "watch mode should be read from the mode selector");
+assert(watchModeState.readState.firstBatTeam === "home", "watch mode should honor the first-bat selection");
+assert(watchModeState.readState.maxInnings === 9, "watch mode should honor the innings selection");
+assert(watchModeState.readState.awayPreset === "tigers", "watch mode should honor Team A preset selection");
+assert(watchModeState.readState.homePreset === "dodgers", "watch mode should honor Team B preset selection");
+assert(watchModeState.readState.awayDefenseControl === "auto" && watchModeState.readState.homeDefenseControl === "auto", "watch mode should force defense and baserunning to auto");
+assert(watchModeState.readState.awayDefenseSelect === "auto" && watchModeState.readState.homeDefenseSelect === "auto", "watch mode should show auto in both defense and baserunning selectors");
+assert(watchModeState.awayBattingPlayerControlled === false && watchModeState.homeBattingPlayerControlled === false, "watch mode should not let either batter side wait for player input");
+assert(watchModeState.homePitchingPlayerControlled === false && watchModeState.awayPitchingPlayerControlled === false, "watch mode should not let either pitcher side wait for player input");
+assert(watchModeState.manualHomeDefense === false && watchModeState.manualAwayDefense === false, "watch mode should disable manual defense");
+assert(watchModeState.manualAwayRun === false && watchModeState.manualHomeRun === false, "watch mode should disable manual baserunning");
+assert(watchModeState.startedPhase === "playing", "watch mode should start a normal game");
+assert(watchModeState.startedBattingTeam === "home", "watch mode should start with the selected first-bat team");
+assert(watchModeState.startedPitchers.away === 5 && watchModeState.startedPitchers.home === 5, "watch mode should allow both teams' selected rosters");
+assert(watchModeState.autoScheduleAllowed === true, "watch mode should schedule CPU pitches automatically");
+assert(watchModeState.autoPitchStarted === true, "watch mode should start the CPU pitch without player input");
 
 const teamPresetSelectionState = JSON.parse(runInGame(
   context,
@@ -2149,11 +2259,11 @@ assert(teamPresetSelectionState.awayLabel === "デンドーズ", "Team A label s
 assert(teamPresetSelectionState.homeLabel === "タイガース", "Team B label should follow the selected preset");
 assert(teamPresetSelectionState.awayCost > 59, "Dendos should exceed the normal point limit");
 assert(teamPresetSelectionState.awayPointText.includes("制限なし"), "Dendos point status should show no limit");
-assert(!teamPresetSelectionState.awayPointText.includes("/60"), "Dendos point status should not show the normal limit");
-assert(teamPresetSelectionState.homePointText.includes("/60"), "non-Dendos teams should keep the normal point limit");
+assert(!teamPresetSelectionState.awayPointText.includes("/65"), "Dendos point status should not show the normal limit");
+assert(teamPresetSelectionState.homePointText.includes("/65"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
-assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,maddux", "Dendos preset should apply the elite pitching staff to Team A");
-assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen", "Tigers preset should apply to Team B");
+assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,maddux,hikari,magari", "Dendos preset should apply the elite pitching staff to Team A");
+assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen,hanifee,summers", "Tigers preset should apply to Team B");
 assert(teamPresetSelectionState.awayOtaniAllowed === true, "Dendos teams should still allow player swaps without point-limit blocking");
 assert(!rosterAndPointState.escapedChooserHtml.includes("<img src=x"), "player chooser should not render saved player names as HTML");
 
@@ -2211,6 +2321,29 @@ const pitcherStaminaState = JSON.parse(runInGame(
     const specialSpeedFactor = pitchTypes.special.speedFactor;
     const specialBaseKmhFactor = pitchTypes.special.baseKmhFactor;
     resetBall();
+    pitcherInfo.currentStamina = max;
+    activePitcher = pitcherInfo;
+    currentPitchType = "fast";
+    ball.inPitch = true;
+    ball.staminaMistake = false;
+    const beforeHorizontalVariation = pitcherInfo.currentStamina;
+    consumePitchVariationStamina("horizontal");
+    const afterHorizontalVariation = pitcherInfo.currentStamina;
+    consumePitchVariationStamina("horizontal");
+    const afterRepeatedHorizontalVariation = pitcherInfo.currentStamina;
+    consumePitchVariationStamina("vertical");
+    const afterVerticalVariation = pitcherInfo.currentStamina;
+    pitcherInfo.currentStamina = max;
+    const beforeHitPenalty = pitcherInfo.currentStamina;
+    recordPitcherHitAllowed(fieldingTeam(), pitcherInfo, 1);
+    const afterHitPenalty = pitcherInfo.currentStamina;
+    recordCurrentPitcherWalkAllowed(1, pitcherInfo);
+    const afterWalkPenalty = pitcherInfo.currentStamina;
+    recordResponsiblePitcherRunsAllowed(fieldingTeam(), 2, [pitcherInfo.id, pitcherInfo.id], staminaTuning.runPenalty);
+    const afterRunPenalty = pitcherInfo.currentStamina;
+    recordResponsiblePitcherRunsAllowed(fieldingTeam(), 1, [pitcherInfo.id], staminaTuning.homerRunPenalty);
+    const afterHomerRunPenalty = pitcherInfo.currentStamina;
+    resetBall();
     pitcherInfo.currentStamina = max * 0.35;
     const tiredState = getPitcherStaminaState(pitcherInfo).label;
     const tiredSpeedDrop = getStaminaSpeedDrop(pitcherInfo);
@@ -2232,6 +2365,7 @@ const pitcherStaminaState = JSON.parse(runInGame(
     const deepEmptyMultiplier = getStaminaAbilityMultiplier({ ...pitcherInfo, currentStamina: max * 0.04 });
     const emptyBend = getStaminaChangeMultiplier({ ...pitcherInfo, currentStamina: max * 0.05 }, staminaTuning.bendExhaustedMultiplier);
     const barHtml = staminaBar(pitcherInfo);
+    const gameStaminaText = getPitcherGameStaminaText(pitcherInfo);
     return JSON.stringify({
       stamina: pitcherInfo.stamina,
       fastKmh: pitcherInfo.fastKmh,
@@ -2256,6 +2390,21 @@ const pitcherStaminaState = JSON.parse(runInGame(
       fastSpeedFactor,
       specialSpeedFactor,
       specialBaseKmhFactor,
+      beforeHorizontalVariation,
+      afterHorizontalVariation,
+      afterRepeatedHorizontalVariation,
+      afterVerticalVariation,
+      horizontalVariationCostRate: staminaTuning.horizontalVariationCostRate,
+      verticalVariationCostRate: staminaTuning.verticalVariationCostRate,
+      beforeHitPenalty,
+      afterHitPenalty,
+      afterWalkPenalty,
+      afterRunPenalty,
+      afterHomerRunPenalty,
+      hitPenalty: staminaTuning.hitPenalty,
+      walkPenalty: staminaTuning.walkPenalty,
+      runPenalty: staminaTuning.runPenalty,
+      homerRunPenalty: staminaTuning.homerRunPenalty,
       tiredState,
       tiredSpeedDrop,
       tiredControl,
@@ -2272,7 +2421,8 @@ const pitcherStaminaState = JSON.parse(runInGame(
       capped,
       exhaustedState,
       exhaustedSpeedDrop,
-      barHtml
+      barHtml,
+      gameStaminaText
     });
   })()`
 ));
@@ -2280,12 +2430,12 @@ const pitcherStaminaState = JSON.parse(runInGame(
 assert(pitcherStaminaState.stamina === 8, "active default pitcher should use the roster stamina rating");
 assert(Math.abs(pitcherStaminaState.max - 145.6) < 0.001, "stamina rating eight should create thirty-percent more current-stamina points");
 assert(pitcherStaminaState.initial === pitcherStaminaState.max, "selected pitchers should begin at full stamina");
-assert(Math.abs(pitcherStaminaState.pitchCostMultiplier - 0.49) < 0.001, "pitch stamina consumption should be reduced by another thirty percent");
-assert(Math.abs(pitcherStaminaState.initial - pitcherStaminaState.afterFast - pitcherStaminaState.fastCost * pitcherStaminaState.pitchCostMultiplier) < 0.001, "fastballs should consume forty-nine percent of their base stamina cost");
+assert(Math.abs(pitcherStaminaState.pitchCostMultiplier - 0.55) < 0.001, "pitch stamina consumption should use fifty-five percent of the base pitch cost");
+assert(Math.abs(pitcherStaminaState.initial - pitcherStaminaState.afterFast - pitcherStaminaState.fastCost * pitcherStaminaState.pitchCostMultiplier) < 0.001, "fastballs should consume fifty-five percent of their base stamina cost");
 assert(pitcherStaminaState.initialPitchCount === 0, "pitchers should begin with zero pitches thrown");
 assert(pitcherStaminaState.afterFastPitchCount === 1, "starting a pitch should increment the pitch count");
-assert(Math.abs(pitcherStaminaState.beforeSpecial - pitcherStaminaState.afterSpecial - 16 * pitcherStaminaState.pitchCostMultiplier) < 0.001, "special pitches should consume twice their previous base stamina cost");
-assert(pitcherStaminaState.specialCost === 16, "special pitch stamina cost should be sixteen");
+assert(Math.abs(pitcherStaminaState.beforeSpecial - pitcherStaminaState.afterSpecial - 6 * pitcherStaminaState.pitchCostMultiplier) < 0.001, "special pitches should use the reduced base stamina cost");
+assert(pitcherStaminaState.specialCost === 6, "special pitch stamina cost should be six");
 assert(Math.abs(pitcherStaminaState.specialPendingMultiplier - 1) < 0.001, "special pitches should not inflate control and movement through the general ability multiplier");
 assert(Math.abs(pitcherStaminaState.specialStuffMultiplier - 2) < 0.001, "special pitches should double pitcher stuff internally");
 assert(pitcherStaminaState.specialStuff > 10 && Math.abs(pitcherStaminaState.specialStuff / pitcherStaminaState.fastStuff - 2) < 0.001, "special pitch stuff should be allowed to exceed ten internally");
@@ -2295,6 +2445,13 @@ assert(Math.abs(pitcherStaminaState.fastSpeedRatio - 1.4) < 0.000001, "fast pitc
 assert(Math.abs(pitcherStaminaState.fastSpeedFactor - 1.15) < 0.000001, "fast pitch actual speed should keep its current factor");
 assert(Math.abs(pitcherStaminaState.specialSpeedFactor - pitcherStaminaState.fastSpeedFactor * 1.1) < 0.001, "special pitches should be ten percent faster than fast pitches");
 assert(Math.abs(pitcherStaminaState.specialBaseKmhFactor - 1.1) < 0.001, "special pitch displayed speed should be ten percent above the fast pitch base");
+assert(Math.abs(pitcherStaminaState.beforeHorizontalVariation - pitcherStaminaState.afterHorizontalVariation - pitcherStaminaState.fastCost * pitcherStaminaState.horizontalVariationCostRate * pitcherStaminaState.pitchCostMultiplier) < 0.001, "post-release horizontal variation should add ten percent of the base pitch stamina cost");
+assert(Math.abs(pitcherStaminaState.afterHorizontalVariation - pitcherStaminaState.afterRepeatedHorizontalVariation) < 0.001, "repeated horizontal variation in one pitch should not stack stamina cost");
+assert(Math.abs(pitcherStaminaState.afterRepeatedHorizontalVariation - pitcherStaminaState.afterVerticalVariation - pitcherStaminaState.fastCost * pitcherStaminaState.verticalVariationCostRate * pitcherStaminaState.pitchCostMultiplier) < 0.001, "post-release vertical variation should add twenty percent of the base pitch stamina cost");
+assert(Math.abs(pitcherStaminaState.beforeHitPenalty - pitcherStaminaState.afterHitPenalty - pitcherStaminaState.hitPenalty) < 0.001, "hits allowed should reduce pitcher stamina by three");
+assert(Math.abs(pitcherStaminaState.afterHitPenalty - pitcherStaminaState.afterWalkPenalty - pitcherStaminaState.walkPenalty) < 0.001, "walks and hit batters should reduce pitcher stamina by three");
+assert(Math.abs(pitcherStaminaState.afterWalkPenalty - pitcherStaminaState.afterRunPenalty - pitcherStaminaState.runPenalty * 2) < 0.001, "non-homer runs allowed should reduce pitcher stamina by five per run");
+assert(Math.abs(pitcherStaminaState.afterRunPenalty - pitcherStaminaState.afterHomerRunPenalty - pitcherStaminaState.homerRunPenalty) < 0.001, "home-run runs allowed should reduce pitcher stamina by seven per run");
 assert(typeof pitcherStaminaState.tiredState === "string", "35 percent stamina should be marked as tired");
 assert(Math.abs(pitcherStaminaState.tiredSpeedDrop - pitcherStaminaState.fastKmh * 0.2) < 0.001, "30-50 percent stamina should reduce speed by twenty percent");
 assert(Math.abs(pitcherStaminaState.tiredControl - pitcherStaminaState.control * 0.8) < 0.001, "30-50 percent stamina should reduce control by twenty percent");
@@ -2312,6 +2469,7 @@ assert(typeof pitcherStaminaState.exhaustedState === "string", "10-30 percent st
 assert(Math.abs(pitcherStaminaState.exhaustedSpeedDrop - pitcherStaminaState.fastKmh * 0.3) < 0.001, "10-30 percent stamina should drop speed by thirty percent");
 assert(pitcherStaminaState.barHtml.includes("stamina-row"), "pitcher sidebar should render a stamina bar");
 assert(!/\d+\/\d+/.test(pitcherStaminaState.barHtml), "stamina bar should not show numeric current stamina");
+assert(/^\d+\/\d+$/.test(pitcherStaminaState.gameStaminaText), "in-game pitcher stamina bar should show current and max stamina numbers");
 assert(pitcherStaminaState.barHtml.includes("stamina-mark-70"), "stamina bar should show the seventy-percent fatigue mark");
 assert(pitcherStaminaState.barHtml.includes("stamina-mark-50"), "stamina bar should show the fifty-percent fatigue mark");
 assert(pitcherStaminaState.barHtml.includes("stamina-mark-30"), "stamina bar should show the thirty-percent fatigue mark");
@@ -2435,8 +2593,8 @@ const battingTighteningState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(battingTighteningState.topExtension <= 16, "good-contact yellow zone should be shorter toward the pitcher");
-assert(battingTighteningState.topExtension >= 8, "good-contact yellow zone should still leave a visible pitcher-side area");
+assert(battingTighteningState.topExtension <= 20, "good-contact yellow zone should stay controlled after the extra pitcher-side extension");
+assert(battingTighteningState.topExtension >= 10, "good-contact yellow zone should extend farther toward the pitcher");
 assert(battingTighteningState.topWidth > 60, "good-contact yellow zone should keep its horizontal reach");
 assert(Math.abs(battingTighteningState.effectivePower10 - 9) < 0.001, "effective batter power should be reduced by ten percent");
 assert(Math.abs(battingTighteningState.effectivePower1 - 0.9) < 0.001, "low effective batter power should also be reduced by ten percent");
@@ -3272,7 +3430,7 @@ assert(battingPracticeModeState.selectedPracticePitcher === "sawamura", "practic
 assert(battingPracticeModeState.practiceStaminaAfterPitch === battingPracticeModeState.practiceStaminaBeforePitch, "practice mode pitches should not consume pitcher stamina");
 assert(battingPracticeModeState.practicePitchCountAfterPitch === battingPracticeModeState.practicePitchCountBeforePitch + 1, "practice mode pitches should still count as pitches thrown");
 assert(battingPracticeModeState.practiceStaminaAfterHomer === battingPracticeModeState.practiceStaminaBeforeHomer, "practice mode homers should not consume pitcher stamina");
-assert(battingPracticeModeState.versusStaminaBeforeHomer - battingPracticeModeState.versusStaminaAfterHomer === 5, "versus mode homers should still consume pitcher stamina");
+assert(battingPracticeModeState.versusStaminaBeforeHomer - battingPracticeModeState.versusStaminaAfterHomer === 7, "versus mode home-run run penalties should consume seven stamina for a solo homer");
 assert(battingPracticeModeState.practiceSameBatterAfterReset === true, "practice mode should keep the same batter after each plate appearance");
 assert(battingPracticeModeState.practiceSamePitcherAfterReset === true, "practice mode should keep the same pitcher after each plate appearance");
 assert(battingPracticeModeState.practiceCountReset === true, "practice mode should reset the count and bases between repeated matchups");
@@ -4152,10 +4310,46 @@ const toweringFlyAndTagUpState = JSON.parse(runInGame(
     const outcome = { kind: "out", label: hitLabels.toweringFly, caught: true, needsThrow: false, fieldingTime: 2.7 };
     const deepFielder = { role: "C", x: deepTarget.x, y: deepTarget.y, speed: 5, fielding: 5, arm: 5 };
     const shallowFielder = { ...deepFielder, x: shallowTarget.x, y: shallowTarget.y, arm: 10 };
+    gameMode = "versus";
+    battingTeam = "away";
+    defenseControlMode = { away: "auto", home: "auto" };
+    count.outs = 0;
     bases = createEmptyBases();
     bases.third = thirdRunner;
     const deepAnimations = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget);
     const shallowAnimations = createDefenseBaseRunnerAnimations(outcome, { ...flyBall, target: shallowTarget, landingDistance: defenseField.fenceDistance * 0.28, isDeep: false }, null, shallowFielder, shallowTarget);
+    const tagThrow = createTagUpVisualThrowState(deepFielder, deepTarget, outcome, flyBall, deepAnimations);
+    defenseControlMode.away = "semiauto";
+    const semiAutoAnimations = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget);
+    defenseControlMode.away = "auto";
+    const rightDeepTarget = { x: field.plateX + 340, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.82 };
+    const leftDeepTarget = { x: field.plateX - 260, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.72 };
+    const rightFly = { ...flyBall, target: rightDeepTarget, landingDistance: defenseField.fenceDistance * 0.82, flightDistance: defenseField.fenceDistance * 0.82 };
+    const leftFly = { ...flyBall, target: leftDeepTarget, landingDistance: defenseField.fenceDistance * 0.72, flightDistance: defenseField.fenceDistance * 0.72 };
+    const fastSecondRunner = makeBaseRunner({ id: "fast2", name: "fast2", run: 9 });
+    const slowSecondRunner = makeBaseRunner({ id: "slow2", name: "slow2", run: 2 });
+    const fastFirstRunner = makeBaseRunner({ id: "fast1", name: "fast1", run: 9 });
+    const slowFirstRunner = makeBaseRunner({ id: "slow1", name: "slow1", run: 7 });
+    bases = createEmptyBases();
+    bases.second = fastSecondRunner;
+    const fastSecondRight = createDefenseBaseRunnerAnimations(outcome, rightFly, null, { ...deepFielder, x: rightDeepTarget.x, y: rightDeepTarget.y }, rightDeepTarget)[0];
+    bases = createEmptyBases();
+    bases.second = slowSecondRunner;
+    const slowSecondRight = createDefenseBaseRunnerAnimations(outcome, rightFly, null, { ...deepFielder, x: rightDeepTarget.x, y: rightDeepTarget.y, arm: 8 }, rightDeepTarget)[0];
+    bases = createEmptyBases();
+    bases.second = fastSecondRunner;
+    const fastSecondLeft = createDefenseBaseRunnerAnimations(outcome, leftFly, null, { ...deepFielder, x: leftDeepTarget.x, y: leftDeepTarget.y }, leftDeepTarget)[0];
+    bases = createEmptyBases();
+    bases.first = fastFirstRunner;
+    const fastFirstDeep = createDefenseBaseRunnerAnimations(outcome, rightFly, null, { ...deepFielder, x: rightDeepTarget.x, y: rightDeepTarget.y }, rightDeepTarget)[0];
+    bases = createEmptyBases();
+    bases.first = slowFirstRunner;
+    const slowFirstDeep = createDefenseBaseRunnerAnimations(outcome, rightFly, null, { ...deepFielder, x: rightDeepTarget.x, y: rightDeepTarget.y }, rightDeepTarget)[0];
+    count.outs = 2;
+    bases = createEmptyBases();
+    bases.third = thirdRunner;
+    const twoOutThird = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget)[0];
+    count.outs = 0;
     defenseState = { ...createDefenseState(), baseRunners: deepAnimations };
     const tagUpRuns = applyDefenseOutAdvancements();
     return JSON.stringify({
@@ -4167,6 +4361,15 @@ const toweringFlyAndTagUpState = JSON.parse(runInGame(
       grounderVisualHeight: getDefenseBallVisualHeightOffset(120, { trajectory: "grounder", maxHeight: 12 }),
       deepTagUp: deepAnimations[0],
       shallowTagUp: shallowAnimations[0],
+      semiAutoTagUp: semiAutoAnimations[0],
+      fastSecondRight,
+      slowSecondRight,
+      fastSecondLeft,
+      fastFirstDeep,
+      slowFirstDeep,
+      twoOutThird,
+      tagUpStartsAfterCatch: Math.abs((deepAnimations[0]?.routeStartTime ?? 0) - outcome.fieldingTime) < 0.001,
+      tagUpVisualThrow: Boolean(tagThrow?.visualOnly) && tagThrow.targetBase === "home" && tagThrow.startTime > outcome.fieldingTime,
       tagUpRuns,
       thirdAfterTag: bases.third
     });
@@ -4182,8 +4385,46 @@ assert(toweringFlyAndTagUpState.grounderVisualHeight === 120, "grounders should 
 assert(toweringFlyAndTagUpState.deepTagUp.tagUp === true, "third-base runners should tag up on deep caught flies when likely safe");
 assert(toweringFlyAndTagUpState.deepTagUp.scored === true, "successful tag-up runners should head home");
 assert(toweringFlyAndTagUpState.shallowTagUp.tagUp === false, "third-base runners should not tag up on shallow caught flies");
+assert(toweringFlyAndTagUpState.semiAutoTagUp.tagUp === false, "semi-auto baserunning should leave tag-up decisions to the player");
+assert(toweringFlyAndTagUpState.fastSecondRight.tagUp === true, "fast second-base runners should try tag ups on deep right-field flies");
+assert(toweringFlyAndTagUpState.slowSecondRight.tagUp === false, "slow second-base runners should often stay on deep right-field flies");
+assert(toweringFlyAndTagUpState.fastSecondLeft.tagUp === false, "second-base runners should favor right-field tag-up chances rather than left-field flies");
+assert(toweringFlyAndTagUpState.fastFirstDeep.tagUp === true, "very fast first-base runners can try tag ups on very deep flies");
+assert(toweringFlyAndTagUpState.slowFirstDeep.tagUp === false, "first-base runners below the high-speed threshold should usually stay put");
+assert(toweringFlyAndTagUpState.twoOutThird?.tagUp !== true, "tag-up choices should not be created when the catch itself would be the third out");
+assert(toweringFlyAndTagUpState.tagUpStartsAfterCatch === true, "tag-up runners should visibly start after the catch instead of resolving immediately");
+assert(toweringFlyAndTagUpState.tagUpVisualThrow === true, "caught deep flies with tag-up runners should create a quick visual throw to the target base");
 assert(toweringFlyAndTagUpState.tagUpRuns === 1, "successful tag ups should add a run");
 assert(toweringFlyAndTagUpState.thirdAfterTag === null, "successful tag ups should clear third base");
+
+const grounderLeadRunnerState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const slowRunner = makeBaseRunner({ id: "slow", name: "slow", run: 2 });
+    const fastRunner = makeBaseRunner({ id: "fast", name: "fast", run: 9 });
+    const grounder = { isGrounder: true, isLiner: false, isPopupFly: false, trajectory: "grounder", ballTime: 0.7, target: defenseField.bases.second };
+    const outcome = { kind: "force", caught: true, needsThrow: true, fieldingTime: 0.62 };
+    bases = createEmptyBases();
+    bases.first = slowRunner;
+    const slowLead = createDefenseBaseRunner("first", slowRunner, outcome, grounder);
+    bases.first = fastRunner;
+    const fastLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder);
+    const hitRunLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder, null, null, null, { active: true, startBase: "first", targetBase: "second", runnerId: "fast" });
+    const firstBase = defenseField.bases.first;
+    return JSON.stringify({
+      slowLeadDistance: Math.hypot(slowLead.x - firstBase.x, slowLead.y - firstBase.y),
+      fastLeadDistance: Math.hypot(fastLead.x - firstBase.x, fastLead.y - firstBase.y),
+      hitRunLeadDistance: Math.hypot(hitRunLead.x - firstBase.x, hitRunLead.y - firstBase.y),
+      fastArrivalEarlier: fastLead.arrivalTime < createForcedRunnerFromInfo(fastRunner, "first", "second").arrivalTime,
+      hitRunArrivalEarlier: hitRunLead.arrivalTime < fastLead.arrivalTime
+    });
+  })()`
+));
+
+assert(grounderLeadRunnerState.slowLeadDistance > 0, "ground-ball base runners should start with a visible lead from the base");
+assert(grounderLeadRunnerState.fastLeadDistance > grounderLeadRunnerState.slowLeadDistance, "faster runners should take a larger ground-ball lead");
+assert(grounderLeadRunnerState.hitRunLeadDistance > grounderLeadRunnerState.fastLeadDistance, "hit-and-run runners should start much farther toward the next base");
+assert(grounderLeadRunnerState.fastArrivalEarlier === true && grounderLeadRunnerState.hitRunArrivalEarlier === true, "runner leads should make force-play arrival times earlier");
 
 const outAdvancementState = JSON.parse(runInGame(
   context,
@@ -7840,6 +8081,7 @@ const defenseOutAdvancementState = JSON.parse(runInGame(
     bases.third = thirdRunner;
     scores = { away: 0, home: 0 };
     battingTeam = "away";
+    count.outs = 1;
     defenseState = {
       ...createDefenseState(),
       baseRunners: [
@@ -7875,11 +8117,33 @@ const defenseOutAdvancementState = JSON.parse(runInGame(
       score: scores.away
     };
 
+    bases = createEmptyBases();
+    bases.third = thirdRunner;
+    scores = { away: 0, home: 0 };
+    count.outs = 2;
+    defenseState = {
+      ...createDefenseState(),
+      throw: { visualOnly: true, targetBase: "home", endTime: 2.0 },
+      baseRunners: [
+        { ...thirdRunner, startBase: "third", targetBase: "home", tagUp: true, scored: true, arrivalTime: 2.6 }
+      ]
+    };
+    const failedRuns = applyDefenseOutAdvancements();
+    const failedBases = {
+      third: bases.third?.id || "",
+      score: scores.away,
+      outs: count.outs,
+      tagUpOuts: defenseState.tagUpOutsAdded || 0
+    };
+    count.outs = 0;
+
     return JSON.stringify({
       loadedTagRuns,
       loadedTagBases,
       blockedRuns,
-      blockedBases
+      blockedBases,
+      failedRuns,
+      failedBases
     });
   })()`
 ));
@@ -7893,6 +8157,11 @@ assert(defenseOutAdvancementState.blockedRuns === 0, "blocked tag-up attempts sh
 assert(defenseOutAdvancementState.blockedBases.first === "ichiro", "runner from first should stay put when second base remains occupied");
 assert(defenseOutAdvancementState.blockedBases.second === "shuto", "non-advancing lead runner should keep second base");
 assert(defenseOutAdvancementState.blockedBases.third === "", "blocked tag-up attempts should not create a runner on third");
+assert(defenseOutAdvancementState.failedRuns === 0, "failed tag-up attempts should not score");
+assert(defenseOutAdvancementState.failedBases.third === "", "failed tag-up runners should be removed from the bases");
+assert(defenseOutAdvancementState.failedBases.score === 0, "failed tag-up attempts should not add a run");
+assert(defenseOutAdvancementState.failedBases.outs === 3, "failed tag-up attempts should add an out and can complete the third out");
+assert(defenseOutAdvancementState.failedBases.tagUpOuts === 1, "failed tag-up outs should be tracked on the defense state");
 
 const deepOutfieldFielderState = JSON.parse(runInGame(
   context,
@@ -9898,6 +10167,57 @@ const fiveInningStarterWinState = JSON.parse(runInGame(
 
 assert(!fiveInningStarterWinState.shortStarterLines.some((line) => line.includes(`${fiveInningStarterWinState.shortStarter}投手`) && line.includes("勝利")), "in a five-inning game, a starter should not receive the win before pitching three innings");
 assert(fiveInningStarterWinState.qualifiedStarterLines.some((line) => line.includes(`${fiveInningStarterWinState.qualifiedStarter}投手`) && line.includes("勝利")), "in a five-inning game, a starter should receive the win after pitching at least three innings");
+
+const nineInningRulesState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    gameMode = "versus";
+    maxInnings = 9;
+    scores = { away: 0, home: 0 };
+    battingTeam = "away";
+    bases = createEmptyBases();
+    setMatchup();
+    const shortStarter = getTeamActivePitcher("away").name;
+    recordPitcherOuts("away", getTeamActivePitcher("away"), 12);
+    addRunsToBattingTeam(1);
+    endGame();
+    const shortStarterLines = buildPitcherGameRecordLines("away");
+
+    startGame();
+    gameMode = "versus";
+    maxInnings = 9;
+    scores = { away: 0, home: 0 };
+    battingTeam = "away";
+    bases = createEmptyBases();
+    setMatchup();
+    const qualifiedStarter = getTeamActivePitcher("away").name;
+    recordPitcherOuts("away", getTeamActivePitcher("away"), 15);
+    addRunsToBattingTeam(1);
+    endGame();
+    const qualifiedStarterLines = buildPitcherGameRecordLines("away");
+
+    startGame();
+    maxInnings = 9;
+    firstBatTeam = "away";
+    inning = 9;
+    half = "bottom";
+    battingTeam = "home";
+    scores = { away: 2, home: 2 };
+    count.outs = 3;
+    lastOutBatterByTeam.away = findById(batters, "otani");
+    gamePhase = "playing";
+    changeSide();
+    const extraTop = { gamePhase, inning, half, battingTeam, outs: count.outs, second: bases.second?.id };
+
+    return JSON.stringify({ shortStarter, qualifiedStarter, shortStarterLines, qualifiedStarterLines, extraTop });
+  })()`
+));
+
+assert(!nineInningRulesState.shortStarterLines.some((line) => line.includes(`${nineInningRulesState.shortStarter}投手`) && line.includes("勝利")), "in a nine-inning game, a starter should not receive the win before pitching five innings");
+assert(nineInningRulesState.qualifiedStarterLines.some((line) => line.includes(`${nineInningRulesState.qualifiedStarter}投手`) && line.includes("勝利")), "in a nine-inning game, a starter should receive the win after pitching at least five innings");
+assert(nineInningRulesState.extraTop.gamePhase === "playing" && nineInningRulesState.extraTop.inning === 10 && nineInningRulesState.extraTop.half === "top", "nine-inning ties should continue into a tenth-inning tiebreaker");
+assert(nineInningRulesState.extraTop.outs === 0 && nineInningRulesState.extraTop.second === "otani", "nine-inning tiebreakers should start with no outs and the previous last-out batter on second");
 
 runInGame(context, 'startGame(); activePitcher = { ...activePitcher, control: 10 }; startPitch("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });');
 

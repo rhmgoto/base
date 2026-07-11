@@ -68,9 +68,13 @@ const homeBatterDHName = byId("homeBatterDHName");
 const awayPitcherName = byId("awayPitcherName");
 const awayPitcher2Name = byId("awayPitcher2Name");
 const awayPitcher3Name = byId("awayPitcher3Name");
+const awayPitcher4Name = byId("awayPitcher4Name");
+const awayPitcher5Name = byId("awayPitcher5Name");
 const homePitcherName = byId("homePitcherName");
 const homePitcher2Name = byId("homePitcher2Name");
 const homePitcher3Name = byId("homePitcher3Name");
+const homePitcher4Name = byId("homePitcher4Name");
+const homePitcher5Name = byId("homePitcher5Name");
 const awayBatterSSStats = byId("awayBatterSSStats");
 const awayBatter2BStats = byId("awayBatter2BStats");
 const awayBatterLStats = byId("awayBatterLStats");
@@ -88,9 +92,13 @@ const homeBatterDHStats = byId("homeBatterDHStats");
 const awayPitcherStats = byId("awayPitcherStats");
 const awayPitcher2Stats = byId("awayPitcher2Stats");
 const awayPitcher3Stats = byId("awayPitcher3Stats");
+const awayPitcher4Stats = byId("awayPitcher4Stats");
+const awayPitcher5Stats = byId("awayPitcher5Stats");
 const homePitcherStats = byId("homePitcherStats");
 const homePitcher2Stats = byId("homePitcher2Stats");
 const homePitcher3Stats = byId("homePitcher3Stats");
+const homePitcher4Stats = byId("homePitcher4Stats");
+const homePitcher5Stats = byId("homePitcher5Stats");
 const awayTeamAutoButton = byId("awayTeamAutoButton");
 const homeTeamAutoButton = byId("homeTeamAutoButton");
 const awayTeamResetButton = byId("awayTeamResetButton");
@@ -208,7 +216,7 @@ const pitchTypes = {
   normal: { key: "5", label: "直球", speedFactor: 1.15 / 1.4, baseKmhFactor: 0.87, color: "#ffffff", targetSpread: 30, staminaCost: 1.5 },
   slow: { key: "8", label: "遅い球", speedFactor: (1.15 / 1.4) * 0.7, baseKmhFactor: 0.73, color: "#ffe66b", targetSpread: 42, staminaCost: 1 },
   fast: { key: "2", label: "速球", speedFactor: 1.15, baseKmhFactor: 1, color: "#aee7ff", targetSpread: 24, staminaCost: 2 },
-  special: { key: "0", label: "決め球", speedFactor: 1.15 * 1.1, baseKmhFactor: 1.1, color: "#ffcf70", targetSpread: 16, staminaCost: 16, stuffMultiplier: 2 }
+  special: { key: "0", label: "決め球", speedFactor: 1.15 * 1.1, baseKmhFactor: 1.1, color: "#ffcf70", targetSpread: 16, staminaCost: 6, stuffMultiplier: 2 }
 };
 
 // 表示球速はそのままに、実際の到達時間だけを調整する係数。
@@ -228,11 +236,16 @@ const pitcherAbilityTuning = {
 };
 const staminaTuning = {
   pointsPerRating: 18.2,
-  pitchCostMultiplier: 0.49,
+  pitchCostMultiplier: 0.55,
+  horizontalVariationCostRate: 0.1,
+  verticalVariationCostRate: 0.2,
   strikeoutRecovery: 5,
   outRecovery: 3,
   sideChangeRecovery: 10,
-  homerPenalty: 5,
+  runPenalty: 5,
+  homerRunPenalty: 7,
+  hitPenalty: 3,
+  walkPenalty: 3,
   abilityDrops: [
     { threshold: 0.7, multiplier: 1 },
     { threshold: 0.5, multiplier: 0.9 },
@@ -334,7 +347,7 @@ const teams = {
 };
 
 const teamIds = ["away", "home"];
-const pitcherRoles = ["pitcher", "pitcher2", "pitcher3"];
+const pitcherRoles = ["pitcher", "pitcher2", "pitcher3", "pitcher4", "pitcher5"];
 const infielderRoles = ["SS", "2B"];
 const outfielderRoles = ["L", "C", "R"];
 const catcherRole = "CA";
@@ -345,21 +358,21 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 60;
+const teamPointLimit = 65;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
   tigers: {
     label: "タイガース",
-    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", lineupOrder: [...awayRegularLineupOrder] }
+    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "hanifee", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", lineupOrder: [...awayRegularLineupOrder] }
   },
   dodgers: {
     label: "ドジャース",
-    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", lineupOrder: [...homeRegularLineupOrder] }
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "rojas", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", lineupOrder: [...homeRegularLineupOrder] }
   },
   dendos: {
     label: "デンドーズ",
-    selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "maddux", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", lineupOrder: [...batterRoles] }
+    selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "maddux", pitcher4: "hikari", pitcher5: "magari", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", lineupOrder: [...batterRoles] }
   }
 };
 const defaultTeamPresetBySide = { away: "tigers", home: "dodgers" };
@@ -719,6 +732,8 @@ let ball = {
   spin: 0,
   curvePower: 0,
   staminaMistake: false,
+  horizontalVariationStaminaCharged: false,
+  verticalVariationStaminaCharged: false,
   pitchAbilityMultiplier: 1,
   trail: []
 };
@@ -1355,7 +1370,11 @@ async function savePlayerEditorForm() {
 function cloneMenuSelection(source) {
   return Object.fromEntries(teamIds.map((team) => [
     team,
-    { ...source[team], [lineupOrderKey]: getSelectionLineupOrder(source[team]) }
+    {
+      ...getTeamPreset(defaultTeamPresetBySide[team]).selection,
+      ...source[team],
+      [lineupOrderKey]: getSelectionLineupOrder(source[team])
+    }
   ]));
 }
 
@@ -1445,6 +1464,12 @@ function getPitcherStaminaState(player = activePitcher) {
   return { label: "バテバテ", percent };
 }
 
+function getPitcherGameStaminaText(player = activePitcher) {
+  const max = getPitcherMaxStamina(player);
+  const current = clamp(player?.currentStamina ?? max, 0, max);
+  return `${Math.round(current)}/${Math.round(max)}`;
+}
+
 function getStaminaFatigueScore(player = activePitcher) {
   return clamp((0.7 - getPitcherStaminaPercent(player)) / 0.7, 0, 1);
 }
@@ -1475,9 +1500,21 @@ function consumePitchStamina(player, pitch) {
   adjustPitcherStamina(player, -(pitch?.staminaCost ?? 2) * staminaTuning.pitchCostMultiplier);
 }
 
+function consumePitchVariationStamina(axis) {
+  if (gameMode === "practice" || !ball.inPitch) return;
+  const pitch = pitchTypes[currentPitchType];
+  if (!pitch) return;
+  const isHorizontal = axis === "horizontal";
+  const flag = isHorizontal ? "horizontalVariationStaminaCharged" : "verticalVariationStaminaCharged";
+  if (ball[flag]) return;
+  ball[flag] = true;
+  const rate = isHorizontal ? staminaTuning.horizontalVariationCostRate : staminaTuning.verticalVariationCostRate;
+  adjustPitcherStamina(activePitcher, -(pitch.staminaCost ?? 2) * rate * staminaTuning.pitchCostMultiplier);
+}
+
 function applyHomeRunPitcherStaminaPenalty(player) {
   if (gameMode === "practice") return;
-  adjustPitcherStamina(player, -staminaTuning.homerPenalty);
+  adjustPitcherStamina(player, -staminaTuning.homerRunPenalty);
 }
 
 function recordPitchThrown(player) {
@@ -1538,10 +1575,16 @@ function readMenu() {
   practicePitcherId = practicePitcherSelect?.value || practicePitcherId || getPracticePitchers()[0]?.id || "";
   firstBatTeam = firstBatSelect.value;
   maxInnings = Number(inningsSelect.value);
-  defenseControlMode = {
-    away: getDefenseRunControlMode(p1DefenseSelect?.value),
-    home: getDefenseRunControlMode(p2DefenseSelect?.value)
-  };
+  if (gameMode === "watch") {
+    if (p1DefenseSelect) p1DefenseSelect.value = "auto";
+    if (p2DefenseSelect) p2DefenseSelect.value = "auto";
+  }
+  defenseControlMode = gameMode === "watch"
+    ? { away: "auto", home: "auto" }
+    : {
+        away: getDefenseRunControlMode(p1DefenseSelect?.value),
+        home: getDefenseRunControlMode(p2DefenseSelect?.value)
+      };
   selected = createSelectedTeams(menuSelection);
 }
 
@@ -1603,6 +1646,21 @@ function recordPitcherStat(team, pitcherInfo, stat, amount = 1) {
   if (gameMode === "practice" || !stat || !amount) return;
   const record = ensurePitcherGameRecord(team, pitcherInfo);
   if (record) record[stat] = (record[stat] || 0) + amount;
+}
+
+function applyPitcherEventStaminaPenalty(player, amount) {
+  if (gameMode === "practice" || !player || !amount || amount <= 0) return;
+  adjustPitcherStamina(player, -amount);
+}
+
+function recordPitcherHitAllowed(team, pitcherInfo, amount = 1) {
+  recordPitcherStat(team, pitcherInfo, "hitsAllowed", amount);
+  applyPitcherEventStaminaPenalty(pitcherInfo, staminaTuning.hitPenalty * amount);
+}
+
+function recordCurrentPitcherWalkAllowed(amount = 1, pitcherInfo = activePitcher) {
+  recordCurrentPitcherStat("walksAllowed", amount, pitcherInfo);
+  applyPitcherEventStaminaPenalty(pitcherInfo, staminaTuning.walkPenalty * amount);
 }
 
 function recordCurrentPitcherStat(stat, amount = 1, pitcherInfo = activePitcher) {
@@ -1696,7 +1754,7 @@ function recordPitcherDecisionEvent(team, runs, beforeScores, afterScores, respo
   }
 }
 
-function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherIds = []) {
+function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherIds = [], staminaPenaltyPerRun = staminaTuning.runPenalty) {
   if (gameMode === "practice" || !runs || runs <= 0) return;
   const fallbackPitcher = getTeamActivePitcher(fielding);
   const totals = new Map();
@@ -1708,6 +1766,7 @@ function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherI
   totals.forEach((amount, pitcherId) => {
     const pitcherInfo = selected?.[fielding]?.pitchers?.find((entry) => entry.id === pitcherId) || fallbackPitcher;
     recordPitcherStat(fielding, pitcherInfo, "runsAllowed", amount);
+    applyPitcherEventStaminaPenalty(pitcherInfo, staminaPenaltyPerRun * amount);
   });
 }
 
@@ -1731,12 +1790,18 @@ function getPitcherRecordById(team, pitcherId) {
 
 function chooseWinningPitcherRecord(winner, preferredPitcherId) {
   const preferred = getPitcherRecordById(winner, preferredPitcherId);
-  const starterWinMinimumOuts = maxInnings >= 5 ? 9 : 3;
+  const starterWinMinimumOuts = getStarterWinMinimumOuts();
   if (preferred && (!preferred.started || preferred.outs >= starterWinMinimumOuts)) return preferred;
   const entries = Object.values(pitcherGameRecords[winner] || {}).sort((a, b) => a.order - b.order);
   return entries.find((record) => !record.started && record.outs > 0)
     || entries.find((record) => record.started && record.outs >= starterWinMinimumOuts)
     || null;
+}
+
+function getStarterWinMinimumOuts() {
+  if (maxInnings >= 9) return 15;
+  if (maxInnings >= 5) return 9;
+  return 3;
 }
 
 function markPitcherWinLossAndHolds() {
@@ -1942,6 +2007,8 @@ function getMenuRoleLabel(role) {
   if (role === "pitcher") return "先発投手";
   if (role === "pitcher2") return "控え投手1";
   if (role === "pitcher3") return "控え投手2";
+  if (role === "pitcher4") return "控え投手3";
+  if (role === "pitcher5") return "控え投手4";
   if (role === "SS") return "ショート";
   if (role === "2B") return "セカンド";
   if (role === "L") return "レフト";
@@ -1956,6 +2023,8 @@ function getLineupCardId(team, role) {
   if (role === "pitcher") return `${side}PitcherCard`;
   if (role === "pitcher2") return `${side}Pitcher2Card`;
   if (role === "pitcher3") return `${side}Pitcher3Card`;
+  if (role === "pitcher4") return `${side}Pitcher4Card`;
+  if (role === "pitcher5") return `${side}Pitcher5Card`;
   return `${side}Batter${role}Card`;
 }
 
@@ -2352,6 +2421,8 @@ const menuPanelElements = {
     pitcher: { name: awayPitcherName, stats: awayPitcherStats },
     pitcher2: { name: awayPitcher2Name, stats: awayPitcher2Stats },
     pitcher3: { name: awayPitcher3Name, stats: awayPitcher3Stats },
+    pitcher4: { name: awayPitcher4Name, stats: awayPitcher4Stats },
+    pitcher5: { name: awayPitcher5Name, stats: awayPitcher5Stats },
     SS: { name: awayBatterSSName, stats: awayBatterSSStats },
     "2B": { name: awayBatter2BName, stats: awayBatter2BStats },
     L: { name: awayBatterLName, stats: awayBatterLStats },
@@ -2364,6 +2435,8 @@ const menuPanelElements = {
     pitcher: { name: homePitcherName, stats: homePitcherStats },
     pitcher2: { name: homePitcher2Name, stats: homePitcher2Stats },
     pitcher3: { name: homePitcher3Name, stats: homePitcher3Stats },
+    pitcher4: { name: homePitcher4Name, stats: homePitcher4Stats },
+    pitcher5: { name: homePitcher5Name, stats: homePitcher5Stats },
     SS: { name: homeBatterSSName, stats: homeBatterSSStats },
     "2B": { name: homeBatter2BName, stats: homeBatter2BStats },
     L: { name: homeBatterLName, stats: homeBatterLStats },
@@ -2381,7 +2454,7 @@ function renderMenuPlayerPanel(team, role) {
     renderMenuPitcherSlot(findSelectedById(pitchers, menuSelection[team][role]), panel.name, panel.stats);
     const card = getLineupCard(team, role);
     const picker = card?.querySelector?.(".position-picker");
-    if (picker) picker.textContent = role === "pitcher" ? "先発" : role === "pitcher2" ? "控え1" : "控え2";
+    if (picker) picker.textContent = getPitcherRoleShortLabel(role);
     return;
   }
   updateLineupCardShell(team, role);
@@ -2389,6 +2462,12 @@ function renderMenuPlayerPanel(team, role) {
   const card = getLineupCard(team, role);
   const picker = card?.querySelector?.(".position-picker");
   if (picker) picker.textContent = getMenuRoleLabel(role);
+}
+
+function getPitcherRoleShortLabel(role) {
+  if (role === "pitcher") return "先発";
+  const index = pitcherRoles.indexOf(role);
+  return index > 0 ? `控え${index}` : "控え";
 }
 
 function renderMenuPitcherSlot(player, nameElement, statsElement) {
@@ -2789,13 +2868,19 @@ function fieldingTeam() {
   return battingTeam === "away" ? "home" : "away";
 }
 
+function isComputerControlledGameMode() {
+  return gameMode === "single" || gameMode === "practice" || gameMode === "watch";
+}
+
 function isPlayerBatting() {
   if (gameMode === "practice") return true;
+  if (gameMode === "watch") return false;
   return gameMode === "versus" || battingTeam === playerTeam;
 }
 
 function isPlayerPitching() {
   if (gameMode === "practice") return practicePitcherControl === "manual";
+  if (gameMode === "watch") return false;
   return gameMode === "versus" || fieldingTeam() === playerTeam;
 }
 
@@ -2805,12 +2890,14 @@ function isPlayerFielding() {
 
 function isManualDefenseControl() {
   const team = fieldingTeam();
+  if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
   return isPlayerFielding() && defenseControlMode[team] === "manual";
 }
 
 function isManualBaserunningControl(team = battingTeam) {
   if (gameMode === "practice") return false;
+  if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
   return isPlayerBatting() && (defenseControlMode[team] === "manual" || defenseControlMode[team] === "semiauto");
 }
@@ -2823,7 +2910,7 @@ function isInputLocked(now = performance.now()) {
 }
 
 function shouldAutoScheduleComputerPitch() {
-  return gamePhase === "playing" && (gameMode === "single" || gameMode === "practice") && !isPlayerPitching();
+  return gamePhase === "playing" && isComputerControlledGameMode() && !isPlayerPitching();
 }
 
 function scheduleNextComputerPitchAfterJudgment(delay = computerJudgmentNextPitchDelay) {
@@ -2834,7 +2921,7 @@ function scheduleNextComputerPitchAfterJudgment(delay = computerJudgmentNextPitc
 }
 
 function scheduleNextPitch(delay = 900) {
-  if ((gameMode === "single" || gameMode === "practice") && !isPlayerPitching()) {
+  if (isComputerControlledGameMode() && !isPlayerPitching()) {
     computerPitchPlan = chooseComputerPitchPlan();
     autoPitchTimer = Math.max(performance.now(), inputLockedUntil) + delay;
     return;
@@ -2865,6 +2952,8 @@ function resetBall() {
   ball.spin = 0;
   ball.curvePower = 0;
   ball.staminaMistake = false;
+  ball.horizontalVariationStaminaCharged = false;
+  ball.verticalVariationStaminaCharged = false;
   ball.pitchAbilityMultiplier = 1;
   ball.trail = [];
   hbpPose.active = false;
@@ -2942,7 +3031,7 @@ function declareIntentionalWalk() {
   resetBall();
   resetSwing();
   const runs = advanceRunners("walk", activeBatter);
-  recordCurrentPitcherStat("walksAllowed", 1);
+  recordCurrentPitcherWalkAllowed(1);
   resetCountOnly();
   message = runs > 0 ? `申告敬遠: ${runs}点` : "申告敬遠";
   showEffect(runs > 0 ? `申告敬遠 +${runs}` : "申告敬遠", "#aee7ff");
@@ -3016,6 +3105,9 @@ function startPitch(typeKey, options = {}) {
   ball.targetY = targetY;
   ball.spin = 0;
   ball.curvePower = 0;
+  ball.staminaMistake = staminaMistake;
+  ball.horizontalVariationStaminaCharged = false;
+  ball.verticalVariationStaminaCharged = false;
   ball.pitchAbilityMultiplier = pitchAbilityMultiplier;
   ball.trail = [];
   currentPitchType = typeKey;
@@ -3641,7 +3733,7 @@ function getComputerSpecialPitchChance() {
 }
 
 function computerBendPitch() {
-  if ((gameMode !== "single" && gameMode !== "practice") || isPlayerPitching() || !computerPitchPlan || !isPitching || !ball.inPitch || ball.crossedPlate) return;
+  if (!isComputerControlledGameMode() || isPlayerPitching() || !computerPitchPlan || !isPitching || !ball.inPitch || ball.crossedPlate) return;
   const progress = getPitchProgress();
   const bendSegments = computerPitchPlan.bendSegments?.length
     ? computerPitchPlan.bendSegments
@@ -3705,7 +3797,7 @@ function getComputerSwingStrikeConfidence() {
 }
 
 function computerSwingBat() {
-  if (gameMode !== "single" || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
+  if ((gameMode !== "single" && gameMode !== "watch") || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
   const progress = getPitchProgress();
   if (progress < 0.72 || progress > 1.08) return;
   const strikeConfidence = getComputerSwingStrikeConfidence();
@@ -4177,6 +4269,16 @@ function resolveSteal(isOut) {
   }
 }
 
+function getHitAndRunLeadState() {
+  if (!stealState.active || stealState.resolved || !stealState.startBase || !stealState.targetBase) return null;
+  return {
+    active: true,
+    startBase: stealState.startBase,
+    targetBase: stealState.targetBase,
+    runnerId: stealState.runner?.id || stealState.runner?.name || null
+  };
+}
+
 function isGamepadButtonDown(gamepad, index) {
   return Boolean(gamepad.buttons?.[index]?.pressed);
 }
@@ -4194,7 +4296,7 @@ function update(delta) {
   if (shouldAutoScheduleComputerPitch() && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && !stealState.active && !Number.isFinite(autoPitchTimer)) {
     scheduleNextComputerPitchAfterJudgment();
   }
-  if ((gameMode === "single" || gameMode === "practice") && gamePhase === "playing" && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && now > autoPitchTimer) {
+  if (isComputerControlledGameMode() && gamePhase === "playing" && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && now > autoPitchTimer) {
     const plan = computerPitchPlan || chooseComputerPitchPlan();
     startPitch(plan.type, plan);
   }
@@ -4336,6 +4438,7 @@ function applyPitchBend(direction, frameScale = 1, progress = getPitchProgress()
   const staminaMultiplier = getStaminaChangeMultiplier(activePitcher, staminaTuning.bendExhaustedMultiplier);
   const ability = (0.55 + rating * 0.09) * (ball.pitchAbilityMultiplier ?? 1) * pitcherAbilityTuning.globalMultiplier * staminaMultiplier;
   const bendStrength = (0.11 + Math.sin(progress * Math.PI) * 0.07) * ability;
+  consumePitchVariationStamina("horizontal");
   ball.curvePower = clamp(ball.curvePower + direction * bendStrength * pitchBendEffect * frameScale, -4.25 * ability * pitchBendEffect, 4.25 * ability * pitchBendEffect);
   ball.vx = clamp(ball.vx + direction * bendStrength * 0.55 * pitchBendEffect * frameScale, -6.1 * pitchBendEffect, 6.1 * pitchBendEffect);
   ball.spin += direction * 0.42 * frameScale;
@@ -4354,6 +4457,7 @@ function applyPitchSpeedChange(direction, frameScale = 1) {
   const nextScale = clamp(ball.speedScale + direction * changeAmount, 1 - pitchSpeedChangeLimit, 1 + pitchSpeedChangeLimit);
   if (nextScale === ball.speedScale) return;
 
+  consumePitchVariationStamina("vertical");
   const velocityMultiplier = nextScale / ball.speedScale;
   ball.vx *= velocityMultiplier;
   ball.vy *= velocityMultiplier;
@@ -6658,7 +6762,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
   } else if (kind === "hbp") {
     stealState = createStealState();
     const runs = advanceRunners("walk", activeBatter);
-    recordCurrentPitcherStat("walksAllowed", 1);
+    recordCurrentPitcherWalkAllowed(1);
     message = runs > 0 ? `デッドボール: ${runs}点` : "デッドボール";
     showEffect(runs > 0 ? `デッドボール +${runs}` : "デッドボール", "#ff8f70");
     hbpPose.active = true;
@@ -6670,12 +6774,14 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
       setMatchup();
     }
   } else if (kind === "out") {
+    const hitAndRunState = getHitAndRunLeadState();
     stealState = createStealState();
-    startDefensePlay(label, kind, power, timeDiff, hitDirection, battedProfile);
+    startDefensePlay(label, kind, power, timeDiff, hitDirection, battedProfile, hitAndRunState);
     return;
   } else if (kind === "hit") {
+    const hitAndRunState = getHitAndRunLeadState();
     stealState = createStealState();
-    startDefensePlay(label, kind, power, timeDiff, hitDirection, battedProfile);
+    startDefensePlay(label, kind, power, timeDiff, hitDirection, battedProfile, hitAndRunState);
     return;
   }
   if (stealState.active && !stealState.resolved) {
@@ -6739,7 +6845,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
       bases.first = runner;
     }
   });
-  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds);
+  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { homer: type === "homer" });
   playScoringCheer(runs);
   return runs;
 }
@@ -6758,13 +6864,14 @@ function isFinalBottomSecondBatTeamLeading() {
     && scores[secondHalfTeam] > scores[firstHalfTeam];
 }
 
-function addRunsToBattingTeam(runs, responsiblePitcherIds = []) {
+function addRunsToBattingTeam(runs, responsiblePitcherIds = [], options = {}) {
   const beforeScores = { away: scores.away, home: scores.home };
   scores[battingTeam] += runs;
   const afterScores = { away: scores.away, home: scores.home };
   if (runs > 0) {
     recordPitcherDecisionEvent(battingTeam, runs, beforeScores, afterScores, responsiblePitcherIds);
-    recordResponsiblePitcherRunsAllowed(fieldingTeam(), runs, responsiblePitcherIds);
+    const penaltyPerRun = options.homer ? staminaTuning.homerRunPenalty : staminaTuning.runPenalty;
+    recordResponsiblePitcherRunsAllowed(fieldingTeam(), runs, responsiblePitcherIds, penaltyPerRun);
     endGameIfFinalBottomSecondBatTeamLeads();
   }
 }
@@ -6784,15 +6891,15 @@ function getExtraRunnerAdvance(base, type, runner, battedBall, outcome) {
   return 0;
 }
 
-function createDefenseBaseRunnerAnimations(outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null) {
+function createDefenseBaseRunnerAnimations(outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
   return [
-    createDefenseBaseRunner("first", bases.first, outcome, battedBall, throwState, fielder, fieldingTarget),
-    createDefenseBaseRunner("second", bases.second, outcome, battedBall, throwState, fielder, fieldingTarget),
-    createDefenseBaseRunner("third", bases.third, outcome, battedBall, throwState, fielder, fieldingTarget)
+    createDefenseBaseRunner("first", bases.first, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState),
+    createDefenseBaseRunner("second", bases.second, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState),
+    createDefenseBaseRunner("third", bases.third, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState)
   ].filter(Boolean);
 }
 
-function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null) {
+function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
   if (!runnerInfo) return null;
   const startBase = baseIndexByName[baseName];
   const manualBaserunning = isManualBaserunningControl();
@@ -6806,7 +6913,10 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
     : startBase;
   const route = createBaseRunnerRoute(startBase, nextBase);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
-  const distance = getRunnerRouteDistance(route);
+  const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase);
+  const ledRoute = applyRunnerLeadToRoute(route, startLeadDistance);
+  const routeStartTime = tagUp ? Math.max(0, outcome.fieldingTime ?? battedBall?.ballTime ?? 0) : 0;
+  const distance = getRunnerRouteDistance(ledRoute);
   return {
     ...runnerInfo,
     startBase: baseName,
@@ -6814,13 +6924,13 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
     tagUp,
     groundOutAdvance,
     scored: nextBase >= 4,
-    route,
-    routeStartTime: 0,
+    route: ledRoute,
+    routeStartTime,
     routeDuration: distance > 0 ? distance / speed : 0,
-    x: route[0].x,
-    y: route[0].y,
+    x: ledRoute[0].x,
+    y: ledRoute[0].y,
     speed,
-    arrivalTime: distance > 0 ? distance / speed : 0,
+    arrivalTime: routeStartTime + (distance > 0 ? distance / speed : 0),
     arrived: distance === 0
   };
 }
@@ -6843,22 +6953,49 @@ function getBaseAdvanceSteps(type) {
 
 function shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder = null, fieldingTarget = null) {
   if (!runnerInfo || !outcome || !battedBall || !fielder || !fieldingTarget) return false;
+  if (isManualBaserunningControl()) return false;
+  if (count.outs >= 2) return false;
   if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return false;
   if (fielder.role === "P" || battedBall.isGrounder || battedBall.isLiner || battedBall.isPopupFly) return false;
   const startBase = baseIndexByName[baseName];
   if (!startBase || startBase >= 4) return false;
   const catchDepth = getFenceDistance(fieldingTarget);
+  const depthRatio = catchDepth / Math.max(1, defenseField.fenceDistance);
   if (catchDepth < getTagUpDepthThreshold(startBase)) return false;
   const runnerTime = getRunnerRouteDistance(createBaseRunnerRoute(startBase, startBase + 1)) / getDefenseBaseRunnerSpeed(runnerInfo);
-  const throwDistance = Math.hypot(defenseField.bases.home.x - fieldingTarget.x, defenseField.bases.home.y - fieldingTarget.y);
+  const throwTarget = getDefenseBasePoint(startBase + 1);
+  const throwDistance = Math.hypot(throwTarget.x - fieldingTarget.x, throwTarget.y - fieldingTarget.y);
   const throwProfile = getThrowProfile(fielder, throwDistance);
   const defenseTime = (outcome.fieldingTime ?? battedBall.ballTime ?? 0) + getAutoThrowSetSeconds(fielder) + throwProfile.throwTime;
-  return runnerTime + getTagUpRiskMargin(runnerInfo, fielder, catchDepth) < defenseTime;
+  const safeMargin = defenseTime - runnerTime;
+  const runScore = clamp(((runnerInfo.run ?? 5) - 1) / 9, 0, 1);
+  const marginScore = clamp((safeMargin + 0.08) / 0.9, 0, 1);
+  const rightFieldScore = getTagUpRightFieldScore(fieldingTarget);
+  if (startBase === 3) {
+    const score = depthRatio * 0.62 + runScore * 0.22 + marginScore * 0.3 - clamp((0.46 - depthRatio) / 0.24, 0, 1) * 0.22;
+    return score >= 0.64;
+  }
+  if (startBase === 2) {
+    if (rightFieldScore <= 0 || depthRatio < 0.52) return false;
+    const score = depthRatio * 0.44 + runScore * 0.24 + marginScore * 0.22 + rightFieldScore * 0.18;
+    return score >= 0.82;
+  }
+  if (startBase === 1) {
+    if ((runnerInfo.run ?? 5) < 8 || depthRatio < 0.68) return false;
+    const score = depthRatio * 0.46 + runScore * 0.3 + marginScore * 0.18 + rightFieldScore * 0.08;
+    return score >= 0.86;
+  }
+  return false;
 }
 
 function getTagUpDepthThreshold(startBase) {
-  const ratio = startBase === 3 ? 0.42 : startBase === 2 ? 0.52 : 0.68;
+  const ratio = startBase === 3 ? 0.36 : startBase === 2 ? 0.52 : 0.68;
   return defenseField.fenceDistance * ratio;
+}
+
+function getTagUpRightFieldScore(fieldingTarget) {
+  if (!fieldingTarget) return 0;
+  return clamp((fieldingTarget.x - field.plateX) / 420, 0, 1);
 }
 
 function shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall) {
@@ -6867,6 +7004,29 @@ function shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall) {
   if (!battedBall.isGrounder) return false;
   const startBase = baseIndexByName[baseName];
   return startBase >= 1 && startBase <= 3;
+}
+
+function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null) {
+  if (!baseName || !runnerInfo || !battedBall || !battedBall.isGrounder) return 0;
+  const startBase = baseIndexByName[baseName];
+  if (startBase < 1 || startBase > 2) return 0;
+  if (!nextBase || nextBase <= startBase) return 0;
+  const run = clamp(runnerInfo.run ?? 5, 1, 10);
+  const normalLead = 18 + run * 5.2;
+  const isHitAndRunRunner = hitAndRunState?.active
+    && hitAndRunState.startBase === baseName
+    && (!hitAndRunState.runnerId || hitAndRunState.runnerId === runnerInfo.id || hitAndRunState.runnerId === runnerInfo.name);
+  const hitAndRunLead = isHitAndRunRunner ? 96 + run * 10 : 0;
+  const maxSegment = getRunnerRouteDistance(createBaseRunnerRoute(startBase, startBase + 1)) * 0.58;
+  return clamp(Math.max(normalLead, hitAndRunLead), 0, maxSegment);
+}
+
+function applyRunnerLeadToRoute(route, leadDistance = 0) {
+  if (!route?.length || route.length < 2 || leadDistance <= 0) return route;
+  const totalDistance = getRunnerRouteDistance(route);
+  if (totalDistance <= 0) return route;
+  const startPoint = getRunnerRoutePoint(route, clamp(leadDistance / totalDistance, 0, 0.82));
+  return [{ ...startPoint }, ...route.slice(1)];
 }
 
 function getTagUpRiskMargin(runnerInfo, fielder, catchDepth) {
@@ -7028,7 +7188,7 @@ function getPendingHomeRunRuns() {
   return 1 + baseNames.reduce((total, base) => total + (bases[base] ? 1 : 0), 0);
 }
 
-function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, battedProfile = null) {
+function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, battedProfile = null, hitAndRunState = null) {
   const direction = hitDirection || getHitDirection(timeDiff, false);
   const battedBall = buildBattedBall(power, direction, label, battedProfile);
   appendBattedBallFeedback(battedBall);
@@ -7076,9 +7236,9 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   } else {
     outcome = createThrowPlayForFieldedHit(chosenFielder, battedBall, outcome, fieldingTarget, runner);
   }
-  const baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingTarget);
+  const baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingTarget, hitAndRunState);
   const forceTargets = createForceTargetsForPlay(battedBall, outcome);
-  const throwState = manualFielding
+  let throwState = manualFielding
     ? null
     : createThrowState(chosenFielder, fieldingTarget, outcome, runner, {
       manualWait: isManualDefenseControl(),
@@ -7092,6 +7252,9 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
       baseRunners,
       minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, chosenFielder)
     });
+  if (!throwState) {
+    throwState = createTagUpVisualThrowState(chosenFielder, fieldingTarget, outcome, battedBall, baseRunners);
+  }
 
   gamePhase = "defense";
   isPitching = false;
@@ -7990,6 +8153,39 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
     baseLabel: getBaseLabel(targetBase),
     targetBase,
     safe: Number.isFinite(throwArrivalTime) ? isDefenseThrowSafeAtBase(targetBase, throwArrivalTime, runner, options.baseRunners, outcome) : true
+  };
+}
+
+function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBall, baseRunners = []) {
+  if (!fielder || !fieldingTarget || !outcome || !battedBall) return null;
+  if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return null;
+  const tagRunner = (baseRunners || [])
+    .filter((runner) => runner.tagUp && runner.targetBase && runner.targetBase !== runner.startBase)
+    .sort((a, b) => getRunnerBaseIndex(b.targetBase) - getRunnerBaseIndex(a.targetBase))[0];
+  if (!tagRunner) return null;
+  const targetBase = tagRunner.targetBase;
+  const destination = getDefenseBasePointByName(targetBase);
+  const distance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
+  const throwProfile = getThrowProfile(fielder, distance);
+  const prepareStartTime = Math.max(0, outcome.fieldingTime ?? battedBall.ballTime ?? 0);
+  const startTime = prepareStartTime + Math.max(0.12, getAutoThrowSetSeconds(fielder) * 0.42);
+  const throwTime = throwProfile.throwTime;
+  return {
+    active: false,
+    visualOnly: true,
+    from: { ...fieldingTarget },
+    to: { ...destination },
+    prepareStartTime,
+    startTime,
+    endTime: startTime + throwTime,
+    holdDeadline: startTime + throwTime + defenseThrowResultHoldSeconds,
+    manualWait: false,
+    throwTime,
+    arcHeight: throwProfile.arcHeight,
+    bounce: throwProfile.bounce,
+    baseLabel: getBaseLabel(targetBase),
+    targetBase,
+    safe: true
   };
 }
 
@@ -10271,7 +10467,13 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
     }
     refreshDefenseThrowSafety();
   } else {
-    defenseState.throw = null;
+    defenseState.throw = createTagUpVisualThrowState(
+      defenseState.chosenFielder,
+      fieldingPoint,
+      defenseState.outcome,
+      battedBall,
+      defenseState.baseRunners
+    );
   }
   defenseState.duration = Math.max(
     elapsedSeconds * 1000 + 1600,
@@ -10396,7 +10598,10 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   }
 
   if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) {
-    return elapsedSeconds >= outcome.fieldingTime + defenseThrowResultHoldSeconds
+    const tagUpThrowHold = defenseState.throw?.visualOnly && Number.isFinite(defenseState.throw.holdDeadline)
+      ? defenseState.throw.holdDeadline
+      : outcome.fieldingTime + defenseThrowResultHoldSeconds;
+    return elapsedSeconds >= tagUpThrowHold
       && isBatterRunnerSettledForResolution();
   }
 
@@ -10553,6 +10758,7 @@ function removeCompletedForceOutRunnersFromDefenseDisplay() {
 }
 
 function getForceOutBasesFromThrowState(throwState) {
+  if (throwState?.visualOnly) return [];
   if (!throwState?.targetBase || !Number.isFinite(throwState.endTime)) return [];
   if (!isForceThrowTargetBase(throwState.targetBase, defenseState.outcome, defenseState.battedBall)) return [];
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
@@ -10562,6 +10768,7 @@ function getForceOutBasesFromThrowState(throwState) {
 }
 
 function getThrowOutRunner(throwState) {
+  if (throwState?.visualOnly) return null;
   if (!throwState?.targetBase || !Number.isFinite(throwState.endTime)) return null;
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
   if (forcedRunner && isDefenseRunnerOutAtThrowTarget(throwState, forcedRunner)) return forcedRunner;
@@ -10788,7 +10995,7 @@ function finishDefensePlay() {
     } else {
       const advanceType = getBatterRunnerAdvanceTypeFromThrow(defenseState.throw);
       if (!outcome.fieldingError && outcome.kind === "force") {
-        recordPitcherStat(fieldingTeam(), defendingPitcher, "hitsAllowed", 1);
+        recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
       }
       const runs = outcome.kind === "force" && defenseState.baseRunners?.length
         ? applySafeDefenseThrowBaseState(activeBatter)
@@ -10821,8 +11028,7 @@ function finishDefensePlay() {
     showEffect(runs > 0 ? `エラー +${runs}` : "エラー", "#ff6f61");
   } else {
     const scoreType = getScoringHitType(outcome);
-    if (scoringHitTypes.has(scoreType)) recordPitcherStat(fieldingTeam(), defendingPitcher, "hitsAllowed", 1);
-    if (scoreType === "homer") applyHomeRunPitcherStaminaPenalty(defendingPitcher);
+    if (scoringHitTypes.has(scoreType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
     const runs = advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
     const label = getHitLabelByScoreType(scoreType);
     const baseMessage = `${label}: ${formatRuns(runs)}`;
@@ -10986,15 +11192,24 @@ function hasDefenseOutAdvancements() {
 }
 
 function applyDefenseOutAdvancements() {
+  if (count.outs >= 3) return 0;
   const advancingRunners = defenseState.baseRunners?.filter((runner) => runner.tagUp || runner.groundOutAdvance) || [];
   if (!advancingRunners.length) return 0;
   const nextBases = { ...bases };
   let runs = 0;
+  let tagUpOuts = 0;
   [...advancingRunners]
     .sort((a, b) => (baseIndexByName[b.startBase] ?? 0) - (baseIndexByName[a.startBase] ?? 0))
     .forEach((runner) => {
     if (!runner?.startBase) return;
     const targetBase = runner.targetBase || runner.startBase;
+    const tagUpSafe = !runner.tagUp || isTagUpRunnerSafe(runner);
+    if (runner.tagUp && !tagUpSafe) {
+      nextBases[runner.startBase] = null;
+      tagUpOuts += 1;
+      recordLastOutBatter(battingTeam, runner);
+      return;
+    }
     if (targetBase === "home" || runner.scored) {
       nextBases[runner.startBase] = null;
       runs += 1;
@@ -11005,9 +11220,23 @@ function applyDefenseOutAdvancements() {
     }
   });
   bases = nextBases;
+  if (tagUpOuts > 0) {
+    const outsToAdd = clamp(tagUpOuts, 0, 3 - count.outs);
+    count.outs += outsToAdd;
+    recordPitcherOuts(fieldingTeam(), getTeamActivePitcher(fieldingTeam()), outsToAdd);
+    if (outsToAdd > 0) adjustPitcherStamina(getTeamActivePitcher(fieldingTeam()), staminaTuning.outRecovery);
+    defenseState.tagUpOutsAdded = (defenseState.tagUpOutsAdded || 0) + outsToAdd;
+  }
   addRunsToBattingTeam(runs);
   playScoringCheer(runs);
   return runs;
+}
+
+function isTagUpRunnerSafe(runner) {
+  const throwState = defenseState.throw;
+  if (!runner?.tagUp || !throwState?.visualOnly || throwState.targetBase !== runner.targetBase) return true;
+  if (!Number.isFinite(runner.arrivalTime) || !Number.isFinite(throwState.endTime)) return true;
+  return runner.arrivalTime <= throwState.endTime;
 }
 
 function checkCountEnd() {
@@ -11027,7 +11256,7 @@ function checkCountEnd() {
   }
   if (count.balls >= 4) {
     const runs = advanceRunners("walk", activeBatter);
-    recordCurrentPitcherStat("walksAllowed", 1);
+    recordCurrentPitcherWalkAllowed(1);
     resetCountOnly();
     message = runs > 0 ? `四球: ${runs}点` : "四球";
     showEffect(runs > 0 ? `四球 +${runs}` : "四球", "#aee7ff");
@@ -11263,7 +11492,8 @@ function getGoodContactZonePoints() {
   const plateTop = field.plateY - 12 * scale;
   const zoneScale = 2 / 3;
   const pitcherDirectionShrink = 18 * scale;
-  const extension = Math.max(0, (42 + meetDelta * 3.5) * scale * zoneScale - pitcherDirectionShrink);
+  const baseExtension = Math.max(0, (42 + meetDelta * 3.5) * scale * zoneScale - pitcherDirectionShrink);
+  const extension = baseExtension * 1.44;
   const sidePad = meetDelta * 1.7 * scale;
   const halfTop = clamp(((36 * scale) + sidePad) * zoneScale, 14 * scale, 50 * scale);
   const halfShoulder = clamp(((26 * scale) + sidePad * 0.85) * zoneScale, 10 * scale, 40 * scale);
@@ -12121,10 +12351,12 @@ function drawStealPlay() {
 function drawDefenseBaseRunners() {
   const visibleBaseRunners = getVisibleDefenseBaseRunners();
   if (!visibleBaseRunners.length) return;
-  const elapsedMs = performance.now() - defenseState.startTime;
+  const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   visibleBaseRunners.forEach((runner) => {
-    const runProgress = runner.arrivalTime > 0
-      ? clamp(elapsedMs / Math.max(1, runner.arrivalTime * 1000), 0, 1)
+    const routeStartTime = runner.routeStartTime ?? 0;
+    const routeDuration = runner.routeDuration ?? runner.arrivalTime;
+    const runProgress = routeDuration > 0
+      ? clamp((elapsedSeconds - routeStartTime) / routeDuration, 0, 1)
       : 0;
     drawMiniRunner(runner.x, runner.y, runProgress, {
       jersey: runner.scored && runner.arrived ? "#ffcf70" : "#ff9f43",
@@ -12885,7 +13117,7 @@ function drawHud() {
   drawPanel(18, 18, 360, 164, "#233047");
   ctx.fillStyle = "#fff2a8";
   ctx.font = "bold 24px monospace";
-  const modeLabel = gameMode === "practice" ? "MODE: 打撃練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : "MODE: 2人用";
+  const modeLabel = gameMode === "practice" ? "MODE: 打撃練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : gameMode === "watch" ? "MODE: 観戦モード" : "MODE: 2人用";
   ctx.fillText(modeLabel, 38, 52);
   ctx.fillStyle = "#f8f3d8";
   ctx.font = "bold 22px monospace";
@@ -13505,6 +13737,10 @@ function drawGameStaminaBar(x, y, width, player) {
   roundRect(barX, barY, barWidth * state.percent, 10, 5);
   ctx.fill();
   drawGameStaminaMarks(barX, barY, barWidth);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#162033";
+  ctx.font = "bold 11px sans-serif";
+  ctx.fillText(getPitcherGameStaminaText(player), barX + barWidth / 2, barY + 9);
   ctx.textAlign = "right";
   ctx.fillStyle = "#233047";
   ctx.font = "bold 13px sans-serif";

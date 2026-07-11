@@ -555,15 +555,23 @@ canvas {
 }
 
 .pitcher-role-pitcher {
-  top: 35%;
+  top: 25%;
 }
 
 .pitcher-role-pitcher2 {
-  top: 50%;
+  top: 37%;
 }
 
 .pitcher-role-pitcher3 {
-  top: 65%;
+  top: 49%;
+}
+
+.pitcher-role-pitcher4 {
+  top: 61%;
+}
+
+.pitcher-role-pitcher5 {
+  top: 73%;
 }
 
 .menu-simple-cost {
