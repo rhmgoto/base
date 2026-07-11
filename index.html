@@ -117,7 +117,6 @@
             </section>
 
             <div class="menu-status-row">
-              <button id="playerEditorButton" class="player-editor-open-button" type="button">能力値変更</button>
               <div class="audio-controls menu-audio-controls" aria-label="メニュー音声設定">
                 <button id="menuSoundToggleButton" class="audio-toggle" type="button" aria-pressed="true">効果音 ON</button>
                 <button id="menuBgmToggleButton" class="audio-toggle" type="button" aria-pressed="true">BGM ON</button>
@@ -248,28 +247,6 @@
                 <button id="chooserClose" type="button">閉じる</button>
               </div>
               <div id="chooserOptions" class="chooser-options"></div>
-            </section>
-            <section id="playerEditor" class="player-editor hidden" aria-label="能力値変更">
-              <div class="editor-header">
-                <h3 id="playerEditorTitle">能力値変更</h3>
-                <button id="playerEditorClose" type="button">閉じる</button>
-              </div>
-              <div class="editor-toolbar">
-                <label>
-                  種類
-                  <select id="playerEditorKind">
-                    <option value="batter" selected>野手</option>
-                    <option value="pitcher">投手</option>
-                  </select>
-                </label>
-                <button id="playerEditorNewButton" type="button">新規選手</button>
-                <button id="playerEditorResetButton" type="button">初期値に戻す</button>
-              </div>
-              <div class="editor-body">
-                <div id="playerEditorList" class="editor-player-list"></div>
-                <form id="playerEditorForm" class="editor-form"></form>
-              </div>
-              <div id="playerEditorStatus" class="editor-status" aria-live="polite"></div>
             </section>
           </div>
         </section>

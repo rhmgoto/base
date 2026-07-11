@@ -20,16 +20,16 @@ const menuSoundToggleButton = byId("menuSoundToggleButton");
 const menuBgmToggleButton = byId("menuBgmToggleButton");
 const soundToggleButtons = [soundToggleButton, menuSoundToggleButton].filter(Boolean);
 const bgmToggleButtons = [bgmToggleButton, menuBgmToggleButton].filter(Boolean);
-const playerEditorButton = byId("playerEditorButton");
-const playerEditor = byId("playerEditor");
-const playerEditorTitle = byId("playerEditorTitle");
-const playerEditorClose = byId("playerEditorClose");
-const playerEditorKind = byId("playerEditorKind");
-const playerEditorList = byId("playerEditorList");
-const playerEditorForm = byId("playerEditorForm");
-const playerEditorNewButton = byId("playerEditorNewButton");
-const playerEditorResetButton = byId("playerEditorResetButton");
-const playerEditorStatus = byId("playerEditorStatus");
+const playerEditorButton = null;
+const playerEditor = null;
+const playerEditorTitle = null;
+const playerEditorClose = null;
+const playerEditorKind = null;
+const playerEditorList = null;
+const playerEditorForm = null;
+const playerEditorNewButton = null;
+const playerEditorResetButton = null;
+const playerEditorStatus = null;
 const awayPitcherPointStatus = byId("awayPitcherPointStatus");
 const awayFielderPointStatus = byId("awayFielderPointStatus");
 const homePitcherPointStatus = byId("homePitcherPointStatus");
@@ -375,6 +375,8 @@ const rosterIndexedDbKey = "current";
 const defaultBatters = batters.map((player) => ({ ...player }));
 const defaultCatchers = catchers.map((player) => ({ ...player }));
 const defaultPitchers = pitchers.map((player) => ({ ...player }));
+const originalMenuBatterIds = { away: "original-away-batter", home: "original-home-batter" };
+const originalMenuBatters = Object.fromEntries(teamIds.map((team) => [team, createDefaultOriginalMenuBatter(team)]));
 const practiceOnlyPitchers = [
   { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: 1, fielding: 5, stamina: 99, cost: 0, practiceOnly: true }
 ];
@@ -1820,19 +1822,19 @@ function isCatcherLikePlayer(player) {
 }
 
 function getAllHitters() {
-  return [...batters, ...catchers];
+  return [...batters, ...Object.values(originalMenuBatters), ...catchers];
 }
 
 function getPlayerListForRole(role) {
   if (isDhRole(role)) return getAllHitters();
-  return isCatcherRole(role) ? catchers : batters;
+  return isCatcherRole(role) ? catchers : [...batters, ...Object.values(originalMenuBatters)];
 }
 
 function getPlayerListForKind(kind) {
   if (kind === "pitcher") return pitchers;
   if (kind === "catcher") return catchers;
   if (kind === "hitter") return getAllHitters();
-  return batters;
+  return [...batters, ...Object.values(originalMenuBatters)];
 }
 
 function getChooserKindForRole(role) {
@@ -2091,7 +2093,6 @@ function getChooserPlayerStats(player, kind, role = null) {
   }
   if (kind === "catcher" || isCatcherRole(role) || isCatcherLikePlayer(player)) {
     return [
-      chooserHandRow("打", handLabel(player.bats), player.bats),
       chooserStatRow("パワー", player.power, "power"),
       chooserStatRow("ミート", player.meet, "meet"),
       chooserStatRow("走塁", player.run, "run"),
@@ -2101,7 +2102,6 @@ function getChooserPlayerStats(player, kind, role = null) {
   const infield = player.infieldDefense ?? player.fielding ?? 5;
   const outfield = player.outfieldDefense ?? player.fielding ?? 5;
   return [
-    chooserHandRow("打", handLabel(player.bats), player.bats),
     chooserStatRow("パワー", player.power, "power"),
     chooserStatRow("ミート", player.meet, "meet"),
     chooserStatRow("走塁", player.run, "run"),
@@ -2110,6 +2110,139 @@ function getChooserPlayerStats(player, kind, role = null) {
     chooserStatRow("肩", player.arm ?? 5, "arm")
   ].join("");
 }
+
+function createDefaultOriginalMenuBatter(team = "away") {
+  return {
+    id: originalMenuBatterIds[team] || `original-${team}-batter`,
+    name: "オリジナル",
+    bats: "R",
+    power: 5,
+    meet: 5,
+    run: 4,
+    infieldDefense: 4,
+    outfieldDefense: 4,
+    arm: 3,
+    cost: 5,
+    originalMenuPlayer: true
+  };
+}
+
+function shouldShowOriginalBatterCreator(kind) {
+  return kind === "batter" || kind === "hitter";
+}
+
+function getOriginalMenuBatter(team) {
+  if (!originalMenuBatters[team]) originalMenuBatters[team] = createDefaultOriginalMenuBatter(team);
+  return originalMenuBatters[team];
+}
+
+function getOriginalBatterBudget(player) {
+  return clamp(Number(player?.cost ?? 5), 1, 10) * 5;
+}
+
+function getOriginalBatterPointTotal(player) {
+  return ["power", "meet", "run", "infieldDefense", "outfieldDefense", "arm"]
+    .reduce((total, key) => total + Number(player?.[key] ?? 1), 0);
+}
+
+function renderOriginalBatterCreator(team, role, kind) {
+  if (!shouldShowOriginalBatterCreator(kind)) return "";
+  const player = getOriginalMenuBatter(team);
+  const total = getOriginalBatterPointTotal(player);
+  const budget = getOriginalBatterBudget(player);
+  const remaining = budget - total;
+  const selectedClass = player.id === menuSelection[team][role] ? " selected" : "";
+  const overClass = remaining < 0 ? " original-over-budget" : "";
+  const statInput = (field, label, value) => `
+    <label class="stat-row original-stat-row">
+      <span class="stat-name">${label}</span>
+      <input class="stat-value original-stat-input" type="number" data-original-field="${field}" min="1" max="12" step="1" value="${escapeHtml(value)}">
+      <span class="ability-bar" aria-hidden="true"><span class="ability-bar-fill" style="width:${clamp(value / 12, 0, 1) * 100}%"></span></span>
+    </label>
+  `;
+  return `
+    <form class="original-player-creator${selectedClass}${overClass}" data-team="${escapeHtml(team)}" data-role="${escapeHtml(role)}" data-kind="${escapeHtml(kind)}">
+      <strong class="chooser-player-title original-player-title">
+        <span class="original-name-side">
+          <input class="original-name-input" type="text" data-original-field="name" maxlength="18" value="${escapeHtml(player.name)}" aria-label="名前">
+          <select class="original-hand-select chooser-hand-sort" data-original-field="bats" aria-label="打席">
+            <option value="R" ${player.bats === "R" ? "selected" : ""}>右</option>
+            <option value="L" ${player.bats === "L" ? "selected" : ""}>左</option>
+          </select>
+        </span>
+        <span class="original-title-numbers">
+          <span class="original-point-status" data-original-point-status>${total}/${budget}</span>
+          <em class="original-cost-badge"><input type="number" data-original-field="cost" min="1" max="10" step="1" value="${escapeHtml(player.cost)}" aria-label="獲得ポイント">P</em>
+        </span>
+      </strong>
+      <div class="chooser-card-stats compact-stats original-card-stats">
+        ${statInput("power", "パワー", player.power)}
+        ${statInput("meet", "ミート", player.meet)}
+        ${statInput("run", "走塁", player.run)}
+        ${statInput("infieldDefense", "内野", player.infieldDefense)}
+        ${statInput("outfieldDefense", "外野", player.outfieldDefense)}
+        ${statInput("arm", "肩", player.arm)}
+      </div>
+    </form>
+  `;
+}
+
+function readOriginalBatterForm(form) {
+  const team = form?.dataset?.team || form?.getAttribute?.("data-team") || "away";
+  const current = getOriginalMenuBatter(team);
+  const next = { ...current };
+  form?.querySelectorAll?.("[data-original-field]")?.forEach((input) => {
+    const field = input.dataset.originalField;
+    if (field === "name") {
+      next.name = String(input.value || "オリジナル").trim().slice(0, 18) || "オリジナル";
+    } else if (field === "bats") {
+      next.bats = input.value === "L" ? "L" : "R";
+    } else if (field === "cost") {
+      next.cost = sanitizeNumber(input.value, 1, 10, current.cost ?? 5);
+    } else {
+      next[field] = sanitizeNumber(input.value, 1, 12, current[field] ?? 1);
+    }
+  });
+  next.originalMenuPlayer = true;
+  return next;
+}
+
+function updateOriginalBatterCreatorState(form) {
+  if (!form) return null;
+  const preview = readOriginalBatterForm(form);
+  const total = getOriginalBatterPointTotal(preview);
+  const budget = getOriginalBatterBudget(preview);
+  const remaining = budget - total;
+  const status = form.querySelector("[data-original-point-status]");
+  if (status) status.textContent = `${total}/${budget}`;
+  form.querySelectorAll("[data-original-field]").forEach((input) => {
+    const field = input.dataset.originalField;
+    if (!["power", "meet", "run", "infieldDefense", "outfieldDefense", "arm"].includes(field)) return;
+    const bar = input.closest(".original-stat-row")?.querySelector(".ability-bar-fill");
+    if (bar) bar.style.width = `${clamp(Number(input.value || 1) / 12, 0, 1) * 100}%`;
+  });
+  form.classList.toggle("original-over-budget", remaining < 0);
+  return { preview, total, budget, remaining };
+}
+
+function submitOriginalBatterCreator(form) {
+  const state = updateOriginalBatterCreatorState(form);
+  if (!state || state.remaining < 0) return;
+  const team = form.dataset?.team || form.getAttribute?.("data-team") || "away";
+  const role = form.dataset?.role || form.getAttribute?.("data-role") || "";
+  const kind = form.dataset?.kind || form.getAttribute?.("data-kind") || "batter";
+  if (!role) return;
+  const player = getOriginalMenuBatter(team);
+  Object.assign(player, state.preview, { id: originalMenuBatterIds[team], originalMenuPlayer: true });
+  if (isMenuPlayerUnavailable(team, role, kind, player.id)) {
+    renderPlayerChooserOptions();
+    return;
+  }
+  menuSelection[team][role] = player.id;
+  closePlayerChooser();
+  updateMenuAbilityPanels();
+}
+
 function renderChooserOption(player, team, role, kind) {
   const unavailable = isMenuPlayerUnavailable(team, role, kind, player.id);
   const selectedClass = player.id === menuSelection[team][role] ? " selected" : "";
@@ -2136,7 +2269,10 @@ function openPlayerChooser(card) {
 function renderPlayerChooserOptions() {
   const { team, role, kind } = chooserSortState;
   const list = getChooserPlayerList(kind);
-  chooserOptions.innerHTML = list.map((player) => renderChooserOption(player, team, role, kind)).join("");
+  chooserOptions.innerHTML = [
+    renderOriginalBatterCreator(team, role, kind),
+    ...list.map((player) => renderChooserOption(player, team, role, kind))
+  ].join("");
 }
 
 function getChooserSortValue(player, key) {
@@ -2154,6 +2290,7 @@ function getChooserPlayerList(kind) {
   const source = getPlayerListForKind(kind);
   const sortKey = chooserSortState.kind === kind ? chooserSortState.key : "";
   return source
+    .filter((player) => !player.originalMenuPlayer)
     .map((player, index) => ({ player, index }))
     .sort((a, b) => {
       if (sortKey === "hand") {
@@ -13623,9 +13760,31 @@ menuPlayerCards.forEach((card) => {
 chooserClose.addEventListener("click", closePlayerChooser);
 chooserOptions.addEventListener("click", (event) => {
   if (event.target.closest("[data-sort-key]")) return;
+  const originalForm = event.target.closest(".original-player-creator");
+  if (originalForm) {
+    if (event.target.closest("input, select")) return;
+    submitOriginalBatterCreator(originalForm);
+    return;
+  }
   const option = event.target.closest(".chooser-option");
   if (!option || option.disabled) return;
   selectMenuPlayer(option);
+});
+chooserOptions.addEventListener("input", (event) => {
+  const form = event.target.closest(".original-player-creator");
+  if (!form) return;
+  updateOriginalBatterCreatorState(form);
+});
+chooserOptions.addEventListener("change", (event) => {
+  const form = event.target.closest(".original-player-creator");
+  if (!form) return;
+  updateOriginalBatterCreatorState(form);
+});
+chooserOptions.addEventListener("submit", (event) => {
+  const form = event.target.closest(".original-player-creator");
+  if (!form) return;
+  event.preventDefault();
+  submitOriginalBatterCreator(form);
 });
 chooserOptions.addEventListener("dblclick", (event) => {
   const sortTarget = event.target.closest("[data-sort-key]");

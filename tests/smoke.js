@@ -219,6 +219,7 @@ function assertHtmlShell() {
   assertIncludesAll(html, ["試合開始", "打撃練習開始", "メインメニューに戻る", "効果音 ON"], "index.html");
   assert(html.includes(">BGM ON</button>"), "BGM toggle should default to ON");
   assert(html.includes("menu-audio-controls"), "main menu should include audio controls");
+  assert(!html.includes('id="playerEditorButton"') && !html.includes('id="playerEditor"'), "main menu should no longer expose the old ability editor");
   assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
   assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
   assertNoMojibake(html, "index.html");
@@ -981,7 +982,38 @@ const rosterAndPointState = JSON.parse(runInGame(
     openPlayerChooser({ dataset: { team: "away", role: "L", kind: "batter" } });
     const chooserHtml = chooserOptions.innerHTML;
     const firstBatterOption = chooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
+    const originalCreatorFirst = chooserHtml.trim().startsWith('<form class="original-player-creator');
+    const makeOriginalForm = (values) => {
+      const status = { textContent: "" };
+      return {
+        dataset: { team: "away", role: "L", kind: "batter" },
+        classList: { toggle() {} },
+        getAttribute(name) {
+          return this.dataset[name.replace(/^data-/, "")] || "";
+        },
+        querySelector(selector) {
+          if (selector === "[data-original-point-status]") return status;
+          return null;
+        },
+        querySelectorAll(selector) {
+          if (selector === "[data-original-field]") {
+            return Object.entries(values).map(([field, value]) => ({ dataset: { originalField: field }, value: String(value), closest: () => null }));
+          }
+          return [];
+        },
+        status
+      };
+    };
+    const originalOverForm = makeOriginalForm({ cost: 1, power: 12, meet: 12, run: 12, infieldDefense: 12, outfieldDefense: 12, arm: 12 });
+    const originalOverState = updateOriginalBatterCreatorState(originalOverForm);
+    const originalValidForm = makeOriginalForm({ name: "テストオリジナル", bats: "L", cost: 5, power: 4, meet: 4, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 4 });
+    submitOriginalBatterCreator(originalValidForm);
+    const originalSelected = menuSelection.away.L === "original-away-batter";
+    const originalPlayer = findSelectedById(getPlayerListForRole("L"), "original-away-batter");
+    const originalSelectedCost = getMenuPlayerCost(getPlayerListForRole("L"), "original-away-batter");
     closePlayerChooser();
+    menuSelection.away = originalAway;
+    updateMenuPointStatus();
     openPlayerChooser({ dataset: { team: "away", role: "CA", kind: "catcher" } });
     const catcherChooserHtml = chooserOptions.innerHTML;
     const firstCatcherOption = catcherChooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
@@ -1568,6 +1600,21 @@ const rosterAndPointState = JSON.parse(runInGame(
       pitcherCardHtml,
       escapedPracticeSelectHtml,
       escapedChooserHtml,
+      originalCreatorFirst,
+      originalOverRemaining: originalOverState.remaining,
+      originalSelected,
+      originalPlayer: {
+        name: originalPlayer.name,
+        bats: originalPlayer.bats,
+        power: originalPlayer.power,
+        meet: originalPlayer.meet,
+        run: originalPlayer.run,
+        infieldDefense: originalPlayer.infieldDefense,
+        outfieldDefense: originalPlayer.outfieldDefense,
+        arm: originalPlayer.arm,
+        cost: originalPlayer.cost
+      },
+      originalSelectedCost,
       awayFielderPointText: awayFielderPointStatus.textContent,
       menuText: awayPitcherPointStatus.textContent + " " + awayFielderPointStatus.textContent
     });
@@ -1930,6 +1977,14 @@ assert(rosterAndPointState.pitcherOverLimitText.includes("/60"), "menu should sh
 assert(rosterAndPointState.awayFielderPointText === "", "menu should show only the combined point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
+assert(rosterAndPointState.originalCreatorFirst === true, "batter chooser should show the original-player creator as the first card");
+assert(!rosterAndPointState.chooserHtml.includes("オリジナル選手作成") && !rosterAndPointState.chooserHtml.includes("この選手を使う"), "original-player creator should fit into a normal card without extra title or use button text");
+assert(rosterAndPointState.originalOverRemaining < 0, "original-player creator should block stat totals above cost times five");
+assert(rosterAndPointState.originalSelected === true, "valid original-player creator entries should be selectable");
+assert(rosterAndPointState.originalPlayer.name === "テストオリジナル" && rosterAndPointState.originalPlayer.bats === "L", "original-player creator should apply name and batting side");
+assert(rosterAndPointState.originalPlayer.power === 4 && rosterAndPointState.originalPlayer.meet === 4 && rosterAndPointState.originalPlayer.run === 4, "original-player creator should apply batting and running stats");
+assert(rosterAndPointState.originalPlayer.infieldDefense === 4 && rosterAndPointState.originalPlayer.outfieldDefense === 4 && rosterAndPointState.originalPlayer.arm === 4, "original-player creator should apply fielding and arm stats");
+assert(rosterAndPointState.originalPlayer.cost === 5 && rosterAndPointState.originalSelectedCost === 5, "original-player creator should use the entered acquisition point cost");
 assert(rosterAndPointState.chooserHtml.includes("chooser-player-title"), "batter chooser should show cost beside the player name");
 assert(rosterAndPointState.chooserHtml.includes("chooser-card-stats"), "batter chooser should render card-style stat rows");
 assert(rosterAndPointState.chooserHtml.length > 0, "batter chooser should show batting side");
