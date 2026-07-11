@@ -2356,6 +2356,8 @@ const battingTighteningState = JSON.parse(runInGame(
       scoreAtScoringEdge: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score")),
       scoreTwoWidthsOutside: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score") * 2),
       scoreFourWidthsOutside: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score") * 4),
+      scoreAtBatHandleEnd: getSweetSpotScore(0),
+      scoreAtBatTipEnd: getSweetSpotScore(1),
       balancedAllGood: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.86, barrelScore: 0.88, zoneScore: 1, quality: 0.92 }),
       balancedWeakSweetSpot: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.22, barrelScore: 0.86, zoneScore: 1, quality: 1 }),
       balancedPlayable: getBattingFeedbackBalancedScore({ timingScore: 0.74, sweetSpotScore: 0.62, barrelScore: 0.65, zoneScore: 1, quality: 0.78 }),
@@ -2384,9 +2386,10 @@ assert(Math.abs(battingTighteningState.meetZoneWidthScale - 0.8) < 0.001, "meet 
 assert(Math.abs(battingTighteningState.outsideVisibleHitWidth - battingTighteningState.unscaledOutsideVisibleHitWidth * 0.8) < 0.001, "visible meet zone should be narrowed to eighty percent");
 assert(battingTighteningState.scoreAtVisibleEdge > 0.78, "visible sweet-spot edge should still receive useful sweet-spot scoring");
 assert(battingTighteningState.scoreOutsideVisibleEdge > 0.66, "nearby contact just outside the visible sweet spot should still receive partial scoring");
-assert(battingTighteningState.scoreAtScoringEdge >= 0.54, "sweet-spot scoring should no longer fall to zero at the scoring edge");
-assert(battingTighteningState.scoreTwoWidthsOutside >= 0.32 && battingTighteningState.scoreTwoWidthsOutside < battingTighteningState.scoreAtScoringEdge, "sweet-spot scoring should keep a useful tail outside the scoring edge");
-assert(battingTighteningState.scoreFourWidthsOutside >= 0.12 && battingTighteningState.scoreFourWidthsOutside < battingTighteningState.scoreTwoWidthsOutside, "farther sweet-spot misses should fade gradually instead of dropping off a cliff");
+assert(battingTighteningState.scoreAtScoringEdge >= 0.67, "sweet-spot scoring should stay generous at the scoring edge");
+assert(battingTighteningState.scoreTwoWidthsOutside >= 0.5 && battingTighteningState.scoreTwoWidthsOutside < battingTighteningState.scoreAtScoringEdge, "sweet-spot scoring should keep a stronger useful tail outside the scoring edge");
+assert(battingTighteningState.scoreFourWidthsOutside >= 0.3 && battingTighteningState.scoreFourWidthsOutside < battingTighteningState.scoreTwoWidthsOutside, "farther sweet-spot misses should fade more gradually instead of dropping off a cliff");
+assert(battingTighteningState.scoreAtBatHandleEnd >= 0.15 && battingTighteningState.scoreAtBatTipEnd >= 0.15, "bat contact should keep at least a fifteen-percent sweet-spot score floor");
 assert(battingTighteningState.balancedAllGood > 0.7, "balanced batting feedback should still reward all-around good contact after the ten-point reduction");
 assert(battingTighteningState.balancedWeakSweetSpot < 0.62, "balanced batting feedback should be stricter when the sweet spot is poor");
 assert(battingTighteningState.balancedPlayable >= 0.5 && battingTighteningState.balancedPlayable <= 0.69, "balanced batting feedback should keep playable contact about five points lower");

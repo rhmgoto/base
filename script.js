@@ -13260,11 +13260,12 @@ function getSweetSpotScore(t) {
   const center = 0.68;
   const halfWidth = getSweetSpotHalfWidth("score");
   const normalizedDistance = Math.abs(t - center) / Math.max(halfWidth, 0.0001);
+  const contactFloor = 0.15;
   if (normalizedDistance <= 1) {
-    return clamp(1 - normalizedDistance * 0.45, 0, 1);
+    return clamp(Math.max(1 - normalizedDistance * 0.32, contactFloor), 0, 1);
   }
-  const outsideTailScore = 0.55 * Math.exp(-(normalizedDistance - 1) * 0.45);
-  return outsideTailScore < 0.035 ? 0 : clamp(outsideTailScore, 0, 1);
+  const outsideTailScore = 0.68 * Math.exp(-(normalizedDistance - 1) * 0.22);
+  return clamp(Math.max(outsideTailScore, contactFloor), 0, 1);
 }
 
 function getSweetSpotHalfWidth(type) {
