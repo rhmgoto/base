@@ -260,11 +260,22 @@
               <button id="practiceStartButton" type="button">打撃練習開始</button>
             </div>
             <section id="playerChooser" class="player-chooser hidden" aria-label="選手一覧">
-              <div class="chooser-header">
-                <h3 id="chooserTitle">選手を選ぶ</h3>
-                <button id="chooserClose" type="button">閉じる</button>
+              <div class="chooser-split">
+                <section class="chooser-pane hidden" data-chooser-team="away" aria-label="1P 選手一覧">
+                  <div class="chooser-header">
+                    <h3 id="chooserTitle">1P 選手を選ぶ</h3>
+                    <button id="chooserClose" type="button">閉じる</button>
+                  </div>
+                  <div id="chooserOptions" class="chooser-options"></div>
+                </section>
+                <section class="chooser-pane hidden" data-chooser-team="home" aria-label="2P 選手一覧">
+                  <div class="chooser-header">
+                    <h3 id="chooserTitleHome">2P 選手を選ぶ</h3>
+                    <button id="chooserCloseHome" type="button">閉じる</button>
+                  </div>
+                  <div id="chooserOptionsHome" class="chooser-options"></div>
+                </section>
               </div>
-              <div id="chooserOptions" class="chooser-options"></div>
             </section>
           </div>
         </section>

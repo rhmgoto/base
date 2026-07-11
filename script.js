@@ -38,6 +38,9 @@ const playerChooser = byId("playerChooser");
 const chooserTitle = byId("chooserTitle");
 const chooserOptions = byId("chooserOptions");
 const chooserClose = byId("chooserClose");
+const chooserTitleHome = byId("chooserTitleHome");
+const chooserOptionsHome = byId("chooserOptionsHome");
+const chooserCloseHome = byId("chooserCloseHome");
 const pitcherChangeControls = byId("pitcherChangeControls");
 const modeSelect = byId("modeSelect");
 const firstBatSelect = byId("firstBatSelect");
@@ -396,6 +399,10 @@ const practiceOnlyPitchers = [
 ];
 let playerEditorState = { kind: "batter", playerId: batters[0]?.id ?? "", isNew: false };
 let chooserSortState = { team: "", role: "", kind: "", key: "" };
+let chooserSortStates = {
+  away: { team: "", role: "", kind: "", key: "" },
+  home: { team: "", role: "", kind: "", key: "" }
+};
 
 const scoringHitTypes = new Set(["single", "double", "triple", "homer"]);
 const defenseFieldDistanceScale = 0.8 * 1.15;
@@ -2153,12 +2160,11 @@ function getChooserPlayerStats(player, kind, role = null) {
   if (kind === "pitcher") {
     return [
       chooserSpeedRow("球速", player.fastKmh, "fastKmh"),
-      chooserHandRow("投", handLabel(player.throws), player.throws),
+      chooserStaminaStatRow(player.stamina ?? 6, "stamina"),
       pitchCross(player, true),
       chooserStatRow("制球", player.control, "control"),
       chooserStatRow("球威", player.stuff, "stuff"),
-      chooserStatRow("守備", player.fielding ?? 5, "fielding"),
-      chooserStaminaStatRow(player.stamina ?? 6, "stamina")
+      chooserStatRow("守備", player.fielding ?? 5, "fielding")
     ].join("");
   }
   if (kind === "catcher" || isCatcherRole(role) || isCatcherLikePlayer(player)) {
@@ -2312,11 +2318,11 @@ function submitOriginalBatterCreator(form) {
   const player = getOriginalMenuBatter(team);
   Object.assign(player, state.preview, { id: originalMenuBatterIds[team], originalMenuPlayer: true });
   if (isMenuPlayerUnavailable(team, role, kind, player.id)) {
-    renderPlayerChooserOptions();
+    renderPlayerChooserOptions(team);
     return;
   }
   menuSelection[team][role] = player.id;
-  closePlayerChooser();
+  closePlayerChooser(team);
   updateMenuAbilityPanels();
 }
 
@@ -2325,28 +2331,54 @@ function renderChooserOption(player, team, role, kind) {
   const selectedClass = player.id === menuSelection[team][role] ? " selected" : "";
   const unavailableClass = unavailable ? " unavailable" : "";
   const side = kind === "pitcher" ? handLabel(player.throws) : handLabel(player.bats);
+  const currentSort = chooserSortStates[team] || chooserSortState;
   return `
     <button class="chooser-option${selectedClass}${unavailableClass}" type="button" data-team="${escapeHtml(team)}" data-role="${escapeHtml(role)}" data-player-id="${escapeHtml(player.id)}" data-kind="${escapeHtml(kind)}" ${unavailable ? "disabled" : ""}>
-      <strong class="chooser-player-title"><span>${escapeHtml(player.name)} <span class="chooser-hand-sort sortable-stat${chooserSortState.key === "hand" && chooserSortState.hand === (kind === "pitcher" ? player.throws : player.bats) ? " sort-active" : ""}" data-sort-key="hand" data-sort-hand="${escapeHtml(kind === "pitcher" ? player.throws : player.bats)}">${escapeHtml(side)}</span></span><em class="sortable-stat${chooserSortState.key === "cost" ? " sort-active" : ""}" data-sort-key="cost">${player.cost ?? 5}P</em></strong>
+      <strong class="chooser-player-title"><span>${escapeHtml(player.name)} <span class="chooser-hand-sort sortable-stat${currentSort.key === "hand" && currentSort.hand === (kind === "pitcher" ? player.throws : player.bats) ? " sort-active" : ""}" data-sort-key="hand" data-sort-hand="${escapeHtml(kind === "pitcher" ? player.throws : player.bats)}">${escapeHtml(side)}</span></span><em class="sortable-stat${currentSort.key === "cost" ? " sort-active" : ""}" data-sort-key="cost">${player.cost ?? 5}P</em></strong>
       <div class="chooser-card-stats compact-stats">${getChooserPlayerStats(player, kind, role)}</div>
     </button>
   `;
+}
+
+function getChooserElements(team) {
+  return team === "home"
+    ? {
+        pane: playerChooser?.querySelector?.('[data-chooser-team="home"]'),
+        title: chooserTitleHome,
+        options: chooserOptionsHome
+      }
+    : {
+        pane: playerChooser?.querySelector?.('[data-chooser-team="away"]'),
+        title: chooserTitle,
+        options: chooserOptions
+      };
+}
+
+function hasOpenChooserPane() {
+  return teamIds.some((team) => !getChooserElements(team).pane?.classList.contains("hidden"));
 }
 
 function openPlayerChooser(card) {
   const team = card.dataset.team;
   const role = card.dataset.role;
   const kind = getChooserKindForRole(role) || card.dataset.kind;
-  chooserSortState = { team, role, kind, key: "" };
-  chooserTitle.textContent = `${teamLabel(team)} ${getMenuRoleLabel(role)}`;
-  renderPlayerChooserOptions();
+  chooserSortStates[team] = { team, role, kind, key: "" };
+  chooserSortState = chooserSortStates[team];
+  const elements = getChooserElements(team);
+  if (elements.title) elements.title.textContent = `${team === "away" ? "1P" : "2P"} ${teamLabel(team)} ${getMenuRoleLabel(role)}`;
+  elements.pane?.classList.remove("hidden");
+  renderPlayerChooserOptions(team);
   playerChooser.classList.remove("hidden");
 }
 
-function renderPlayerChooserOptions() {
-  const { team, role, kind } = chooserSortState;
+function renderPlayerChooserOptions(team = chooserSortState.team) {
+  const state = chooserSortStates[team] || chooserSortState;
+  chooserSortState = state;
+  const { role, kind } = state;
+  const elements = getChooserElements(team);
+  if (!elements.options || !team || !role || !kind) return;
   const list = getChooserPlayerList(kind);
-  chooserOptions.innerHTML = [
+  elements.options.innerHTML = [
     renderOriginalBatterCreator(team, role, kind),
     ...list.map((player) => renderChooserOption(player, team, role, kind))
   ].join("");
@@ -2388,9 +2420,13 @@ function getChooserPlayerList(kind) {
 
 function sortPlayerChooserBy(key, options = {}) {
   if (!key || playerChooser.classList.contains("hidden")) return;
-  chooserSortState.key = key;
-  chooserSortState.hand = options.hand || "";
-  renderPlayerChooserOptions();
+  const team = options.team || chooserSortState.team;
+  const state = chooserSortStates[team] || chooserSortState;
+  state.key = key;
+  state.hand = options.hand || "";
+  chooserSortStates[team] = state;
+  chooserSortState = state;
+  renderPlayerChooserOptions(team);
 }
 
 function isMenuPlayerUnavailable(team, role, kind, playerId) {
@@ -2402,7 +2438,22 @@ function isMenuPlayerUnavailable(team, role, kind, playerId) {
   return doesMenuPointLimitApply(team) && getMenuTeamCostWithCandidate(team, role, kind, playerId) > teamPointLimit;
 }
 
-function closePlayerChooser() {
+function closePlayerChooser(team = null) {
+  if (team) {
+    const elements = getChooserElements(team);
+    elements.pane?.classList.add("hidden");
+    if (elements.options) elements.options.innerHTML = "";
+    chooserSortStates[team] = { team: "", role: "", kind: "", key: "" };
+    if (!hasOpenChooserPane()) playerChooser.classList.add("hidden");
+    return;
+  }
+  teamIds.forEach((side) => {
+    const elements = getChooserElements(side);
+    elements.pane?.classList.add("hidden");
+    if (elements.options) elements.options.innerHTML = "";
+    chooserSortStates[side] = { team: "", role: "", kind: "", key: "" };
+  });
+  chooserSortState = { team: "", role: "", kind: "", key: "" };
   playerChooser.classList.add("hidden");
 }
 
@@ -2412,7 +2463,7 @@ function selectMenuPlayer(option) {
   const kind = option.dataset.kind;
   if (isMenuPlayerUnavailable(team, role, kind, option.dataset.playerId)) return;
   menuSelection[team][role] = option.dataset.playerId;
-  closePlayerChooser();
+  closePlayerChooser(team);
   updateMenuAbilityPanels();
 }
 
@@ -14020,8 +14071,14 @@ menuPlayerCards.forEach((card) => {
     openCardChooser();
   });
 });
-chooserClose.addEventListener("click", closePlayerChooser);
-chooserOptions.addEventListener("click", (event) => {
+chooserClose.addEventListener("click", () => closePlayerChooser("away"));
+chooserCloseHome?.addEventListener("click", () => closePlayerChooser("home"));
+
+function getChooserEventTeam(event) {
+  return event.target.closest("[data-chooser-team]")?.dataset?.chooserTeam || event.target.closest("[data-team]")?.dataset?.team || chooserSortState.team || "away";
+}
+
+function handleChooserOptionsClick(event) {
   if (event.target.closest("[data-sort-key]")) return;
   const originalForm = event.target.closest(".original-player-creator");
   if (originalForm) {
@@ -14047,29 +14104,41 @@ chooserOptions.addEventListener("click", (event) => {
   const option = event.target.closest(".chooser-option");
   if (!option || option.disabled) return;
   selectMenuPlayer(option);
-});
-chooserOptions.addEventListener("input", (event) => {
+}
+
+function handleChooserOptionsInput(event) {
   const form = event.target.closest(".original-player-creator");
   if (!form) return;
   updateOriginalBatterCreatorState(form);
-});
-chooserOptions.addEventListener("change", (event) => {
+}
+
+function handleChooserOptionsChange(event) {
   const form = event.target.closest(".original-player-creator");
   if (!form) return;
   updateOriginalBatterCreatorState(form);
-});
-chooserOptions.addEventListener("submit", (event) => {
+}
+
+function handleChooserOptionsSubmit(event) {
   const form = event.target.closest(".original-player-creator");
   if (!form) return;
   event.preventDefault();
   submitOriginalBatterCreator(form);
-});
-chooserOptions.addEventListener("dblclick", (event) => {
+}
+
+function handleChooserOptionsDblClick(event) {
   const sortTarget = event.target.closest("[data-sort-key]");
   if (!sortTarget) return;
   event.preventDefault();
   event.stopPropagation();
-  sortPlayerChooserBy(sortTarget.dataset.sortKey, { hand: sortTarget.dataset.sortHand || "" });
+  sortPlayerChooserBy(sortTarget.dataset.sortKey, { team: getChooserEventTeam(event), hand: sortTarget.dataset.sortHand || "" });
+}
+
+[chooserOptions, chooserOptionsHome].filter(Boolean).forEach((optionsElement) => {
+  optionsElement.addEventListener("click", handleChooserOptionsClick);
+  optionsElement.addEventListener("input", handleChooserOptionsInput);
+  optionsElement.addEventListener("change", handleChooserOptionsChange);
+  optionsElement.addEventListener("submit", handleChooserOptionsSubmit);
+  optionsElement.addEventListener("dblclick", handleChooserOptionsDblClick);
 });
 pitcherChangeControls?.addEventListener("click", (event) => {
   const button = event.target.closest(".pitcher-change-button");

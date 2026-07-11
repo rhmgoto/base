@@ -85,6 +85,9 @@ function createGameContext() {
     "chooserTitle",
     "chooserOptions",
     "chooserClose",
+    "chooserTitleHome",
+    "chooserOptionsHome",
+    "chooserCloseHome",
     "modeSelect",
     "awayPresetSelect",
     "homePresetSelect",
@@ -229,7 +232,17 @@ function assertHtmlShell() {
   assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
   assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
   assertNoMojibake(html, "index.html");
-  assert(/\.chooser-options\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\);/.test(css), "player chooser should show nine larger cards per row");
+  assert(/\.player-chooser\s*\{[\s\S]*background:\s*transparent;[\s\S]*pointer-events:\s*none;/.test(css), "player chooser parent should not visually or interactively cover both teams");
+  assert(/\.player-chooser\s*\{[\s\S]*inset:\s*34px 0 auto;/.test(css), "player chooser should stay inside the visible game screen");
+  assert(/\.chooser-pane\s*\{[\s\S]*position:\s*absolute;[\s\S]*width:\s*50%;/.test(css), "each player chooser pane should be exactly half-width");
+  assert(/\.chooser-pane\[data-chooser-team="away"\]\s*\{\s*left:\s*0;/.test(css), "1P chooser pane should stay on the left side");
+  assert(/\.chooser-pane\[data-chooser-team="home"\]\s*\{\s*right:\s*0;/.test(css), "2P chooser pane should stay on the right side");
+  assert(/\.chooser-pane\.hidden\s*\{\s*display:\s*none;/.test(css), "hidden chooser panes should not cover the opposite team");
+  assert(/overflow-x:\s*hidden;/.test(css), "player chooser should avoid horizontal overflow when five cards are shown");
+  assert(/\.game-shell\.menu-open\s*\{[\s\S]*width:\s*100vw;[\s\S]*max-width:\s*none;/.test(css), "menu-open game shell should use the full viewport width");
+  assert(/\.chooser-options\s*\{[\s\S]*gap:\s*2px;/.test(css), "chooser card gaps should be tightly compressed");
+  assert(/\.chooser-option\s*\{\s*display:\s*grid;\s*justify-self:\s*center;\s*width:\s*82%;/.test(css), "chooser cards should be narrowed enough to fit five columns inside each pane");
+  assert(/\.chooser-options\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\);/.test(css), "each player chooser pane should show five cards per row");
   assert(/\.field-role-C\s*\{\s*left:\s*50%;\s*top:\s*17%;/.test(css), "center fielder card should sit in the top outfield row");
   assert(/\.pitcher-role-pitcher\s*\{\s*left:\s*50%;\s*top:\s*34%;/.test(css), "starting pitcher card should sit below the outfield row");
   assert(/\.pitcher-role-pitcher5\s*\{\s*left:\s*61%;\s*top:\s*58%;/.test(css), "fifth pitcher card should sit in the lower two-column pitcher row");
@@ -991,6 +1004,11 @@ const rosterAndPointState = JSON.parse(runInGame(
     const chooserHtml = chooserOptions.innerHTML;
     const firstBatterOption = chooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
     const originalCreatorFirst = chooserHtml.trim().startsWith('<form class="original-player-creator');
+    openPlayerChooser({ dataset: { team: "home", role: "R", kind: "batter" } });
+    const simultaneousAwayChooserHtml = chooserOptions.innerHTML;
+    const simultaneousHomeChooserHtml = chooserOptionsHome.innerHTML;
+    const simultaneousChooserTitles = [chooserTitle.textContent, chooserTitleHome.textContent];
+    closePlayerChooser("home");
     const makeOriginalForm = (values) => {
       const status = { textContent: "" };
       return {
@@ -1041,6 +1059,7 @@ const rosterAndPointState = JSON.parse(runInGame(
     openPlayerChooser({ dataset: { team: "away", role: "pitcher", kind: "pitcher" } });
     const pitcherChooserHtml = chooserOptions.innerHTML;
     const firstPitcherOption = pitcherChooserHtml.match(/data-player-id="([^"]+)"/)?.[1] || "";
+    const pitcherChooserHasPitchHandRow = pitcherChooserHtml.includes(">投<") || pitcherChooserHtml.includes(">投</span>");
     closePlayerChooser();
     openPlayerChooser({ dataset: { team: "away", role: "pitcher2", kind: "pitcher" } });
     const pitcher2ChooserHtml = chooserOptions.innerHTML;
@@ -1581,8 +1600,12 @@ const rosterAndPointState = JSON.parse(runInGame(
       pitcherOverLimitDisabled,
       pitcherOverLimitText,
       chooserHtml,
+      simultaneousAwayChooserHtml,
+      simultaneousHomeChooserHtml,
+      simultaneousChooserTitles,
       catcherChooserHtml,
       pitcherChooserHtml,
+      pitcherChooserHasPitchHandRow,
       overLimitBatterDisabled,
       overLimitPickBlocked,
       firstBatterOption,
@@ -1989,6 +2012,8 @@ assert(rosterAndPointState.awayFielderPointText === "", "menu should show only t
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
 assert(rosterAndPointState.originalCreatorFirst === true, "batter chooser should show the original-player creator as the first card");
+assert(rosterAndPointState.simultaneousAwayChooserHtml.length > 0 && rosterAndPointState.simultaneousHomeChooserHtml.length > 0, "player chooser should render 1P and 2P option panes at the same time");
+assert(rosterAndPointState.simultaneousChooserTitles[0].includes("1P") && rosterAndPointState.simultaneousChooserTitles[1].includes("2P"), "player chooser panes should label the 1P and 2P sides clearly");
 assert(!rosterAndPointState.chooserHtml.includes("オリジナル選手作成") && !rosterAndPointState.chooserHtml.includes("この選手を使う"), "original-player creator should fit into a normal card without extra title or use button text");
 assert(rosterAndPointState.originalOverRemaining < 0, "original-player creator should block stat totals above cost times five");
 assert(rosterAndPointState.originalSelected === true, "valid original-player creator entries should be selectable");
@@ -2005,6 +2030,7 @@ assert(!rosterAndPointState.chooserHtml.includes('data-player-id="dingler"'), "b
 assert(rosterAndPointState.catcherChooserHtml.includes("chooser-card-stats"), "catcher chooser should render card-style stat rows");
 assert(rosterAndPointState.catcherChooserHasDingler === true, "catcher chooser should include Dingler");
 assert(rosterAndPointState.pitcherChooserHtml.length > 0, "pitcher chooser should show throwing side");
+assert(rosterAndPointState.pitcherChooserHasPitchHandRow === false, "pitcher chooser should not duplicate throwing side in a separate pitch-hand row");
 assert(rosterAndPointState.duplicatePitcherDisabled === true, "pitcher chooser should prevent duplicate pitchers in the same team");
 assert(rosterAndPointState.rodgersCatcherAllowedWithPitcher === true, "catcher chooser should allow Rodgers when Rodgers is already selected as a pitcher");
 assert(rosterAndPointState.rodgersPitcherAllowedWithCatcher === true, "pitcher chooser should allow Rodgers when Rodgers is already selected as catcher");

@@ -49,9 +49,9 @@ body {
 }
 
 .game-shell {
-  width: min(100vw - 4px, 2269px);
+  width: 100vw;
   min-height: 100vh;
-  margin: 0 auto;
+  margin: 0;
   padding: 6px 0 20px;
   display: flex;
   flex-direction: column;
@@ -189,7 +189,8 @@ h1 {
 }
 
 .game-shell.menu-open {
-  width: min(100vw - 4px, 2622px);
+  width: 100vw;
+  max-width: none;
 }
 
 .game-shell.menu-open .play-area {
@@ -1155,19 +1156,54 @@ canvas {
 
 .player-chooser {
   position: absolute;
-  inset: 34px 4px auto;
+  inset: 34px 0 auto;
   z-index: 4;
   max-height: calc(100% - 58px);
-  overflow: auto;
-  padding: 8px;
+  overflow: visible;
+  padding: 0;
   color: #233047;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.player-chooser.hidden {
+  display: none;
+}
+
+.chooser-split {
+  position: relative;
+  min-height: calc(100vh - 104px);
+  min-width: 0;
+}
+
+.chooser-pane {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  padding: 4px;
   background: #fff8df;
   border: 4px solid #2e4b5b;
   border-radius: 8px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
+  pointer-events: auto;
 }
 
-.player-chooser.hidden {
+.chooser-pane[data-chooser-team="away"] {
+  left: 0;
+}
+
+.chooser-pane[data-chooser-team="home"] {
+  right: 0;
+}
+
+.chooser-pane.hidden {
   display: none;
 }
 
@@ -1175,8 +1211,8 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .chooser-header h3 {
@@ -1185,25 +1221,30 @@ canvas {
 
 .chooser-options {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  min-width: 0;
 }
 
 .chooser-option {
   display: grid;
-  gap: 4px;
-  padding: 4px;
+  justify-self: center;
+  width: 82%;
+  min-width: 0;
+  gap: 2px;
+  padding: 2px;
   color: #233047;
   text-align: left;
   background: #f8fbff;
-  border: 3px solid #78acd0;
-  border-radius: 8px;
+  border: 2px solid #78acd0;
+  border-radius: 7px;
   cursor: pointer;
 }
 
 .chooser-player-title {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
   align-items: center;
   gap: 4px;
   font-size: 11px;
@@ -1228,13 +1269,19 @@ canvas {
 
 .chooser-hand-sort {
   display: inline-block;
-  padding: 1px 3px;
+  margin-left: 3px;
+  padding: 1px 5px;
+  color: #233047;
+  font-weight: 900;
+  background: #eaf6ff;
+  border: 1px solid rgba(57, 116, 155, 0.28);
   border-radius: 5px;
 }
 
 
 .chooser-card-stats {
   display: grid;
+  min-width: 0;
 }
 
 .chooser-option .compact-stats {
@@ -1242,9 +1289,15 @@ canvas {
 }
 
 .chooser-option .stat-row {
+  min-width: 0;
   min-height: 24px;
   padding: 2px 3px;
   border-width: 1px;
+}
+
+.chooser-option .stat-name,
+.chooser-option .stat-value {
+  min-width: 0;
 }
 
 .chooser-option .compact-stats .stat-name {
@@ -1261,9 +1314,10 @@ canvas {
 
 .chooser-option .pitch-cross {
   grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
-  grid-template-rows: repeat(3, 18px);
+  grid-template-rows: repeat(3, 16px);
   gap: 2px;
   padding: 2px;
+  min-width: 0;
 }
 
 .chooser-option .cross-cell {
@@ -1291,6 +1345,9 @@ canvas {
 
 .original-player-creator {
   display: grid;
+  justify-self: center;
+  width: 82%;
+  min-width: 0;
   gap: 2px;
   padding: 3px;
   color: #233047;
@@ -1322,6 +1379,7 @@ canvas {
 
 .original-player-title {
   grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
   gap: 3px;
   line-height: 1.1;
 }
@@ -1354,6 +1412,7 @@ canvas {
   display: grid;
   grid-template-columns: minmax(22px, auto) auto;
   align-items: center;
+  min-width: 0;
   gap: 2px;
 }
 
@@ -1874,14 +1933,18 @@ button {
     align-items: center;
   }
 
+  .chooser-split {
+    grid-template-columns: 1fr;
+  }
+
   .chooser-options {
-    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 920px) {
   .chooser-options {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
