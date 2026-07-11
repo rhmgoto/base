@@ -1615,6 +1615,9 @@ const rosterAndPointState = JSON.parse(runInGame(
         cost: originalPlayer.cost
       },
       originalSelectedCost,
+      originalHasCostStepper: chooserHtml.includes('data-original-step-field="cost"'),
+      originalHasPowerStepper: chooserHtml.includes('data-original-step-field="power"'),
+      originalUsesDirectNumberInput: chooserHtml.includes('type="number" data-original-field="cost"') || chooserHtml.includes('type="number" data-original-field="power"'),
       awayFielderPointText: awayFielderPointStatus.textContent,
       menuText: awayPitcherPointStatus.textContent + " " + awayFielderPointStatus.textContent
     });
@@ -1985,6 +1988,8 @@ assert(rosterAndPointState.originalPlayer.name === "テストオリジナル" &&
 assert(rosterAndPointState.originalPlayer.power === 4 && rosterAndPointState.originalPlayer.meet === 4 && rosterAndPointState.originalPlayer.run === 4, "original-player creator should apply batting and running stats");
 assert(rosterAndPointState.originalPlayer.infieldDefense === 4 && rosterAndPointState.originalPlayer.outfieldDefense === 4 && rosterAndPointState.originalPlayer.arm === 4, "original-player creator should apply fielding and arm stats");
 assert(rosterAndPointState.originalPlayer.cost === 5 && rosterAndPointState.originalSelectedCost === 5, "original-player creator should use the entered acquisition point cost");
+assert(rosterAndPointState.originalHasCostStepper === true && rosterAndPointState.originalHasPowerStepper === true, "original-player creator should use arrow steppers for acquisition points and ability values");
+assert(rosterAndPointState.originalUsesDirectNumberInput === false, "original-player creator should not use direct numeric inputs for acquisition points or ability values");
 assert(rosterAndPointState.chooserHtml.includes("chooser-player-title"), "batter chooser should show cost beside the player name");
 assert(rosterAndPointState.chooserHtml.includes("chooser-card-stats"), "batter chooser should render card-style stat rows");
 assert(rosterAndPointState.chooserHtml.length > 0, "batter chooser should show batting side");

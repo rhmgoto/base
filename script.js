@@ -2153,10 +2153,17 @@ function renderOriginalBatterCreator(team, role, kind) {
   const remaining = budget - total;
   const selectedClass = player.id === menuSelection[team][role] ? " selected" : "";
   const overClass = remaining < 0 ? " original-over-budget" : "";
+  const stepper = (field, value, min, max, className = "") => `
+    <span class="original-stepper ${className}">
+      <button class="original-step-button" type="button" data-original-step-field="${field}" data-original-step="1" aria-label="${field}を増やす">▲</button>
+      <input class="original-step-value" type="text" data-original-field="${field}" data-original-min="${min}" data-original-max="${max}" value="${escapeHtml(value)}" readonly tabindex="-1">
+      <button class="original-step-button" type="button" data-original-step-field="${field}" data-original-step="-1" aria-label="${field}を減らす">▼</button>
+    </span>
+  `;
   const statInput = (field, label, value) => `
     <label class="stat-row original-stat-row">
       <span class="stat-name">${label}</span>
-      <input class="stat-value original-stat-input" type="number" data-original-field="${field}" min="1" max="12" step="1" value="${escapeHtml(value)}">
+      ${stepper(field, value, 1, 12, "original-stat-stepper")}
       <span class="ability-bar" aria-hidden="true"><span class="ability-bar-fill" style="width:${clamp(value / 12, 0, 1) * 100}%"></span></span>
     </label>
   `;
@@ -2165,14 +2172,14 @@ function renderOriginalBatterCreator(team, role, kind) {
       <strong class="chooser-player-title original-player-title">
         <span class="original-name-side">
           <input class="original-name-input" type="text" data-original-field="name" maxlength="18" value="${escapeHtml(player.name)}" aria-label="名前">
-          <select class="original-hand-select chooser-hand-sort" data-original-field="bats" aria-label="打席">
+          <select class="original-hand-select" data-original-field="bats" aria-label="打席">
             <option value="R" ${player.bats === "R" ? "selected" : ""}>右</option>
             <option value="L" ${player.bats === "L" ? "selected" : ""}>左</option>
           </select>
         </span>
         <span class="original-title-numbers">
-          <span class="original-point-status" data-original-point-status>${total}/${budget}</span>
-          <em class="original-cost-badge"><input type="number" data-original-field="cost" min="1" max="10" step="1" value="${escapeHtml(player.cost)}" aria-label="獲得ポイント">P</em>
+          <span class="original-point-status" data-original-point-status>${remaining}</span>
+          <em class="original-cost-badge">${stepper("cost", player.cost, 1, 10, "original-cost-stepper")}P</em>
         </span>
       </strong>
       <div class="chooser-card-stats compact-stats original-card-stats">
@@ -2214,7 +2221,7 @@ function updateOriginalBatterCreatorState(form) {
   const budget = getOriginalBatterBudget(preview);
   const remaining = budget - total;
   const status = form.querySelector("[data-original-point-status]");
-  if (status) status.textContent = `${total}/${budget}`;
+  if (status) status.textContent = String(remaining);
   form.querySelectorAll("[data-original-field]").forEach((input) => {
     const field = input.dataset.originalField;
     if (!["power", "meet", "run", "infieldDefense", "outfieldDefense", "arm"].includes(field)) return;
@@ -13762,7 +13769,22 @@ chooserOptions.addEventListener("click", (event) => {
   if (event.target.closest("[data-sort-key]")) return;
   const originalForm = event.target.closest(".original-player-creator");
   if (originalForm) {
-    if (event.target.closest("input, select")) return;
+    const stepButton = event.target.closest("[data-original-step-field]");
+    if (stepButton) {
+      const field = stepButton.dataset.originalStepField;
+      const input = originalForm.querySelector(`[data-original-field="${field}"]`);
+      if (input) {
+        const min = Number(input.dataset.originalMin ?? 1);
+        const max = Number(input.dataset.originalMax ?? (field === "cost" ? 10 : 12));
+        const step = Number(stepButton.dataset.originalStep ?? 0);
+        input.value = String(sanitizeNumber(Number(input.value || 0) + step, min, max, Number(input.value || min)));
+        updateOriginalBatterCreatorState(originalForm);
+      }
+      return;
+    }
+    const costBadge = event.target.closest(".original-cost-badge");
+    if (costBadge) return;
+    if (event.target.closest("input, select, button")) return;
     submitOriginalBatterCreator(originalForm);
     return;
   }

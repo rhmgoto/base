@@ -1272,7 +1272,7 @@ canvas {
 
 .original-player-creator {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   padding: 3px;
   color: #233047;
   text-align: left;
@@ -1290,10 +1290,12 @@ canvas {
 .original-player-creator select {
   min-width: 0;
   min-height: 0;
+  height: 14px;
   padding: 0;
   color: #233047;
   font: inherit;
   font-weight: 900;
+  line-height: 1;
   background: transparent;
   border: 0;
   outline: none;
@@ -1301,34 +1303,39 @@ canvas {
 
 .original-player-title {
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
+  line-height: 1.1;
 }
 
 .original-name-side {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .original-name-input {
-  width: 100%;
+  width: 60px;
+  min-width: 0;
+  flex: 0 0 60px;
   font-size: 11px;
 }
 
 .original-hand-select {
-  width: 24px;
+  flex: 0 0 13px;
+  width: 13px;
   color: #233047;
   font-size: 11px;
   text-align: center;
-  appearance: auto;
+  appearance: none;
   cursor: pointer;
 }
 
 .original-title-numbers {
   display: grid;
-  grid-template-columns: minmax(28px, auto) auto;
+  grid-template-columns: minmax(16px, auto) auto;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .original-point-status {
@@ -1338,7 +1345,7 @@ canvas {
   font-weight: 900;
   text-align: center;
   background: transparent;
-  transform: translateX(-4px);
+  transform: translateX(-6px);
 }
 
 .original-player-creator.original-over-budget .original-point-status {
@@ -1349,7 +1356,7 @@ canvas {
 
 .original-cost-badge {
   display: inline-grid;
-  grid-template-columns: 22px auto;
+  grid-template-columns: auto auto;
   align-items: center;
   gap: 0;
   padding: 1px 4px;
@@ -1361,21 +1368,61 @@ canvas {
   border-radius: 6px;
 }
 
-.original-cost-badge input {
-  width: 22px;
-  color: #ffffff;
+.original-stepper {
+  display: inline-grid;
+  grid-template-columns: 8px 17px 8px;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.original-step-value {
+  width: 17px;
+  height: 14px;
+  color: #233047;
+  font-size: 11px;
   text-align: right;
-  cursor: text;
-  pointer-events: auto;
+  pointer-events: none;
+}
+
+.original-step-button {
+  width: 8px;
+  height: 14px;
+  min-height: 0;
+  margin-top: 0;
+  padding: 0;
+  color: #466176;
+  font-size: 8px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.original-step-button:hover {
+  color: #bf4331;
+}
+
+.original-cost-badge .original-stepper {
+  grid-template-columns: 9px 16px 9px;
+}
+
+.original-cost-badge .original-step-value,
+.original-cost-badge .original-step-button {
+  color: #ffffff;
+}
+
+.original-stat-stepper {
+  justify-self: end;
 }
 
 .original-card-stats {
-  gap: 3px;
+  gap: 2px;
 }
 
 .original-player-creator .stat-row {
-  min-height: 22px;
-  padding: 1px 2px;
+  min-height: 20px;
+  padding: 0 2px;
   border-width: 1px;
 }
 
@@ -1386,15 +1433,6 @@ canvas {
 .original-player-creator .stat-value {
   font-size: 11px;
   text-align: right;
-}
-
-.original-stat-input {
-  width: 36px;
-}
-
-.original-player-creator select.original-stat-input {
-  width: 32px;
-  appearance: auto;
 }
 
 .original-player-creator .ability-bar {
