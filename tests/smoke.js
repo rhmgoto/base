@@ -229,8 +229,10 @@ function assertHtmlShell() {
   assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
   assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
   assertNoMojibake(html, "index.html");
-  assert(/\.pitcher-role-pitcher\s*\{\s*top:\s*25%;/.test(css), "starting pitcher card should sit at the top of the five-pitcher stack");
-  assert(/\.pitcher-role-pitcher5\s*\{\s*top:\s*73%;/.test(css), "fifth pitcher card should stay above the catcher card");
+  assert(/\.chooser-options\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\);/.test(css), "player chooser should show nine larger cards per row");
+  assert(/\.field-role-C\s*\{\s*left:\s*50%;\s*top:\s*17%;/.test(css), "center fielder card should sit in the top outfield row");
+  assert(/\.pitcher-role-pitcher\s*\{\s*left:\s*50%;\s*top:\s*34%;/.test(css), "starting pitcher card should sit below the outfield row");
+  assert(/\.pitcher-role-pitcher5\s*\{\s*left:\s*61%;\s*top:\s*58%;/.test(css), "fifth pitcher card should sit in the lower two-column pitcher row");
 }
 
 assertHtmlShell();
@@ -2468,7 +2470,7 @@ assert(pitcherStaminaState.capped === pitcherStaminaState.max, "stamina recovery
 assert(typeof pitcherStaminaState.exhaustedState === "string", "10-30 percent stamina should still report a fatigue label");
 assert(Math.abs(pitcherStaminaState.exhaustedSpeedDrop - pitcherStaminaState.fastKmh * 0.3) < 0.001, "10-30 percent stamina should drop speed by thirty percent");
 assert(pitcherStaminaState.barHtml.includes("stamina-row"), "pitcher sidebar should render a stamina bar");
-assert(!/\d+\/\d+/.test(pitcherStaminaState.barHtml), "stamina bar should not show numeric current stamina");
+assert(/\d+\/\d+/.test(pitcherStaminaState.barHtml), "pitcher sidebar stamina bar should show numeric current and max stamina");
 assert(/^\d+\/\d+$/.test(pitcherStaminaState.gameStaminaText), "in-game pitcher stamina bar should show current and max stamina numbers");
 assert(pitcherStaminaState.barHtml.includes("stamina-mark-70"), "stamina bar should show the seventy-percent fatigue mark");
 assert(pitcherStaminaState.barHtml.includes("stamina-mark-50"), "stamina bar should show the fifty-percent fatigue mark");

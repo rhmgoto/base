@@ -2679,11 +2679,13 @@ function speedRow(label, value, options = {}) {
 function staminaBar(player) {
   const state = getPitcherStaminaState(player);
   const percent = Math.round(state.percent * 100);
+  const staminaText = getPitcherGameStaminaText(player);
   return `
     <div class="stamina-row">
       <div class="stamina-row-header">
         <span class="stat-name">スタミナ</span>
         <em>${state.label}</em>
+        <strong class="stamina-value">${staminaText}</strong>
       </div>
       <div class="stamina-track" aria-label="スタミナ ${percent}%">
         <div class="stamina-fill stamina-${getStaminaClass(state.percent)}" style="width: ${percent}%"></div>

@@ -456,8 +456,8 @@ canvas {
 
 .ability-board {
   position: relative;
-  min-height: clamp(495px, 70vh, 660px);
-  padding: 7px;
+  min-height: clamp(560px, 74vh, 760px);
+  padding: 9px;
   overflow: visible;
   background:
     radial-gradient(ellipse at 50% 88%, rgba(246, 208, 128, 0.92) 0 14%, transparent 14.5%),
@@ -536,11 +536,11 @@ canvas {
 .pitcher-list-item {
   position: absolute;
   left: 50%;
-  width: clamp(118px, 22%, 148px);
-  min-height: 42px;
+  width: clamp(146px, 20%, 198px);
+  min-height: 54px;
   border-color: #78acd0;
   box-shadow: 0 6px 0 rgba(35, 48, 71, 0.16);
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .pitcher-list-item .ability-title {
@@ -555,23 +555,28 @@ canvas {
 }
 
 .pitcher-role-pitcher {
-  top: 25%;
+  left: 50%;
+  top: 34%;
 }
 
 .pitcher-role-pitcher2 {
-  top: 37%;
+  left: 39%;
+  top: 46%;
 }
 
 .pitcher-role-pitcher3 {
-  top: 49%;
+  left: 61%;
+  top: 46%;
 }
 
 .pitcher-role-pitcher4 {
-  top: 61%;
+  left: 39%;
+  top: 58%;
 }
 
 .pitcher-role-pitcher5 {
-  top: 73%;
+  left: 61%;
+  top: 58%;
 }
 
 .menu-simple-cost {
@@ -615,8 +620,8 @@ canvas {
 
 .field-symbol {
   position: absolute;
-  width: clamp(104px, 21%, 142px);
-  min-height: 66px;
+  width: clamp(130px, 21%, 176px);
+  min-height: 76px;
   overflow: visible;
   color: #233047;
   background: #fff8df;
@@ -634,26 +639,26 @@ canvas {
 
 .field-role-C {
   left: 50%;
-  top: 25%;
+  top: 17%;
 }
 
 .field-role-L {
-  left: 23%;
-  top: 38%;
+  left: 21%;
+  top: 18%;
 }
 
 .field-role-R {
-  left: 77%;
-  top: 38%;
+  left: 79%;
+  top: 18%;
 }
 
 .field-role-SS {
-  left: 31%;
+  left: 29%;
   top: 79%;
 }
 
 .field-role-2B {
-  left: 69%;
+  left: 71%;
   top: 79%;
 }
 
@@ -663,7 +668,7 @@ canvas {
 }
 
 .field-role-DH {
-  left: 84%;
+  left: 86%;
   top: 92%;
 }
 
@@ -678,7 +683,7 @@ canvas {
 }
 
 .pitcher-list-item:focus-within {
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .ability-title {
@@ -1000,7 +1005,7 @@ canvas {
 
 .stamina-row-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
 }
@@ -1009,6 +1014,12 @@ canvas {
   color: #39749b;
   font-size: 12px;
   font-style: normal;
+  font-weight: 900;
+}
+
+.stamina-value {
+  color: #233047;
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -1174,14 +1185,14 @@ canvas {
 
 .chooser-options {
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .chooser-option {
   display: grid;
-  gap: 3px;
-  padding: 3px;
+  gap: 4px;
+  padding: 4px;
   color: #233047;
   text-align: left;
   background: #f8fbff;
@@ -1227,25 +1238,25 @@ canvas {
 }
 
 .chooser-option .compact-stats {
-  gap: 3px;
+  gap: 4px;
 }
 
 .chooser-option .stat-row {
-  min-height: 22px;
-  padding: 1px 2px;
+  min-height: 24px;
+  padding: 2px 3px;
   border-width: 1px;
 }
 
 .chooser-option .compact-stats .stat-name {
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .chooser-option .compact-stats .stat-value {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .chooser-option .ability-bar {
-  height: 6px;
+  height: 7px;
 }
 
 .chooser-option .pitch-cross {
@@ -1326,7 +1337,7 @@ canvas {
   width: 60px;
   min-width: 0;
   flex: 0 0 60px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .original-hand-select {
