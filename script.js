@@ -546,7 +546,7 @@ const defenseRangeTuning = {
   difficultCatchFieldingChance: 0.084
 };
 
-function outfielderStartPoint(side, depthRatio = 0.8) {
+function outfielderStartPoint(side, depthRatio = 0.92) {
   const center = defenseField.bases.home;
   const angle = side === "L" ? -132 : side === "R" ? -48 : -90;
   const radians = degreesToRadians(angle);
@@ -7012,31 +7012,24 @@ function shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder 
   if (fielder.role === "P" || battedBall.isGrounder || battedBall.isLiner || battedBall.isPopupFly) return false;
   const startBase = baseIndexByName[baseName];
   if (!startBase || startBase >= 4) return false;
+  if (startBase !== 3) return false;
   const catchDepth = getFenceDistance(fieldingTarget);
   const depthRatio = catchDepth / Math.max(1, defenseField.fenceDistance);
   if (catchDepth < getTagUpDepthThreshold(startBase)) return false;
   const runnerTime = getRunnerRouteDistance(createBaseRunnerRoute(startBase, startBase + 1)) / getDefenseBaseRunnerSpeed(runnerInfo);
   const throwTarget = getDefenseBasePoint(startBase + 1);
   const throwDistance = Math.hypot(throwTarget.x - fieldingTarget.x, throwTarget.y - fieldingTarget.y);
-  const throwProfile = getThrowProfile(fielder, throwDistance);
+  const throwProfile = getThrowProfile(fielder, throwDistance, {
+    targetBase: baseNameByIndex[startBase + 1],
+    from: fieldingTarget
+  });
   const defenseTime = (outcome.fieldingTime ?? battedBall.ballTime ?? 0) + getAutoThrowSetSeconds(fielder) + throwProfile.throwTime;
   const safeMargin = defenseTime - runnerTime;
   const runScore = clamp(((runnerInfo.run ?? 5) - 1) / 9, 0, 1);
   const marginScore = clamp((safeMargin + 0.08) / 0.9, 0, 1);
-  const rightFieldScore = getTagUpRightFieldScore(fieldingTarget);
   if (startBase === 3) {
     const score = depthRatio * 0.62 + runScore * 0.22 + marginScore * 0.3 - clamp((0.46 - depthRatio) / 0.24, 0, 1) * 0.22;
     return score >= 0.64;
-  }
-  if (startBase === 2) {
-    if (rightFieldScore <= 0 || depthRatio < 0.52) return false;
-    const score = depthRatio * 0.44 + runScore * 0.24 + marginScore * 0.22 + rightFieldScore * 0.18;
-    return score >= 0.82;
-  }
-  if (startBase === 1) {
-    if ((runnerInfo.run ?? 5) < 8 || depthRatio < 0.68) return false;
-    const score = depthRatio * 0.46 + runScore * 0.3 + marginScore * 0.18 + rightFieldScore * 0.08;
-    return score >= 0.86;
   }
   return false;
 }
@@ -7639,7 +7632,10 @@ function estimateAutoThrowArrivalToBase(targetBase, outcome, options = {}) {
   const destination = getDefenseBasePointByName(targetBase);
   const distance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
   const prepareStartTime = Math.max(outcome.fieldingTime ?? 0, options.minStartTime ?? 0);
-  return prepareStartTime + getAutoThrowSetSeconds(fielder) + getThrowProfile(fielder, distance).throwTime;
+  return prepareStartTime + getAutoThrowSetSeconds(fielder) + getThrowProfile(fielder, distance, {
+    targetBase,
+    from: fieldingTarget
+  }).throwTime;
 }
 
 function getLeadForceThrowTargetBase(outcome, battedBall) {
@@ -8179,7 +8175,10 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
   const targetBase = options.targetBase || runner?.targetBase || outcome.targetBase || "first";
   const destination = getDefenseBasePointByName(targetBase);
   const distance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
-  const throwProfile = getThrowProfile(fielder, distance);
+  const throwProfile = getThrowProfile(fielder, distance, {
+    targetBase,
+    from: fieldingTarget
+  });
   const prepareStartTime = Math.max(options.prepareStartTime ?? outcome.fieldingTime, options.minStartTime ?? 0);
   const fieldingTime = options.immediate
     ? (options.startTime ?? prepareStartTime)
@@ -8219,7 +8218,10 @@ function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBal
   const targetBase = tagRunner.targetBase;
   const destination = getDefenseBasePointByName(targetBase);
   const distance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
-  const throwProfile = getThrowProfile(fielder, distance);
+  const throwProfile = getThrowProfile(fielder, distance, {
+    targetBase,
+    from: fieldingTarget
+  });
   const prepareStartTime = Math.max(0, outcome.fieldingTime ?? battedBall.ballTime ?? 0);
   const startTime = prepareStartTime + Math.max(0.12, getAutoThrowSetSeconds(fielder) * 0.42);
   const throwTime = throwProfile.throwTime;
@@ -8475,28 +8477,49 @@ function getActiveForceTargets() {
   return getForceTargetsForCurrentPlay().filter((entry) => isForceTargetActive(entry.targetBase));
 }
 
-function getThrowProfile(fielder, distance) {
+function getThrowProfile(fielder, distance, options = {}) {
   const arm = clamp(fielder?.arm ?? 5, 1, 10);
   const longThrowFactor = clamp((distance - 420) / 1180, 0, 1);
+  const longOutfieldHomeThrow = isLongOutfieldHomeThrow(fielder, distance, options);
   const baseSpeed = getArmThrowSpeed(arm);
-  const longThrowPenalty = 0.76 - arm * 0.045;
-  const speedMultiplier = clamp(1 - longThrowFactor * longThrowPenalty, 0.22, 1);
-  const throwSpeed = baseSpeed * speedMultiplier;
-  const minimumTime = 0.78 + longThrowFactor * (1.35 - arm * 0.055);
-  const needsBounce = distance >= 900 && arm < 8;
+  const outfieldArmSpeedScale = longOutfieldHomeThrow
+    ? 1 - ((arm - 1) / 9) * 0.2
+    : 1;
+  const longThrowPenalty = 0.76 - arm * 0.045 + (longOutfieldHomeThrow ? ((arm - 1) / 9) * 0.14 : 0);
+  const speedMultiplier = clamp(1 - longThrowFactor * longThrowPenalty, longOutfieldHomeThrow ? 0.28 : 0.22, 1);
+  const throwSpeed = baseSpeed * outfieldArmSpeedScale * speedMultiplier;
+  const minimumTime = 0.78
+    + longThrowFactor * (1.35 - arm * 0.055)
+    + (longOutfieldHomeThrow ? longThrowFactor * 0.16 : 0);
+  const needsBounce = distance >= 900 && (longOutfieldHomeThrow ? arm <= 8 : arm < 8);
   const bounceDrag = needsBounce
-    ? clamp(((8 - arm) / 7) * ((distance - 900) / 760), 0.06, 0.24)
+    ? clamp(
+        ((longOutfieldHomeThrow ? 9 - arm : 8 - arm) / (longOutfieldHomeThrow ? 8 : 7)) * ((distance - 900) / 760),
+        longOutfieldHomeThrow ? 0.18 : 0.06,
+        longOutfieldHomeThrow ? 0.52 : 0.24
+      )
     : 0;
-  const throwTime = Math.max(distance / throwSpeed, minimumTime) * (1 + bounceDrag);
-  const arcHeight = 38 + longThrowFactor * (210 - arm * 7);
+  const bounceTimePenalty = needsBounce && longOutfieldHomeThrow
+    ? clamp((9 - arm) * 0.12 + longThrowFactor * 0.28, 0.24, 1.12)
+    : 0;
+  const throwTime = Math.max(distance / throwSpeed, minimumTime + bounceTimePenalty) * (1 + bounceDrag);
+  const arcHeight = 38 + longThrowFactor * (210 - arm * 7 + (longOutfieldHomeThrow ? 28 : 0));
   const bounce = needsBounce
     ? {
         enabled: true,
-        progress: clamp(0.58 + arm * 0.018 - longThrowFactor * 0.05, 0.52, 0.68),
-        height: clamp(22 + (8 - arm) * 5 + longThrowFactor * 18, 28, 62)
+        progress: clamp(0.58 + arm * 0.018 - longThrowFactor * (longOutfieldHomeThrow ? 0.09 : 0.05), 0.5, 0.68),
+        height: clamp(22 + (longOutfieldHomeThrow ? 9 - arm : 8 - arm) * 5 + longThrowFactor * 18, 28, longOutfieldHomeThrow ? 74 : 62)
       }
     : null;
   return { throwSpeed, throwTime, arcHeight, longThrowFactor, bounce };
+}
+
+function isLongOutfieldHomeThrow(fielder, distance, options = {}) {
+  if (options.targetBase !== "home") return false;
+  if (!outfielderRoles.includes(fielder?.role)) return false;
+  const from = options.from || fielder || {};
+  const outfieldDepth = Math.max(0, (defenseField.bases.home.y ?? field.plateY) - (from.y ?? fielder?.y ?? 0));
+  return distance >= 900 || outfieldDepth >= defenseField.fenceDistance * 0.38;
 }
 
 function getThrowPointAtProgress(throwState, progress) {
@@ -8879,6 +8902,16 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isToweringFly
     ? distance * randomBetween(0.94, 1.04)
     : distance * carryScale;
+  if (!isBunt && trajectory === "fly" && !isPopupFly) {
+    const flyDepthScale = isRoutineFly
+      ? 1.14
+      : isChaseFly
+        ? 1.1
+        : isToweringFly
+          ? 1.08
+          : 1.06;
+    landingDistance = Math.min(landingDistance * flyDepthScale + 55, fenceTravelDistance + 90);
+  }
   if (isBunt && !isPopupFly) {
     landingDistance = Math.min(landingDistance, randomBetween(180, 405) + clamp(battedProfile?.buntQuality ?? 0.4, 0, 1) * 80);
   }
@@ -10103,6 +10136,19 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
       scoreType,
       caught: false,
       fieldingTime: Math.max(ballTime + 0.1, fielderTime + 0.08),
+      fieldingPoint
+    };
+  }
+
+  if (battedBall.isHardOutfieldBounce && !isInfielderRole(fielder.role)) {
+    const landingDistance = battedBall.landingDistance ?? getFenceDistance(battedBall.target);
+    const scoreType = landingDistance >= defenseField.fenceDistance * 0.62 ? "double" : "single";
+    return {
+      kind: scoreType,
+      label: hitLabels[scoreType],
+      scoreType,
+      caught: false,
+      fieldingTime: Math.max(ballTime + 0.16, fielderTime + 0.1),
       fieldingPoint
     };
   }

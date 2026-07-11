@@ -240,6 +240,8 @@ function assertHtmlShell() {
   assert(/\.chooser-pane\.hidden\s*\{\s*display:\s*none;/.test(css), "hidden chooser panes should not cover the opposite team");
   assert(/overflow-x:\s*hidden;/.test(css), "player chooser should avoid horizontal overflow when five cards are shown");
   assert(/\.game-shell\.menu-open\s*\{[\s\S]*width:\s*100vw;[\s\S]*max-width:\s*none;/.test(css), "menu-open game shell should use the full viewport width");
+  assert(/\.game-shell\s*\{[\s\S]*padding:\s*2px 0;/.test(css), "game shell should minimize vertical padding on the play screen");
+  assert(/canvas\s*\{[\s\S]*height:\s*calc\(100vh - 8px\);/.test(css), "canvas should stretch vertically to use the screen height");
   assert(/\.chooser-options\s*\{[\s\S]*gap:\s*2px;/.test(css), "chooser card gaps should be tightly compressed");
   assert(/\.chooser-option\s*\{\s*display:\s*grid;\s*justify-self:\s*center;\s*width:\s*82%;/.test(css), "chooser cards should be narrowed enough to fit five columns inside each pane");
   assert(/\.chooser-options\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\);/.test(css), "each player chooser pane should show five cards per row");
@@ -4414,10 +4416,10 @@ assert(toweringFlyAndTagUpState.deepTagUp.tagUp === true, "third-base runners sh
 assert(toweringFlyAndTagUpState.deepTagUp.scored === true, "successful tag-up runners should head home");
 assert(toweringFlyAndTagUpState.shallowTagUp.tagUp === false, "third-base runners should not tag up on shallow caught flies");
 assert(toweringFlyAndTagUpState.semiAutoTagUp.tagUp === false, "semi-auto baserunning should leave tag-up decisions to the player");
-assert(toweringFlyAndTagUpState.fastSecondRight.tagUp === true, "fast second-base runners should try tag ups on deep right-field flies");
+assert(toweringFlyAndTagUpState.fastSecondRight.tagUp === false, "second-base runners should not try automatic tag ups");
 assert(toweringFlyAndTagUpState.slowSecondRight.tagUp === false, "slow second-base runners should often stay on deep right-field flies");
 assert(toweringFlyAndTagUpState.fastSecondLeft.tagUp === false, "second-base runners should favor right-field tag-up chances rather than left-field flies");
-assert(toweringFlyAndTagUpState.fastFirstDeep.tagUp === true, "very fast first-base runners can try tag ups on very deep flies");
+assert(toweringFlyAndTagUpState.fastFirstDeep.tagUp === false, "first-base runners should not try automatic tag ups");
 assert(toweringFlyAndTagUpState.slowFirstDeep.tagUp === false, "first-base runners below the high-speed threshold should usually stay put");
 assert(toweringFlyAndTagUpState.twoOutThird?.tagUp !== true, "tag-up choices should not be created when the catch itself would be the third out");
 assert(toweringFlyAndTagUpState.tagUpStartsAfterCatch === true, "tag-up runners should visibly start after the catch instead of resolving immediately");
@@ -4643,6 +4645,15 @@ const throwProfileState = JSON.parse(runInGame(
     const strongShort = getThrowProfile({ arm: 10 }, 420);
     const normalShort = getThrowProfile({ arm: 5 }, 420);
     const normalLong = getThrowProfile({ arm: 5 }, 1500);
+    const deepOutfieldFrom = { x: field.centerX, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.72 };
+    const home = getDefenseBasePointByName("home");
+    const deepHomeDistance = Math.hypot(home.x - deepOutfieldFrom.x, home.y - deepOutfieldFrom.y);
+    const weakOutfieldHome = getThrowProfile({ role: "C", arm: 1 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
+    const weakNonOutfieldHome = getThrowProfile({ role: "SS", arm: 1 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
+    const arm8OutfieldHome = getThrowProfile({ role: "C", arm: 8 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
+    const arm9OutfieldHome = getThrowProfile({ role: "C", arm: 9 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
+    const strongOutfieldHome = getThrowProfile({ role: "C", arm: 10 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
+    const strongNonOutfieldHome = getThrowProfile({ role: "SS", arm: 10 }, deepHomeDistance, { targetBase: "home", from: deepOutfieldFrom });
     return JSON.stringify({
       weakLongTime: weakLong.throwTime,
       strongLongTime: strongLong.throwTime,
@@ -4658,7 +4669,15 @@ const throwProfileState = JSON.parse(runInGame(
       weakLongBounce: Boolean(weakLong.bounce?.enabled),
       normalLongBounce: Boolean(normalLong.bounce?.enabled),
       strongLongBounce: Boolean(strongLong.bounce?.enabled),
-      weakShortBounce: Boolean(weakShort.bounce?.enabled)
+      weakShortBounce: Boolean(weakShort.bounce?.enabled),
+      weakOutfieldHomeSpeed: weakOutfieldHome.throwSpeed,
+      weakNonOutfieldHomeSpeed: weakNonOutfieldHome.throwSpeed,
+      arm8OutfieldHomeBounce: Boolean(arm8OutfieldHome.bounce?.enabled),
+      arm9OutfieldHomeBounce: Boolean(arm9OutfieldHome.bounce?.enabled),
+      arm8OutfieldHomeTime: arm8OutfieldHome.throwTime,
+      arm9OutfieldHomeTime: arm9OutfieldHome.throwTime,
+      strongOutfieldHomeSpeed: strongOutfieldHome.throwSpeed,
+      strongNonOutfieldHomeSpeed: strongNonOutfieldHome.throwSpeed
     });
   })()`
 ));
@@ -4674,6 +4693,11 @@ assert(throwProfileState.weakLongBounce === true, "weak arms should bounce deep 
 assert(throwProfileState.normalLongBounce === true, "average arms should bounce deep outfield throws");
 assert(throwProfileState.strongLongBounce === false, "strong arms should be able to reach deep throws without a bounce");
 assert(throwProfileState.weakShortBounce === false, "short throws should stay no-bounce even for weak arms");
+assert(Math.abs(throwProfileState.weakOutfieldHomeSpeed - throwProfileState.weakNonOutfieldHomeSpeed) < 0.001, "arm 1 outfield-to-home speed should stay unchanged");
+assert(throwProfileState.strongOutfieldHomeSpeed <= throwProfileState.strongNonOutfieldHomeSpeed * 0.81, "arm 10 outfield-to-home speed should be reduced by about twenty percent");
+assert(throwProfileState.arm8OutfieldHomeBounce === true, "arm 8 outfield throws home should bounce before the plate");
+assert(throwProfileState.arm9OutfieldHomeBounce === false, "arm 9 outfield throws home should barely reach without bouncing");
+assert(throwProfileState.arm8OutfieldHomeTime > throwProfileState.arm9OutfieldHomeTime, "bounced arm 8 throws home should arrive slower than arm 9 throws");
 
 const variedBattedBallState = JSON.parse(runInGame(
   context,
@@ -4809,6 +4833,20 @@ const variedBattedBallState = JSON.parse(runInGame(
       hardOutfieldBounceBall,
       hardOutfieldBounceBall.target,
       hardOutfieldBounceFieldingTarget
+    );
+    const hardOutfieldBounceOutfielderOutcome = resolveDefenseOutcome(
+      {
+        role: "C",
+        x: hardOutfieldBounceBall.target.x,
+        y: hardOutfieldBounceBall.target.y,
+        speed: 10,
+        fielding: 10,
+        arm: 8,
+        distanceToTarget: 0,
+        fieldingPoint: hardOutfieldBounceBall.target
+      },
+      hardOutfieldBounceBall,
+      runner
     );
     Math.random = originalRandom;
     const builtDrop = buildBattedBall(0.62, normalize({ x: -0.7, y: -0.9 }), hitLabels.lineDrop);
@@ -5003,6 +5041,8 @@ const variedBattedBallState = JSON.parse(runInGame(
       hardOutfieldBounceAttemptRoute,
       hardOutfieldBouncePostLandingRoll,
       hardOutfieldBounceRollDuration,
+      hardOutfieldBounceOutfielderCaught: hardOutfieldBounceOutfielderOutcome.caught,
+      hardOutfieldBounceOutfielderKind: hardOutfieldBounceOutfielderOutcome.kind,
       builtDropFlag: builtDrop.isLineDrop,
       builtFrontDropFlag: builtFrontDrop.isFrontDrop,
       builtFrontDropSoft: builtFrontDrop.isSoftDrop,
@@ -5078,6 +5118,7 @@ const variedBattedBallState = JSON.parse(runInGame(
       builtLineMetric: getBattedBallMetricText(builtLine),
       builtRoutineFlyFlag: builtRoutineFly.isRoutineFly,
       builtRoutineFlyHeight: builtRoutineFly.maxHeight,
+      builtRoutineFlyLandingDistance: builtRoutineFly.landingDistance,
       builtRoutineFlyVisualAmount: getHighFlyVisualAmount(builtRoutineFly, builtRoutineFly.maxHeight * 0.85),
       builtRoutineFlyVisualHeight: getDefenseBallVisualHeightOffset(builtRoutineFly.maxHeight * 0.85, builtRoutineFly),
       lineFast,
@@ -5109,6 +5150,7 @@ assert(variedBattedBallState.builtLineOutfielderCaught === false, "ordinary line
 assert(["single", "double"].includes(variedBattedBallState.builtLineOutfielderKind), "ordinary line-liners should stay as hit-like plays when they reach the outfield");
 assert(["L", "R"].includes(variedBattedBallState.builtLineFielderRole), "line-liner labels should be assigned to corner outfielders instead of middle infielders");
 assert(variedBattedBallState.builtLineInfielderRouteReaction === false, "deep line-liners should not become easy direct route catches for infielders");
+assert(variedBattedBallState.builtRoutineFlyLandingDistance >= 1350, "ordinary outfield flies should land deeper to create more tag-up chances");
 assert(variedBattedBallState.excellentLineWallHit === true, "excellent line-liners should be able to turn into fence-direct shots");
 assert(variedBattedBallState.excellentLineOver === false, "excellent line-liners should hit the fence instead of becoming automatic home runs");
 assert(variedBattedBallState.excellentLineFlightDistance >= variedBattedBallState.excellentLineFenceDistance - 120, "excellent line-liners should carry close to the fence");
@@ -5127,6 +5169,8 @@ assert(variedBattedBallState.hardOutfieldBounceReactionRoute === false, "hard ou
 assert(variedBattedBallState.hardOutfieldBounceAttemptRoute === false, "hard outfield-bounce liners should not invite an infielder attempt route");
 assert(variedBattedBallState.hardOutfieldBouncePostLandingRoll >= 300, "uncaught hard outfield-bounce liners should keep rolling after the first landing");
 assert(variedBattedBallState.hardOutfieldBounceRollDuration >= 1, "uncaught hard outfield-bounce liners should show a visible post-landing roll duration");
+assert(variedBattedBallState.hardOutfieldBounceOutfielderCaught === false, "clean-hit outfield-bounce liners should drop in front of outfielders instead of becoming direct catches");
+assert(["single", "double"].includes(variedBattedBallState.hardOutfieldBounceOutfielderKind), "clean-hit outfield-bounce liners should remain hit outcomes after dropping");
 assert(Math.abs(variedBattedBallState.linerSpeedMultiplier - 3.2) < 0.001, "liner batted balls should use the twenty-percent slower speed multiplier");
 assert(variedBattedBallState.builtLineBallTime > variedBattedBallState.oldLinerBallTimeEstimate, "line-liner travel time should be slower than the previous multiplier");
 assert(variedBattedBallState.builtDropFlag === true, "line-drop labels should create line-drop batted balls");
@@ -9292,9 +9336,9 @@ const outfieldPositionAndRollState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(outfieldPositionAndRollState.depths.L > 0.78 && outfieldPositionAndRollState.depths.L < 0.82, "left fielder should start at 80% outfield depth");
-assert(outfieldPositionAndRollState.depths.C > 0.78 && outfieldPositionAndRollState.depths.C < 0.82, "center fielder should start at 80% outfield depth");
-assert(outfieldPositionAndRollState.depths.R > 0.78 && outfieldPositionAndRollState.depths.R < 0.82, "right fielder should start at 80% outfield depth");
+assert(outfieldPositionAndRollState.depths.L > 0.9 && outfieldPositionAndRollState.depths.L < 0.94, "left fielder should start near the fence");
+assert(outfieldPositionAndRollState.depths.C > 0.9 && outfieldPositionAndRollState.depths.C < 0.94, "center fielder should start near the fence");
+assert(outfieldPositionAndRollState.depths.R > 0.9 && outfieldPositionAndRollState.depths.R < 0.94, "right fielder should start near the fence");
 assert(outfieldPositionAndRollState.outfieldGrounderLinerScale === 1.95, "outfield grounders and liners should use the increased roll scale");
 assert(["L", "C", "R"].includes(outfieldPositionAndRollState.frontDropChoiceRole), "center-front outfield drops should make an outfielder charge forward");
 assert(outfieldPositionAndRollState.frontDropRollDistance >= 160 && outfieldPositionAndRollState.frontDropRollDistance <= 460, "front-of-outfield line drops should roll naturally after landing instead of racing deep");
