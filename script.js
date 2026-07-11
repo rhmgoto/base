@@ -128,7 +128,7 @@ const showHbpHitBox = false;
 const batters = [
   { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
   { id: "ichiro", name: "イチロー", bats: "L", power: 3, meet: 17, run: 10, infieldDefense: 3, outfieldDefense: 11, arm: 11, cost: 17 },
-  { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 5, cost: 5 },
+  { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 6, cost: 5 },
   { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 7, run: 4, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
   { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
   { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 3, run: 10, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 5 },
@@ -144,7 +144,7 @@ const batters = [
   { id: "nagashima", name: "ナガシマ", bats: "R", power: 11, meet: 10, run: 8, infieldDefense: 11, outfieldDefense: 2, arm: 8, cost: 15 },
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 8, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
-  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 7, cost: 8 },
+  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 8, cost: 8 },
   { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
   { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
   { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
@@ -153,9 +153,9 @@ const batters = [
   { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 2 },
   { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
   { id: "sadaharu", name: "サダハル", bats: "L", power: 14, meet: 9, run: 5, infieldDefense: 8, outfieldDefense: 2, arm: 7, cost: 17 },
-  { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 3, cost: 4 },
+  { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
   { id: "tucker", name: "タッカー", bats: "L", power: 6, meet: 5, run: 7, infieldDefense: 2, outfieldDefense: 6, arm: 7, cost: 5 },
-  { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 5, cost: 5 },
+  { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 5 },
   { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 },
   { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
   { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 }
@@ -180,9 +180,9 @@ const pitchers = [
   { id: "hikari", name: "ヒカリ", throws: "L", fastKmh: 220, rightBreak: 1, leftBreak: 1, slowChange: 9, fastChange: 1, control: 3, stuff: 6, fielding: 4, stamina: 6, cost: 5 },
   { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 5 },
   { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
-  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 6, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 7 },
+  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 6 },
   { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 9, control: 7, stuff: 11, fielding: 8, stamina: 12, cost: 15 },
-  { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 8, fielding: 6, stamina: 2, cost: 4 },
+  { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 12, fielding: 6, stamina: 2, cost: 4 },
   { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
   { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 7, leftBreak: 4, slowChange: 5, fastChange: 7, control: 5, stuff: 8, fielding: 4, stamina: 7, cost: 8 },
   { id: "hanifee", name: "ハニフィー", throws: "R", fastKmh: 156, rightBreak: 2, leftBreak: 10, slowChange: 2, fastChange: 2, control: 5, stuff: 2, fielding: 5, stamina: 2, cost: 3 },
@@ -197,8 +197,11 @@ const pitchers = [
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 10, leftBreak: 9, slowChange: 9, fastChange: 10, control: 9, stuff: 11, fielding: 8, stamina: 12, cost: 18 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 14, leftBreak: 12, slowChange: 11, fastChange: 10, control: 11, stuff: 10, fielding: 7, stamina: 11, cost: 17 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 149, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 6, control: 6, stuff: 8, fielding: 6, stamina: 7, cost: 6 },
-  { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 163, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 10, fielding: 5, stamina: 2, cost: 4 }
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 149, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 8, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
+  { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 13, fielding: 6, stamina: 2, cost: 4 },
+  { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 11, fielding: 5, stamina: 2, cost: 4 },
+  { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
+  { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 2, cost: 1 }
 ];
 
 const pitchTypes = {
@@ -266,10 +269,17 @@ const battingFeedbackDisplayPenalty = 0.1;
 const battingPracticeHomerBoostMultiplier = 4.2;
 const oppositeHandedBattingAdvantageMultiplier = 1.2;
 const buntTuning = {
+  goodFeedback: 0.45,
+  greatFeedback: 0.5,
+  solidFeedback: 0.3,
+  popupFeedback: 0.3,
+  forcePopupFeedback: 0.3,
   goodQuality: 0.68,
   goodTiming: 0.58,
   goodSweetSpot: 0.58,
-  goodLineChance: 0.88,
+  goodLineChance: 0.96,
+  solidLineChance: 0.2,
+  solidPitcherFrontChance: 0.68,
   badLineBase: 0.1,
   badLineQualityScale: 0.32,
   badLineSweetSpotScale: 0.16,
@@ -290,9 +300,7 @@ const buntTuning = {
   solidContactQuality: 0.48,
   solidContactTiming: 0.46,
   solidContactSweetSpot: 0.44,
-  solidContactPopupReduction: 0.98,
-  solidLineChance: 0.28,
-  solidPitcherFrontChance: 0.58
+  solidContactPopupReduction: 0.98
 };
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
@@ -308,13 +316,14 @@ const batOuterTrimRatio = -0.05;
 const batThicknessMultiplier = 1.5;
 const meetZoneWidthScale = 0.8;
 const sweetSpotWidthScale = 0.85 * 0.8;
+const sweetSpotScoreEaseScale = 1.3;
 const sweetSpotTuning = {
   visualBaseHalfWidth: 0.003125 * 0.9 * sweetSpotWidthScale,
   visualMeetStep: 0.000208375 * 0.9 * sweetSpotWidthScale,
-  scoreBaseHalfWidth: 0.003125 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale,
-  scoreMeetStep: 0.000208375 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale,
+  scoreBaseHalfWidth: 0.003125 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
+  scoreMeetStep: 0.000208375 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
   visualMinHalfWidth: 0.0025 * 0.9 * sweetSpotWidthScale,
-  minHalfWidth: 0.0025 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale,
+  minHalfWidth: 0.0025 * 0.9 * 3.84 * 1.1 * 1.15 * sweetSpotWidthScale * sweetSpotScoreEaseScale,
   maxHalfWidth: 0.14 * 0.9 * sweetSpotWidthScale
 };
 
@@ -341,11 +350,11 @@ const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
   tigers: {
     label: "タイガース",
-    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "hanifee", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", lineupOrder: [...awayRegularLineupOrder] }
+    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", lineupOrder: [...awayRegularLineupOrder] }
   },
   dodgers: {
     label: "ドジャース",
-    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "sasaki", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", lineupOrder: [...homeRegularLineupOrder] }
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", lineupOrder: [...homeRegularLineupOrder] }
   },
   dendos: {
     label: "デンドーズ",
@@ -4612,7 +4621,7 @@ function decideHitResultFromBattedProfile(contact) {
   const roll = Math.random();
 
   if (profile.isFoul) {
-    return { label: hitLabels.foul, kind: "foul", power: profile.power, direction: profile.direction };
+    return { label: hitLabels.foul, kind: "foul", power: profile.power, direction: profile.direction, battedProfile: profile };
   }
   if (profile.isBunt && profile.pitcherBuntPopup) {
     return makePopupFlyResultFromProfile(profile);
@@ -5703,35 +5712,35 @@ function buildBattedBallProfile(contact) {
   });
   if (getCurrentSwingType() === "bunt") {
     const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12, 0, 1);
-    const goodBunt = buntQuality >= buntTuning.goodQuality
-      && timingScore >= buntTuning.goodTiming
-      && sweetSpotScore >= buntTuning.goodSweetSpot;
+    const goodBunt = feedbackScore >= buntTuning.goodFeedback;
+    const greatBunt = feedbackScore >= buntTuning.greatFeedback;
+    const solidBuntContact = feedbackScore >= buntTuning.solidFeedback;
     const badBuntScore = goodBunt
       ? 0
       : clamp(
-          (0.66 - buntQuality) / 0.66
-            + Math.max(0, buntTuning.goodTiming - timingScore) * 0.55
-            + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.45,
+          (buntTuning.popupFeedback - feedbackScore) / buntTuning.popupFeedback
+            + Math.max(0, buntTuning.solidFeedback - feedbackScore) * 0.55
+            + Math.max(0, buntTuning.goodTiming - timingScore) * 0.24
+            + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.18,
           0,
           1
         );
-    const solidBuntContact = buntQuality >= buntTuning.solidContactQuality
-      && timingScore >= buntTuning.solidContactTiming
-      && sweetSpotScore >= buntTuning.solidContactSweetSpot;
-    const lineChance = goodBunt
-      ? buntTuning.goodLineChance
+    const lineChance = greatBunt
+      ? clamp(0.9 + (feedbackScore - buntTuning.greatFeedback) * 0.4, 0.9, buntTuning.goodLineChance)
+      : goodBunt
+      ? clamp(0.72 + (feedbackScore - buntTuning.goodFeedback) * 3.6, 0.72, 0.9)
       : solidBuntContact
-      ? buntTuning.solidLineChance
+      ? clamp(buntTuning.solidLineChance + (feedbackScore - buntTuning.solidFeedback) * 0.24, 0.18, 0.26)
       : clamp(
-          buntTuning.badLineBase + buntQuality * buntTuning.badLineQualityScale + sweetSpotScore * buntTuning.badLineSweetSpotScale,
+          buntTuning.badLineBase + feedbackScore * 0.2 + sweetSpotScore * 0.08,
           buntTuning.badLineMin,
-          buntTuning.badLineMax
+          Math.min(0.28, buntTuning.badLineMax)
         );
     const pitcherFrontChance = goodBunt
-      ? 0.08
+      ? greatBunt ? clamp(0.04 - (feedbackScore - buntTuning.greatFeedback) * 0.3, 0.01, 0.04) : 0.12
       : solidBuntContact
-      ? buntTuning.solidPitcherFrontChance
-      : 0.34;
+      ? clamp(buntTuning.solidPitcherFrontChance + (feedbackScore - buntTuning.solidFeedback) * 0.42, 0.68, 0.76)
+      : clamp(0.32 + feedbackScore * 0.5, 0.32, 0.52);
     const roll = Math.random();
     const side = Math.random() < 0.5 ? -1 : 1;
     const buntFoulChance = clamp(
@@ -5750,21 +5759,25 @@ function buildBattedBallProfile(contact) {
     );
     const popupProtection = solidBuntContact
       ? clamp(
-          ((buntQuality - buntTuning.solidContactQuality) / 0.28)
-            + ((timingScore - buntTuning.solidContactTiming) / 0.42) * 0.5
-            + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.5,
+          ((feedbackScore - buntTuning.solidFeedback) / 0.2)
+            + ((timingScore - buntTuning.solidContactTiming) / 0.42) * 0.25
+            + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.25,
           0,
           1
         )
       : 0;
     const protectedPopupChance = pitcherBuntPopupChance * (1 - popupProtection * buntTuning.solidContactPopupReduction);
-    const forcePopup = badBuntScore >= buntTuning.forcePopupBadScore && !solidBuntContact;
+    const forcePopup = feedbackScore <= buntTuning.forcePopupFeedback
+      && (feedbackScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
+      && !solidBuntContact;
     const pitcherBuntPopup = !goodBunt && !isFoul && (forcePopup || Math.random() < protectedPopupChance);
     const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance
-      ? normalize({ x: side * randomBetween(0.58, 0.86), y: -randomBetween(0.72, 0.94) })
+      ? goodBunt
+        ? normalize({ x: side * randomBetween(0.95, 1.25), y: -randomBetween(0.42, 0.66) })
+        : normalize({ x: side * randomBetween(0.72, 1.02), y: -randomBetween(0.58, 0.82) })
       : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92, 1.18), y: -randomBetween(0.38, 0.68) });
@@ -6452,7 +6465,8 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     ball.active = false;
   } else if (kind === "foul") {
     stealState = createStealState();
-    if (battedProfile?.isBunt && count.strikes >= 2) {
+    const isBuntFoul = battedProfile?.isBunt || getCurrentSwingType() === "bunt";
+    if (isBuntFoul && count.strikes >= 2) {
       count.strikes += 1;
       count.outs += 1;
       recordLastOutBatter(battingTeam, activeBatter);
@@ -8419,7 +8433,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (label === hitLabels.grounder || power < 0.38));
   const isLiner = isHardOutfieldBounce || isCenterReturnLiner || isLineEdge || isLineLiner || isLineDrop || isFenceLiner || (isDeepDrive && !isSuperDeepDrive) || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
   const trajectory = isGrounder ? "grounder" : isLiner ? "liner" : "fly";
-  if (isGrounder && !isLineEdgeGrounder && !isCenterReturnGrounder) {
+  if (isGrounder && !isBunt && !isLineEdgeGrounder && !isCenterReturnGrounder) {
     direction = getRandomGrounderDirection64(battedProfile);
   }
   const isSoftDrop = isFrontDrop || isLineDrop || (label === hitLabels.single && isLiner && power <= 0.66);
@@ -13245,7 +13259,12 @@ function closestPointOnSegment(px, py, x1, y1, x2, y2) {
 function getSweetSpotScore(t) {
   const center = 0.68;
   const halfWidth = getSweetSpotHalfWidth("score");
-  return clamp(1 - Math.abs(t - center) / halfWidth, 0, 1);
+  const normalizedDistance = Math.abs(t - center) / Math.max(halfWidth, 0.0001);
+  if (normalizedDistance <= 1) {
+    return clamp(1 - normalizedDistance * 0.45, 0, 1);
+  }
+  const outsideTailScore = 0.55 * Math.exp(-(normalizedDistance - 1) * 0.45);
+  return outsideTailScore < 0.035 ? 0 : clamp(outsideTailScore, 0, 1);
 }
 
 function getSweetSpotHalfWidth(type) {

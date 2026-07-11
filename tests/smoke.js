@@ -477,8 +477,8 @@ assert(lineupState.awayRoles.join(",") === "2B,CA,R,L,SS,C,DH", "away lineup sho
 assert(lineupState.homeRoles.join(",") === "R,L,2B,CA,C,SS,DH", "home lineup should use the requested batting order");
 assert(lineupState.awayPitchers.length === 3 && lineupState.homePitchers.length === 3, "each team should carry three pitchers");
 assert(lineupState.awayActivePitcher === lineupState.awayPitchers[0], "the first pitcher slot should be the starter");
-assert(lineupState.awayPitchers.join(",") === "skubal,melton,hanifee", "away default pitchers should match the requested regular roster");
-assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,sasaki", "home default pitchers should match the requested regular roster");
+assert(lineupState.awayPitchers.join(",") === "skubal,melton,jansen", "away default pitchers should match the requested regular roster");
+assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz", "home default pitchers should match the requested regular roster");
 assert(lineupState.awayBatters.join(",") === "mcgonigle,dingler,carpenter,greene,torkelson,outman,jones", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
@@ -605,13 +605,13 @@ const weakSwingState = JSON.parse(runInGame(
     Math.random = () => solidBuntRolls.length ? solidBuntRolls.shift() : 0.5;
     const solidBuntProfile = buildBattedBallProfile({
       timeDiff: 52,
-      quality: 0.56,
-      timingScore: 0.54,
-      barrelScore: 0.56,
-      zoneScore: 0.88,
-      plateDistance: 10,
+      quality: 0.3,
+      timingScore: 0.38,
+      barrelScore: 0.38,
+      zoneScore: 0.62,
+      plateDistance: 30,
       outsideStrikeZone: false,
-      sweetSpotScore: 0.58,
+      sweetSpotScore: 0.36,
       inGoodContactZone: true,
       yellowZoneBoost: 0
     });
@@ -638,6 +638,41 @@ const weakSwingState = JSON.parse(runInGame(
     count = { strikes: 2, balls: 0, outs: 0 };
     finishPitch(hitLabels.foul, "foul", 0.2, 0, badBuntProfile.direction, badBuntProfile);
     const twoStrikeBuntFoul = {
+      strikes: count.strikes,
+      outs: count.outs,
+      message
+    };
+    count = { strikes: 2, balls: 0, outs: 0 };
+    resetSwing();
+    startSwing(performance.now(), "bunt");
+    const directBuntFoulProfile = buildBattedBallProfile({
+      timeDiff: 180,
+      quality: 0.18,
+      timingScore: 0.22,
+      barrelScore: 0.28,
+      zoneScore: 0.42,
+      plateDistance: 52,
+      outsideStrikeZone: false,
+      sweetSpotScore: 0.22,
+      inGoodContactZone: false,
+      yellowZoneBoost: 0
+    });
+    const directBuntFoulResult = decideHitResultFromBattedProfile({
+      timeDiff: 180,
+      quality: 0.18,
+      timingScore: 0.22,
+      barrelScore: 0.28,
+      zoneScore: 0.42,
+      plateDistance: 52,
+      outsideStrikeZone: false,
+      sweetSpotScore: 0.22,
+      inGoodContactZone: false,
+      yellowZoneBoost: 0
+    });
+    finishPitch(directBuntFoulResult.label, "foul", directBuntFoulResult.power, 180, directBuntFoulResult.direction, directBuntFoulResult.battedProfile);
+    const directTwoStrikeBuntFoul = {
+      profileHasBunt: directBuntFoulProfile.isBunt === true,
+      resultHasBunt: directBuntFoulResult.battedProfile?.isBunt === true,
       strikes: count.strikes,
       outs: count.outs,
       message
@@ -687,7 +722,7 @@ const weakSwingState = JSON.parse(runInGame(
     }, "away");
     const button0StealActive = stealState.active;
     const button0StealTarget = stealState.targetBase;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
+    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
   })()`
 ));
 
@@ -699,20 +734,22 @@ assert(weakSwingState.bunt.type === "bunt", "button-3/bunt swing should mark the
 assert(weakSwingState.bunt.meet === 15, "bunt swing should add five meet points and allow values over 10");
 assert(weakSwingState.bunt.power === 1, "bunt swing should sharply reduce power with a floor of one");
 assert(weakSwingState.buntProfile.isBunt === true && weakSwingState.buntProfile.power <= 0.34 && weakSwingState.buntProfile.launchAngle <= 3, "good bunt contact should become a weak ground-ball profile instead of an outfield drive");
-assert(weakSwingState.buntProfile.buntLineChance >= 0.85 && weakSwingState.buntProfile.buntLineChance <= 0.9, "good bunt contact should favor the first-base or third-base line about eighty-five to ninety percent");
+assert(weakSwingState.buntProfile.buntLineChance >= 0.9 && weakSwingState.buntProfile.buntPitcherFrontChance <= 0.04, "60-ish good bunt contact should strongly favor the first-base or third-base line instead of rolling in front of the pitcher");
 assert(weakSwingState.buntBall.isBunt === true && weakSwingState.buntBall.landingDistance >= 180 && weakSwingState.buntBall.landingDistance < 560 && weakSwingState.buntBall.distance < 590, "bunt batted balls should roll longer for pitcher fielding while staying inside the infield");
+assert(Math.abs(weakSwingState.buntProfile.direction.x) >= 0.78 && Math.abs(weakSwingState.buntBall.direction.x) >= 0.78, "good bunt direction should stay near the first-base or third-base line after batted-ball construction");
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
 assert(weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first", "bunts should always become an infield throw play instead of leaking to the outfield");
 assert(weakSwingState.buntProfile.buntFoulChance >= 0.075 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
 assert(weakSwingState.solidBuntProfile.solidBuntContact === true && weakSwingState.solidBuntProfile.pitcherBuntPopup === false, "solid bunt contact should be protected from becoming pitcher popup flies too often");
 assert(weakSwingState.solidBuntProfile.protectedPopupChance < weakSwingState.solidBuntProfile.pitcherBuntPopupChance, "solid bunt contact should lower the popup-fly chance");
-assert(weakSwingState.solidBuntProfile.buntLineChance >= 0.25 && weakSwingState.solidBuntProfile.buntLineChance <= 0.32, "ordinary solid bunts should not over-favor the first-base or third-base line");
-assert(weakSwingState.solidBuntProfile.buntPitcherFrontChance >= 0.55, "ordinary solid bunts should more often roll in front of the pitcher");
+assert(weakSwingState.solidBuntProfile.buntLineChance >= 0.18 && weakSwingState.solidBuntProfile.buntLineChance <= 0.28, "30-50 point bunts should not over-favor the first-base or third-base line");
+assert(weakSwingState.solidBuntProfile.buntPitcherFrontChance >= 0.68, "30-50 point bunts should more often roll in front of the pitcher");
 assert(weakSwingState.badBuntProfile.buntLineChance < weakSwingState.buntProfile.buntLineChance, "bad bunt contact should reduce first-base and third-base line placement");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
 assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, "pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
+assert(weakSwingState.directTwoStrikeBuntFoul.profileHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.resultHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.outs === 1 && weakSwingState.directTwoStrikeBuntFoul.strikes === 0 && weakSwingState.directTwoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls from the normal batted-ball result path should display strikeout and add an out");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
 assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1WithStickStealActive === false, "gamepad button 1 should stay a weak swing even with a direction held");
 assert(weakSwingState.button2Type === "strong", "gamepad button 2 should keep starting the existing strong swing");
@@ -912,6 +949,7 @@ const rosterAndPointState = JSON.parse(runInGame(
     const cyyoung = findById(pitchers, "cyyoung");
     const maddux = findById(pitchers, "maddux");
     const ediaz = findById(pitchers, "ediaz");
+    const jansen = findById(pitchers, "jansen");
     const ichiro = findById(batters, "ichiro");
     const ruth = findById(batters, "ruth");
     const nagashima = findById(batters, "nagashima");
@@ -1480,6 +1518,19 @@ const rosterAndPointState = JSON.parse(runInGame(
         stamina: ediaz.stamina,
         cost: ediaz.cost
       },
+      jansen: {
+        throws: jansen.throws,
+        fastKmh: jansen.fastKmh,
+        rightBreak: jansen.rightBreak,
+        leftBreak: jansen.leftBreak,
+        slowChange: jansen.slowChange,
+        fastChange: jansen.fastChange,
+        control: jansen.control,
+        stuff: jansen.stuff,
+        fielding: jansen.fielding,
+        stamina: jansen.stamina,
+        cost: jansen.cost
+      },
       baseCost,
       pitcherIncludedCost,
       defaultAwayPitcherCost,
@@ -1522,6 +1573,29 @@ const rosterAndPointState = JSON.parse(runInGame(
     });
   })()`
 ));
+
+const latestSpreadsheetRosterState = JSON.parse(runInGame(
+  context,
+  `JSON.stringify({
+    sato: findById(batters, "sato"),
+    harper: findById(batters, "harper"),
+    carpenter: findById(batters, "carpenter"),
+    mcgonigle: findById(batters, "mcgonigle"),
+    darvish: findById(pitchers, "darvish"),
+    rojas: findById(pitchers, "rojas"),
+    summers: findById(pitchers, "summers")
+  })`
+));
+
+assert(latestSpreadsheetRosterState.sato.arm === 6, "Sato arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.harper.arm === 8, "Harper arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.carpenter.arm === 4, "Carpenter arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.mcgonigle.arm === 6, "McGonigle arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.darvish.rightBreak === 9, "Darvish right break should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.darvish.cost === 6, "Darvish cost should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRosterState.rojas.fastKmh === 77 && latestSpreadsheetRosterState.rojas.cost === 1, "Rojas should be available as a new pitcher");
+assert(latestSpreadsheetRosterState.summers.throws === "L" && latestSpreadsheetRosterState.summers.fastKmh === 152 && latestSpreadsheetRosterState.summers.cost === 1, "Summers should be available as a new pitcher");
 
 assert(rosterAndPointState.shuto.bats === "L", "Shuto should be a left-handed batter");
 assert(rosterAndPointState.shuto.power === 2, "Shuto power should match the roster table");
@@ -1591,7 +1665,7 @@ assert(rosterAndPointState.harper.power === 8, "Harper power should match the ro
 assert(rosterAndPointState.harper.infieldDefense === 5, "Harper infield defense should match the roster table");
 assert(rosterAndPointState.harper.outfieldDefense === 4, "Harper outfield defense should match the roster table");
 assert(rosterAndPointState.harper.run === 6, "Harper run should match the roster table");
-assert(rosterAndPointState.harper.arm === 7, "Harper arm should match the roster table");
+assert(rosterAndPointState.harper.arm === 8, "Harper arm should match the roster table");
 assert(rosterAndPointState.harper.cost === 8, "Harper cost should match the roster table");
 assert(rosterAndPointState.tucker.bats === "L", "Tucker should be a left-handed batter");
 assert(rosterAndPointState.tucker.power === 6, "Tucker power should match the roster table");
@@ -1690,7 +1764,7 @@ assert(rosterAndPointState.miller.leftBreak === 6, "Miller left break should mat
 assert(rosterAndPointState.miller.slowChange === 8, "Miller slow change should match the pitcher roster table");
 assert(rosterAndPointState.miller.fastChange === 3, "Miller fast change should match the pitcher roster table");
 assert(rosterAndPointState.miller.control === 6, "Miller control should match the pitcher roster table");
-assert(rosterAndPointState.miller.stuff === 8, "Miller stuff should match the pitcher roster table");
+assert(rosterAndPointState.miller.stuff === 12, "Miller stuff should match the pitcher roster table");
 assert(rosterAndPointState.miller.fielding === 6, "Miller fielding should match the pitcher roster table");
 assert(rosterAndPointState.miller.stamina === 2, "Miller stamina should match the pitcher roster table");
 assert(rosterAndPointState.miller.cost === 4, "Miller pitcher cost should match the pitcher roster table");
@@ -1824,20 +1898,31 @@ assert(rosterAndPointState.maddux.stuff === 10, "Maddux stuff should match the p
 assert(rosterAndPointState.maddux.stamina === 11, "Maddux stamina should match the pitcher roster table");
 assert(rosterAndPointState.maddux.cost === 17, "Maddux pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.throws === "R", "E. Diaz should be a right-handed pitcher");
-assert(rosterAndPointState.ediaz.fastKmh === 163, "E. Diaz fastball should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.fastKmh === 164, "E. Diaz fastball should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.rightBreak === 8, "E. Diaz right break should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.leftBreak === 1, "E. Diaz left break should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.slowChange === 4, "E. Diaz slow change should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.fastChange === 9, "E. Diaz fast change should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.control === 6, "E. Diaz control should match the pitcher roster table");
-assert(rosterAndPointState.ediaz.stuff === 10, "E. Diaz stuff should match the pitcher roster table");
-assert(rosterAndPointState.ediaz.fielding === 5, "E. Diaz fielding should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.stuff === 13, "E. Diaz stuff should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.fielding === 6, "E. Diaz fielding should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.stamina === 2, "E. Diaz stamina should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.cost === 4, "E. Diaz pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.jansen.throws === "R", "Jansen should be a right-handed pitcher");
+assert(rosterAndPointState.jansen.fastKmh === 161, "Jansen fastball should match the pitcher roster table");
+assert(rosterAndPointState.jansen.rightBreak === 9, "Jansen right break should match the pitcher roster table");
+assert(rosterAndPointState.jansen.leftBreak === 7, "Jansen left break should match the pitcher roster table");
+assert(rosterAndPointState.jansen.slowChange === 3, "Jansen slow change should match the pitcher roster table");
+assert(rosterAndPointState.jansen.fastChange === 6, "Jansen fast change should match the pitcher roster table");
+assert(rosterAndPointState.jansen.control === 4, "Jansen control should match the pitcher roster table");
+assert(rosterAndPointState.jansen.stuff === 11, "Jansen stuff should match the pitcher roster table");
+assert(rosterAndPointState.jansen.fielding === 5, "Jansen fielding should match the pitcher roster table");
+assert(rosterAndPointState.jansen.stamina === 2, "Jansen stamina should match the pitcher roster table");
+assert(rosterAndPointState.jansen.cost === 4, "Jansen pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
 assert(rosterAndPointState.teamPointLimit === 60, "combined point limit should be 60 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 17, "default away pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.defaultHomePitcherCost === 23, "default home pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultAwayPitcherCost === 18, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultHomePitcherCost === 21, "default home pitcher cost should remain visible in the point breakdown");
 assert(rosterAndPointState.overLimitDisabled === true, "teams over 60 combined points should not be startable");
 assert(rosterAndPointState.overLimitText.includes("/60"), "menu should show the 60-point combined limit");
 assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 60 combined points should not be startable");
@@ -2008,7 +2093,7 @@ assert(!teamPresetSelectionState.awayPointText.includes("/60"), "Dendos point st
 assert(teamPresetSelectionState.homePointText.includes("/60"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
 assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,maddux", "Dendos preset should apply the elite pitching staff to Team A");
-assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,hanifee", "Tigers preset should apply to Team B");
+assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen", "Tigers preset should apply to Team B");
 assert(teamPresetSelectionState.awayOtaniAllowed === true, "Dendos teams should still allow player swaps without point-limit blocking");
 assert(!rosterAndPointState.escapedChooserHtml.includes("<img src=x"), "player chooser should not render saved player names as HTML");
 
@@ -2268,6 +2353,9 @@ const battingTighteningState = JSON.parse(runInGame(
       unscaledOutsideVisibleHitWidth,
       scoreAtVisibleEdge: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("visual")),
       scoreOutsideVisibleEdge: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("visual") * 1.1),
+      scoreAtScoringEdge: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score")),
+      scoreTwoWidthsOutside: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score") * 2),
+      scoreFourWidthsOutside: getSweetSpotScore(0.68 + getSweetSpotHalfWidth("score") * 4),
       balancedAllGood: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.86, barrelScore: 0.88, zoneScore: 1, quality: 0.92 }),
       balancedWeakSweetSpot: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.22, barrelScore: 0.86, zoneScore: 1, quality: 1 }),
       balancedPlayable: getBattingFeedbackBalancedScore({ timingScore: 0.74, sweetSpotScore: 0.62, barrelScore: 0.65, zoneScore: 1, quality: 0.78 }),
@@ -2290,12 +2378,15 @@ assert(battingTighteningState.topExtension >= 8, "good-contact yellow zone shoul
 assert(battingTighteningState.topWidth > 60, "good-contact yellow zone should keep its horizontal reach");
 assert(Math.abs(battingTighteningState.effectivePower10 - 9) < 0.001, "effective batter power should be reduced by ten percent");
 assert(Math.abs(battingTighteningState.effectivePower1 - 0.9) < 0.001, "low effective batter power should also be reduced by ten percent");
-assert(battingTighteningState.scoreSweetSpotHalfWidth > battingTighteningState.visualSweetSpotHalfWidth * 4.2, "scored sweet spot should be more forgiving than the visible sweet spot");
-assert(Math.abs(battingTighteningState.scoreSweetSpotHalfWidth - 0.00929) < 0.001, "sweet spot scoring should be narrowed to eighty percent of the current width");
+assert(battingTighteningState.scoreSweetSpotHalfWidth > battingTighteningState.visualSweetSpotHalfWidth * 5.4, "scored sweet spot should be thirty percent more forgiving than the previous scoring width");
+assert(Math.abs(battingTighteningState.scoreSweetSpotHalfWidth - 0.01208) < 0.001, "sweet spot scoring should be boosted by thirty percent from the current narrowed width");
 assert(Math.abs(battingTighteningState.meetZoneWidthScale - 0.8) < 0.001, "meet zone width should use the requested eighty-percent scale");
 assert(Math.abs(battingTighteningState.outsideVisibleHitWidth - battingTighteningState.unscaledOutsideVisibleHitWidth * 0.8) < 0.001, "visible meet zone should be narrowed to eighty percent");
 assert(battingTighteningState.scoreAtVisibleEdge > 0.78, "visible sweet-spot edge should still receive useful sweet-spot scoring");
 assert(battingTighteningState.scoreOutsideVisibleEdge > 0.66, "nearby contact just outside the visible sweet spot should still receive partial scoring");
+assert(battingTighteningState.scoreAtScoringEdge >= 0.54, "sweet-spot scoring should no longer fall to zero at the scoring edge");
+assert(battingTighteningState.scoreTwoWidthsOutside >= 0.32 && battingTighteningState.scoreTwoWidthsOutside < battingTighteningState.scoreAtScoringEdge, "sweet-spot scoring should keep a useful tail outside the scoring edge");
+assert(battingTighteningState.scoreFourWidthsOutside >= 0.12 && battingTighteningState.scoreFourWidthsOutside < battingTighteningState.scoreTwoWidthsOutside, "farther sweet-spot misses should fade gradually instead of dropping off a cliff");
 assert(battingTighteningState.balancedAllGood > 0.7, "balanced batting feedback should still reward all-around good contact after the ten-point reduction");
 assert(battingTighteningState.balancedWeakSweetSpot < 0.62, "balanced batting feedback should be stricter when the sweet spot is poor");
 assert(battingTighteningState.balancedPlayable >= 0.5 && battingTighteningState.balancedPlayable <= 0.69, "balanced batting feedback should keep playable contact about five points lower");
