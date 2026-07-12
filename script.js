@@ -8653,7 +8653,8 @@ function getThrowBouncePoint(throwState) {
 function getArmThrowSpeed(armRating) {
   const value = clamp(armRating ?? 5, 1, 10);
   const boosted = boostLowActualAbilityRating(1, 10);
-  const effectiveArm = boosted.boostedRatingOne + ((value - 1) / 9) * (boosted.maxRating - boosted.boostedRatingOne);
+  const boostedLowSpeedRating = (abilitySpeedBaseRating + boosted.boostedRatingOne) * 1.3 - abilitySpeedBaseRating;
+  const effectiveArm = boostedLowSpeedRating + ((value - 1) / 9) * (boosted.maxRating - boostedLowSpeedRating);
   return (abilitySpeedBaseRating + effectiveArm) * throwSpeedUnit;
 }
 

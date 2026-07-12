@@ -3894,6 +3894,11 @@ const defenseTuningState = JSON.parse(runInGame(
       fielderSpeed10: getFielderSpeed({ speed: 10 }),
       oldFielderSpeed36: (abilitySpeedBaseRating + getBaseCompressedMovementRating(3.6)) * fielderSpeedUnit * defenseFielderMoveSpeedScale,
       oldFielderSpeed10: (abilitySpeedBaseRating + getBaseCompressedMovementRating(10)) * fielderSpeedUnit * defenseFielderMoveSpeedScale,
+      throwSpeed1: getArmThrowSpeed(1),
+      throwSpeed5: getArmThrowSpeed(5),
+      throwSpeed10: getArmThrowSpeed(10),
+      oldThrowSpeed1: (abilitySpeedBaseRating + boostLowActualAbilityRating(1, 10).boostedRatingOne) * throwSpeedUnit,
+      oldThrowSpeed10: (abilitySpeedBaseRating + 10) * throwSpeedUnit,
       reaction1: getFielderReactionDelay({ fielding: 1 }),
       reaction5,
       reaction10: getFielderReactionDelay({ fielding: 10 }),
@@ -3921,6 +3926,9 @@ assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder
 assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
 assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10) < 0.001, "fielding speed 10 should keep the previous top speed");
 assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && defenseTuningState.fielderSpeed < defenseTuningState.fielderSpeed10, "fielding movement should be redistributed across ten steps");
+assert(Math.abs(defenseTuningState.throwSpeed1 - defenseTuningState.oldThrowSpeed1 * 1.3) < 0.001, "arm 1 throw speed should be thirty percent faster than the previous low-end baseline");
+assert(Math.abs(defenseTuningState.throwSpeed10 - defenseTuningState.oldThrowSpeed10) < 0.001, "arm 10 throw speed should keep the previous top speed");
+assert(defenseTuningState.throwSpeed5 > defenseTuningState.throwSpeed1 && defenseTuningState.throwSpeed5 < defenseTuningState.throwSpeed10, "throw speed should be redistributed between arm 1 and arm 10");
 assert(defenseTuningState.reaction5 > 0.2, "average fielders should hesitate briefly before moving");
 assert(defenseTuningState.reaction10 < defenseTuningState.reaction5, "elite fielders should react sooner than average fielders");
 assert(defenseTuningState.reaction1 > defenseTuningState.reaction5, "weak fielders should react later than average fielders");
@@ -4693,9 +4701,9 @@ assert(throwProfileState.normalLongTime > throwProfileState.normalShortTime, "lo
 assert(throwProfileState.normalLongArc > throwProfileState.normalShortArc, "long throws should have a higher arc");
 assert(throwProfileState.strongLongTime < throwProfileState.weakLongTime, "strong-arm fielders should throw long balls faster");
 assert(throwProfileState.strongLongArc < throwProfileState.weakLongArc, "strong-arm fielders should throw long balls on a lower arc");
-assert(Math.abs(throwProfileState.normalShortSpeed - 803.6470588235293) < 0.001, "arm 5 should use the redistributed low-end-boosted throw speed");
+assert(Math.abs(throwProfileState.normalShortSpeed - 884.011764705882) < 0.001, "arm 5 should use the redistributed thirty-percent low-end-boosted throw speed");
 assert(Math.abs(throwProfileState.strongShortSpeed - 1205.470588235294) < 0.001, "arm 10 should keep the previous top throw speed");
-assert(Math.abs(throwProfileState.weakShortSpeed - 482.1882352941177) < 0.001, "arm 1 should be twenty percent faster than the previous low-end throw speed");
+assert(Math.abs(throwProfileState.weakShortSpeed - 626.844705882353) < 0.001, "arm 1 should be thirty percent faster than the previous low-end throw speed");
 assert(throwProfileState.weakLongBounce === true, "weak arms should bounce deep outfield throws");
 assert(throwProfileState.normalLongBounce === true, "average arms should bounce deep outfield throws");
 assert(throwProfileState.strongLongBounce === false, "strong arms should be able to reach deep throws without a bounce");
