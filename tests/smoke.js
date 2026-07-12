@@ -823,6 +823,58 @@ assert(hbpAfterSwingState.afterSwing.strikes === 1, "a pitch hitting the batter 
 assert(!hbpAfterSwingState.afterSwing.message.includes("デッドボール"), "a pitch hitting the batter after a swing should not become hit-by-pitch");
 assert(hbpAfterSwingState.noSwing.message.includes("デッドボール"), "a pitch hitting the batter without a swing should still become hit-by-pitch");
 
+const foulBallDefenseState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    count = { strikes: 1, balls: 0, outs: 0 };
+    bases = createEmptyBases();
+    const foulDirection = normalize({ x: 1.1, y: -0.36 });
+    const groundProfile = { isFoul: true, power: 0.26, launchAngle: -6, exitVelocity: 0.34 };
+    finishPitch(hitLabels.foul, "foul", 0.26, 170, foulDirection, groundProfile);
+    const groundFoulActive = defenseState.active === true && defenseState.foulPlay === true && defenseState.battedBall?.isFoulBall === true;
+    const groundFoulCaught = defenseState.outcome?.caught === true;
+    finishDefensePlay();
+    const groundAfter = { strikes: count.strikes, outs: count.outs, gamePhase, message };
+
+    startGame();
+    count = { strikes: 1, balls: 0, outs: 0 };
+    bases = createEmptyBases();
+    const flyBall = createFoulBattedBall(0.42, normalize({ x: -0.82, y: -0.44 }), hitLabels.foul, {
+      isFoul: true,
+      power: 0.42,
+      launchAngle: 48,
+      exitVelocity: 0.42
+    });
+    const closeCatcher = { role: "CA", name: "テスト捕手", x: flyBall.target.x, y: flyBall.target.y, currentX: flyBall.target.x, currentY: flyBall.target.y, speed: 8, fielding: 8, arm: 5, distanceToTarget: 0 };
+    const caughtOutcome = resolveFoulDefenseOutcome(closeCatcher, flyBall);
+    startFoulBallPlay(hitLabels.foul, 0.42, -170, flyBall.direction, flyBall.battedProfile);
+    defenseState.chosenFielder = closeCatcher;
+    defenseState.fielders = [closeCatcher];
+    defenseState.target = flyBall.target;
+    defenseState.landingTarget = flyBall.target;
+    defenseState.battedBall = flyBall;
+    defenseState.outcome = caughtOutcome;
+    finishDefensePlay();
+    const caughtAfter = { strikes: count.strikes, outs: count.outs, gamePhase, message };
+
+    return JSON.stringify({
+      groundFoulActive,
+      groundFoulCaught,
+      groundAfter,
+      caughtOutcomeKind: caughtOutcome.kind,
+      caughtOutcomeCaught: caughtOutcome.caught,
+      caughtAfter
+    });
+  })()`
+));
+
+assert(foulBallDefenseState.groundFoulActive === true, "foul balls should start a visible foul-ball defense play");
+assert(foulBallDefenseState.groundFoulCaught === false, "ground foul balls should be chased but not caught for outs");
+assert(foulBallDefenseState.groundAfter.strikes === 2 && foulBallDefenseState.groundAfter.outs === 0 && foulBallDefenseState.groundAfter.gamePhase === "playing", "uncaught foul balls should keep the foul count and return to the next pitch");
+assert(foulBallDefenseState.caughtOutcomeKind === "foulOut" && foulBallDefenseState.caughtOutcomeCaught === true, "reachable foul flies should be catchable for outs");
+assert(foulBallDefenseState.caughtAfter.outs === 1 && foulBallDefenseState.caughtAfter.strikes === 0 && foulBallDefenseState.caughtAfter.gamePhase === "playing", "caught foul flies should add an out, reset the count, and continue play");
+
 const lineupEditState = JSON.parse(runInGame(
   context,
   `(() => {
@@ -974,6 +1026,7 @@ const rosterAndPointState = JSON.parse(runInGame(
     const maddux = findById(pitchers, "maddux");
     const ediaz = findById(pitchers, "ediaz");
     const jansen = findById(pitchers, "jansen");
+    const enriquez = findById(pitchers, "enriquez");
     const ichiro = findById(batters, "ichiro");
     const ruth = findById(batters, "ruth");
     const nagashima = findById(batters, "nagashima");
@@ -1595,6 +1648,19 @@ const rosterAndPointState = JSON.parse(runInGame(
         stamina: jansen.stamina,
         cost: jansen.cost
       },
+      enriquez: {
+        throws: enriquez.throws,
+        fastKmh: enriquez.fastKmh,
+        rightBreak: enriquez.rightBreak,
+        leftBreak: enriquez.leftBreak,
+        slowChange: enriquez.slowChange,
+        fastChange: enriquez.fastChange,
+        control: enriquez.control,
+        stuff: enriquez.stuff,
+        fielding: enriquez.fielding,
+        stamina: enriquez.stamina,
+        cost: enriquez.cost
+      },
       baseCost,
       pitcherIncludedCost,
       defaultAwayPitcherCost,
@@ -1670,7 +1736,8 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
     mcgonigle: findById(batters, "mcgonigle"),
     darvish: findById(pitchers, "darvish"),
     rojas: findById(pitchers, "rojas"),
-    summers: findById(pitchers, "summers")
+    summers: findById(pitchers, "summers"),
+    enriquez: findById(pitchers, "enriquez")
   })`
 ));
 
@@ -1683,6 +1750,7 @@ assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break
 assert(latestSpreadsheetRosterState.darvish.cost === 6, "Darvish cost should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRosterState.rojas.fastKmh === 77 && latestSpreadsheetRosterState.rojas.cost === 1, "Rojas should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.summers.throws === "L" && latestSpreadsheetRosterState.summers.fastKmh === 152 && latestSpreadsheetRosterState.summers.cost === 1, "Summers should be available as a new pitcher");
+assert(latestSpreadsheetRosterState.enriquez.throws === "R" && latestSpreadsheetRosterState.enriquez.fastKmh === 166 && latestSpreadsheetRosterState.enriquez.cost === 1, "Enriquez should be available as a new pitcher");
 
 assert(rosterAndPointState.shuto.bats === "L", "Shuto should be a left-handed batter");
 assert(rosterAndPointState.shuto.power === 2, "Shuto power should match the roster table");
@@ -2006,6 +2074,17 @@ assert(rosterAndPointState.jansen.stuff === 11, "Jansen stuff should match the p
 assert(rosterAndPointState.jansen.fielding === 5, "Jansen fielding should match the pitcher roster table");
 assert(rosterAndPointState.jansen.stamina === 2, "Jansen stamina should match the pitcher roster table");
 assert(rosterAndPointState.jansen.cost === 4, "Jansen pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.throws === "R", "Enriquez should be a right-handed pitcher");
+assert(rosterAndPointState.enriquez.fastKmh === 166, "Enriquez fastball should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.rightBreak === 3, "Enriquez right break should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.leftBreak === 2, "Enriquez left break should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.slowChange === 2, "Enriquez slow change should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.fastChange === 4, "Enriquez fast change should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.control === 3, "Enriquez control should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.stuff === 6, "Enriquez stuff should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.fielding === 3, "Enriquez fielding should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.stamina === 2, "Enriquez stamina should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
 assert(rosterAndPointState.teamPointLimit === 65, "combined point limit should be 65 per team");
 assert(rosterAndPointState.defaultAwayPitcherCost === 22, "default away pitcher cost should remain visible in the point breakdown");
@@ -2498,7 +2577,7 @@ assert(Math.abs(pitcherStaminaState.heavyMultiplier - 0.7) < 0.001, "10-30 perce
 assert(Math.abs(pitcherStaminaState.emptyMultiplier - 0.5) < 0.001, "5-10 percent stamina should reduce abilities by fifty percent");
 assert(Math.abs(pitcherStaminaState.deepEmptyMultiplier - 0.3) < 0.001, "below five percent stamina should reduce abilities by seventy percent");
 assert(pitcherStaminaState.emptyBend < 0.25, "below ten percent stamina should make breaking balls barely move");
-assert(Math.abs(pitcherStaminaState.afterStrikeoutRecovery - pitcherStaminaState.beforeRecovery - 5) < 0.001, "strikeouts should recover five stamina points");
+assert(Math.abs(pitcherStaminaState.afterStrikeoutRecovery - pitcherStaminaState.beforeRecovery - 2) < 0.001, "strikeouts should recover two stamina points");
 assert(pitcherStaminaState.capped === pitcherStaminaState.max, "stamina recovery should be capped at the initial maximum");
 assert(typeof pitcherStaminaState.exhaustedState === "string", "10-30 percent stamina should still report a fatigue label");
 assert(Math.abs(pitcherStaminaState.exhaustedSpeedDrop - pitcherStaminaState.fastKmh * 0.3) < 0.001, "10-30 percent stamina should drop speed by thirty percent");
@@ -8544,6 +8623,12 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       groundRuleDouble: false
     };
     const infieldDropChoice = chooseDefenseFielder(fielders, infieldDropBall);
+    const infieldDropRoutePoint = getClosestPointOnBattedBallRoute(second, infieldDropBall);
+    const infieldDropRouteCatch = getInfielderRouteBodyCatch(
+      { ...second, x: infieldDropRoutePoint.x - 72, y: infieldDropRoutePoint.y, speed: 8, fielding: 8 },
+      infieldDropBall,
+      infieldDropRoutePoint
+    );
     const infieldDropFastOutcome = resolveDefenseOutcome(
       {
         ...infieldDropChoice,
@@ -8629,6 +8714,13 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
     Math.random = () => 0.99;
     const linerOutcome = resolveDefenseOutcome(linerFielder, liner, runner);
     Math.random = originalRandom;
+    const linerRoutePoint = getClosestPointOnBattedBallRoute(short, liner);
+    const oldLinerBodyWidth = 34 + 10 * 4 + 10 * 1.5;
+    const reducedLinerBodyCatch = getInfielderRouteBodyCatch(
+      { ...short, speed: 10, fielding: 10, x: linerRoutePoint.x - oldLinerBodyWidth * 0.9, y: linerRoutePoint.y },
+      liner,
+      linerRoutePoint
+    );
     const marginalLiner = {
       ...liner,
       target: { x: short.x - 118, y: short.y + 10 },
@@ -8934,6 +9026,7 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       softDeepInfieldPickupForce: softDeepInfieldPickup?.outcome?.kind === "force",
       softDeepInfieldPickupNeedsThrow: softDeepInfieldPickup?.outcome?.needsThrow === true,
       infieldDropChoiceIsInfielder: isInfielderRole(infieldDropChoice.role),
+      infieldDropRouteCatch: infieldDropRouteCatch.caught,
       infieldDropFastOut: infieldDropFastOutcome.kind === "out" || infieldDropFastOutcome.kind === "force",
       infieldDropFastHandledByInfielder: infieldDropFastOutcome.caught === true || Boolean(infieldDropFastOutcome.fieldingPoint),
       infieldDropSlowOut: infieldDropSlowOutcome.kind === "out" || infieldDropSlowOutcome.kind === "force",
@@ -8949,6 +9042,7 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       hardGrounderCaughtBeforeStop: hardGrounderOutcome.fieldingTime < hardGrounder.ballTime,
       linerCaught: linerOutcome.caught,
       linerKind: linerOutcome.kind,
+      reducedLinerBodyCaught: reducedLinerBodyCatch.caught,
       marginalLinerCaught: marginalLinerOutcome.caught,
       marginalLinerScoreType: marginalLinerOutcome.scoreType,
       pitcherRouteUsesCutoff,
@@ -9036,6 +9130,7 @@ assert(infieldTakeoverAndCatchState.softDeepInfieldUsesRouteCutoff === true, "so
 assert(infieldTakeoverAndCatchState.softDeepInfieldAttemptMoves === true, "nearby infielders should visibly react to soft infield-bounce grounders even when another fielder finishes");
 assert(infieldTakeoverAndCatchState.softDeepInfieldPickupForce === true && infieldTakeoverAndCatchState.softDeepInfieldPickupNeedsThrow === true, "reachable soft infield-bounce grounders should become throw plays");
 assert(infieldTakeoverAndCatchState.infieldDropChoiceIsInfielder === true, "slow bloopers landing in the infield should be assigned to infielders first");
+assert(infieldTakeoverAndCatchState.infieldDropRouteCatch === true, "line-drop balls passing over an infielder should be treated as reachable route catches");
 assert(infieldTakeoverAndCatchState.infieldDropFastHandledByInfielder === true && infieldTakeoverAndCatchState.infieldDropFastOut === true, "infielders who arrive in time should turn slow infield bloopers into outs");
 assert(infieldTakeoverAndCatchState.infieldDropSlowOut === false, "slow infielders who cannot reach bloopers in time should let them fall through");
 assert(infieldTakeoverAndCatchState.middleBounceChoiceIsInfielder === true, "middle infielders should react to grounders that bounce in front of second or short");
@@ -9049,6 +9144,7 @@ assert(infieldTakeoverAndCatchState.hardGrounderNeedsThrow === true, "fielded in
 assert(infieldTakeoverAndCatchState.hardGrounderFieldingPointPreserved === true, "fielded infield grounders should use the route cutoff point as the catch point");
 assert(infieldTakeoverAndCatchState.hardGrounderCaughtBeforeStop === true, "infielders should catch rolling grounders before the natural stop point");
 assert(infieldTakeoverAndCatchState.linerCaught === true && infieldTakeoverAndCatchState.linerKind === "out", "infielders should catch liners they reach");
+assert(infieldTakeoverAndCatchState.reducedLinerBodyCaught === false, "liner hidden body-catch range should be reduced from the previous wider width");
 assert(infieldTakeoverAndCatchState.marginalLinerCaught === false, "infielders should not catch every hard liner that is only marginally within reach");
 assert(infieldTakeoverAndCatchState.pitcherRouteUsesCutoff === true, "pitchers should also react to hard balls passing near their route");
 assert(infieldTakeoverAndCatchState.highDifficultChance > infieldTakeoverAndCatchState.lowDifficultChance, "better fielders should have a higher difficult-catch chance");
