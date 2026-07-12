@@ -220,6 +220,7 @@ function assertHtmlShell() {
     'value="fireworks"',
     'value="aozora"',
     'value="hyperOcean"',
+    'value="riverside"',
     'value="nextDome"',
     'value="5"',
     'value="9"',
@@ -303,6 +304,115 @@ assert(Math.abs(stadiumSelectionState.restoredHeight - stadiumSelectionState.bas
 assert(stadiumSelectionState.baseFirstSame === true, "stadium changes should not move the diamond bases");
 assert(stadiumSelectionState.aozoraOutfieldDepths.every((depth) => depth > 0.9 && depth < 0.94), "outfielders should still start near the active stadium fence");
 
+const riversideStadiumState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    stadiumSelect.value = "riverside";
+    readMenu();
+    const centerMeters = getBattedBallDistanceMeters(defenseField.fenceDistance, { direction: { x: 0, y: -1 } });
+    const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
+    const riverCenter = {
+      x: field.plateX,
+      y: getFenceCenter().y - getRiversideRiverDistanceForMeters(stadiumPresets.riverside.riverCenterMeters)
+    };
+    const riverStart = { x: field.plateX, y: riverCenter.y + 160 };
+    const riverEnd = { x: field.plateX, y: riverCenter.y - 160 };
+    const riverBall = {
+      isFoulBall: false,
+      fenceOver: false,
+      wallHit: false,
+      groundRuleDouble: false,
+      isGrounder: true,
+      isLiner: false,
+      target: riverStart,
+      direction: normalize({ x: 0, y: -1 }),
+      flightDistance: getFenceDistance(riverStart),
+      landingDistance: getFenceDistance(riverStart),
+      power: 0.78,
+      ballTime: 0.45
+    };
+    const riverTarget = getDefenseFieldingTarget(riverBall, { kind: "single", scoreType: "single", caught: false });
+    const outfielders = getDefensiveLineup("away").filter((fielder) => ["L", "C", "R"].includes(fielder.role));
+    const riverCenterInside = isPointInRiversideRiver(riverCenter);
+    const riverEntryFound = Boolean(getRiversideRiverEntryPoint(riverStart, riverEnd));
+    const riverTargetInside = isPointInRiversideRiver(riverTarget);
+    const outfieldersBeyondRiver = outfielders.every((fielder) => fielder.y <= getRiversideRiverFarEdgeY(fielder.x) - 20);
+    bases = {
+      first: makeBaseRunner({ name: "R1", responsiblePitcherId: "p1" }),
+      second: makeBaseRunner({ name: "R2", responsiblePitcherId: "p2" }),
+      third: null
+    };
+    const riverRuns = advanceRunners("double", { name: "BAT" }, { groundRuleDouble: true }, { kind: "double", scoreType: "double" });
+    const riverBasesAfter = {
+      first: Boolean(bases.first),
+      second: bases.second?.name ?? null,
+      third: bases.third?.name ?? null
+    };
+    const clampedInfielder = clampFielderOutsideRiversideRiver(riverCenter, "SS");
+    const clampedOutfielder = clampFielderOutsideRiversideRiver(riverCenter, "C");
+    const clampedInfielderInRiver = isPointInRiversideRiver(clampedInfielder);
+    const clampedOutfielderInRiver = isPointInRiversideRiver(clampedOutfielder);
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({
+      hasRiver: stadiumPresets.riverside.hasRiver,
+      centerMeters,
+      lineMeters,
+      lowFence: stadiumPresets.riverside.fenceHeight < baseDefenseField.fenceHeight * 0.5,
+      riverCenterMeters: stadiumPresets.riverside.riverCenterMeters,
+      riverWidthMeters: stadiumPresets.riverside.riverWidthMeters,
+      riverCenterInside,
+      riverEntryFound,
+      riverGroundRuleDouble: riverBall.groundRuleDouble,
+      riverTargetInside,
+      outfieldersBeyondRiver,
+      riverRuns,
+      riverBasesAfter,
+      clampedInfielderInRiver,
+      clampedOutfielderInRiver
+    });
+  })()`
+));
+
+assert(riversideStadiumState.hasRiver === true, "Riverside Park should enable a river hazard");
+assert(riversideStadiumState.centerMeters === 160, "Riverside Park center fence should be 160 meters");
+assert(riversideStadiumState.lineMeters === 160, "Riverside Park line fences should be 160 meters");
+assert(riversideStadiumState.lowFence === true, "Riverside Park should use a low fence");
+assert(riversideStadiumState.riverCenterMeters === 92, "Riverside Park river should be moved back to about 92 meters from home");
+assert(riversideStadiumState.riverWidthMeters === 40, "Riverside Park river should be about 40 meters wide");
+assert(riversideStadiumState.riverCenterInside === true, "Riverside Park river center should be inside the river band");
+assert(riversideStadiumState.riverEntryFound === true, "Riverside Park should detect batted balls entering the river");
+assert(riversideStadiumState.riverGroundRuleDouble === true, "Riverside Park river balls should become ground-rule doubles");
+assert(riversideStadiumState.riverTargetInside === true, "Riverside Park river fielding target should stop at the river");
+assert(riversideStadiumState.outfieldersBeyondRiver === true, "Riverside Park outfielders should start beyond the river");
+assert(riversideStadiumState.riverRuns === 1, "Riverside Park river ground-rule doubles should advance runners two bases with home as the cap");
+assert(riversideStadiumState.riverBasesAfter.first === false, "Riverside Park river ground-rule doubles should leave first base empty");
+assert(riversideStadiumState.riverBasesAfter.second === "BAT", "Riverside Park river ground-rule doubles should put the batter on second");
+assert(riversideStadiumState.riverBasesAfter.third === "R1", "Riverside Park river ground-rule doubles should put a first-base runner on third");
+assert(riversideStadiumState.clampedInfielderInRiver === false, "Riverside Park infielders should be kept out of the river");
+assert(riversideStadiumState.clampedOutfielderInRiver === false, "Riverside Park outfielders should be kept out of the river");
+
+const nextDomeRoofState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    stadiumSelect.value = "nextDome";
+    readMenu();
+    let fillCount = 0;
+    const oldFillRect = ctx.fillRect;
+    ctx.fillRect = function(x, y, w, h) {
+      if (x === 0 && y === 0 && w === canvas.width && h === canvas.height) fillCount += 1;
+      return oldFillRect.apply(this, arguments);
+    };
+    drawNextDomeRoofScreen();
+    ctx.fillRect = oldFillRect;
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({ fillCount });
+  })()`
+));
+
+assert(nextDomeRoofState.fillCount >= 1, "Next Dome roof should cover the full screen with a silver dome background");
+
 const hyperOceanStadiumState = JSON.parse(runInGame(
   context,
   `(() => {
@@ -317,9 +427,16 @@ const hyperOceanStadiumState = JSON.parse(runInGame(
       target: { x: boats[8].x + 180, y: boats[8].y - 80 }
     };
     const fireworks = createHomeRunFireworks(homerBall);
-    const caughtBoat = boats.find((boat) => boat.id === fireworks?.boatCatch?.boatId);
+    const oceanBoats = fireworks?.oceanBoats ?? [];
+    const caughtBoat = oceanBoats.find((boat) => boat.id === fireworks?.boatCatch?.boatId);
     const animatedStart = caughtBoat && fireworks?.boatCatch ? getAnimatedBoatForCatch(caughtBoat, fireworks.boatCatch, 0.05) : null;
     const animatedEnd = caughtBoat && fireworks?.boatCatch ? getAnimatedBoatForCatch(caughtBoat, fireworks.boatCatch, (fireworks.boatCatch.startTime ?? 0.8) + (fireworks.boatCatch.travelDuration ?? 1.2) + 0.1) : null;
+    const oceanBoatMinDistance = oceanBoats.reduce((minDistance, boat, index) => {
+      const rest = oceanBoats.slice(index + 1);
+      return Math.min(minDistance, ...rest.map((other) => Math.hypot(boat.x - other.x, boat.y - other.y)));
+    }, Infinity);
+    const driftingBoatStart = oceanBoats[0] ? getDriftingBoat(oceanBoats[0], 0) : null;
+    const driftingBoatEnd = oceanBoats[0] ? getDriftingBoat(oceanBoats[0], 8) : null;
     stadiumSelect.value = "fireworks";
     readMenu();
     return JSON.stringify({
@@ -327,6 +444,10 @@ const hyperOceanStadiumState = JSON.parse(runInGame(
       centerMeters,
       lineMeters,
       boatCount: boats.length,
+      oceanBoatCount: oceanBoats.length,
+      oceanBoatNearLanding: oceanBoats.every((boat) => Math.hypot(boat.x - (fireworks?.boatCatch?.ballX ?? boat.x), boat.y - (fireworks?.boatCatch?.ballY ?? boat.y)) < 330),
+      oceanBoatMinDistance,
+      oceanBoatDrifts: driftingBoatStart && driftingBoatEnd ? Math.hypot(driftingBoatEnd.x - driftingBoatStart.x, driftingBoatEnd.y - driftingBoatStart.y) > 10 : false,
       boatStyles: Array.from(new Set(boats.map((boat) => boat.style))).sort((a, b) => a - b),
       boatCatchId: fireworks?.boatCatch?.boatId ?? null,
       boatMoved: Math.hypot((fireworks?.boatCatch?.x ?? 0) - (fireworks?.boatCatch?.homeX ?? 0), (fireworks?.boatCatch?.y ?? 0) - (fireworks?.boatCatch?.homeY ?? 0)),
@@ -343,6 +464,10 @@ const hyperOceanStadiumState = JSON.parse(runInGame(
 assert(hyperOceanStadiumState.centerMeters === 115, "Hyper Ocean center field fence should display as 115 meters");
 assert(hyperOceanStadiumState.lineMeters === 92, "Hyper Ocean foul-line fence should display as 92 meters");
 assert(hyperOceanStadiumState.boatCount === 16, "Hyper Ocean should place sixteen boats beyond the outfield");
+assert(hyperOceanStadiumState.oceanBoatCount >= 3 && hyperOceanStadiumState.oceanBoatCount <= 5, "Hyper Ocean home-run water landings should have three to five waiting boats nearby");
+assert(hyperOceanStadiumState.oceanBoatNearLanding === true, "Hyper Ocean waiting boats should gather around the water landing point");
+assert(hyperOceanStadiumState.oceanBoatMinDistance >= 150, "Hyper Ocean waiting boats should not overlap each other");
+assert(hyperOceanStadiumState.oceanBoatDrifts === true, "Hyper Ocean waiting boats should drift slowly around the splash area");
 assert(hyperOceanStadiumState.boatStyles.join(",") === "0,1,2", "Hyper Ocean boats should use three visual designs");
 assert(hyperOceanStadiumState.boatCatchId !== null, "Hyper Ocean home runs near a boat should create a boat-catch highlight");
 assert(hyperOceanStadiumState.boatMoved > 0, "nearby Hyper Ocean boats should move toward catchable home-run balls");
@@ -4358,6 +4483,7 @@ const homeRunFireworksState = JSON.parse(runInGame(
       camera,
       standFocus,
       visibleBounds,
+      targetVisible: visibleBounds.left <= homerBall.target.x && visibleBounds.right >= homerBall.target.x && visibleBounds.top <= homerBall.target.y && visibleBounds.bottom >= homerBall.target.y,
       resolvesBeforeFireworksEnd,
       resolvesAfterFireworksEnd,
       fenceTopY: defenseField.bases.home.y - defenseField.fenceDistance
@@ -4388,6 +4514,7 @@ assert(homeRunFireworksState.camera.y > 0, "home run camera should tilt upward t
 assert(homeRunFireworksState.standFocus.y < homeRunFireworksState.fenceTopY, "home run stand focus should be behind the outfield wall");
 assert(homeRunFireworksState.visibleBounds.top <= homeRunFireworksState.standFocus.y, "home run camera should keep the stands visible");
 assert(homeRunFireworksState.visibleBounds.bottom >= homeRunFireworksState.standFocus.y, "home run camera should frame the stand focus point");
+assert(homeRunFireworksState.targetVisible === true, "home run camera should scroll all the way to the landing point even on very deep homers");
 assert(homeRunFireworksState.resolvesBeforeFireworksEnd === false, "home runs should wait until fireworks finish");
 assert(homeRunFireworksState.resolvesAfterFireworksEnd === true, "home runs should advance after fireworks even before the batter finishes circling the bases");
 

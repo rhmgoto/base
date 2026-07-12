@@ -483,6 +483,23 @@ const stadiumPresets = {
     hasDome: false,
     airCarryScale: 1
   },
+  riverside: {
+    id: "riverside",
+    name: "リバーサイドパーク",
+    surface: "riverGrass",
+    centerFenceMeters: 160,
+    lineFenceMeters: 160,
+    fenceHeight: baseDefenseField.fenceHeight * 0.42,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasRiver: true,
+    riverCenterMeters: 92,
+    riverWidthMeters: 40,
+    airCarryScale: 1
+  },
   nextDome: {
     id: "nextDome",
     name: "ネクストドーム",
@@ -655,10 +672,10 @@ function outfielderStartPoint(side, depthRatio = 0.92) {
   const angle = side === "L" ? -132 : side === "R" ? -48 : -90;
   const radians = degreesToRadians(angle);
   const depth = defenseField.fenceDistance * depthRatio;
-  return {
+  return clampOutfielderBeyondRiversideRiver({
     x: center.x + Math.cos(radians) * depth,
     y: center.y + Math.sin(radians) * depth
-  };
+  }, side);
 }
 
 function infielderStartPoint(role) {
@@ -7085,7 +7102,8 @@ function normalizeAutoHitAdvanceType(type) {
 function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
   let runs = 0;
   const scoringResponsiblePitcherIds = [];
-  type = normalizeAutoHitAdvanceType(type);
+  const groundRuleDouble = Boolean(battedBall?.groundRuleDouble);
+  type = groundRuleDouble ? "double" : normalizeAutoHitAdvanceType(type);
   if (type === "walk") {
     if (bases.first && bases.second && bases.third) {
       runs += 1;
@@ -7108,7 +7126,8 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
   ].filter((entry) => entry.runner);
   bases = createEmptyBases();
   runners.forEach(({ base, runner }) => {
-    const nextBase = base + steps + getExtraRunnerAdvance(base, type, runner, battedBall, outcome);
+    const extraAdvance = groundRuleDouble ? 0 : getExtraRunnerAdvance(base, type, runner, battedBall, outcome);
+    const nextBase = base + steps + extraAdvance;
     if (nextBase >= 4) {
       runs += 1;
       scoringResponsiblePitcherIds.push(runner.responsiblePitcherId);
@@ -7181,7 +7200,9 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const tagUp = shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
   const groundOutAdvance = shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall);
   const automaticAdvanceType = tagUp ? "tagup" : groundOutAdvance ? "groundout" : getDefenseBaseRunnerAdvanceType(outcome, throwState);
-  const advanceType = manualBaserunning && automaticAdvanceType && !tagUp && !groundOutAdvance ? "single" : automaticAdvanceType;
+  const advanceType = battedBall?.groundRuleDouble
+    ? "double"
+    : manualBaserunning && automaticAdvanceType && !tagUp && !groundOutAdvance ? "single" : automaticAdvanceType;
   const extraAdvance = manualBaserunning || outcome?.kind === "force" ? 0 : getExtraRunnerAdvance(startBase, advanceType, runnerInfo, battedBall, outcome);
   const nextBase = advanceType
     ? Math.min(4, startBase + getBaseAdvanceSteps(advanceType) + (advanceType === "tagup" ? 0 : extraAdvance))
@@ -7212,6 +7233,7 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
 
 function getDefenseBaseRunnerAdvanceType(outcome, throwState = null) {
   if (!outcome) return null;
+  if (defenseState.battedBall?.groundRuleDouble) return "double";
   if (outcome.kind === "out" || (outcome.caught && !outcome.needsThrow)) return null;
   if (outcome.kind === "force") {
     if (!throwState) return "single";
@@ -7424,6 +7446,7 @@ function createHomeRunFireworks(battedBall) {
   const side = normalize({ x: -direction.y, y: direction.x });
   const colors = ["#fff2a8", "#ff6f61", "#aee7ff", "#d6f2df", "#ffb3f0"];
   const boatCatch = getHomeRunBoatCatch(battedBall);
+  const oceanBoats = getHomeRunOceanWaitingBoats(battedBall, boatCatch);
   const bursts = Array.from({ length: burstCount }, (_, burstIndex) => {
     const standDistance = defenseField.fenceDistance + randomBetween(70, homerRuns >= 4 ? 430 : 260);
     const lateral = randomBetween(homerRuns >= 4 ? -720 : -420, homerRuns >= 4 ? 720 : 420);
@@ -7449,28 +7472,22 @@ function createHomeRunFireworks(battedBall) {
   });
   return {
     startDelay: Math.max(0.15, battedBall.ballTime ?? 0.7),
-    duration: boatCatch ? Math.max(duration, 5.2) : duration,
+    duration: boatCatch ? Math.max(duration, 5.8) : duration,
     bursts,
+    oceanBoats,
     boatCatch
   };
 }
 
 function getHomeRunBoatCatch(battedBall) {
   if (!getCurrentStadium().hasOcean || !battedBall?.fenceOver) return null;
-  const center = getFenceCenter();
-  const direction = normalize({
-    x: (battedBall.target?.x ?? field.centerX) - center.x,
-    y: (battedBall.target?.y ?? center.y - defenseField.fenceDistance) - center.y
-  });
-  const projectedLanding = {
-    x: center.x + direction.x * (defenseField.fenceDistance + 290),
-    y: center.y + direction.y * (defenseField.fenceDistance + 290)
-  };
-  const nearest = getHyperOceanBoats()
+  const projectedLanding = getHomeRunWaterLandingPoint(battedBall);
+  const waitingBoats = getHyperOceanLandingBoats(projectedLanding, battedBall);
+  const nearest = waitingBoats
     .map((boat) => ({ boat, distance: Math.hypot(boat.x - projectedLanding.x, boat.y - projectedLanding.y) }))
     .sort((a, b) => a.distance - b.distance)[0];
-  if (!nearest || nearest.distance > 360) return null;
-  const moveRatio = nearest.distance <= 80 ? 0 : clamp((nearest.distance - 80) / 280, 0, 1);
+  if (!nearest || nearest.distance > 420) return null;
+  const moveRatio = nearest.distance <= 72 ? 0 : clamp((nearest.distance - 72) / 310, 0, 1);
   const catchX = nearest.boat.x + (projectedLanding.x - nearest.boat.x) * moveRatio;
   const catchY = nearest.boat.y + (projectedLanding.y - nearest.boat.y) * moveRatio;
   const catchAngle = Math.atan2(projectedLanding.y - nearest.boat.y, projectedLanding.x - nearest.boat.x);
@@ -7490,6 +7507,23 @@ function getHomeRunBoatCatch(battedBall) {
   };
 }
 
+function getHomeRunWaterLandingPoint(battedBall) {
+  const center = getFenceCenter();
+  const direction = normalize({
+    x: (battedBall?.target?.x ?? field.centerX) - center.x,
+    y: (battedBall?.target?.y ?? center.y - defenseField.fenceDistance) - center.y
+  });
+  return {
+    x: center.x + direction.x * (defenseField.fenceDistance + 290),
+    y: center.y + direction.y * (defenseField.fenceDistance + 290)
+  };
+}
+
+function getHomeRunOceanWaitingBoats(battedBall, boatCatch = null) {
+  if (!getCurrentStadium().hasOcean || !battedBall?.fenceOver) return [];
+  return getHyperOceanLandingBoats(getHomeRunWaterLandingPoint(battedBall), battedBall, boatCatch?.boatId);
+}
+
 function getPendingHomeRunRuns() {
   return 1 + baseNames.reduce((total, base) => total + (bases[base] ? 1 : 0), 0);
 }
@@ -7499,7 +7533,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   const battedBall = buildBattedBall(power, direction, label, battedProfile);
   appendBattedBallFeedback(battedBall);
   const fielders = getDefensiveLineup(fieldingTeam()).map((fielder) => ({ ...fielder, currentX: fielder.x, currentY: fielder.y }));
-  const manualFielding = isManualDefenseControl() && !shouldAutoFieldFlyInManualDefense(battedBall) && !battedBall.fenceOver && !battedBall.wallHit;
+  const manualFielding = isManualDefenseControl() && !shouldAutoFieldFlyInManualDefense(battedBall) && !battedBall.fenceOver && !battedBall.wallHit && !battedBall.groundRuleDouble;
   let chosenFielder = battedBall.isBunt ? chooseBuntDefenseFielder(fielders, battedBall) : chooseDefenseFielder(fielders, battedBall);
   const runner = createBatterRunner(activeBatter);
   let outcome = resolveDefenseOutcome(chosenFielder, battedBall, runner);
@@ -7883,7 +7917,7 @@ function getDefensiveLineup(team) {
 }
 
 function getDefenseDuration(battedBall, outcome, runner, throwState, fieldingTarget = null) {
-  if (battedBall.fenceOver) return Math.max(3600, ((battedBall.ballTime ?? 0.7) + 3.25) * 1000);
+  if (battedBall.fenceOver) return Math.max(6200, ((battedBall.ballTime ?? 0.7) + 5.4) * 1000);
   const runnerSeconds = runner ? runner.arrivalTime : 0;
   const throwSeconds = throwState
     ? Number.isFinite(throwState.endTime)
@@ -8998,6 +9032,7 @@ function resolveGrounderPickupThrow(fielder, battedBall, outcome, fieldingTarget
 function getDefenseFieldingTarget(battedBall, outcome) {
   if (battedBall?.isFoulBall && !outcome?.caught) return getFoulBallFieldingTarget(battedBall);
   if (battedBall.fenceOver) return getHomeRunFielderWatchTarget(battedBall);
+  if (battedBall.groundRuleDouble && battedBall.riverEntryPoint) return battedBall.riverEntryPoint;
   if (outcome?.fieldingPoint && (outcome.caught || outcome.needsThrow || battedBall.isGrounder)) return outcome.fieldingPoint;
   if (outcome.caught && !outcome.needsThrow) return battedBall.target;
   if (battedBall.wallHit) return battedBall.wallReboundTarget || battedBall.target;
@@ -9029,6 +9064,12 @@ function getDefenseFieldingTarget(battedBall, outcome) {
     x: battedBall.target.x + battedBall.direction.x * rollDistance,
     y: battedBall.target.y + battedBall.direction.y * rollDistance
   };
+  const riverEntry = getRiversideRiverEntryPoint(battedBall.target, projectedTarget);
+  if (riverEntry) {
+    battedBall.groundRuleDouble = true;
+    battedBall.riverEntryPoint = riverEntry;
+    return riverEntry;
+  }
   if (isPastOutfieldFence(projectedTarget)) {
     if (shouldBounceIntoStands(battedBall, projectedTarget)) {
       battedBall.groundRuleDouble = true;
@@ -9146,6 +9187,80 @@ function getFenceCenter() {
 function getFenceDistance(point) {
   const center = getFenceCenter();
   return Math.hypot(point.x - center.x, point.y - center.y);
+}
+
+function getRiversideRiverDistanceForMeters(meters) {
+  const stadium = getCurrentStadium();
+  const centerMeters = Number.isFinite(stadium.centerFenceMeters) ? stadium.centerFenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  return defenseField.fenceDistance * (meters / centerMeters);
+}
+
+function getRiversideRiverMetrics() {
+  const stadium = getCurrentStadium();
+  if (!stadium.hasRiver) return null;
+  return {
+    centerDistance: getRiversideRiverDistanceForMeters(stadium.riverCenterMeters ?? 64),
+    halfWidth: getRiversideRiverDistanceForMeters(stadium.riverWidthMeters ?? 40) / 2,
+    xSpan: defenseField.fenceDistance * 0.96
+  };
+}
+
+function getRiversideRiverCenterY(x) {
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics) return Infinity;
+  const center = getFenceCenter();
+  const n = clamp((x - field.plateX) / Math.max(1, metrics.xSpan), -1.15, 1.15);
+  const bend = Math.sin(n * Math.PI * 1.08) * 54 + Math.sin((n + 0.18) * Math.PI * 2.1) * 20;
+  return center.y - metrics.centerDistance + bend;
+}
+
+function getRiversideRiverFarEdgeY(x) {
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics) return -Infinity;
+  return getRiversideRiverCenterY(x) - metrics.halfWidth;
+}
+
+function getRiversideRiverNearEdgeY(x) {
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics) return Infinity;
+  return getRiversideRiverCenterY(x) + metrics.halfWidth;
+}
+
+function isPointInRiversideRiver(point) {
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics || !point) return false;
+  if (Math.abs(point.x - field.plateX) > metrics.xSpan) return false;
+  if (point.y >= getFenceCenter().y) return false;
+  return Math.abs(point.y - getRiversideRiverCenterY(point.x)) <= metrics.halfWidth;
+}
+
+function getRiversideRiverEntryPoint(start, end) {
+  if (!getCurrentStadium().hasRiver || !start || !end) return null;
+  const samples = 54;
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples;
+    const point = {
+      x: start.x + (end.x - start.x) * t,
+      y: start.y + (end.y - start.y) * t
+    };
+    if (isPointInRiversideRiver(point)) return point;
+  }
+  return null;
+}
+
+function clampOutfielderBeyondRiversideRiver(point, role = "") {
+  if (!getCurrentStadium().hasRiver || !outfielderRoles.includes(role) || !point) return point;
+  const farEdgeY = getRiversideRiverFarEdgeY(point.x) - 28;
+  if (!Number.isFinite(farEdgeY) || point.y <= farEdgeY) return point;
+  return { ...point, y: farEdgeY };
+}
+
+function clampFielderOutsideRiversideRiver(point, role = "") {
+  if (!getCurrentStadium().hasRiver || !point || !isPointInRiversideRiver(point)) return point;
+  if (outfielderRoles.includes(role)) {
+    return { ...point, y: getRiversideRiverFarEdgeY(point.x) - 18 };
+  }
+  return { ...point, y: getRiversideRiverNearEdgeY(point.x) + 18 };
 }
 
 function isPastOutfieldFence(point) {
@@ -9513,6 +9628,12 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : fenceOver
       ? rawTarget
       : clampPointInsideFence(rawTarget, 12);
+  const riverEntryPoint = !fenceOver && !wallHit && isPointInRiversideRiver(target)
+    ? { ...target }
+    : null;
+  if (riverEntryPoint) {
+    groundRuleDouble = true;
+  }
   const wallReboundTarget = wallHit
     ? clampPointInsideFence({
         x: target.x - direction.x * getWallReboundDistance(power),
@@ -9550,7 +9671,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ballTime,
     launchAngle: launchAngleDegrees
   });
-  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, maxHeightMeters, launchAngleDegrees, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble, domeRule, ballTime, maxHeight, wallImpactHeight };
+  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, maxHeightMeters, launchAngleDegrees, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble, riverEntryPoint, domeRule, ballTime, maxHeight, wallImpactHeight };
 }
 
 function getNextDomeBattedBallRule({
@@ -10934,10 +11055,10 @@ function updateDefensePlay(now) {
         const distance = Math.hypot(dx, dy) || 1;
         const maxRunDistance = getFielderSpeed(fielder) * movementDeltaSeconds;
         const runProgress = clamp(maxRunDistance / distance, 0, 1);
-        const current = clampPointInsideFence({
+        const current = clampFielderOutsideRiversideRiver(clampPointInsideFence({
           x: currentX + dx * runProgress,
           y: currentY + dy * runProgress
-        }, 36);
+        }, 36), fielder.role);
         return {
           ...fielder,
           currentX: current.x,
@@ -10950,10 +11071,10 @@ function updateDefensePlay(now) {
       const runSeconds = Math.max(0, elapsedSeconds - getFielderReactionDelay(fielder));
       const maxRunDistance = getFielderSpeed(fielder) * runSeconds;
       const runProgress = clamp(maxRunDistance / distance, 0, 1);
-      const current = clampPointInsideFence({
+      const current = clampFielderOutsideRiversideRiver(clampPointInsideFence({
         x: fielder.x + dx * runProgress,
         y: fielder.y + dy * runProgress
-      }, 36);
+      }, 36), fielder.role);
       return {
         ...fielder,
         currentX: current.x,
@@ -11083,10 +11204,10 @@ function updateManualDefenseFielders(deltaSeconds) {
     if (!combined.magnitude) return { ...fielder, currentX, currentY };
     const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
     const speed = getFielderSpeed(fielder) * (0.72 + fielding * 0.035) * combined.magnitude;
-    const current = clampPointInsideFence({
+    const current = clampFielderOutsideRiversideRiver(clampPointInsideFence({
       x: currentX + combined.x * speed * deltaSeconds,
       y: currentY + combined.y * speed * deltaSeconds
-    }, 36);
+    }, 36), fielder.role);
     return {
       ...fielder,
       currentX: current.x,
@@ -11372,7 +11493,7 @@ function completeManualDefenseMiss(elapsedSeconds) {
 function getDefenseFielderMovementTarget(fielder, elapsedSeconds) {
   if (!fielder || !defenseState.active || !defenseState.battedBall) return null;
   if (fielder.role === defenseState.chosenFielder?.role) {
-    return getDefenseFielderChaseTarget(elapsedSeconds);
+    return clampOutfielderBeyondRiversideRiver(getDefenseFielderChaseTarget(elapsedSeconds), fielder.role);
   }
   if (!isInfielderRole(defenseState.chosenFielder?.role) && shouldInfielderAttemptRollingRoute(fielder, defenseState.battedBall, defenseState.target)) {
     return getInfielderRollingAttemptTarget(fielder, defenseState.battedBall, defenseState.target);
@@ -12603,19 +12724,40 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
     ? "#64ad5f"
     : stadium.surface === "artificialTurf"
         ? "#3aa65f"
+        : stadium.surface === "riverGrass"
+          ? "#4f9b49"
       : "#5fa85b";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < canvas.width; i += 56) {
     ctx.fillStyle = i % 112 === 0
-      ? (stadium.surface === "premiumGrass" ? "rgba(220,255,220,0.09)" : stadium.surface === "artificialTurf" ? "rgba(190,255,220,0.11)" : "rgba(255,255,255,0.05)")
+      ? (stadium.surface === "premiumGrass" ? "rgba(220,255,220,0.09)" : stadium.surface === "artificialTurf" ? "rgba(190,255,220,0.11)" : stadium.surface === "riverGrass" ? "rgba(220,255,205,0.075)" : "rgba(255,255,255,0.05)")
       : "rgba(0,0,0,0.045)";
     ctx.fillRect(i, 0, 56, canvas.height);
+  }
+  if (stadium.surface === "riverGrass") {
+    for (let i = 0; i < 220; i += 1) {
+      const x = (i * 73) % canvas.width;
+      const y = (i * 41) % canvas.height;
+      ctx.strokeStyle = i % 3 === 0 ? "rgba(232,255,218,0.08)" : "rgba(27,80,38,0.08)";
+      ctx.lineWidth = 1;
+      drawLine(x, y, x + 18, y - 4);
+    }
   }
 }
 
 function drawNextDomeRoofScreen() {
   if (!getCurrentStadium().hasDome) return;
   ctx.save();
+  const fullRoof = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  if (fullRoof?.addColorStop) {
+    fullRoof.addColorStop(0, "#f4f6fa");
+    fullRoof.addColorStop(0.42, "#c8d0d8");
+    fullRoof.addColorStop(1, "#87939e");
+    ctx.fillStyle = fullRoof;
+  } else {
+    ctx.fillStyle = "#c8d0d8";
+  }
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   const roof = ctx.createRadialGradient(field.plateX, 80, 120, field.plateX, 260, 820);
   if (roof?.addColorStop) {
     roof.addColorStop(0, "#f5f7fb");
@@ -12735,14 +12877,37 @@ function getHyperOceanBoats() {
   });
 }
 
+function getHyperOceanLandingBoats(landing, battedBall = null, caughtBoatId = null) {
+  if (!landing) return [];
+  const base = Math.abs(Math.round((landing.x * 0.013 + landing.y * 0.017) * 10));
+  const count = 3 + (base % 3);
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / count + 0.46 + (base % 7) * 0.05;
+    const distance = 180 + (index % 2) * 74 + (base % 5) * 8;
+    const x = landing.x + Math.cos(angle) * distance;
+    const y = landing.y + Math.sin(angle) * distance;
+    return {
+      id: 100 + index,
+      style: (index + base) % 3,
+      x,
+      y,
+      angle: Math.atan2(landing.y - y, landing.x - x),
+      waitingNearLanding: true,
+      caughtCandidate: caughtBoatId === 100 + index
+    };
+  });
+}
+
 function drawBoat(boat, caught = false, alpha = 1) {
   ctx.save();
   ctx.translate(boat.x, boat.y);
   const catchAngle = caught && Number.isFinite(boat.catchAngle) ? boat.catchAngle : boat.angle;
   ctx.rotate(catchAngle + Math.PI / 2);
-  ctx.scale(2, 2);
+  const modelScale = boat.waitingNearLanding ? 2.25 : 2;
+  ctx.scale(modelScale, modelScale);
   ctx.globalAlpha = alpha;
   const boatStyle = boat.style ?? 0;
+  const isWaitingBoat = Boolean(boat.waitingNearLanding);
   const hullFill = boatStyle === 1
     ? "#f8fbff"
     : boatStyle === 2
@@ -12750,21 +12915,19 @@ function drawBoat(boat, caught = false, alpha = 1) {
       : "#163760";
   const hullStroke = boatStyle === 1 ? "#111827" : boatStyle === 2 ? "#f7fbff" : "#8ed9ff";
   const reachedCatch = !caught || boat.hasReachedCatch !== false;
-  ctx.fillStyle = caught && reachedCatch ? "#fff2a8" : hullFill;
-  ctx.strokeStyle = caught && reachedCatch ? "#1f4660" : hullStroke;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
   const halfWidth = caught ? 58 : 46;
   const halfHeight = caught ? 20 : 16;
-  ctx.moveTo(-halfWidth, 0);
-  ctx.lineTo(-halfWidth * 0.72, -halfHeight);
-  ctx.lineTo(halfWidth * 0.62, -halfHeight);
-  ctx.lineTo(halfWidth, 0);
-  ctx.lineTo(halfWidth * 0.62, halfHeight);
-  ctx.lineTo(-halfWidth * 0.72, halfHeight);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  const activeFill = caught && reachedCatch ? "#fff2a8" : hullFill;
+  const activeStroke = caught && reachedCatch ? "#1f4660" : hullStroke;
+  drawModeledBoatHull({
+    halfWidth,
+    halfHeight,
+    fill: activeFill,
+    stroke: activeStroke,
+    style: boatStyle,
+    waiting: isWaitingBoat,
+    caught: caught && reachedCatch
+  });
   if (boatStyle === 1) {
     ctx.strokeStyle = "#111827";
     ctx.lineWidth = 2;
@@ -12804,6 +12967,121 @@ function drawBoat(boat, caught = false, alpha = 1) {
     drawBaseballIcon(0, -58, 8);
   }
   ctx.restore();
+}
+
+function drawModeledBoatHull({ halfWidth, halfHeight, fill, stroke, style = 0, waiting = false, caught = false }) {
+  const topFill = caught ? fill : fill;
+  const sideFill = style === 1
+    ? "#d6e0ea"
+    : style === 2
+      ? "#288fc8"
+      : "#0b223d";
+  const farSideFill = style === 1
+    ? "#eef5fb"
+    : style === 2
+      ? "#8ddcff"
+      : "#2a6c9d";
+  const noseFill = style === 1 ? "#ffffff" : style === 2 ? "#b7edff" : "#5dbde8";
+  ctx.save();
+  ctx.globalAlpha *= waiting ? 0.62 : 0.45;
+  ctx.fillStyle = "rgba(3, 18, 35, 0.52)";
+  ctx.beginPath();
+  ctx.ellipse(6, halfHeight * 0.9, halfWidth * 1.18, halfHeight * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(174, 231, 255, 0.22)";
+  ctx.beginPath();
+  ctx.ellipse(-10, halfHeight * 1.3, halfWidth * 0.92, halfHeight * 0.24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = waiting ? 3.2 : 3;
+
+  ctx.fillStyle = farSideFill;
+  ctx.beginPath();
+  ctx.moveTo(-halfWidth * 0.76, -halfHeight * 0.92);
+  ctx.lineTo(halfWidth * 0.54, -halfHeight * 0.92);
+  ctx.lineTo(halfWidth, -halfHeight * 0.08);
+  ctx.lineTo(halfWidth * 0.62, 0);
+  ctx.lineTo(-halfWidth * 0.9, -halfHeight * 0.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = sideFill;
+  ctx.beginPath();
+  ctx.moveTo(-halfWidth * 0.9, -halfHeight * 0.2);
+  ctx.lineTo(halfWidth * 0.62, 0);
+  ctx.lineTo(halfWidth, halfHeight * 0.08);
+  ctx.lineTo(halfWidth * 0.56, halfHeight * 0.96);
+  ctx.lineTo(-halfWidth * 0.76, halfHeight * 0.96);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = topFill;
+  ctx.beginPath();
+  ctx.moveTo(-halfWidth, 0);
+  ctx.lineTo(-halfWidth * 0.72, -halfHeight);
+  ctx.lineTo(halfWidth * 0.62, -halfHeight);
+  ctx.lineTo(halfWidth, 0);
+  ctx.lineTo(halfWidth * 0.62, halfHeight);
+  ctx.lineTo(-halfWidth * 0.72, halfHeight);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255,255,255,0.32)";
+  ctx.beginPath();
+  ctx.moveTo(-halfWidth * 0.58, -halfHeight * 0.74);
+  ctx.lineTo(halfWidth * 0.3, -halfHeight * 0.72);
+  ctx.lineTo(halfWidth * 0.18, -halfHeight * 0.28);
+  ctx.lineTo(-halfWidth * 0.68, -halfHeight * 0.24);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(0,0,0,0.24)";
+  ctx.beginPath();
+  ctx.moveTo(-halfWidth * 0.64, halfHeight * 0.28);
+  ctx.lineTo(halfWidth * 0.54, halfHeight * 0.18);
+  ctx.lineTo(halfWidth * 0.42, halfHeight * 0.78);
+  ctx.lineTo(-halfWidth * 0.58, halfHeight * 0.78);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = noseFill;
+  ctx.beginPath();
+  ctx.moveTo(halfWidth * 0.62, -halfHeight);
+  ctx.lineTo(halfWidth, 0);
+  ctx.lineTo(halfWidth * 0.62, halfHeight);
+  ctx.lineTo(halfWidth * 0.42, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.42)";
+  ctx.lineWidth = 1.6;
+  drawLine(-halfWidth * 0.64, -halfHeight * 0.82, halfWidth * 0.42, -halfHeight * 0.8);
+  drawLine(-halfWidth * 0.68, halfHeight * 0.82, halfWidth * 0.48, halfHeight * 0.72);
+  ctx.restore();
+}
+
+function getDriftingBoat(boat, elapsedSeconds = 0) {
+  if (!boat?.waitingNearLanding) return boat;
+  const drift = Math.sin(elapsedSeconds * 0.38 + boat.id) * 30;
+  const bob = Math.cos(elapsedSeconds * 0.31 + boat.id * 0.7) * 18;
+  const slowTurn = Math.sin(elapsedSeconds * 0.29 + boat.id * 0.41) * 0.22;
+  const forward = Math.cos(elapsedSeconds * 0.24 + boat.id * 0.21) * 14;
+  const side = normalize({ x: -Math.sin(boat.angle), y: Math.cos(boat.angle) });
+  const front = normalize({ x: Math.cos(boat.angle), y: Math.sin(boat.angle) });
+  return {
+    ...boat,
+    x: boat.x + side.x * drift + front.x * forward,
+    y: boat.y + side.y * drift + front.y * forward + bob,
+    angle: boat.angle + slowTurn,
+    rowPhase: elapsedSeconds * 1.25 + boat.id * 0.3
+  };
 }
 
 function drawBoatOars(rowPhase = 0, caught = false) {
@@ -12850,6 +13128,14 @@ function drawHyperOceanBeyondOutfield() {
   const center = getFenceCenter();
   const top = center.y - defenseField.fenceDistance - 780;
   ctx.save();
+  const oceanLeft = field.plateX - defenseField.fenceDistance - 620;
+  const oceanWidth = defenseField.fenceDistance * 2 + 1240;
+  const oceanHeight = 980;
+  ctx.beginPath();
+  ctx.rect(oceanLeft, top, oceanWidth, oceanHeight);
+  ctx.arc(center.x, center.y, defenseField.fenceDistance + 6, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip("evenodd");
   const gradient = ctx.createLinearGradient(field.plateX, top, field.plateX, center.y - defenseField.fenceDistance + 190);
   if (gradient?.addColorStop) {
     gradient.addColorStop(0, "#4eb3d3");
@@ -12858,7 +13144,7 @@ function drawHyperOceanBeyondOutfield() {
   } else {
     ctx.fillStyle = "#2f91b7";
   }
-  ctx.fillRect(field.plateX - defenseField.fenceDistance - 620, top, defenseField.fenceDistance * 2 + 1240, 980);
+  ctx.fillRect(oceanLeft, top, oceanWidth, oceanHeight);
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.lineWidth = 4;
   for (let i = 0; i < 9; i += 1) {
@@ -12867,12 +13153,18 @@ function drawHyperOceanBeyondOutfield() {
   }
   const boatCatch = defenseState.homeRunFireworks?.boatCatch;
   const elapsedSeconds = defenseState.active ? (performance.now() - defenseState.startTime) / 1000 : 0;
-  getHyperOceanBoats().forEach((boat) => {
+  const oceanBoats = defenseState.homeRunFireworks?.oceanBoats || [];
+  if (!oceanBoats.length) {
+    getHyperOceanBoats().forEach((boat) => {
+      drawBoat(boat, false, 0.76);
+    });
+  }
+  oceanBoats.forEach((boat) => {
     const isCaughtBoat = boatCatch?.boatId === boat.id;
     const displayBoat = isCaughtBoat
       ? getAnimatedBoatForCatch(boat, boatCatch, elapsedSeconds)
-      : boat;
-    drawBoat(displayBoat, isCaughtBoat, isCaughtBoat ? 1 : 0.76);
+      : getDriftingBoat(boat, elapsedSeconds);
+    drawBoat(displayBoat, isCaughtBoat, isCaughtBoat ? 1 : 0.88);
   });
   ctx.restore();
 }
@@ -12900,6 +13192,130 @@ function drawNextDomeBeyondOutfield() {
     ctx.fillStyle = tier % 2 === 0 ? "rgba(255, 235, 137, 0.82)" : "rgba(214, 242, 223, 0.82)";
     roundRect(field.plateX - 620 + tier * 34, standY + 11 - tier * 38, 1240 - tier * 68, 8, 4);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRiversideBeyondOutfield() {
+  if (!getCurrentStadium().hasRiver) return;
+  const center = getFenceCenter();
+  const standY = center.y - defenseField.fenceDistance - 170;
+  ctx.save();
+  ctx.fillStyle = "rgba(80, 58, 39, 0.34)";
+  roundRect(field.plateX - defenseField.fenceDistance * 0.72, standY - 16, defenseField.fenceDistance * 1.44, 86, 18);
+  ctx.fill();
+  for (let row = 0; row < 5; row += 1) {
+    ctx.fillStyle = row % 2 === 0 ? "rgba(255,235,137,0.76)" : "rgba(127,185,226,0.7)";
+    roundRect(field.plateX - defenseField.fenceDistance * 0.64, standY + row * 17, defenseField.fenceDistance * 1.28, 8, 5);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function getRiversideRiverBandPoints(extraWidth = 0) {
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics) return null;
+  const left = field.plateX - metrics.xSpan;
+  const right = field.plateX + metrics.xSpan;
+  const samples = 32;
+  const upper = [];
+  const lower = [];
+  for (let i = 0; i <= samples; i += 1) {
+    const x = left + (right - left) * (i / samples);
+    const y = getRiversideRiverCenterY(x);
+    upper.push({ x, y: y - metrics.halfWidth - extraWidth });
+    lower.push({ x, y: y + metrics.halfWidth + extraWidth });
+  }
+  return { upper, lower };
+}
+
+function traceRiversideRiverBand(extraWidth = 0) {
+  const band = getRiversideRiverBandPoints(extraWidth);
+  if (!band) return false;
+  ctx.beginPath();
+  band.upper.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  [...band.lower].reverse().forEach((point) => ctx.lineTo(point.x, point.y));
+  ctx.closePath();
+  return true;
+}
+
+function drawRiversideRiver() {
+  if (!getCurrentStadium().hasRiver) return;
+  const metrics = getRiversideRiverMetrics();
+  if (!metrics) return;
+  ctx.save();
+
+  if (traceRiversideRiverBand(50)) {
+    ctx.fillStyle = "#8e6b45";
+    ctx.fill();
+  }
+  if (traceRiversideRiverBand(32)) {
+    ctx.fillStyle = "#b99160";
+    ctx.fill();
+  }
+  if (traceRiversideRiverBand(0)) {
+    const bandGradient = ctx.createLinearGradient(field.plateX, getFenceCenter().y - metrics.centerDistance - metrics.halfWidth, field.plateX, getFenceCenter().y - metrics.centerDistance + metrics.halfWidth);
+    if (bandGradient?.addColorStop) {
+      bandGradient.addColorStop(0, "#2e8bbb");
+      bandGradient.addColorStop(0.55, "#56b3d0");
+      bandGradient.addColorStop(1, "#1d6f9f");
+      ctx.fillStyle = bandGradient;
+    } else {
+      ctx.fillStyle = "#3a9fc5";
+    }
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "rgba(236, 252, 255, 0.42)";
+  ctx.lineWidth = 5;
+  for (let lane = -0.55; lane <= 0.6; lane += 0.38) {
+    ctx.beginPath();
+    for (let i = 0; i <= 26; i += 1) {
+      const x = field.plateX - metrics.xSpan * 0.92 + (metrics.xSpan * 1.84 * i) / 26;
+      const y = getRiversideRiverCenterY(x) + metrics.halfWidth * lane + Math.sin(i * 0.8 + lane * 4) * 7;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 34; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const x = field.plateX - metrics.xSpan * 0.84 + (metrics.xSpan * 1.68 * i) / 33;
+    const y = getRiversideRiverCenterY(x) + side * (metrics.halfWidth + 24 + (i % 3) * 8);
+    ctx.fillStyle = i % 3 === 0 ? "rgba(72, 96, 58, 0.84)" : "rgba(180, 166, 126, 0.72)";
+    if (i % 3 === 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, 12 + (i % 4) * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#6d4e2f";
+      ctx.fillRect(x - 2, y + 8, 4, 16);
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(x, y, 7, 4, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const riverPoint = defenseState.battedBall?.riverEntryPoint;
+  if (defenseState.active && riverPoint) {
+    const elapsed = (performance.now() - defenseState.startTime) / 1000;
+    const age = Math.max(0, elapsed - (defenseState.battedBall?.ballTime ?? 0.8));
+    const alpha = clamp(1 - age / 2.2, 0, 1);
+    if (alpha > 0) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.8 * alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(riverPoint.x, riverPoint.y, 18 + age * 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(18, 63, 91, ${0.28 * alpha})`;
+      ctx.beginPath();
+      ctx.arc(riverPoint.x, riverPoint.y + age * 10, 10 + age * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -12944,6 +13360,7 @@ function drawDefenseView() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const stadium = getCurrentStadium();
   drawStadiumTurfPattern(stadium);
+  drawNextDomeRoofScreen();
 
   const camera = getDefenseCameraOffset();
   ctx.save();
@@ -12951,6 +13368,7 @@ function drawDefenseView() {
 
   drawHyperOceanBeyondOutfield();
   drawNextDomeBeyondOutfield();
+  drawRiversideBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
 
@@ -12966,6 +13384,8 @@ function drawDefenseView() {
   ctx.beginPath();
   ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
   ctx.fill();
+
+  drawRiversideRiver();
 
   ctx.strokeStyle = "rgba(255,255,255,0.78)";
   ctx.lineWidth = 5;
@@ -13035,6 +13455,48 @@ function drawHomeRunFireworks() {
     ctx.arc(x, y, 18 + progress * 36, 0, Math.PI * 2);
     ctx.fill();
   });
+  drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds);
+  ctx.restore();
+}
+
+function drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds) {
+  const boatCatch = fireworks?.boatCatch;
+  if (!boatCatch) return;
+  const catchMoment = (boatCatch.startTime ?? 0.8) + (boatCatch.travelDuration ?? 1.2);
+  const age = elapsedSeconds - catchMoment;
+  if (age < 0 || age > 2.6) return;
+  const alpha = 1 - age / 2.6;
+  const x = boatCatch.x ?? boatCatch.ballX;
+  const y = boatCatch.y ?? boatCatch.ballY;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(174, 231, 255, ${0.9 * alpha})`;
+  ctx.lineWidth = 7;
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (Math.PI * 2 * i) / 10 + age * 1.6;
+    const inner = 18 + age * 22;
+    const outer = 64 + age * 82 + (i % 2) * 24;
+    drawLine(
+      x + Math.cos(angle) * inner,
+      y + Math.sin(angle) * inner,
+      x + Math.cos(angle) * outer,
+      y + Math.sin(angle) * outer
+    );
+  }
+  ctx.strokeStyle = `rgba(255, 242, 168, ${0.9 * alpha})`;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(x, y, 40 + age * 78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.38 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(x, y, 24 + age * 58, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+  ctx.font = "bold 26px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("CATCH!", x, y - 96 - age * 18);
   ctx.restore();
 }
 
@@ -13113,7 +13575,7 @@ function drawOutfieldWall() {
   const homeY = field.plateY + 42;
   const wallHeight = defenseField.fenceHeight;
   const stadium = getCurrentStadium();
-  const lowFence = stadium.id === "aozora";
+  const lowFence = stadium.id === "aozora" || stadium.id === "riverside";
   ctx.save();
 
   ctx.strokeStyle = "rgba(18, 34, 47, 0.32)";
@@ -13199,9 +13661,11 @@ function getHomeRunCameraOffset() {
   const standWeight = clamp((elapsedSeconds - (battedBall.ballTime ?? 0.8) * 0.58) / 0.7, 0, 1);
   const focusX = ballFocus.x * (1 - standWeight) + standFocus.x * standWeight;
   const focusY = ballFocus.y * (1 - standWeight) + standFocus.y * standWeight;
-  const minX = field.plateX - defenseField.fenceDistance - 360;
-  const maxX = field.plateX + defenseField.fenceDistance + 360;
-  const minY = center.y - defenseField.fenceDistance - 760;
+  const target = battedBall?.target || standFocus;
+  const focusBoundsX = Math.max(defenseField.fenceDistance + 520, Math.abs((target?.x ?? field.plateX) - field.plateX) + 420, Math.abs(standFocus.x - field.plateX) + 420);
+  const minX = field.plateX - focusBoundsX;
+  const maxX = field.plateX + focusBoundsX;
+  const minY = Math.min(center.y - defenseField.fenceDistance - 1080, (target?.y ?? center.y) - 520, standFocus.y - 520);
   const maxY = center.y + 120;
   return {
     x: clamp(canvas.width / 2 - focusX, canvas.width - maxX, -minX),
@@ -13211,21 +13675,21 @@ function getHomeRunCameraOffset() {
 
 function getHomeRunStandFocusPoint() {
   const fireworks = defenseState.homeRunFireworks;
-  if (fireworks?.bursts?.length) {
-    const total = fireworks.bursts.reduce((sum, burst) => ({
-      x: sum.x + burst.origin.x,
-      y: sum.y + burst.origin.y
-    }), { x: 0, y: 0 });
+  if (fireworks?.boatCatch) {
     return {
-      x: total.x / fireworks.bursts.length,
-      y: total.y / fireworks.bursts.length - 95
+      x: fireworks.boatCatch.x ?? fireworks.boatCatch.ballX,
+      y: (fireworks.boatCatch.y ?? fireworks.boatCatch.ballY) - 60
     };
   }
   const target = defenseState.battedBall?.target || {
     x: field.plateX,
     y: getFenceCenter().y - defenseField.fenceDistance - 260
   };
-  return { x: target.x, y: target.y - 100 };
+  if (getCurrentStadium().hasOcean && defenseState.battedBall?.fenceOver) {
+    const water = getHomeRunWaterLandingPoint(defenseState.battedBall);
+    return { x: water.x, y: water.y - 62 };
+  }
+  return { x: target.x, y: target.y - 86 };
 }
 
 function getBattedBallFirstLandingPoint(battedBall) {
