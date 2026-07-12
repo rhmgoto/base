@@ -1010,6 +1010,9 @@ const rosterAndPointState = JSON.parse(runInGame(
     const simultaneousAwayChooserHtml = chooserOptions.innerHTML;
     const simultaneousHomeChooserHtml = chooserOptionsHome.innerHTML;
     const simultaneousChooserTitles = [chooserTitle.textContent, chooserTitleHome.textContent];
+    gamePhase = "menu";
+    closeMenuGamepadOverlay("away");
+    const awayGamepadCloseClearsOnlyAway = chooserOptions.innerHTML === "" && chooserOptionsHome.innerHTML.length > 0;
     closePlayerChooser("home");
     const makeOriginalForm = (values) => {
       const status = { textContent: "" };
@@ -1605,6 +1608,7 @@ const rosterAndPointState = JSON.parse(runInGame(
       simultaneousAwayChooserHtml,
       simultaneousHomeChooserHtml,
       simultaneousChooserTitles,
+      awayGamepadCloseClearsOnlyAway,
       catcherChooserHtml,
       pitcherChooserHtml,
       pitcherChooserHasPitchHandRow,
@@ -2016,6 +2020,7 @@ assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-lim
 assert(rosterAndPointState.originalCreatorFirst === true, "batter chooser should show the original-player creator as the first card");
 assert(rosterAndPointState.simultaneousAwayChooserHtml.length > 0 && rosterAndPointState.simultaneousHomeChooserHtml.length > 0, "player chooser should render 1P and 2P option panes at the same time");
 assert(rosterAndPointState.simultaneousChooserTitles[0].includes("1P") && rosterAndPointState.simultaneousChooserTitles[1].includes("2P"), "player chooser panes should label the 1P and 2P sides clearly");
+assert(rosterAndPointState.awayGamepadCloseClearsOnlyAway === true, "1P gamepad close should only close the 1P chooser pane and leave the 2P pane open");
 assert(!rosterAndPointState.chooserHtml.includes("オリジナル選手作成") && !rosterAndPointState.chooserHtml.includes("この選手を使う"), "original-player creator should fit into a normal card without extra title or use button text");
 assert(rosterAndPointState.originalOverRemaining < 0, "original-player creator should block stat totals above cost times five");
 assert(rosterAndPointState.originalSelected === true, "valid original-player creator entries should be selectable");
@@ -3892,6 +3897,7 @@ const defenseTuningState = JSON.parse(runInGame(
       reaction1: getFielderReactionDelay({ fielding: 1 }),
       reaction5,
       reaction10: getFielderReactionDelay({ fielding: 10 }),
+      reactionGap: getFielderReactionDelay({ fielding: 1 }) - getFielderReactionDelay({ fielding: 10 }),
       arrival5: getDefenseFielderArrivalTime(fielder, target),
       travelOnly5: Math.hypot(target.x - fielder.x, target.y - fielder.y) / getFielderSpeed(fielder),
       runBeforeDelay,
@@ -3918,6 +3924,7 @@ assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && def
 assert(defenseTuningState.reaction5 > 0.2, "average fielders should hesitate briefly before moving");
 assert(defenseTuningState.reaction10 < defenseTuningState.reaction5, "elite fielders should react sooner than average fielders");
 assert(defenseTuningState.reaction1 > defenseTuningState.reaction5, "weak fielders should react later than average fielders");
+assert(defenseTuningState.reactionGap >= 0.45, "first-step delay should differ clearly between weak and elite fielders");
 assert(defenseTuningState.arrival5 > defenseTuningState.travelOnly5, "fielder arrival time should include reaction delay");
 assert(defenseTuningState.runBeforeDelay === 0, "fielders should not begin moving before their reaction delay");
 assert(Math.abs(defenseTuningState.grounderTravelHalf - 0.5) < 0.001, "grounders should travel smoothly into the first bounce point");
@@ -4958,20 +4965,28 @@ const variedBattedBallState = JSON.parse(runInGame(
       fenceOver: false,
       wallHit: false
     };
-    const lateFielder = { role: "C", x: 640, y: 360, speed: 5, fielding: 6, arm: 5, distanceToTarget: getFielderSpeed({ speed: 5 }) * 1.5 };
+    const lateFielder = { role: "C", x: 640, y: 360, speed: 5, fielding: 6, arm: 5, distanceToTarget: getFielderSpeed({ speed: 5 }) * 1.28 };
     const lateFlyCatch = resolveDefenseOutcome(lateFielder, lateRoutineFly, runner);
     const extraLateFielder = { ...lateFielder, distanceToTarget: getFielderSpeed({ speed: 5 }) * 2.55 };
     const extraLateFlyCatch = resolveDefenseOutcome(extraLateFielder, lateRoutineFly, runner);
     const visualLateFielder = { ...lateFielder, fielding: 2, speed: 2, distanceToTarget: getFielderSpeed({ speed: 2 }) * 1.88 };
     const visualLateFlyCatch = resolveDefenseOutcome(visualLateFielder, lateRoutineFly, runner);
-    const eliteFlyFielder = { ...lateFielder, fielding: 10, speed: 10, distanceToTarget: getFielderSpeed({ speed: 10 }) * 1.62 };
+    const eliteFlyFielder = { ...lateFielder, fielding: 10, speed: 10, distanceToTarget: getFielderSpeed({ speed: 10 }) * 1.42 };
     const eliteFlyCatch = resolveDefenseOutcome(eliteFlyFielder, lateRoutineFly, runner);
+    const sameFlyHighFielder = { ...lateFielder, speed: 8, fielding: 10, distanceToTarget: getFielderSpeed({ speed: 8 }) * 1.12 };
+    const sameFlyLowFielder = { ...sameFlyHighFielder, fielding: 1 };
+    const sameFlyHighCatch = resolveDefenseOutcome(sameFlyHighFielder, lateRoutineFly, runner);
+    const sameFlyLowCatch = resolveDefenseOutcome(sameFlyLowFielder, lateRoutineFly, runner);
     const flyProfile = {
       power: 0.62,
       quality: 0.34,
       timingPull: 0.22,
       direction: normalize({ x: 0.04, y: -1 })
     };
+    Math.random = () => 0.06;
+    const shallowRoutineFly = buildBattedBall(0.68, normalize({ x: 0.1, y: -1 }), hitLabels.routineFly, flyProfile);
+    Math.random = () => 0.94;
+    const deepRoutineFly = buildBattedBall(0.68, normalize({ x: 0.1, y: -1 }), hitLabels.routineFly, flyProfile);
     Math.random = () => 0.18;
     const variedFlyA = makeRoutineFlyResultFromProfile(flyProfile);
     Math.random = () => 0.82;
@@ -5131,6 +5146,10 @@ const variedBattedBallState = JSON.parse(runInGame(
       extraLateFlyCatch,
       visualLateFlyCatch,
       eliteFlyCatch,
+      sameFlyHighCatch,
+      sameFlyLowCatch,
+      routineFlyDepthGap: deepRoutineFly.landingDistance - shallowRoutineFly.landingDistance,
+      routineFlyLineGap: Math.abs(deepRoutineFly.direction.x - shallowRoutineFly.direction.x),
       variedFlyDirectionGap: Math.abs(variedFlyA.direction.x - variedFlyB.direction.x),
       flyChaseTargetIsLanding: flyChaseTarget.x === lateRoutineFly.target.x && flyChaseTarget.y === lateRoutineFly.target.y,
       wallFlyChaseTargetIsLanding: wallFlyChaseTarget.x === lateRoutineFly.target.x && wallFlyChaseTarget.y === lateRoutineFly.target.y,
@@ -5250,6 +5269,10 @@ assert(variedBattedBallState.lateFlyCatch.caught === true && variedBattedBallSta
 assert(variedBattedBallState.extraLateFlyCatch.caught === false, "outfielders should not catch fly balls when they are clearly late to the landing point");
 assert(variedBattedBallState.visualLateFlyCatch.caught === false, "low-fielding outfielders should miss fly balls unless they truly reach the landing point");
 assert(variedBattedBallState.eliteFlyCatch.caught === true && variedBattedBallState.eliteFlyCatch.kind === "out", "elite outfielders should still catch fly balls when their range gets them there");
+assert(variedBattedBallState.sameFlyHighCatch.caught === true, "high-fielding outfielders should beat the same fly ball with a faster first step");
+assert(variedBattedBallState.sameFlyLowCatch.caught === false, "low-fielding outfielders should lose the same fly ball when their first step is late");
+assert(variedBattedBallState.routineFlyDepthGap > 240, "routine fly balls should include clearly shallow and deep landing points");
+assert(variedBattedBallState.routineFlyLineGap > 0.08, "routine fly balls should be able to drift toward different lanes");
 assert(variedBattedBallState.variedFlyDirectionGap > 0.08, "routine fly balls should vary their landing direction enough to test fielder range");
 assert(variedBattedBallState.flyChaseTargetIsLanding === true, "fielders should chase fly-ball landing predictions before the ball drops");
 assert(variedBattedBallState.wallFlyChaseTargetIsLanding === true, "fielders should chase wall-hit fly-ball predictions before the ball drops");
@@ -7725,7 +7748,10 @@ assert(manualAutoFlyState.caught === true && manualAutoFlyState.needsThrow === f
 const manualFlyAssistState = JSON.parse(runInGame(
   context,
   `(() => {
+    const originalRandom = Math.random;
+    Math.random = () => 0.5;
     const flyBall = buildBattedBall(0.72, normalize({ x: 0.05, y: -1 }), hitLabels.fly);
+    Math.random = originalRandom;
     const landing = { ...flyBall.target };
     const fielder = { role: "C", x: landing.x + 320, y: landing.y + 80, currentX: landing.x + 320, currentY: landing.y + 80, speed: 6, fielding: 6, arm: 6 };
     const farFielder = { role: "R", x: landing.x + 720, y: landing.y + 260, currentX: landing.x + 720, currentY: landing.y + 260, speed: 6, fielding: 6, arm: 6 };
@@ -8602,7 +8628,9 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       power: 0.9
     };
     const marginalLinerFielder = { ...short, distanceToTarget: Math.hypot(marginalLiner.target.x - short.x, marginalLiner.target.y - short.y), fieldingPoint: marginalLiner.target };
+    Math.random = () => 0.99;
     const marginalLinerOutcome = resolveDefenseOutcome(marginalLinerFielder, marginalLiner, runner);
+    Math.random = originalRandom;
     const pitcher = fielders.find((fielder) => fielder.role === "P");
     const pitcherNearGrounder = {
       ...hardGrounder,
@@ -9058,6 +9086,71 @@ assert(infieldTakeoverAndCatchState.popupOutcomeCaught === true, "reachable infi
 assert(infieldTakeoverAndCatchState.popupOutfieldPlannedOverrideIsInfield === true && infieldTakeoverAndCatchState.popupOutfieldPlannedOverrideCaught === true, "infield popup flies should override any initially outfield-planned play");
 assert(infieldTakeoverAndCatchState.highLinerIncludesInfielder === false, "infielders should not chase high liners that clearly pass over their heads");
 
+const liveInfielderContactState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    activeBatter = findById(batters, "suzuki");
+    const second = { role: "2B", name: "テスト二塁", x: field.centerX + 120, y: field.plateY - 520, currentX: field.centerX + 120, currentY: field.plateY - 520, speed: 6, fielding: 7, arm: 5 };
+    const battedBall = {
+      origin: { x: field.plateX, y: field.plateY - 10 },
+      target: { x: second.x + 360, y: second.y - 420 },
+      direction: normalize({ x: 0.34, y: -1 }),
+      flightDistance: 980,
+      landingDistance: 980,
+      ballTime: 1.2,
+      isGrounder: true,
+      isLiner: false,
+      isDeep: false,
+      power: 0.48,
+      trajectory: "grounder",
+      fenceOver: false,
+      wallHit: false,
+      groundRuleDouble: false
+    };
+    defenseState = {
+      ...createDefenseState(),
+      active: true,
+      manualFielding: false,
+      startTime: performance.now() - 700,
+      duration: 2400,
+      battedBall,
+      fielders: [second],
+      chosenFielder: { role: "C" },
+      outcome: { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: 1.2 },
+      target: battedBall.target,
+      landingTarget: battedBall.target,
+      runner: createBatterRunner(activeBatter)
+    };
+    ball.x = second.currentX + getLiveInfielderContactRadius(second, battedBall) * 0.45;
+    ball.y = second.currentY;
+    const liveCaught = resolveLiveInfielderContactCatch(0.7);
+    const weakGroundRange = getFielderCatchRangeRadius({ fielding: 1 }, { isGrounder: true, trajectory: "grounder" });
+    const eliteGroundRange = getFielderCatchRangeRadius({ fielding: 10 }, { isGrounder: true, trajectory: "grounder" });
+    const eliteFlyRange = getFielderCatchRangeRadius({ fielding: 10 }, { isGrounder: false, isLiner: false, trajectory: "fly" });
+    const oldEliteGroundRange = 40 + 10 * 2.8;
+    return JSON.stringify({
+      liveCaught,
+      outcomeCaught: defenseState.outcome.caught,
+      outcomeNeedsThrow: defenseState.outcome.needsThrow,
+      chosenRole: defenseState.chosenFielder.role,
+      rangeDebugEnabled: showFielderCatchRangeDebug,
+      liveRadiusGreaterThanBase: getLiveInfielderContactRadius(second, battedBall) > getFielderCatchRangeRadius(second, battedBall),
+      weakGroundRange,
+      eliteGroundRange,
+      eliteFlyRange,
+      oldEliteGroundRange
+    });
+  })()`
+));
+
+assert(liveInfielderContactState.liveCaught === true && liveInfielderContactState.outcomeCaught === true, "infielders already on top of a soft grounder should field it instead of letting it pass through");
+assert(liveInfielderContactState.outcomeNeedsThrow === true && liveInfielderContactState.chosenRole === "2B", "live infield contact catches should become normal infield throw plays");
+assert(liveInfielderContactState.rangeDebugEnabled === true, "fielder catch range debug display should be switchable from one constant");
+assert(liveInfielderContactState.liveRadiusGreaterThanBase === true, "soft grounders should have a slightly forgiving live contact radius");
+assert(liveInfielderContactState.eliteFlyRange === liveInfielderContactState.eliteGroundRange, "fly range circles should match grounder range circles");
+assert(liveInfielderContactState.eliteGroundRange >= liveInfielderContactState.oldEliteGroundRange * 1.2, "elite fielder grounder circles should be at least 20% larger");
+assert(liveInfielderContactState.weakGroundRange > 40 + 1 * 2.8, "low fielder grounder circles should also be larger than before");
+
 const fenceInPlayState = JSON.parse(runInGame(
   context,
   `(() => {
@@ -9136,6 +9229,7 @@ const hardGrounderFenceState = JSON.parse(runInGame(
     return JSON.stringify({
       groundRuleDouble: hardGrounder.groundRuleDouble,
       atFence: isAtOutfieldFence(target),
+      targetFieldableInsideFence: defenseField.fenceDistance - getFenceDistance(target) >= outfieldFenceFieldingInset - 1,
       needsThrow: throwPlay.needsThrow,
       throwActive: Boolean(throwState)
     });
@@ -9144,6 +9238,7 @@ const hardGrounderFenceState = JSON.parse(runInGame(
 
 assert(hardGrounderFenceState.groundRuleDouble === false, "hard grounders reaching the fence should remain in play");
 assert(hardGrounderFenceState.atFence === true, "hard grounders reaching the fence should be fielded at the fence");
+assert(hardGrounderFenceState.targetFieldableInsideFence === true, "hard grounders reaching the fence should stop at a fieldable point inside the wall");
 assert(hardGrounderFenceState.needsThrow === true, "hard grounders at the fence should create a throw");
 assert(hardGrounderFenceState.throwActive === true, "hard grounders at the fence should have a throw animation state");
 
