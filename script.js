@@ -327,6 +327,7 @@ const pitchBendEffect = 1.15;
 const pitchSpeedChangeEffect = 1.05 * 1.15;
 const maxPitchSpeedChangeAmount = (0.0018 + 10 * 0.00072) * 9 * pitchSpeedChangeEffect;
 const batJudgmentSpeedMultiplier = 1.6;
+const homeRunFrequencyMultiplier = 1.6;
 const powerHitterHomeRunReductionRate = 0.624;
 const homerToStrongInfieldGrounderRate = 0.16;
 const batLengthMultiplier = 0.648 * 0.85 * 0.9;
@@ -381,7 +382,7 @@ const teamPresets = {
     selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "maddux", pitcher4: "hikari", pitcher5: "magari", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", lineupOrder: [...batterRoles] }
   }
 };
-const defaultTeamPresetBySide = { away: "tigers", home: "dodgers" };
+const defaultTeamPresetBySide = { away: "dodgers", home: "dodgers" };
 const defaultMenuSelection = {
   away: cloneTeamSelection(teamPresets[defaultTeamPresetBySide.away].selection),
   home: cloneTeamSelection(teamPresets[defaultTeamPresetBySide.home].selection)
@@ -444,17 +445,58 @@ const stadiumPresets = {
     id: "fireworks",
     name: "大花火スタジアム",
     surface: "grass",
-    fenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
     fenceHeight: baseDefenseField.fenceHeight,
-    grassRadiusScale: 1
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: false,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    airCarryScale: 1
   },
   aozora: {
     id: "aozora",
     name: "青空グラウンド",
     surface: "dirt",
-    fenceMeters: 85,
+    centerFenceMeters: 85,
+    lineFenceMeters: 85,
     fenceHeight: baseDefenseField.fenceHeight * 0.42,
-    grassRadiusScale: 0.72
+    grassRadiusScale: 0.72,
+    hasFoulGroundDetails: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    airCarryScale: 1
+  },
+  hyperOcean: {
+    id: "hyperOcean",
+    name: "ハイパーオーシャンパーク",
+    surface: "premiumGrass",
+    centerFenceMeters: 115,
+    lineFenceMeters: 92,
+    fenceHeight: baseDefenseField.fenceHeight * 0.86,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: true,
+    hasOcean: true,
+    hasMountains: false,
+    hasDome: false,
+    airCarryScale: 1
+  },
+  nextDome: {
+    id: "nextDome",
+    name: "ネクストドーム",
+    surface: "artificialTurf",
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
+    fenceHeight: baseDefenseField.fenceHeight,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: true,
+    airCarryScale: 1,
+    fireworkScale: 1.6
   }
 };
 let currentStadiumId = "fireworks";
@@ -464,7 +506,7 @@ function getCurrentStadium() {
 }
 
 function getStadiumFenceDistance(stadium) {
-  const fenceMeters = Number.isFinite(stadium?.fenceMeters) ? stadium.fenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  const fenceMeters = Number.isFinite(stadium?.centerFenceMeters) ? stadium.centerFenceMeters : realFieldMetrics.centerFieldFenceMeters;
   return baseDefenseField.fenceDistance * (fenceMeters / realFieldMetrics.centerFieldFenceMeters);
 }
 
@@ -7370,9 +7412,10 @@ function formatRuns(runs) {
 function createHomeRunFireworks(battedBall) {
   if (!battedBall?.fenceOver) return null;
   const homerRuns = getPendingHomeRunRuns();
-  const burstCount = homerRuns >= 4 ? 28 : homerRuns === 3 ? 20 : homerRuns === 2 ? 15 : 10;
-  const sparkBase = homerRuns >= 4 ? 36 : homerRuns === 3 ? 30 : homerRuns === 2 ? 26 : 22;
-  const duration = homerRuns >= 4 ? 4.2 : homerRuns === 3 ? 3.6 : homerRuns === 2 ? 3.2 : 3;
+  const fireworkScale = getCurrentStadium().fireworkScale ?? 1;
+  const burstCount = Math.round((homerRuns >= 4 ? 28 : homerRuns === 3 ? 20 : homerRuns === 2 ? 15 : 10) * fireworkScale);
+  const sparkBase = Math.round((homerRuns >= 4 ? 36 : homerRuns === 3 ? 30 : homerRuns === 2 ? 26 : 22) * Math.sqrt(fireworkScale));
+  const duration = (homerRuns >= 4 ? 4.2 : homerRuns === 3 ? 3.6 : homerRuns === 2 ? 3.2 : 3) * (fireworkScale > 1 ? 1.12 : 1);
   const center = getFenceCenter();
   const direction = normalize({
     x: (battedBall.target?.x ?? field.centerX) - center.x,
@@ -7380,6 +7423,7 @@ function createHomeRunFireworks(battedBall) {
   });
   const side = normalize({ x: -direction.y, y: direction.x });
   const colors = ["#fff2a8", "#ff6f61", "#aee7ff", "#d6f2df", "#ffb3f0"];
+  const boatCatch = getHomeRunBoatCatch(battedBall);
   const bursts = Array.from({ length: burstCount }, (_, burstIndex) => {
     const standDistance = defenseField.fenceDistance + randomBetween(70, homerRuns >= 4 ? 430 : 260);
     const lateral = randomBetween(homerRuns >= 4 ? -720 : -420, homerRuns >= 4 ? 720 : 420);
@@ -7405,8 +7449,44 @@ function createHomeRunFireworks(battedBall) {
   });
   return {
     startDelay: Math.max(0.15, battedBall.ballTime ?? 0.7),
-    duration,
-    bursts
+    duration: boatCatch ? Math.max(duration, 5.2) : duration,
+    bursts,
+    boatCatch
+  };
+}
+
+function getHomeRunBoatCatch(battedBall) {
+  if (!getCurrentStadium().hasOcean || !battedBall?.fenceOver) return null;
+  const center = getFenceCenter();
+  const direction = normalize({
+    x: (battedBall.target?.x ?? field.centerX) - center.x,
+    y: (battedBall.target?.y ?? center.y - defenseField.fenceDistance) - center.y
+  });
+  const projectedLanding = {
+    x: center.x + direction.x * (defenseField.fenceDistance + 290),
+    y: center.y + direction.y * (defenseField.fenceDistance + 290)
+  };
+  const nearest = getHyperOceanBoats()
+    .map((boat) => ({ boat, distance: Math.hypot(boat.x - projectedLanding.x, boat.y - projectedLanding.y) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+  if (!nearest || nearest.distance > 360) return null;
+  const moveRatio = nearest.distance <= 80 ? 0 : clamp((nearest.distance - 80) / 280, 0, 1);
+  const catchX = nearest.boat.x + (projectedLanding.x - nearest.boat.x) * moveRatio;
+  const catchY = nearest.boat.y + (projectedLanding.y - nearest.boat.y) * moveRatio;
+  const catchAngle = Math.atan2(projectedLanding.y - nearest.boat.y, projectedLanding.x - nearest.boat.x);
+  return {
+    boatId: nearest.boat.id,
+    homeX: nearest.boat.x,
+    homeY: nearest.boat.y,
+    x: catchX,
+    y: catchY,
+    ballX: projectedLanding.x,
+    ballY: projectedLanding.y,
+    distance: nearest.distance,
+    moveRatio,
+    catchAngle,
+    startTime: Math.max(0.12, battedBall.ballTime ?? 0.8),
+    travelDuration: clamp((battedBall.ballTime ?? 0.8) + 0.55, 0.85, 1.65)
   };
 }
 
@@ -9188,12 +9268,15 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? fenceDistance * 0.24 + Math.max(0, profileExitVelocity - 1.1) * 260 + Math.max(0, profileCarry - 1.05) * 260
     : 0;
   const boostedRawDistance = rawDistance + battingPracticeHomerDistanceBonus;
-  const distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
+  let distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
     ? boostedRawDistance * (isBattingPracticeHomerCandidate ? 1.04 : bigOutfieldFlyDistanceScale)
     : boostedRawDistance;
   const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (label === hitLabels.grounder || power < 0.38));
   const isLiner = isHardOutfieldBounce || isCenterReturnLiner || isLineEdge || isLineLiner || isLineDrop || isFenceLiner || (isDeepDrive && !isSuperDeepDrive) || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
   const trajectory = isGrounder ? "grounder" : isLiner ? "liner" : "fly";
+  if (trajectory === "fly" && !isBunt) {
+    distance *= getCurrentStadium().airCarryScale ?? 1;
+  }
   if (isGrounder && !isBunt && !isLineEdgeGrounder && !isCenterReturnGrounder) {
     direction = getRandomGrounderDirection64(battedProfile);
   }
@@ -9307,9 +9390,14 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     && power >= 1.34
     && distance > defenseField.deepHitDistance
     && Math.random() < 0.36;
-  const possibleFenceOver = fairDeepFlight && fenceIntersection && distance > fenceTravelDistance;
+  const homeRunQualityBoost = getHomeRunQuality({ contactScore, profileExitVelocity, power });
+  const homeRunFrequencyDistanceBonus = !isBunt && fairDeepFlight && !isGrounder
+    ? (homeRunFrequencyMultiplier - 1) * 170 * clamp(homeRunQualityBoost + (isFenceLiner ? 0.12 : 0), 0.28, 1)
+    : 0;
+  const homeRunTestDistance = distance + homeRunFrequencyDistanceBonus;
+  const possibleFenceOver = fairDeepFlight && fenceIntersection && homeRunTestDistance > fenceTravelDistance;
   const possibleHomerFlightDistance = getPossibleHomeRunFlightDistance(
-    distance,
+    homeRunTestDistance,
     fenceTravelDistance,
     { isFenceEdgeFly, isToweringFly, isChaseFly, isDeepDrive, isFenceLiner, power, contactScore, profileExitVelocity, profileCarry }
   );
@@ -9332,11 +9420,29 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
         trajectory
       })
     : 0;
-  let fenceOver = !possibleWallHit && possibleFenceOver && getBattedBallHeightAtDistance(fenceTravelDistance, {
+  const domeRule = getNextDomeBattedBallRule({
+    direction,
+    trajectory,
+    distance,
+    possibleHomerFlightDistance,
+    possibleHomerHeight,
+    fairDeepFlight,
+    fenceTravelDistance,
+    fenceIntersection,
+    isGrounder,
+    isLiner,
+    isPopupFly,
+    isRoutineFly,
+    isToweringFly,
+    isFenceEdgeFly,
+    isDeepDrive,
+    isFenceLiner
+  });
+  let fenceOver = domeRule?.kind === "homer" || (!possibleWallHit && possibleFenceOver && getBattedBallHeightAtDistance(fenceTravelDistance, {
     flightDistance: possibleHomerFlightDistance,
     maxHeight: possibleHomerHeight,
     trajectory
-  }) >= defenseField.fenceHeight;
+  }) >= defenseField.fenceHeight);
   if (isBattingPracticeHomerCandidate && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 180) {
     fenceOver = true;
   }
@@ -9352,7 +9458,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     profileCarry,
     power
   });
-  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate) fenceOver = false;
+  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && domeRule?.kind !== "homer") fenceOver = false;
   const flyWallHit = trajectory === "fly"
     ? distance >= fenceTravelDistance - (isFenceEdgeFly ? 38 : isDeepDrive ? 52 : 24)
     : isFenceLiner
@@ -9360,8 +9466,10 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       : isExcellentLineLiner
         ? distance >= fenceTravelDistance - 96
       : distance >= defenseField.wallHitDistance;
-  const wallHit = !fenceOver && fairDeepFlight && fenceIntersection && (distance >= fenceTravelDistance || flyWallHit || possibleWallHit);
-  const flightDistance = fenceOver ? possibleHomerFlightDistance : wallHit ? fenceTravelDistance : landingDistance;
+  let groundRuleDouble = domeRule?.kind === "groundRuleDouble";
+  if (groundRuleDouble) fenceOver = false;
+  let wallHit = !groundRuleDouble && !fenceOver && fairDeepFlight && fenceIntersection && (distance >= fenceTravelDistance || flyWallHit || possibleWallHit);
+  const flightDistance = fenceOver ? possibleHomerFlightDistance : wallHit ? fenceTravelDistance : groundRuleDouble ? Math.min(distance, fenceTravelDistance + 70) : landingDistance;
   const contactSpeedLift = getSolidContactSpeedLift(contactScore, profileExitVelocity);
   if (fenceOver) {
     baseBallSpeed *= getHomeRunBallSpeedScale({
@@ -9442,7 +9550,45 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ballTime,
     launchAngle: launchAngleDegrees
   });
-  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, maxHeightMeters, launchAngleDegrees, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble: false, ballTime, maxHeight, wallImpactHeight };
+  return { origin, direction, target, wallReboundTarget, distance, landingDistance, flightDistance, flightDistanceMeters, maxHeightMeters, launchAngleDegrees, exitSpeedKmh, battedProfile, power, trajectory, isGrounder, isLiner, isPopupFly, isRoutineFly, isLineLiner, isLineDrop, isFenceLiner, isFrontDrop, isLineEdge, isLineEdgeGrounder, isCenterReturnGrounder, isCenterReturnLiner, isCenterReturn: isCenterReturnGrounder || isCenterReturnLiner, isChaseFly, isToweringFly, isFenceEdgeFly, isDeepDrive, isSuperDeepDrive, isSoftDrop, isHardOutfieldHit, isHardOutfieldBounce, isDeep, isBunt, fenceOver, wallHit, groundRuleDouble, domeRule, ballTime, maxHeight, wallImpactHeight };
+}
+
+function getNextDomeBattedBallRule({
+  direction,
+  trajectory,
+  distance,
+  possibleHomerFlightDistance,
+  possibleHomerHeight,
+  fairDeepFlight,
+  fenceTravelDistance,
+  fenceIntersection,
+  isGrounder,
+  isLiner,
+  isPopupFly,
+  isRoutineFly,
+  isToweringFly,
+  isFenceEdgeFly,
+  isDeepDrive,
+  isFenceLiner
+} = {}) {
+  if (!getCurrentStadium().hasDome || isGrounder || !Number.isFinite(possibleHomerHeight)) return null;
+  const fair = isFairDirection(direction);
+  const domeContactHeight = 455;
+  const innerRingHeight = 510;
+  const outerRingHeight = 560;
+  const depthRatio = fenceTravelDistance > 0 ? distance / fenceTravelDistance : 0;
+  const highEnough = possibleHomerHeight >= domeContactHeight;
+  if (!highEnough && !isPopupFly) return null;
+  if (fair && possibleHomerHeight >= outerRingHeight && depthRatio >= 0.82 && (isFenceEdgeFly || isToweringFly || isDeepDrive || isFenceLiner)) {
+    return { kind: "homer", label: "スーパーリング本塁打", contact: "outerRing" };
+  }
+  if (fair && possibleHomerHeight >= innerRingHeight && depthRatio >= 0.54 && depthRatio < 0.82) {
+    return { kind: "groundRuleDouble", label: "スーパーリング二塁打", contact: "innerRing" };
+  }
+  if (possibleHomerHeight >= domeContactHeight || isPopupFly) {
+    return { kind: "inPlay", label: "天井インプレイ", contact: "ceiling" };
+  }
+  return null;
 }
 
 function getSolidContactSpeedLift(contactScore = 0.5, exitVelocity = 0.6) {
@@ -9473,7 +9619,8 @@ function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
   });
   const eliteProtection = clamp((quality - 0.86) / 0.14, 0, 1);
   const powerHitterBoost = clamp((batterPower - 8) / 2, 0, 1) * 0.06;
-  const conversionChance = clamp(powerHitterHomeRunReductionRate + powerHitterBoost - eliteProtection * 0.2, 0.12, 0.56);
+  const adjustedReductionRate = powerHitterHomeRunReductionRate / homeRunFrequencyMultiplier;
+  const conversionChance = clamp(adjustedReductionRate + powerHitterBoost - eliteProtection * 0.2, 0.08, 0.38);
   return Math.random() < conversionChance;
 }
 
@@ -9561,15 +9708,16 @@ function getMetersPerBattedBallFieldUnit({ direction = null, fenceTravelDistance
 
 function getActualFenceDistanceMetersForDirection(direction = null) {
   const stadium = getCurrentStadium();
-  if (stadium.id === "aozora") return stadium.fenceMeters;
+  const centerMeters = Number.isFinite(stadium.centerFenceMeters) ? stadium.centerFenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  const lineMeters = Number.isFinite(stadium.lineFenceMeters) ? stadium.lineFenceMeters : realFieldMetrics.leftRightFieldFenceMeters;
+  if (stadium.id === "aozora") return centerMeters;
   if (!direction || !Number.isFinite(direction.x) || !Number.isFinite(direction.y)) {
-    return realFieldMetrics.centerFieldFenceMeters;
+    return centerMeters;
   }
   const lateralRatio = clamp(Math.abs(direction.x), 0, Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)));
   const foulRatio = Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees));
   const towardLine = Math.pow(clamp(lateralRatio / foulRatio, 0, 1), 1.15);
-  return realFieldMetrics.centerFieldFenceMeters
-    - (realFieldMetrics.centerFieldFenceMeters - realFieldMetrics.leftRightFieldFenceMeters) * towardLine;
+  return centerMeters - (centerMeters - lineMeters) * towardLine;
 }
 
 function getBattedBallMetricText(battedBall) {
@@ -12451,16 +12599,58 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
     }
     return;
   }
-  ctx.fillStyle = "#5fa85b";
+  ctx.fillStyle = stadium.surface === "premiumGrass"
+    ? "#64ad5f"
+    : stadium.surface === "artificialTurf"
+        ? "#3aa65f"
+      : "#5fa85b";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < canvas.width; i += 56) {
-    ctx.fillStyle = i % 112 === 0 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.045)";
+    ctx.fillStyle = i % 112 === 0
+      ? (stadium.surface === "premiumGrass" ? "rgba(220,255,220,0.09)" : stadium.surface === "artificialTurf" ? "rgba(190,255,220,0.11)" : "rgba(255,255,255,0.05)")
+      : "rgba(0,0,0,0.045)";
     ctx.fillRect(i, 0, 56, canvas.height);
   }
 }
 
-function drawAozoraFoulGroundDetails(homeY = field.plateY + 42) {
-  if (getCurrentStadium().id !== "aozora") return;
+function drawNextDomeRoofScreen() {
+  if (!getCurrentStadium().hasDome) return;
+  ctx.save();
+  const roof = ctx.createRadialGradient(field.plateX, 80, 120, field.plateX, 260, 820);
+  if (roof?.addColorStop) {
+    roof.addColorStop(0, "#f5f7fb");
+    roof.addColorStop(0.48, "#cfd7df");
+    roof.addColorStop(1, "#7e8b96");
+    ctx.fillStyle = roof;
+  } else {
+    ctx.fillStyle = "#cfd7df";
+  }
+  ctx.beginPath();
+  ctx.ellipse(field.plateX, 200, 760, 260, 0, Math.PI, Math.PI * 2);
+  ctx.lineTo(canvas.width, 0);
+  ctx.lineTo(0, 0);
+  ctx.closePath();
+  ctx.fill();
+  drawNextDomeRoofHighlights(field.plateX, 96, 1);
+  ctx.restore();
+}
+
+function drawNextDomeRoofHighlights(cx, cy, scale = 1) {
+  ctx.save();
+  [
+    { x1: -620, y1: 18, x2: 620, y2: 54, width: 7, color: "rgba(255,255,255,0.48)" },
+    { x1: -520, y1: 64, x2: 520, y2: 92, width: 5, color: "rgba(180,225,255,0.34)" },
+    { x1: -410, y1: 110, x2: 410, y2: 128, width: 4, color: "rgba(255,242,168,0.28)" }
+  ].forEach((ring) => {
+    ctx.strokeStyle = ring.color;
+    ctx.lineWidth = ring.width * scale;
+    drawLine(cx + ring.x1 * scale, cy + ring.y1 * scale, cx + ring.x2 * scale, cy + ring.y2 * scale);
+  });
+  ctx.restore();
+}
+
+function drawStadiumFoulGroundDetails(homeY = field.plateY + 42) {
+  if (!getCurrentStadium().hasFoulGroundDetails) return;
   ctx.save();
   const benches = [
     { x: field.plateX - 710, y: homeY - 230 },
@@ -12494,11 +12684,233 @@ function drawAozoraFoulGroundDetails(homeY = field.plateY + 42) {
   ctx.restore();
 }
 
+function drawNextDomeFoulGroundDetails(homeY = field.plateY + 42) {
+  if (!getCurrentStadium().hasDome) return;
+  ctx.save();
+  [
+    { x: field.plateX - 880, y: homeY - 320 },
+    { x: field.plateX + 880, y: homeY - 320 }
+  ].forEach((stand) => {
+    ctx.fillStyle = "rgba(35, 48, 71, 0.52)";
+    roundRect(stand.x - 155, stand.y - 34, 310, 104, 12);
+    ctx.fill();
+    for (let row = 0; row < 5; row += 1) {
+      ctx.fillStyle = row % 2 === 0 ? "rgba(214,242,223,0.82)" : "rgba(255,235,137,0.8)";
+      roundRect(stand.x - 130, stand.y - 14 + row * 18, 260, 9, 5);
+      ctx.fill();
+    }
+  });
+  [
+    { x: field.plateX - 510, y: homeY - 115 },
+    { x: field.plateX + 510, y: homeY - 115 }
+  ].forEach((pit) => {
+    ctx.fillStyle = "rgba(20, 28, 40, 0.48)";
+    roundRect(pit.x - 76, pit.y - 18, 152, 42, 8);
+    ctx.fill();
+    ctx.fillStyle = "#d7e5ef";
+    ctx.fillRect(pit.x - 42, pit.y - 6, 38, 20);
+    ctx.fillStyle = "#233047";
+    ctx.beginPath();
+    ctx.arc(pit.x + 26, pit.y + 4, 12, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function getHyperOceanBoats() {
+  const center = getFenceCenter();
+  const distance = defenseField.fenceDistance + 270;
+  return Array.from({ length: 16 }, (_, index) => {
+    const offset = -0.92 + (1.84 * index) / 15;
+    const angle = -Math.PI / 2 + offset;
+    const lane = index % 3;
+    const laneDistance = distance + (lane - 1) * 82;
+    return {
+      id: index,
+      style: index % 3,
+      x: center.x + Math.cos(angle) * laneDistance,
+      y: center.y + Math.sin(angle) * laneDistance,
+      angle
+    };
+  });
+}
+
+function drawBoat(boat, caught = false, alpha = 1) {
+  ctx.save();
+  ctx.translate(boat.x, boat.y);
+  const catchAngle = caught && Number.isFinite(boat.catchAngle) ? boat.catchAngle : boat.angle;
+  ctx.rotate(catchAngle + Math.PI / 2);
+  ctx.scale(2, 2);
+  ctx.globalAlpha = alpha;
+  const boatStyle = boat.style ?? 0;
+  const hullFill = boatStyle === 1
+    ? "#f8fbff"
+    : boatStyle === 2
+      ? "#67c8f5"
+      : "#163760";
+  const hullStroke = boatStyle === 1 ? "#111827" : boatStyle === 2 ? "#f7fbff" : "#8ed9ff";
+  const reachedCatch = !caught || boat.hasReachedCatch !== false;
+  ctx.fillStyle = caught && reachedCatch ? "#fff2a8" : hullFill;
+  ctx.strokeStyle = caught && reachedCatch ? "#1f4660" : hullStroke;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  const halfWidth = caught ? 58 : 46;
+  const halfHeight = caught ? 20 : 16;
+  ctx.moveTo(-halfWidth, 0);
+  ctx.lineTo(-halfWidth * 0.72, -halfHeight);
+  ctx.lineTo(halfWidth * 0.62, -halfHeight);
+  ctx.lineTo(halfWidth, 0);
+  ctx.lineTo(halfWidth * 0.62, halfHeight);
+  ctx.lineTo(-halfWidth * 0.72, halfHeight);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (boatStyle === 1) {
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2;
+    drawLine(-38, -8, 38, -2);
+    drawLine(-34, 8, 34, 12);
+    ctx.fillStyle = "#111827";
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("ホームラン号", 0, 0);
+  } else if (boatStyle === 2) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-28, -9, 56, 18);
+    ctx.fillStyle = "#2e92d0";
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("ハイパー号", 0, 0);
+  } else {
+    ctx.fillStyle = "#8ed9ff";
+    ctx.fillRect(-26, -9, 20, 7);
+    ctx.fillStyle = "#b9efff";
+    ctx.fillRect(6, 2, 30, 8);
+    ctx.fillStyle = "#2b5f90";
+    ctx.fillRect(-24, 6, 42, 8);
+  }
+  const rowPhase = Number.isFinite(boat.rowPhase) ? boat.rowPhase : 0;
+  drawBoatOars(rowPhase, caught);
+  ctx.fillStyle = "#233047";
+  ctx.beginPath();
+  ctx.arc(0, -5, 6, 0, Math.PI * 2);
+  ctx.fill();
+  if (caught && reachedCatch) {
+    ctx.strokeStyle = "#fff2a8";
+    ctx.lineWidth = 5;
+    drawLine(0, -18, 0, -48);
+    drawBaseballIcon(0, -58, 8);
+  }
+  ctx.restore();
+}
+
+function drawBoatOars(rowPhase = 0, caught = false) {
+  const sweep = Math.sin(rowPhase) * 10;
+  const reach = caught ? 34 : 28;
+  const bladeColor = caught ? "#fff2a8" : "#e9f4ff";
+  ctx.save();
+  ctx.strokeStyle = "rgba(35, 48, 71, 0.86)";
+  ctx.lineWidth = 3;
+  [
+    { side: -1, y: -18 },
+    { side: 1, y: 18 }
+  ].forEach((oar) => {
+    const bladeX = -10 + sweep;
+    const bladeY = oar.y + oar.side * reach;
+    drawLine(-14, oar.y * 0.55, bladeX, bladeY);
+    ctx.fillStyle = bladeColor;
+    ctx.beginPath();
+    ctx.ellipse(bladeX, bladeY, 9, 4, oar.side * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function getAnimatedBoatForCatch(boat, boatCatch, elapsedSeconds = 0) {
+  if (!boatCatch || boatCatch.boatId !== boat.id) return boat;
+  const travelStart = Math.max(0, (boatCatch.startTime ?? 0) - 0.45);
+  const travelDuration = Math.max(0.35, boatCatch.travelDuration ?? 1.25);
+  const travelProgress = clamp((elapsedSeconds - travelStart) / travelDuration, 0, 1);
+  const eased = travelProgress * travelProgress * (3 - 2 * travelProgress);
+  return {
+    ...boat,
+    x: (boatCatch.homeX ?? boat.x) + ((boatCatch.x ?? boat.x) - (boatCatch.homeX ?? boat.x)) * eased,
+    y: (boatCatch.homeY ?? boat.y) + ((boatCatch.y ?? boat.y) - (boatCatch.homeY ?? boat.y)) * eased,
+    catchAngle: boatCatch.catchAngle,
+    rowPhase: elapsedSeconds * 12 + boat.id,
+    hasReachedCatch: travelProgress >= 0.98
+  };
+}
+
+function drawHyperOceanBeyondOutfield() {
+  if (!getCurrentStadium().hasOcean) return;
+  const center = getFenceCenter();
+  const top = center.y - defenseField.fenceDistance - 780;
+  ctx.save();
+  const gradient = ctx.createLinearGradient(field.plateX, top, field.plateX, center.y - defenseField.fenceDistance + 190);
+  if (gradient?.addColorStop) {
+    gradient.addColorStop(0, "#4eb3d3");
+    gradient.addColorStop(1, "#156b91");
+    ctx.fillStyle = gradient;
+  } else {
+    ctx.fillStyle = "#2f91b7";
+  }
+  ctx.fillRect(field.plateX - defenseField.fenceDistance - 620, top, defenseField.fenceDistance * 2 + 1240, 980);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 9; i += 1) {
+    const y = top + 90 + i * 76;
+    drawLine(field.plateX - defenseField.fenceDistance - 560, y, field.plateX + defenseField.fenceDistance + 560, y + Math.sin(i) * 18);
+  }
+  const boatCatch = defenseState.homeRunFireworks?.boatCatch;
+  const elapsedSeconds = defenseState.active ? (performance.now() - defenseState.startTime) / 1000 : 0;
+  getHyperOceanBoats().forEach((boat) => {
+    const isCaughtBoat = boatCatch?.boatId === boat.id;
+    const displayBoat = isCaughtBoat
+      ? getAnimatedBoatForCatch(boat, boatCatch, elapsedSeconds)
+      : boat;
+    drawBoat(displayBoat, isCaughtBoat, isCaughtBoat ? 1 : 0.76);
+  });
+  ctx.restore();
+}
+
+function drawNextDomeBeyondOutfield() {
+  if (!getCurrentStadium().hasDome) return;
+  const center = getFenceCenter();
+  const standY = center.y - defenseField.fenceDistance - 210;
+  ctx.save();
+  const roof = ctx.createLinearGradient(field.plateX, standY - 720, field.plateX, standY + 150);
+  if (roof?.addColorStop) {
+    roof.addColorStop(0, "#f5f7fb");
+    roof.addColorStop(0.56, "#c6d0d9");
+    roof.addColorStop(1, "#87939e");
+    ctx.fillStyle = roof;
+  } else {
+    ctx.fillStyle = "#c6d0d9";
+  }
+  ctx.fillRect(field.plateX - defenseField.fenceDistance - 760, standY - 760, defenseField.fenceDistance * 2 + 1520, 840);
+  drawNextDomeRoofHighlights(field.plateX, standY - 650, 1.45);
+  for (let tier = 0; tier < 4; tier += 1) {
+    ctx.fillStyle = tier % 2 === 0 ? "rgba(35, 48, 71, 0.68)" : "rgba(48, 74, 95, 0.62)";
+    roundRect(field.plateX - 680 + tier * 34, standY - tier * 38, 1360 - tier * 68, 42, 10);
+    ctx.fill();
+    ctx.fillStyle = tier % 2 === 0 ? "rgba(255, 235, 137, 0.82)" : "rgba(214, 242, 223, 0.82)";
+    roundRect(field.plateX - 620 + tier * 34, standY + 11 - tier * 38, 1240 - tier * 68, 8, 4);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawField() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const stadium = getCurrentStadium();
   drawStadiumTurfPattern(stadium);
-  drawAozoraFoulGroundDetails(field.plateY + 42);
+  drawNextDomeRoofScreen();
+  drawStadiumFoulGroundDetails(field.plateY + 42);
+  drawNextDomeFoulGroundDetails(field.plateY + 42);
   ctx.fillStyle = "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
@@ -12537,7 +12949,10 @@ function drawDefenseView() {
   ctx.save();
   ctx.translate(camera.x, camera.y);
 
-  drawAozoraFoulGroundDetails(field.plateY + 42);
+  drawHyperOceanBeyondOutfield();
+  drawNextDomeBeyondOutfield();
+  drawStadiumFoulGroundDetails(field.plateY + 42);
+  drawNextDomeFoulGroundDetails(field.plateY + 42);
 
   ctx.fillStyle = "#d89548";
   ctx.beginPath();
@@ -13625,16 +14040,22 @@ function drawBall() {
     return;
   }
   const pitch = pitchTypes[currentPitchType];
-  ctx.fillStyle = pitch ? pitch.color : "#ffffff";
+  drawBaseballIcon(ball.x, ball.y, ball.radius, pitch ? pitch.color : "#ffffff", ball.spin);
+  ctx.globalAlpha = 1;
+}
+
+function drawBaseballIcon(x, y, radius = ball.radius, fill = "#ffffff", spin = ball.spin) {
+  ctx.fillStyle = fill;
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#bf4331";
-  ctx.lineWidth = 2;
-  const seam = Math.sin(ball.spin) * 3;
-  drawLine(ball.x - 4, ball.y - 2 + seam, ball.x + 4, ball.y + 2 - seam);
-  drawLine(ball.x - 4, ball.y + 2 - seam, ball.x + 4, ball.y - 2 + seam);
-  ctx.globalAlpha = 1;
+  ctx.lineWidth = Math.max(1.4, radius * 0.22);
+  const seam = Math.sin(spin) * Math.min(3, radius * 0.38);
+  const seamX = radius * 0.5;
+  const seamY = radius * 0.25;
+  drawLine(x - seamX, y - seamY + seam, x + seamX, y + seamY - seam);
+  drawLine(x - seamX, y + seamY - seam, x + seamX, y - seamY + seam);
 }
 
 function drawDefenseBall() {
@@ -13699,15 +14120,7 @@ function drawDefenseBall() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y - visualHeightOffset, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#bf4331";
-  ctx.lineWidth = 2;
-  const seam = Math.sin(ball.spin) * 3;
-  drawLine(ball.x - 4, ball.y - visualHeightOffset - 2 + seam, ball.x + 4, ball.y - visualHeightOffset + 2 - seam);
-  drawLine(ball.x - 4, ball.y - visualHeightOffset + 2 - seam, ball.x + 4, ball.y - visualHeightOffset - 2 + seam);
+  drawBaseballIcon(ball.x, ball.y - visualHeightOffset, radius);
 }
 
 function getHighFlyVisualAmount(battedBall, heightOffset) {

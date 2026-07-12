@@ -121,7 +121,7 @@ function createGameContext() {
   ].forEach(makeElement);
 
   makeElement("modeSelect").value = "versus";
-  makeElement("awayPresetSelect").value = "tigers";
+  makeElement("awayPresetSelect").value = "dodgers";
   makeElement("homePresetSelect").value = "dodgers";
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "1";
@@ -219,6 +219,8 @@ function assertHtmlShell() {
     'id="stadiumSelect"',
     'value="fireworks"',
     'value="aozora"',
+    'value="hyperOcean"',
+    'value="nextDome"',
     'value="5"',
     'value="9"',
     'id="awayPitcherCard"',
@@ -300,6 +302,111 @@ assert(Math.abs(stadiumSelectionState.restoredFence - stadiumSelectionState.base
 assert(Math.abs(stadiumSelectionState.restoredHeight - stadiumSelectionState.baseHeight) < 0.1, "switching back to Ohanabi Stadium should restore the original fence height");
 assert(stadiumSelectionState.baseFirstSame === true, "stadium changes should not move the diamond bases");
 assert(stadiumSelectionState.aozoraOutfieldDepths.every((depth) => depth > 0.9 && depth < 0.94), "outfielders should still start near the active stadium fence");
+
+const hyperOceanStadiumState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    stadiumSelect.value = "hyperOcean";
+    readMenu();
+    const centerMeters = getBattedBallDistanceMeters(defenseField.fenceDistance, { direction: { x: 0, y: -1 } });
+    const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
+    const boats = getHyperOceanBoats();
+    const homerBall = {
+      fenceOver: true,
+      ballTime: 0.8,
+      target: { x: boats[8].x + 180, y: boats[8].y - 80 }
+    };
+    const fireworks = createHomeRunFireworks(homerBall);
+    const caughtBoat = boats.find((boat) => boat.id === fireworks?.boatCatch?.boatId);
+    const animatedStart = caughtBoat && fireworks?.boatCatch ? getAnimatedBoatForCatch(caughtBoat, fireworks.boatCatch, 0.05) : null;
+    const animatedEnd = caughtBoat && fireworks?.boatCatch ? getAnimatedBoatForCatch(caughtBoat, fireworks.boatCatch, (fireworks.boatCatch.startTime ?? 0.8) + (fireworks.boatCatch.travelDuration ?? 1.2) + 0.1) : null;
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({
+      currentIdBeforeRestore: "hyperOcean",
+      centerMeters,
+      lineMeters,
+      boatCount: boats.length,
+      boatStyles: Array.from(new Set(boats.map((boat) => boat.style))).sort((a, b) => a - b),
+      boatCatchId: fireworks?.boatCatch?.boatId ?? null,
+      boatMoved: Math.hypot((fireworks?.boatCatch?.x ?? 0) - (fireworks?.boatCatch?.homeX ?? 0), (fireworks?.boatCatch?.y ?? 0) - (fireworks?.boatCatch?.homeY ?? 0)),
+      boatDuration: fireworks?.duration ?? 0,
+      boatStartsNearHome: animatedStart && caughtBoat ? Math.hypot(animatedStart.x - caughtBoat.x, animatedStart.y - caughtBoat.y) < 1 : false,
+      boatEndsNearCatch: animatedEnd && fireworks?.boatCatch ? Math.hypot(animatedEnd.x - fireworks.boatCatch.x, animatedEnd.y - fireworks.boatCatch.y) < 1 : false,
+      boatRows: animatedEnd?.rowPhase !== animatedStart?.rowPhase,
+      boatReachedCatch: animatedEnd?.hasReachedCatch === true,
+      restoredId: currentStadiumId
+    });
+  })()`
+));
+
+assert(hyperOceanStadiumState.centerMeters === 115, "Hyper Ocean center field fence should display as 115 meters");
+assert(hyperOceanStadiumState.lineMeters === 92, "Hyper Ocean foul-line fence should display as 92 meters");
+assert(hyperOceanStadiumState.boatCount === 16, "Hyper Ocean should place sixteen boats beyond the outfield");
+assert(hyperOceanStadiumState.boatStyles.join(",") === "0,1,2", "Hyper Ocean boats should use three visual designs");
+assert(hyperOceanStadiumState.boatCatchId !== null, "Hyper Ocean home runs near a boat should create a boat-catch highlight");
+assert(hyperOceanStadiumState.boatMoved > 0, "nearby Hyper Ocean boats should move toward catchable home-run balls");
+assert(hyperOceanStadiumState.boatStartsNearHome === true && hyperOceanStadiumState.boatEndsNearCatch === true, "Hyper Ocean catch boats should visibly travel from their home position to the ball");
+assert(hyperOceanStadiumState.boatRows === true && hyperOceanStadiumState.boatReachedCatch === true, "Hyper Ocean catch boats should row while moving and then show the caught ball");
+assert(hyperOceanStadiumState.boatDuration >= 5, "boat catches should stay on screen for about five seconds");
+assert(hyperOceanStadiumState.restoredId === "fireworks", "stadium selection should restore cleanly after Hyper Ocean checks");
+
+const nextDomeStadiumState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    stadiumSelect.value = "nextDome";
+    readMenu();
+    bases = createEmptyBases();
+    const direction = normalize({ x: 0, y: -1 });
+    const common = {
+      direction,
+      trajectory: "fly",
+      possibleHomerFlightDistance: defenseField.fenceDistance * 0.92,
+      fairDeepFlight: true,
+      fenceTravelDistance: defenseField.fenceDistance,
+      fenceIntersection: { point: { x: field.plateX, y: defenseField.bases.home.y - defenseField.fenceDistance }, travelDistance: defenseField.fenceDistance },
+      isGrounder: false,
+      isLiner: false,
+      isPopupFly: false,
+      isRoutineFly: false,
+      isToweringFly: true,
+      isFenceEdgeFly: true,
+      isDeepDrive: false,
+      isFenceLiner: false
+    };
+    const homerRule = getNextDomeBattedBallRule({ ...common, distance: defenseField.fenceDistance * 0.92, possibleHomerHeight: 580 });
+    const doubleRule = getNextDomeBattedBallRule({ ...common, distance: defenseField.fenceDistance * 0.62, possibleHomerHeight: 520, isFenceEdgeFly: false });
+    const inPlayRule = getNextDomeBattedBallRule({ ...common, distance: defenseField.fenceDistance * 0.42, possibleHomerHeight: 470, isFenceEdgeFly: false, isToweringFly: false });
+    const groundRule = getNextDomeBattedBallRule({ ...common, isGrounder: true, possibleHomerHeight: 620 });
+    const fireworks = createHomeRunFireworks({
+      fenceOver: true,
+      ballTime: 0.8,
+      target: { x: field.plateX, y: defenseField.bases.home.y - defenseField.fenceDistance - 220 }
+    });
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({
+      centerMeters: getActualFenceDistanceMetersForDirection({ x: 0, y: -1 }),
+      lineMeters: getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 })),
+      surface: stadiumPresets.nextDome.surface,
+      hasDome: stadiumPresets.nextDome.hasDome,
+      fireworkScale: stadiumPresets.nextDome.fireworkScale,
+      homerRule: homerRule?.kind,
+      doubleRule: doubleRule?.kind,
+      inPlayRule: inPlayRule?.kind,
+      groundRule,
+      burstCount: fireworks.bursts.length
+    });
+  })()`
+));
+
+assert(nextDomeStadiumState.centerMeters === 118 && nextDomeStadiumState.lineMeters === 95, "Next Dome should keep the original Ohanabi outfield distances");
+assert(nextDomeStadiumState.surface === "artificialTurf" && nextDomeStadiumState.hasDome === true, "Next Dome should use artificial turf and dome visuals");
+assert(nextDomeStadiumState.fireworkScale === 1.6 && nextDomeStadiumState.burstCount === 16, "Next Dome home-run fireworks should use 1.6x bursts");
+assert(nextDomeStadiumState.homerRule === "homer", "Next Dome outer super-ring contacts in fair territory should be home runs");
+assert(nextDomeStadiumState.doubleRule === "groundRuleDouble", "Next Dome inner super-ring balls that do not fall should award two bases");
+assert(nextDomeStadiumState.inPlayRule === "inPlay", "Next Dome ceiling contacts over the playing field should stay in play");
+assert(nextDomeStadiumState.groundRule === null, "Next Dome ceiling rules should not affect ground balls");
 
 const audioToggleState = JSON.parse(runInGame(
   context,
@@ -538,13 +645,13 @@ const lineupState = JSON.parse(runInGame(
 ));
 
 assert(lineupState.teams.length === 2, "game should have two teams");
-assert(lineupState.awayRoles.join(",") === "2B,CA,R,L,SS,C,DH", "away lineup should use the requested batting order");
+assert(lineupState.awayRoles.join(",") === "R,L,2B,CA,C,SS,DH", "away lineup should use the requested batting order");
 assert(lineupState.homeRoles.join(",") === "R,L,2B,CA,C,SS,DH", "home lineup should use the requested batting order");
 assert(lineupState.awayPitchers.length === 5 && lineupState.homePitchers.length === 5, "each team should carry five pitchers");
 assert(lineupState.awayActivePitcher === lineupState.awayPitchers[0], "the first pitcher slot should be the starter");
-assert(lineupState.awayPitchers.join(",") === "skubal,melton,jansen,hanifee,summers", "away default pitchers should match the requested regular roster");
+assert(lineupState.awayPitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,rojas", "away default pitchers should match the requested regular roster");
 assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,rojas", "home default pitchers should match the requested regular roster");
-assert(lineupState.awayBatters.join(",") === "mcgonigle,dingler,carpenter,greene,torkelson,outman,jones", "away default fielders should match the requested regular batting order");
+assert(lineupState.awayBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
 const semiAutoControlState = JSON.parse(runInGame(
@@ -920,7 +1027,7 @@ const lineupEditState = JSON.parse(runInGame(
   context,
   `(() => {
     menuSelection = cloneMenuSelection(defaultMenuSelection);
-    const originalFirst = menuSelection.away["2B"];
+    const originalFirst = menuSelection.away.R;
     const originalRight = menuSelection.away.R;
     const originalLeft = menuSelection.away.L;
     const positionChanged = changeLineupSlotPosition("away", "2B", "R");
@@ -965,16 +1072,16 @@ const lineupEditState = JSON.parse(runInGame(
 ));
 
 assert(lineupEditState.positionChanged === true, "lineup position select should accept another fielder role");
-assert(lineupEditState.afterPosition.order.join(",") === "R,CA,2B,L,SS,C,DH", "changing a slot position should update batting order roles");
-assert(lineupEditState.afterPosition.firstRole === "R", "changed first slot should use the selected defensive position");
-assert(lineupEditState.afterPosition.firstPlayer === lineupEditState.originalFirst, "changing position should keep the player in the batting slot");
+assert(lineupEditState.afterPosition.order.join(",") === "2B,L,R,CA,C,SS,DH", "changing a slot position should update batting order roles");
+assert(lineupEditState.afterPosition.firstRole === "2B", "changed slot should swap defensive positions in the batting order");
+assert(lineupEditState.afterPosition.firstPlayer === lineupEditState.afterPosition.secondBasePlayer, "changing position should keep the first listed role tied to the swapped position player");
 assert(lineupEditState.afterPosition.secondBasePlayer === lineupEditState.originalRight, "changing position should swap the displaced fielder into the old position");
 assert(lineupEditState.playersSwapped === true, "dragging a lineup card should swap players between slots");
-assert(lineupEditState.afterDrag.order.join(",") === "R,CA,2B,L,SS,C,DH", "dragging players should not change slot defensive positions");
-assert(lineupEditState.afterDrag.firstPlayer === lineupEditState.originalLeft, "dragging to the first slot should move that player into the slot");
-assert(lineupEditState.afterDrag.leftPlayer === lineupEditState.originalFirst, "dragging should move the original first-slot player to the target slot");
+assert(lineupEditState.afterDrag.order.join(",") === "2B,L,R,CA,C,SS,DH", "dragging players should not change slot defensive positions");
+assert(lineupEditState.afterDrag.firstPlayer === lineupEditState.originalFirst, "dragging other roles should leave the first batting slot player in place");
+assert(lineupEditState.afterDrag.rightPlayer === lineupEditState.originalLeft, "dragging should move the left fielder into the right-field role");
 assert(lineupEditState.movedToFifth === true, "number picking should move a batting-order role to the selected slot");
-assert(lineupEditState.afterNumberPick.order.join(",") === "CA,2B,L,SS,R,C,DH", "number picking should reorder the batting slots");
+assert(lineupEditState.afterNumberPick.order.join(",") === "2B,L,CA,C,R,SS,DH", "number picking should reorder the batting slots");
 assert(lineupEditState.afterNumberPick.fifthRole === "R", "number picking should put the chosen role at the requested order number");
 
 const teamResetState = JSON.parse(runInGame(
@@ -1022,9 +1129,9 @@ assert(teamResetState.complete === false, "a reset team should be treated as inc
 assert(teamResetState.startDisabled === true, "a reset team should disable the start button");
 assert(teamResetState.blankPitcherName === "未選択", "reset pitchers should render as blank cards");
 assert(teamResetState.blankBatterName === "未選択", "reset fielders should render as blank cards");
-assert(teamResetState.autoPitcher === "skubal", "auto fill should restore the default starting pitcher");
-assert(teamResetState.autoShortstop === "torkelson", "auto fill should restore the default fielder selections");
-assert(teamResetState.autoLineup === "2B,CA,R,L,SS,C,DH", "auto fill should restore the default batting order");
+assert(teamResetState.autoPitcher === "shohei", "auto fill should restore the default starting pitcher");
+assert(teamResetState.autoShortstop === "kimhyesong", "auto fill should restore the default fielder selections");
+assert(teamResetState.autoLineup === "R,L,2B,CA,C,SS,DH", "auto fill should restore the default batting order");
 assert(teamResetState.autoComplete === true, "auto fill should make the team complete");
 assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 65, "auto fill should restore a valid point total");
 
@@ -2128,7 +2235,7 @@ assert(rosterAndPointState.enriquez.stamina === 2, "Enriquez stamina should matc
 assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
 assert(rosterAndPointState.teamPointLimit === 65, "combined point limit should be 65 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 22, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultAwayPitcherCost === 28, "default away pitcher cost should remain visible in the point breakdown");
 assert(rosterAndPointState.defaultHomePitcherCost === 28, "default home pitcher cost should remain visible in the point breakdown");
 assert(rosterAndPointState.overLimitDisabled === true, "teams over 65 combined points should not be startable");
 assert(rosterAndPointState.overLimitText.includes("/65"), "menu should show the 65-point combined limit");
