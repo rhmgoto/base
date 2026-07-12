@@ -2723,7 +2723,7 @@ assert(battingTighteningState.scoreTwoWidthsOutside >= 0.5 && battingTighteningS
 assert(battingTighteningState.scoreFourWidthsOutside >= 0.3 && battingTighteningState.scoreFourWidthsOutside < battingTighteningState.scoreTwoWidthsOutside, "farther sweet-spot misses should fade more gradually instead of dropping off a cliff");
 assert(battingTighteningState.scoreAtBatHandleEnd >= 0.15 && battingTighteningState.scoreAtBatTipEnd >= 0.15, "bat contact should keep at least a fifteen-percent sweet-spot score floor");
 assert(battingTighteningState.balancedAllGood > 0.7, "balanced batting feedback should still reward all-around good contact after the ten-point reduction");
-assert(battingTighteningState.balancedWeakSweetSpot < 0.62, "balanced batting feedback should be stricter when the sweet spot is poor");
+assert(battingTighteningState.balancedWeakSweetSpot > 0.68, "balanced batting feedback should still reward good timing, contact depth, and zone even when the sweet spot is poor");
 assert(battingTighteningState.balancedPlayable >= 0.5 && battingTighteningState.balancedPlayable <= 0.69, "balanced batting feedback should keep playable contact about five points lower");
 assert(battingTighteningState.demotedKind === "out", "non-yellow hits should lose the penalty roll most of the time");
 assert(battingTighteningState.keptKind === "hit", "non-yellow hits should remain hits outside the penalty roll");

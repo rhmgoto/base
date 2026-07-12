@@ -4708,8 +4708,8 @@ function getRawBattingFeedbackScore(scores) {
   const barrel = clamp(scores.barrelScore ?? 0, 0, 1);
   const zone = clamp(scores.zoneScore ?? 0, 0, 1);
   const quality = clamp(scores.quality ?? 0, 0, 1);
-  const weighted = timing * 0.26 + sweetSpot * 0.24 + barrel * 0.24 + zone * 0.14 + quality * 0.12;
-  const weakestCore = Math.min(timing, sweetSpot, barrel);
+  const weighted = timing * 0.3 + sweetSpot * 0.05 + barrel * 0.28 + zone * 0.2 + quality * 0.17;
+  const weakestCore = Math.min(timing, zone);
   const cap = weakestCore < 0.4 ? 0.66 : weakestCore < 0.55 ? 0.78 : weakestCore < 0.72 ? 0.89 : 1;
   return clamp(Math.min(weighted, cap), 0, 1);
 }
@@ -12664,8 +12664,8 @@ function getHomeRunStandFocusPoint() {
 
 function drawDefenseTarget() {
   if (!defenseState.active) return;
-  const target = defenseState.landingTarget || defenseState.target;
   const battedBall = defenseState.battedBall;
+  const target = defenseState.landingTarget || battedBall?.target || defenseState.target;
   if (battedBall && !battedBall.isGrounder && !battedBall.wallHit && !battedBall.fenceOver) {
     drawFlyLandingTarget(target, battedBall);
     return;
@@ -12680,11 +12680,6 @@ function drawDefenseTarget() {
   ctx.stroke();
   ctx.setLineDash([8, 8]);
   drawBattedBallGuide(target);
-  if (defenseState.outcome && !defenseState.outcome.caught && defenseState.target !== target) {
-    ctx.setLineDash([4, 8]);
-    ctx.strokeStyle = "rgba(174, 231, 255, 0.55)";
-    drawLine(target.x, target.y, defenseState.target.x, defenseState.target.y);
-  }
   ctx.restore();
 }
 
@@ -12692,6 +12687,9 @@ function drawFlyLandingTarget(target, battedBall) {
   const elapsedSeconds = defenseState.active ? (performance.now() - defenseState.startTime) / 1000 : 0;
   const ballTime = Math.max(0.1, battedBall.ballTime ?? 1);
   const timeLeft = Math.max(0, ballTime - elapsedSeconds);
+  const afterLandingAge = Math.max(0, elapsedSeconds - ballTime);
+  if (afterLandingAge > 0.85) return;
+  const markerAlpha = afterLandingAge > 0 ? clamp(1 - afterLandingAge / 0.85, 0, 1) * 0.38 : 1;
   const arrivalProgress = clamp(elapsedSeconds / ballTime, 0, 1);
   const outerRadius = 46 + (1 - arrivalProgress) * 34;
   const catchRadius = defenseState.manualFielding
@@ -12700,37 +12698,39 @@ function drawFlyLandingTarget(target, battedBall) {
   const pulse = 1 + Math.sin(performance.now() / 110) * 0.06;
 
   ctx.save();
-  ctx.fillStyle = "rgba(174, 231, 255, 0.16)";
-  ctx.strokeStyle = "rgba(174, 231, 255, 0.95)";
+  ctx.fillStyle = `rgba(174, 231, 255, ${0.16 * markerAlpha})`;
+  ctx.strokeStyle = `rgba(174, 231, 255, ${0.95 * markerAlpha})`;
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.arc(target.x, target.y, outerRadius * pulse, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255, 242, 168, 0.94)";
+  ctx.strokeStyle = `rgba(255, 242, 168, ${0.94 * markerAlpha})`;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(target.x, target.y, catchRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.88)";
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.88 * markerAlpha})`;
   ctx.lineWidth = 4;
   drawLine(target.x - 34, target.y, target.x + 34, target.y);
   drawLine(target.x, target.y - 34, target.x, target.y + 34);
 
-  ctx.setLineDash([10, 9]);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.lineWidth = 2;
-  drawBattedBallGuide(target);
-  ctx.setLineDash([]);
+  if (afterLandingAge <= 0) {
+    ctx.setLineDash([10, 9]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 2;
+    drawBattedBallGuide(target);
+    ctx.setLineDash([]);
+  }
 
   ctx.font = "bold 18px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 5;
-  ctx.strokeStyle = "rgba(26, 41, 55, 0.78)";
-  ctx.fillStyle = "#fff8df";
+  ctx.strokeStyle = `rgba(26, 41, 55, ${0.78 * markerAlpha})`;
+  ctx.fillStyle = `rgba(255, 248, 223, ${markerAlpha})`;
   const label = timeLeft > 0 ? `落下 ${timeLeft.toFixed(1)}秒` : "落下地点";
   ctx.strokeText(label, target.x, target.y - outerRadius - 24);
   ctx.fillText(label, target.x, target.y - outerRadius - 24);
@@ -12748,7 +12748,7 @@ function drawLandingImpactMarker() {
   const impactAge = elapsedSeconds - battedBall.ballTime;
   if (impactAge < 0 || impactAge > 1.45) return;
 
-  const target = defenseState.landingTarget || defenseState.target;
+  const target = defenseState.landingTarget || battedBall.target || defenseState.target;
   const alpha = 1 - impactAge / 1.45;
   const relation = defenseState.chosenFielder
     ? getBattedBallFielderRelation(defenseState.chosenFielder, battedBall)
@@ -12837,15 +12837,16 @@ function drawPostLandingBounceMarker() {
 
   const holdSeconds = getPostLandingHoldSeconds(battedBall);
   const holdAge = elapsedSeconds - ballTime;
+  if (holdAge > 0.55) return;
   const rollT = getDefenseRollProgress(elapsedSeconds, ballTime);
   if (rollT > 0.68) return;
 
   const isLandingHold = holdAge < holdSeconds;
   const bouncePhase = getPostLandingBounceVisualPhase(rollT, battedBall);
   const alpha = isLandingHold
-    ? 0.54 + bouncePhase * 0.28
-    : (1 - rollT / 0.68) * (0.35 + bouncePhase * 0.55);
-  const markerPoint = rollT < 0.08 ? defenseState.landingTarget || defenseState.target : ball;
+    ? (1 - holdAge / 0.55) * (0.42 + bouncePhase * 0.2)
+    : (1 - holdAge / 0.55) * (0.26 + bouncePhase * 0.28);
+  const markerPoint = defenseState.landingTarget || battedBall.target || defenseState.target;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = "rgba(255, 242, 168, 0.82)";
