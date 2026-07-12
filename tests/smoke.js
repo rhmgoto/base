@@ -93,6 +93,7 @@ function createGameContext() {
     "homePresetSelect",
     "firstBatSelect",
     "inningsSelect",
+    "stadiumSelect",
     "practicePitcherControlSelect",
     "practicePitcherTypeSelect",
     "practiceBatterSelect",
@@ -124,6 +125,7 @@ function createGameContext() {
   makeElement("homePresetSelect").value = "dodgers";
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "1";
+  makeElement("stadiumSelect").value = "fireworks";
   makeElement("p1DefenseSelect").value = "auto";
   makeElement("p2DefenseSelect").value = "auto";
 
@@ -214,6 +216,9 @@ function assertHtmlShell() {
     'id="practicePitcherSelect"',
     'id="firstBatSelect"',
     'id="inningsSelect"',
+    'id="stadiumSelect"',
+    'value="fireworks"',
+    'value="aozora"',
     'value="5"',
     'value="9"',
     'id="awayPitcherCard"',
@@ -259,6 +264,42 @@ vm.runInContext(fs.readFileSync(path.join(root, "script.js"), "utf8"), context, 
 });
 
 assert(makeElement("awayBatterLName").textContent.length > 0, "menu cards are not populated");
+
+const stadiumSelectionState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const baseFence = defenseField.fenceDistance;
+    const baseHeight = defenseField.fenceHeight;
+    const baseFirst = { ...defenseField.bases.first };
+    stadiumSelect.value = "aozora";
+    readMenu();
+    const aozoraFence = defenseField.fenceDistance;
+    const aozoraHeight = defenseField.fenceHeight;
+    const aozoraFenceMeters = getBattedBallDistanceMeters(defenseField.fenceDistance);
+    const aozoraLineup = getDefensiveLineup("away").filter((fielder) => ["L", "C", "R"].includes(fielder.role));
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({
+      baseFence,
+      baseHeight,
+      restoredFence: defenseField.fenceDistance,
+      restoredHeight: defenseField.fenceHeight,
+      aozoraFence,
+      aozoraHeight,
+      aozoraFenceMeters,
+      baseFirstSame: defenseField.bases.first.x === baseFirst.x && defenseField.bases.first.y === baseFirst.y,
+      aozoraOutfieldDepths: aozoraLineup.map((fielder) => getFenceDistance(fielder) / aozoraFence)
+    });
+  })()`
+));
+
+assert(stadiumSelectionState.aozoraFence < stadiumSelectionState.baseFence * 0.75, "Aozora Ground should use a much shorter 85m outfield fence");
+assert(stadiumSelectionState.aozoraHeight < stadiumSelectionState.baseHeight * 0.5, "Aozora Ground should use a low fence");
+assert(stadiumSelectionState.aozoraFenceMeters === 85, "Aozora Ground fence should display as 85 meters");
+assert(Math.abs(stadiumSelectionState.restoredFence - stadiumSelectionState.baseFence) < 0.1, "switching back to Ohanabi Stadium should restore the original fence distance");
+assert(Math.abs(stadiumSelectionState.restoredHeight - stadiumSelectionState.baseHeight) < 0.1, "switching back to Ohanabi Stadium should restore the original fence height");
+assert(stadiumSelectionState.baseFirstSame === true, "stadium changes should not move the diamond bases");
+assert(stadiumSelectionState.aozoraOutfieldDepths.every((depth) => depth > 0.9 && depth < 0.94), "outfielders should still start near the active stadium fence");
 
 const audioToggleState = JSON.parse(runInGame(
   context,

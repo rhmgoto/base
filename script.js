@@ -45,6 +45,7 @@ const pitcherChangeControls = byId("pitcherChangeControls");
 const modeSelect = byId("modeSelect");
 const firstBatSelect = byId("firstBatSelect");
 const inningsSelect = byId("inningsSelect");
+const stadiumSelect = byId("stadiumSelect");
 const p1DefenseSelect = byId("p1DefenseSelect");
 const p2DefenseSelect = byId("p2DefenseSelect");
 const awayPresetSelect = byId("awayPresetSelect");
@@ -410,7 +411,7 @@ const scoringHitTypes = new Set(["single", "double", "triple", "homer"]);
 const defenseFieldDistanceScale = 0.8 * 1.15;
 const defenseFenceHeightScale = 1.15;
 
-const defenseField = {
+const baseDefenseField = {
   fenceDistance: 2280 * defenseFieldDistanceScale,
   fenceHeight: 120 * defenseFenceHeightScale,
   grassRadius: 2190 * defenseFieldDistanceScale,
@@ -418,7 +419,11 @@ const defenseField = {
   doubleDistance: 1770 * defenseFieldDistanceScale,
   wallHitDistance: 2160 * defenseFieldDistanceScale,
   foulLineTopY: -1065 * defenseFieldDistanceScale,
-  foulLineInset: -2250 * defenseFieldDistanceScale,
+  foulLineInset: -2250 * defenseFieldDistanceScale
+};
+
+const defenseField = {
+  ...baseDefenseField,
   bases: {
     home: { x: field.plateX, y: field.plateY + 42 },
     first: { x: 1352, y: 290 },
@@ -433,6 +438,50 @@ const realFieldMetrics = {
   centerFieldFenceMeters: 118,
   fairLineAngleDegrees: 55
 };
+
+const stadiumPresets = {
+  fireworks: {
+    id: "fireworks",
+    name: "大花火スタジアム",
+    surface: "grass",
+    fenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    fenceHeight: baseDefenseField.fenceHeight,
+    grassRadiusScale: 1
+  },
+  aozora: {
+    id: "aozora",
+    name: "青空グラウンド",
+    surface: "dirt",
+    fenceMeters: 85,
+    fenceHeight: baseDefenseField.fenceHeight * 0.42,
+    grassRadiusScale: 0.72
+  }
+};
+let currentStadiumId = "fireworks";
+
+function getCurrentStadium() {
+  return stadiumPresets[currentStadiumId] || stadiumPresets.fireworks;
+}
+
+function getStadiumFenceDistance(stadium) {
+  const fenceMeters = Number.isFinite(stadium?.fenceMeters) ? stadium.fenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  return baseDefenseField.fenceDistance * (fenceMeters / realFieldMetrics.centerFieldFenceMeters);
+}
+
+function applyStadiumPreset(stadiumId = currentStadiumId) {
+  const stadium = stadiumPresets[stadiumId] || stadiumPresets.fireworks;
+  currentStadiumId = stadium.id;
+  const fenceDistance = getStadiumFenceDistance(stadium);
+  const distanceRatio = fenceDistance / baseDefenseField.fenceDistance;
+  defenseField.fenceDistance = fenceDistance;
+  defenseField.fenceHeight = stadium.fenceHeight;
+  defenseField.grassRadius = baseDefenseField.grassRadius * distanceRatio * (stadium.grassRadiusScale ?? 1);
+  defenseField.deepHitDistance = baseDefenseField.deepHitDistance * distanceRatio;
+  defenseField.doubleDistance = baseDefenseField.doubleDistance * distanceRatio;
+  defenseField.wallHitDistance = baseDefenseField.wallHitDistance * distanceRatio;
+  defenseField.foulLineTopY = baseDefenseField.foulLineTopY * distanceRatio;
+  defenseField.foulLineInset = baseDefenseField.foulLineInset * distanceRatio;
+}
 
 const battedBallSpeedMultiplier = {
   grounder: 1.62,
@@ -1585,6 +1634,7 @@ function resetDefenseState() {
 
 function readMenu() {
   gameMode = modeSelect.value;
+  applyStadiumPreset(stadiumSelect?.value || "fireworks");
   const nextAwayPreset = teamPresets[awayPresetSelect?.value] ? awayPresetSelect.value : defaultTeamPresetBySide.away;
   const nextHomePreset = teamPresets[homePresetSelect?.value] ? homePresetSelect.value : defaultTeamPresetBySide.home;
   if (nextAwayPreset !== selectedTeamPresetBySide.away) applyTeamPresetMenuSelection("away", nextAwayPreset);
@@ -7728,9 +7778,12 @@ function getDefensiveLineup(team) {
   const pitcherInfo = getTeamActivePitcher(team);
   const fieldersByRole = new Map(selected[team].batters.map((entry) => [entry.role, entry.player]));
   return template.map((fielder) => {
+    const stadiumFielder = outfielderRoles.includes(fielder.role)
+      ? { ...fielder, ...outfielderStartPoint(fielder.role) }
+      : fielder;
     if (fielder.role === "P") {
       return clampFielderInsideFence({
-        ...fielder,
+        ...stadiumFielder,
         name: pitcherInfo.name,
         speed: pitcherInfo.fielding ?? 5,
         fielding: pitcherInfo.fielding ?? 5,
@@ -7740,7 +7793,7 @@ function getDefensiveLineup(team) {
     const player = fieldersByRole.get(fielder.role) || selected[team].batters[0].player;
     const defenseRating = getBatterDefenseRating(player, fielder.role);
     return clampFielderInsideFence({
-      ...fielder,
+      ...stadiumFielder,
       name: player.name,
       speed: defenseRating,
       fielding: defenseRating,
@@ -9507,6 +9560,8 @@ function getMetersPerBattedBallFieldUnit({ direction = null, fenceTravelDistance
 }
 
 function getActualFenceDistanceMetersForDirection(direction = null) {
+  const stadium = getCurrentStadium();
+  if (stadium.id === "aozora") return stadium.fenceMeters;
   if (!direction || !Number.isFinite(direction.x) || !Number.isFinite(direction.y)) {
     return realFieldMetrics.centerFieldFenceMeters;
   }
@@ -12386,14 +12441,64 @@ function draw() {
   drawHitEffect();
 }
 
-function drawField() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
+  if (stadium.surface === "dirt") {
+    ctx.fillStyle = "#c99055";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = -canvas.height; i < canvas.width; i += 70) {
+      ctx.fillStyle = "rgba(255,255,255,0.035)";
+      ctx.fillRect(i, 0, 32, canvas.height);
+    }
+    return;
+  }
   ctx.fillStyle = "#5fa85b";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < canvas.width; i += 56) {
     ctx.fillStyle = i % 112 === 0 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.045)";
     ctx.fillRect(i, 0, 56, canvas.height);
   }
+}
+
+function drawAozoraFoulGroundDetails(homeY = field.plateY + 42) {
+  if (getCurrentStadium().id !== "aozora") return;
+  ctx.save();
+  const benches = [
+    { x: field.plateX - 710, y: homeY - 230 },
+    { x: field.plateX + 710, y: homeY - 230 }
+  ];
+  benches.forEach((bench) => {
+    ctx.fillStyle = "rgba(80, 48, 28, 0.38)";
+    roundRect(bench.x - 104, bench.y - 30, 208, 56, 8);
+    ctx.fill();
+    ctx.fillStyle = "#8b593a";
+    roundRect(bench.x - 92, bench.y - 18, 184, 17, 5);
+    ctx.fill();
+    ctx.fillStyle = "#6e452f";
+    roundRect(bench.x - 76, bench.y + 6, 152, 12, 4);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(42, 35, 30, 0.5)";
+    ctx.lineWidth = 3;
+    drawLine(bench.x - 70, bench.y + 18, bench.x - 70, bench.y + 34);
+    drawLine(bench.x + 70, bench.y + 18, bench.x + 70, bench.y + 34);
+  });
+  [
+    { x: field.plateX - 850, y: homeY - 380 },
+    { x: field.plateX + 850, y: homeY - 380 }
+  ].forEach((stand) => {
+    for (let row = 0; row < 4; row += 1) {
+      ctx.fillStyle = row % 2 === 0 ? "rgba(255, 235, 137, 0.76)" : "rgba(135, 189, 224, 0.72)";
+      roundRect(stand.x - 120, stand.y + row * 22, 240, 12, 6);
+      ctx.fill();
+    }
+  });
+  ctx.restore();
+}
+
+function drawField() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const stadium = getCurrentStadium();
+  drawStadiumTurfPattern(stadium);
+  drawAozoraFoulGroundDetails(field.plateY + 42);
   ctx.fillStyle = "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
@@ -12401,7 +12506,7 @@ function drawField() {
   ctx.lineTo(1256, 836);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#68b560";
+  ctx.fillStyle = stadium.surface === "dirt" ? "rgba(255, 232, 170, 0.16)" : "#68b560";
   ctx.beginPath();
   ctx.arc(field.centerX, 754, 405, Math.PI, Math.PI * 2);
   ctx.fill();
@@ -12425,12 +12530,14 @@ function drawField() {
 
 function drawDefenseView() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#5fa85b";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const stadium = getCurrentStadium();
+  drawStadiumTurfPattern(stadium);
 
   const camera = getDefenseCameraOffset();
   ctx.save();
   ctx.translate(camera.x, camera.y);
+
+  drawAozoraFoulGroundDetails(field.plateY + 42);
 
   ctx.fillStyle = "#d89548";
   ctx.beginPath();
@@ -12440,7 +12547,7 @@ function drawDefenseView() {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#6ebf69";
+  ctx.fillStyle = stadium.surface === "dirt" ? "rgba(255, 235, 174, 0.14)" : "#6ebf69";
   ctx.beginPath();
   ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
   ctx.fill();
@@ -12590,22 +12697,24 @@ function drawBaseDiamond(x, y, label, color) {
 function drawOutfieldWall() {
   const homeY = field.plateY + 42;
   const wallHeight = defenseField.fenceHeight;
+  const stadium = getCurrentStadium();
+  const lowFence = stadium.id === "aozora";
   ctx.save();
 
   ctx.strokeStyle = "rgba(18, 34, 47, 0.32)";
-  ctx.lineWidth = 70;
+  ctx.lineWidth = lowFence ? 36 : 70;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance + 12, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = "#254b55";
-  ctx.lineWidth = 58;
+  ctx.strokeStyle = lowFence ? "#587b5e" : "#254b55";
+  ctx.lineWidth = lowFence ? 28 : 58;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = "#173340";
-  ctx.lineWidth = 22;
+  ctx.strokeStyle = lowFence ? "#33543e" : "#173340";
+  ctx.lineWidth = lowFence ? 10 : 22;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
@@ -12619,8 +12728,8 @@ function drawOutfieldWall() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#7fc7b0";
-  ctx.lineWidth = 9;
+  ctx.strokeStyle = lowFence ? "#f4dc7b" : "#7fc7b0";
+  ctx.lineWidth = lowFence ? 6 : 9;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY - wallHeight, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
@@ -12635,8 +12744,8 @@ function drawOutfieldWall() {
     const rad = degreesToRadians(angle);
     const x = field.plateX + Math.cos(rad) * defenseField.fenceDistance;
     const y = homeY + Math.sin(rad) * defenseField.fenceDistance;
-    ctx.strokeStyle = "#102833";
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = lowFence ? "#38563f" : "#102833";
+    ctx.lineWidth = lowFence ? 5 : 8;
     drawLine(x, y - wallHeight - 14, x, y + 24);
     ctx.strokeStyle = "rgba(255, 240, 184, 0.55)";
     ctx.lineWidth = 2;
@@ -14645,6 +14754,11 @@ startButton.addEventListener("click", startGame);
 modeSelect?.addEventListener("change", () => {
   readMenu();
   updateMenuAbilityPanels();
+});
+stadiumSelect?.addEventListener("change", () => {
+  applyStadiumPreset(stadiumSelect.value);
+  updateMenuAbilityPanels();
+  draw();
 });
 awayPresetSelect?.addEventListener("change", () => {
   readMenu();
