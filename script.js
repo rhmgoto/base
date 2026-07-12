@@ -227,7 +227,7 @@ const pitchTypes = {
 const actualPitchSpeedReductionScale = 0.8;
 const actualPitchSpeedBoost = 1.265 * 1.15 * 1.15 * 1.1 * 1.3 * 1.2 * actualPitchSpeedReductionScale;
 const computerPitchShapeRateScale = 0.9;
-const computerPitchStrikeZoneRateScale = 1.3;
+const computerPitchStrikeZoneRateScale = 1.42;
 const pitcherAbilityTuning = {
   globalMultiplier: 1.1,
   stuffBoost: 0,
@@ -500,6 +500,7 @@ const yellowZoneHitTuning = {
 };
 const effectiveBatterPowerScale = 0.9;
 const nonYellowHitChancePenalty = 0.898;
+const overallHitResultReductionChance = 0.28;
 const goodContactEaseScale = 1.2;
 
 const defenseThrowResultHoldSeconds = 2.0;
@@ -3532,17 +3533,17 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
         ? { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 46) * strikeOffsetScale, intent: "plainEdge" }
         : { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "awayEdge" };
     }
-    if (allowPlainEdge && roll < 0.28) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "plainEdge" };
-    if (roll < 0.28 + pressure * 0.18) return { direction: 0, offset: randomBetween(-12, 12), intent: "earlyBrakeStrike" };
-    if (roll < 0.52 + pressure * 0.08) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(38, 56) * strikeOffsetScale, intent: "awayEdge" };
-    if (roll < 0.7) {
+    if (allowPlainEdge && roll < 0.34) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "plainEdge" };
+    if (roll < 0.38 + pressure * 0.18) return { direction: 0, offset: randomBetween(-12, 12), intent: "earlyBrakeStrike" };
+    if (roll < 0.62 + pressure * 0.08) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 48) * strikeOffsetScale, intent: "awayEdge" };
+    if (roll < 0.82) {
       const side = Math.random() < 0.5 ? -1 : 1;
-      return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(36, 54) * strikeOffsetScale, intent: "edge" };
+      return { direction: side === dangerousDirection && Math.random() > 0.03 ? awayFromBatter : side, offset: side * randomBetween(28, 46) * strikeOffsetScale, intent: "edge" };
     }
-    if (roll < 0.9) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(48, 66) * strikeOffsetScale, intent: "awayEscape" };
+    if (roll < 0.95) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(26, 44) * strikeOffsetScale, intent: "ballToStrikeBurst" };
     return avoidWasteBall
-      ? { direction: awayFromBatter, offset: awayFromBatter * randomBetween(36, 52) * strikeOffsetScale, intent: "awayEdge" }
-      : { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(34, 54) * strikeOffsetScale, intent: "ballToStrikeBurst" };
+      ? { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 46) * strikeOffsetScale, intent: "awayEdge" }
+      : { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "plainEdge" };
   }
   if (prioritizeStrike) {
     if (type === "normal" && roll < 0.18) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "plainEdge" };
@@ -3557,19 +3558,19 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
     }
     return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(24, 40) * strikeOffsetScale, intent: "plainEdge" };
   }
-  if (type === "normal" && roll < 0.12) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "plainEdge" };
-  if (roll < 0.08) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 52) * strikeOffsetScale, intent: "strikeToBall" };
-  if (roll < 0.34 + pressure * 0.08) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(30, 52) * strikeOffsetScale, intent: "acceleratingStrike" };
-  if (roll < 0.54 + pressure * 0.12) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(32, 54) * strikeOffsetScale, intent: pressure > 0.34 ? "brakeThenBurst" : "ballToStrikeBurst" };
-  if (roll < 0.62) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(36, 58) * strikeOffsetScale, intent: "speedEscape" };
-  if (roll < 0.64) return { direction: dangerousDirection, offset: dangerousDirection * randomBetween(20, 36) * strikeOffsetScale, intent: "hbpBackdoor" };
-  if (roll < 0.74) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(30, 50) * strikeOffsetScale, intent: "backdoor" };
-  if (roll < 0.82) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 46) * strikeOffsetScale, intent: "frontdoor" };
+  if (type === "normal" && roll < 0.18) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(26, 42) * strikeOffsetScale, intent: "plainEdge" };
+  if (roll < 0.04) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 48) * strikeOffsetScale, intent: "strikeToBall" };
+  if (roll < 0.4 + pressure * 0.08) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(26, 46) * strikeOffsetScale, intent: "acceleratingStrike" };
+  if (roll < 0.66 + pressure * 0.1) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(28, 48) * strikeOffsetScale, intent: pressure > 0.34 ? "brakeThenBurst" : "ballToStrikeBurst" };
+  if (roll < 0.7) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 48) * strikeOffsetScale, intent: "speedEscape" };
+  if (roll < 0.71) return { direction: dangerousDirection, offset: dangerousDirection * randomBetween(18, 30) * strikeOffsetScale, intent: "hbpBackdoor" };
+  if (roll < 0.82) return { direction: -awayFromBatter, offset: -awayFromBatter * randomBetween(26, 46) * strikeOffsetScale, intent: "backdoor" };
+  if (roll < 0.91) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(24, 42) * strikeOffsetScale, intent: "frontdoor" };
   if (roll < 0.98) {
     const side = getPreferredComputerBendDirection(player, Math.random() < 0.5 ? -1 : 1);
-    return { direction: side, offset: side * randomBetween(24, 46) * strikeOffsetScale, intent: "edge" };
+    return { direction: side, offset: side * randomBetween(22, 40) * strikeOffsetScale, intent: "edge" };
   }
-  return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(24, 40) * strikeOffsetScale, intent: "plainEdge" };
+  return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(22, 38) * strikeOffsetScale, intent: "plainEdge" };
 }
 
 function buildComputerPitchShape(plan, player = activePitcher) {
@@ -5006,16 +5007,16 @@ function decideHitResultFromBattedProfile(contact) {
     return makeBattingPracticeHomeRunResult(profile, feedbackScore);
   }
   if (shouldForceLowPowerCleanHit(contact, profile, feedbackScore)) {
-    return applyOutfieldHitGrounderReduction(makeLowPowerCleanHitResult(profile, feedbackScore), profile);
+    return applyFinalHitResultBalance(makeLowPowerCleanHitResult(profile, feedbackScore), profile, contact);
   }
   if (!isInsideChaseContact(contact) && shouldUseModerateContactVariety(profile, feedbackScore)) {
-    return applyOutfieldHitGrounderReduction(makeModerateContactVarietyResult(profile, feedbackScore, roll), profile);
+    return applyFinalHitResultBalance(makeModerateContactVarietyResult(profile, feedbackScore, roll), profile, contact);
   }
 
   if (isYellowZoneContact(contact)) {
     const yellowResult = decideYellowZoneHitResult(profile, contact, roll);
-    if (yellowResult) return applyOutfieldHitGrounderReduction(applyFeedbackQualityHitUpgrade(yellowResult, profile, contact), profile);
-    return applyOutfieldHitGrounderReduction(applyFeedbackQualityHitUpgrade(decideNormalZoneHitResult(profile, contact, roll), profile, contact), profile);
+    if (yellowResult) return applyFinalHitResultBalance(applyFeedbackQualityHitUpgrade(yellowResult, profile, contact), profile, contact);
+    return applyFinalHitResultBalance(applyFeedbackQualityHitUpgrade(decideNormalZoneHitResult(profile, contact, roll), profile, contact), profile, contact);
   }
   const result = outsideStrikeZone
     ? decideOutsideZoneHitResult(profile, contact, roll)
@@ -5025,7 +5026,48 @@ function decideHitResultFromBattedProfile(contact) {
     ? applyFeedbackQualityHitUpgrade(result, profile, contact)
     : result;
   const finalResult = contact.inGoodContactZone || shouldRescueFeedbackContact ? adjustedResult : applyNonYellowHitChancePenalty(adjustedResult, profile);
-  return applyOutfieldHitGrounderReduction(finalResult, profile);
+  return applyFinalHitResultBalance(finalResult, profile, contact);
+}
+
+function applyFinalHitResultBalance(result, profile, contact = null) {
+  return applyOverallHitResultReduction(applyOutfieldHitGrounderReduction(result, profile), profile, contact);
+}
+
+function applyOverallHitResultReduction(result, profile, contact = null, roll = Math.random()) {
+  if (!result || result.kind !== "hit") return result;
+  if (result.scoreType === "homer" || result.deepDrive || result.fenceLiner) return result;
+  if (profile?.battingPracticeHomerCandidate || result.battedProfile?.battingPracticeHomerCandidate) return result;
+  if (roll >= getOverallHitResultReductionChance(result, profile, contact)) return result;
+  const sourceProfile = {
+    ...(result.battedProfile || profile || {}),
+    direction: result.direction || profile?.direction,
+    quality: Math.max(profile?.quality ?? 0.42, result.battedProfile?.quality ?? 0.42, contact?.quality ?? 0),
+    exitVelocity: Math.max(profile?.exitVelocity ?? 0.46, result.battedProfile?.exitVelocity ?? 0.46),
+    launchAngle: result.battedProfile?.launchAngle ?? profile?.launchAngle ?? 8
+  };
+  if (sourceProfile.launchAngle <= 10) {
+    return makeGrounderOutResultFromProfile(sourceProfile, Math.min(result.power ?? sourceProfile.power ?? 0.7, 0.74));
+  }
+  if (sourceProfile.launchAngle >= 24) return makeRoutineFlyResultFromProfile(sourceProfile);
+  return makeRoutineFlyResultFromProfile({
+    ...sourceProfile,
+    quality: Math.max(sourceProfile.quality ?? 0, 0.4),
+    exitVelocity: Math.max(sourceProfile.exitVelocity ?? 0, 0.54),
+    reducedHitResult: true
+  });
+}
+
+function getOverallHitResultReductionChance(result, profile, contact = null) {
+  const score = clamp(
+    contact ? getContactFeedbackScore(contact) : result?.battedProfile?.feedbackScore ?? profile?.feedbackScore ?? profile?.quality ?? 0.5,
+    0,
+    1
+  );
+  if (score < 0.46) return clamp(0.64 - score * 0.38, overallHitResultReductionChance, 0.54);
+  if (score < 0.5) return 0.42;
+  if (score < 0.6) return 0.34;
+  if (score < 0.7) return overallHitResultReductionChance;
+  return 0.2;
 }
 
 function applyOutfieldHitGrounderReduction(result, profile, roll = Math.random()) {
@@ -12662,10 +12704,15 @@ function getHomeRunStandFocusPoint() {
   return { x: target.x, y: target.y - 100 };
 }
 
+function getBattedBallFirstLandingPoint(battedBall) {
+  if (!battedBall?.target) return null;
+  return battedBall.target;
+}
+
 function drawDefenseTarget() {
   if (!defenseState.active) return;
   const battedBall = defenseState.battedBall;
-  const target = defenseState.landingTarget || battedBall?.target || defenseState.target;
+  const target = getBattedBallFirstLandingPoint(battedBall) || defenseState.target;
   if (battedBall && !battedBall.isGrounder && !battedBall.wallHit && !battedBall.fenceOver) {
     drawFlyLandingTarget(target, battedBall);
     return;
@@ -12748,12 +12795,8 @@ function drawLandingImpactMarker() {
   const impactAge = elapsedSeconds - battedBall.ballTime;
   if (impactAge < 0 || impactAge > 1.45) return;
 
-  const target = defenseState.landingTarget || battedBall.target || defenseState.target;
+  const target = getBattedBallFirstLandingPoint(battedBall) || defenseState.target;
   const alpha = 1 - impactAge / 1.45;
-  const relation = defenseState.chosenFielder
-    ? getBattedBallFielderRelation(defenseState.chosenFielder, battedBall)
-    : null;
-  const label = battedBall.isGrounder ? "バウンド" : relation?.landsInFront ? "手前落下" : "落下";
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -12776,16 +12819,6 @@ function drawLandingImpactMarker() {
   ctx.quadraticCurveTo(target.x + 17, target.y + 16, target.x + 28, target.y + 5);
   ctx.stroke();
 
-  ctx.globalAlpha = Math.min(1, alpha * 1.35);
-  ctx.font = "bold 16px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "rgba(70, 46, 20, 0.7)";
-  ctx.fillStyle = "#fff0a8";
-  const labelY = target.y - 34 - impactAge * 14;
-  ctx.strokeText(label, target.x, labelY);
-  ctx.fillText(label, target.x, labelY);
   ctx.restore();
 }
 
@@ -12846,7 +12879,7 @@ function drawPostLandingBounceMarker() {
   const alpha = isLandingHold
     ? (1 - holdAge / 0.55) * (0.42 + bouncePhase * 0.2)
     : (1 - holdAge / 0.55) * (0.26 + bouncePhase * 0.28);
-  const markerPoint = defenseState.landingTarget || battedBall.target || defenseState.target;
+  const markerPoint = getBattedBallFirstLandingPoint(battedBall) || defenseState.target;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = "rgba(255, 242, 168, 0.82)";

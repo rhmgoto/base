@@ -6228,7 +6228,7 @@ assert(battedProfileState.centerDriveHomerOver === true, "middle-zone mistake co
 assert(["hit", "out"].includes(battedProfileState.offTimingCenterDriveKind), "slightly off-timing middle-zone contact should resolve as a playable ball");
 assert(battedProfileState.forgivingCenterDriveKind === "hit", "forgiving middle-zone contact should still be a hit");
 assert(battedProfileState.forgivingCenterDriveRoutineFly === false, "forgiving middle-zone contact should not become a routine fly");
-assert(battedProfileState.veryForgivingCenterDriveKind === "hit", "very forgiving middle-zone contact should still be a hit");
+assert(["hit", "out"].includes(battedProfileState.veryForgivingCenterDriveKind), "very forgiving middle-zone contact should resolve as a playable ball");
 assert(battedProfileState.veryForgivingCenterDriveGrounder === false, "very forgiving middle-zone contact should not stay as a grounder");
 assert(["hit", "out", "foul"].includes(battedProfileState.looseCenterDriveKind), "loose middle-zone contact should resolve as a playable result under stronger stuff pressure");
 assert(battedProfileState.looseCenterDriveGrounder === false, "loose middle-zone contact should not stay as a grounder");
@@ -10041,6 +10041,11 @@ const autoRunnerAndOutfieldHitReductionState = JSON.parse(runInGame(
     const outfieldHit = { label: hitLabels.cleanHit, kind: "hit", scoreType: "single", power: 0.92, direction: normalize({ x: 0.04, y: -1 }) };
     const converted = applyOutfieldHitGrounderReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66 }, 0.19);
     const kept = applyOutfieldHitGrounderReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66 }, 0.2);
+    const overallReduced = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66, feedbackScore: 0.66 }, null, 0.27);
+    const overallKept = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66, feedbackScore: 0.66 }, null, 0.28);
+    const fortyScoreReduced = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.58, power: 0.62, quality: 0.44, feedbackScore: 0.44 }, null, 0.47);
+    const fortyScoreKept = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.58, power: 0.62, quality: 0.44, feedbackScore: 0.44 }, null, 0.48);
+    const homerKept = applyOverallHitResultReduction({ label: hitLabels.homer, kind: "hit", scoreType: "homer", power: 1.6 }, { launchAngle: 32, exitVelocity: 1.2, power: 1.4, quality: 0.8 }, null, 0);
     return JSON.stringify({
       firstRunnerTarget: firstRunnerOnDouble.targetBase,
       firstRunnerScored: firstRunnerOnDouble.scored,
@@ -10048,7 +10053,12 @@ const autoRunnerAndOutfieldHitReductionState = JSON.parse(runInGame(
       convertedLabel: converted.label,
       convertedKind: converted.kind,
       keptLabel: kept.label,
-      keptKind: kept.kind
+      keptKind: kept.kind,
+      overallReducedKind: overallReduced.kind,
+      overallKeptKind: overallKept.kind,
+      fortyScoreReducedKind: fortyScoreReduced.kind,
+      fortyScoreKeptKind: fortyScoreKept.kind,
+      homerKeptKind: homerKept.kind
     });
   })()`
 ));
@@ -10058,6 +10068,11 @@ assert(autoRunnerAndOutfieldHitReductionState.firstRunnerScored === false, "auto
 assert(autoRunnerAndOutfieldHitReductionState.forceSafeSecond === "single", "auto baserunners should not treat safe second-base throws as extra-base advances");
 assert(autoRunnerAndOutfieldHitReductionState.convertedLabel === "内野ゴロ" && autoRunnerAndOutfieldHitReductionState.convertedKind === "out", "20% of outfield hits should convert into infield grounders");
 assert(autoRunnerAndOutfieldHitReductionState.keptLabel === "クリーンヒット" && autoRunnerAndOutfieldHitReductionState.keptKind === "hit", "outfield hits outside the 20% window should stay hits");
+assert(autoRunnerAndOutfieldHitReductionState.overallReducedKind === "out", "60-point overall hit reduction should turn some non-homer hits into outs");
+assert(autoRunnerAndOutfieldHitReductionState.overallKeptKind === "hit", "60-point overall hit reduction should keep hits outside the adjusted window");
+assert(autoRunnerAndOutfieldHitReductionState.fortyScoreReducedKind === "out", "40-point contact should have a much higher chance to become an out");
+assert(autoRunnerAndOutfieldHitReductionState.fortyScoreKeptKind === "hit", "40-point contact should still allow rare hit exceptions");
+assert(autoRunnerAndOutfieldHitReductionState.homerKeptKind === "hit", "overall hit reduction should not demote home runs");
 
 const intentionalWalkCommandState = JSON.parse(runInGame(
   context,
