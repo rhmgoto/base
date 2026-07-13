@@ -9534,12 +9534,12 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? (homeRunFrequencyMultiplier - 1) * 170 * clamp(homeRunQualityBoost + (isFenceLiner ? 0.12 : 0), 0.28, 1)
     : 0;
   const homeRunTestDistance = distance + homeRunFrequencyDistanceBonus;
-  const possibleFenceOver = fairDeepFlight && fenceIntersection && homeRunTestDistance > fenceTravelDistance;
   const possibleHomerFlightDistance = getPossibleHomeRunFlightDistance(
     homeRunTestDistance,
     fenceTravelDistance,
-    { isFenceEdgeFly, isToweringFly, isChaseFly, isDeepDrive, isFenceLiner, power, contactScore, profileExitVelocity, profileCarry }
+    { isFenceEdgeFly, isToweringFly, isChaseFly, isDeepDrive, isFenceLiner, power, contactScore, profileExitVelocity, profileCarry, direction }
   );
+  const possibleFenceOver = fairDeepFlight && fenceIntersection && possibleHomerFlightDistance > fenceTravelDistance;
   let possibleHomerHeight = isFenceEdgeFly
     ? randomBetween(330, 450) * bigOutfieldFlyHeightScale
     : isToweringFly
@@ -9876,65 +9876,49 @@ function shouldShortenBigOutfieldFly(traits) {
 }
 
 function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits = {}) {
-  const overFenceDistance = Math.max(0, distance - fenceTravelDistance);
-  if (traits.isFenceEdgeFly) {
-    const quality = clamp((traits.contactScore ?? 0.5) * 0.7 + clamp(((traits.power ?? 1) - 1.12) / 0.55, 0, 1) * 0.3, 0, 1);
-    return fenceTravelDistance + clamp(overFenceDistance * (0.36 + quality * 0.42), 14, 76 + quality * 150);
-  }
-  if (traits.isFenceLiner) {
-    const eliteBonus = (traits.contactScore ?? 0) >= 0.8 ? clamp(((traits.contactScore ?? 0) - 0.8) / 0.2, 0, 1) * 120 : 0;
-    const quality = clamp((traits.contactScore ?? 0.5) * 0.56 + clamp(((traits.profileExitVelocity ?? traits.power ?? 1) - 0.92) / 0.55, 0, 1) * 0.44, 0, 1);
-    return fenceTravelDistance + clamp(overFenceDistance * (0.34 + quality * 0.38) + Math.max(0, (traits.power ?? 1) - 1.24) * 78 + eliteBonus, 18, 140 + quality * 155 + eliteBonus);
-  }
-  if (traits.isToweringFly || traits.isDeepDrive) {
-    const eliteContact = clamp(((traits.contactScore ?? 0) - 0.8) / 0.2, 0, 1);
-    const exitQuality = clamp(((traits.profileExitVelocity ?? 1) - 0.9) / 0.72, 0, 1);
-    const powerQuality = clamp(((traits.power ?? 1.2) - 1.34) / 1.1, 0, 1);
-    const carryQuality = clamp(((traits.profileCarry ?? 1) - 0.92) / 0.78, 0, 1);
-    const contactQuality = clamp(traits.contactScore ?? 0.55, 0, 1);
-    const quality = getHomeRunQuality({
-      contactScore: contactQuality,
-      profileExitVelocity: traits.profileExitVelocity ?? 1,
-      power: traits.power ?? 1.2
-    });
-    const perfectBonus = traits.power >= 2.15 ? Math.max(0, traits.power - 2.15) * 290 : 0;
-    const rawPowerMonsterBonus = traits.power >= 2.35 ? Math.max(0, traits.power - 2.35) * 1040 : 0;
-    const monsterBonus = eliteContact * (120 + exitQuality * 230);
-    const carryRatio = quality < 0.58 ? 0.11 + quality * 0.2 : 0.22 + quality * 0.34;
-    const separationBonus = getHomeRunDistanceSeparationBonus({
-      contactScore: contactQuality,
-      profileExitVelocity: traits.profileExitVelocity ?? 1,
-      profileCarry: traits.profileCarry ?? 1,
-      power: traits.power ?? 1.2
-    });
-    const minClearance = quality < 0.58 ? 6 : quality < 0.78 ? 28 : 70;
-    const distanceVarietyWeight = clamp((quality - 0.42) / 0.36, 0, 1);
-    const qualityClearance =
-      42
-      + Math.pow(quality, 1.25) * 470
-      + Math.pow(exitQuality, 1.18) * 260
-      + Math.pow(powerQuality, 1.15) * 260
-      + Math.pow(carryQuality, 1.18) * 220
-      + Math.pow(eliteContact, 1.65) * 650;
-    const carriedClearance = overFenceDistance * carryRatio;
-    const varietyClearance = qualityClearance * distanceVarietyWeight + separationBonus * 0.32;
-    const maxClearance = quality < 0.58
-      ? 240
-      : quality < 0.78
-        ? 690
-        : 1080
-          + clamp(((traits.power ?? 1.2) - 2.15) / 0.55, 0, 1) * 520
-          + rawPowerMonsterBonus * 0.45
-          + monsterBonus * 0.25
-          + separationBonus * 0.15;
-    return fenceTravelDistance + clamp(carriedClearance + varietyClearance + perfectBonus + rawPowerMonsterBonus + monsterBonus, minClearance, maxClearance);
-  }
-  if (traits.isChaseFly) {
-    const quality = clamp((traits.contactScore ?? 0.5) * 0.64 + clamp(((traits.power ?? 1) - 1) / 0.65, 0, 1) * 0.36, 0, 1);
-    return fenceTravelDistance + clamp(overFenceDistance * (0.24 + quality * 0.34), 18, 88 + quality * 190);
-  }
-  const quality = clamp((traits.contactScore ?? 0.5) * 0.6 + clamp(((traits.power ?? 1) - 1) / 0.8, 0, 1) * 0.4, 0, 1);
-  return fenceTravelDistance + clamp(overFenceDistance * (0.22 + quality * 0.34), 14, 78 + quality * 230);
+  const direction = traits.direction || null;
+  const fenceMeters = getBattedBallDistanceMeters(fenceTravelDistance, { direction, fenceTravelDistance });
+  const rawMeters = getBattedBallDistanceMeters(distance, { direction, fenceTravelDistance });
+  const contactScore = clamp(traits.contactScore ?? 0.5, 0, 1);
+  const profileExitVelocity = clamp(traits.profileExitVelocity ?? traits.power ?? 1, 0.08, 1.85);
+  const profileCarry = clamp(traits.profileCarry ?? traits.power ?? 1, 0.08, 1.95);
+  const power = clamp(traits.power ?? 1.2, 0.08, 3);
+  const quality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
+  const exitQuality = clamp((profileExitVelocity - 0.88) / 0.76, 0, 1);
+  const carryQuality = clamp((profileCarry - 0.88) / 0.78, 0, 1);
+  const powerQuality = clamp((power - 1.18) / 1.22, 0, 1);
+  const eliteQuality = clamp((quality - 0.82) / 0.18, 0, 1);
+  const ordinaryCarryCompression = clamp((rawMeters - 118) / 48, 0, 1) * (0.34 + (1 - eliteQuality) * 0.22);
+  const compressedRawMeters = rawMeters - Math.max(0, rawMeters - 118) * ordinaryCarryCompression;
+  const rawCarryMeters = Math.max(0, rawMeters - 98) * clamp(0.025 + quality * 0.055 + exitQuality * 0.018, 0.025, 0.1);
+  const modestFlyFactor = clamp((rawMeters - 90) / 24, 0, 1);
+  const naturalMeters =
+    compressedRawMeters
+    + rawCarryMeters
+    + Math.pow(quality, 1.35) * 3.5 * modestFlyFactor
+    + Math.pow(exitQuality, 1.3) * 3 * modestFlyFactor
+    + Math.pow(carryQuality, 1.25) * 2.5 * modestFlyFactor
+    + Math.pow(powerQuality, 1.2) * 2.5 * modestFlyFactor
+    + Math.pow(eliteQuality, 1.55) * 18;
+  const styleBonus = traits.isFenceEdgeFly
+    ? -7
+    : traits.isFenceLiner
+      ? -1 + exitQuality * 2.5
+      : traits.isChaseFly
+        ? -4 + quality * 2
+        : traits.isToweringFly
+          ? 1 + carryQuality * 3
+          : traits.isDeepDrive
+            ? -2 + quality * 3
+            : 0;
+  const maximumMeters = 180;
+  const finalMeters = clamp(
+    naturalMeters + styleBonus,
+    0,
+    maximumMeters
+  );
+  const metersPerFieldUnit = fenceMeters / Math.max(1, fenceTravelDistance);
+  return finalMeters / Math.max(0.001, metersPerFieldUnit);
 }
 
 function getWallReboundDistance(power) {

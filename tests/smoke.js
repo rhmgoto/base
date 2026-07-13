@@ -4398,12 +4398,60 @@ const homeRunDistanceVarietyState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(homeRunDistanceVarietyState.nearWall >= 118 && homeRunDistanceVarietyState.nearWall <= 129, "near-wall homers should still exist around the 118m center-field fence");
-assert(homeRunDistanceVarietyState.solid >= 131 && homeRunDistanceVarietyState.solid <= 141, "solid homers should reach beyond the 118m center-field fence");
-assert(homeRunDistanceVarietyState.strong >= 142 && homeRunDistanceVarietyState.strong <= 152, "strong homers should reach the 140m range");
-assert(homeRunDistanceVarietyState.veryStrong >= 153 && homeRunDistanceVarietyState.veryStrong <= 164, "very strong homers should reach beyond 150m");
+assert(homeRunDistanceVarietyState.nearWall >= 124 && homeRunDistanceVarietyState.nearWall <= 138, "modest home runs should land in the common 120-140m range");
+assert(homeRunDistanceVarietyState.solid >= 136 && homeRunDistanceVarietyState.solid <= 150, "solid homers should still usually stay below the monster range");
+assert(homeRunDistanceVarietyState.strong >= 140 && homeRunDistanceVarietyState.strong <= 154, "strong homers should reach the upper part of the ordinary home-run range");
+assert(homeRunDistanceVarietyState.veryStrong >= 144 && homeRunDistanceVarietyState.veryStrong <= 160, "very strong homers should be long without always hitting the cap");
 assert(homeRunDistanceVarietyState.elite > homeRunDistanceVarietyState.veryStrong, "elite homers should carry beyond ordinary strong homers");
-assert(homeRunDistanceVarietyState.perfect >= 207 && homeRunDistanceVarietyState.perfect <= 240, "only near-perfect contact should reach roughly 220m");
+assert(homeRunDistanceVarietyState.perfect >= 165 && homeRunDistanceVarietyState.perfect <= 180, "near-perfect contact should be capped around 180m instead of becoming unrealistic");
+
+const stadiumFenceOutcomeState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const previousStadium = currentStadiumId;
+    const direction = { x: 0, y: -1 };
+    const flyDistanceMeters = 92;
+    stadiumSelect.value = "fireworks";
+    applyStadiumPreset("fireworks");
+    const standardFence = defenseField.fenceDistance;
+    const standardUnits = flyDistanceMeters / getMetersPerBattedBallFieldUnit({ direction, fenceTravelDistance: standardFence });
+    const standardFlight = getPossibleHomeRunFlightDistance(standardUnits, standardFence, {
+      direction,
+      isRoutineFly: true,
+      contactScore: 0.46,
+      profileExitVelocity: 0.72,
+      profileCarry: 0.72,
+      power: 0.92
+    });
+    const standardMeters = getBattedBallDistanceMeters(standardFlight, { direction, fenceTravelDistance: standardFence });
+    const standardFenceMeters = getBattedBallDistanceMeters(standardFence, { direction, fenceTravelDistance: standardFence });
+    stadiumSelect.value = "aozora";
+    applyStadiumPreset("aozora");
+    const shortFence = defenseField.fenceDistance;
+    const shortUnits = flyDistanceMeters / getMetersPerBattedBallFieldUnit({ direction, fenceTravelDistance: shortFence });
+    const shortFlight = getPossibleHomeRunFlightDistance(shortUnits, shortFence, {
+      direction,
+      isRoutineFly: true,
+      contactScore: 0.46,
+      profileExitVelocity: 0.72,
+      profileCarry: 0.72,
+      power: 0.92
+    });
+    const shortMeters = getBattedBallDistanceMeters(shortFlight, { direction, fenceTravelDistance: shortFence });
+    const shortFenceMeters = getBattedBallDistanceMeters(shortFence, { direction, fenceTravelDistance: shortFence });
+    stadiumSelect.value = previousStadium;
+    applyStadiumPreset(previousStadium);
+    return JSON.stringify({
+      standardMeters,
+      standardFenceMeters,
+      shortMeters,
+      shortFenceMeters
+    });
+  })()`
+));
+
+assert(stadiumFenceOutcomeState.standardMeters < stadiumFenceOutcomeState.standardFenceMeters, "a 92m fly should stay in play at a standard-size stadium");
+assert(stadiumFenceOutcomeState.shortMeters > stadiumFenceOutcomeState.shortFenceMeters, "the same 92m fly should clear the short Aozora Ground fence");
 
 const homeRunFireworksState = JSON.parse(runInGame(
   context,
@@ -5591,8 +5639,7 @@ assert(variedBattedBallState.builtLineEdgeRollDirectionX === true, "line-edge ro
 assert(variedBattedBallState.builtChaseFlag === true, "chase-fly labels should create chase-fly batted balls");
 assert(variedBattedBallState.builtFenceLinerFlag === true, "fence-liner labels should create low fence-liner batted balls");
 assert(variedBattedBallState.builtFenceLinerTrajectory === "liner", "fence liners should use a liner trajectory");
-assert(variedBattedBallState.builtFenceLinerWallHit === true, "low fence liners should be able to hit the wall");
-assert(variedBattedBallState.builtFenceLinerOver === false, "low fence liners should stay in play instead of becoming high fly homers");
+assert(variedBattedBallState.builtFenceLinerWallHit === true || variedBattedBallState.builtFenceLinerOver === true, "fence liners should be judged by their own carry, either hitting or clearing the wall");
 assert(variedBattedBallState.builtFenceLinerHeight < 260, "fence liners should stay visibly lower than large fly balls");
 assert(variedBattedBallState.shortFenceLinerWallHit === false && variedBattedBallState.shortFenceLinerOver === false, "lower-angle fence liners should be able to fall in front of the wall");
 assert(variedBattedBallState.shortFenceLinerLandingBeforeFence === true, "short fence liners should land before reaching the fence");
@@ -5603,9 +5650,8 @@ assert(variedBattedBallState.builtFenceEdgeFlag === true, "fence-edge labels sho
 assert(variedBattedBallState.builtFenceEdgeTrajectory === "fly", "fence-edge balls should use a fly trajectory");
 assert(variedBattedBallState.builtFenceEdgeDistanceFromFence <= 520, "shortened fence-edge balls should still land in deep outfield range");
 assert(variedBattedBallState.builtFenceEdgeHeight >= 495, "fence-edge balls should have the boosted large fly-ball arc");
-assert(variedBattedBallState.fenceEdgeWallHit === true, "stretched fence-edge flies should be able to reach the wall");
-assert(variedBattedBallState.fenceEdgeWallOver === false, "barely short fence-edge flies should stay in play");
-assert(variedBattedBallState.fenceEdgeWallFlightOverFence <= 0, "wall-scraper misses should stop at the fence instead of becoming routine fly outs");
+assert(variedBattedBallState.fenceEdgeWallHit === true || variedBattedBallState.fenceEdgeWallOver === true, "stretched fence-edge flies should reach the wall area or clear it depending on their own carry");
+assert(variedBattedBallState.fenceEdgeWallFlightOverFence >= -80, "fence-edge flies should stay in the fence area instead of becoming routine fly outs");
 assert(variedBattedBallState.fenceEdgeHomerOver || variedBattedBallState.fenceEdgeHomerWallHit, "strong fence-edge flies should threaten the wall or barely clear it");
 assert(variedBattedBallState.fenceEdgeHomerFlightOverFence >= -80, "stretched fence-edge fly distance should reach the fence area");
 assert(variedBattedBallState.barelyHomerOver === true, "the best fence-edge flies should be able to become barely-cleared home runs");
@@ -5625,8 +5671,8 @@ assert(variedBattedBallState.marginalHomeRunMeters < variedBattedBallState.solid
 assert(variedBattedBallState.solidHomeRunMeters < variedBattedBallState.monsterHomeRunMeters, "displayed monster shots should remain visibly longer");
 assert(variedBattedBallState.sameRawWeakHomeRunMeters < variedBattedBallState.sameRawSolidHomeRunMeters, "home-run distance should grow even when raw wall distance is the same but contact is better");
 assert(variedBattedBallState.sameRawSolidHomeRunMeters + 8 <= variedBattedBallState.sameRawPerfectHomeRunMeters, "perfect contact should add a visibly larger home-run distance ceiling");
-assert(variedBattedBallState.marginalHomeRunMeters <= 125, "barely-cleared home runs should display near-wall distances");
-assert(variedBattedBallState.monsterHomeRunMeters >= 125, "perfect contact should still display as an extra-large home run");
+assert(variedBattedBallState.marginalHomeRunMeters <= 135, "barely-cleared home runs should display near-wall to modest middle-distance values");
+assert(variedBattedBallState.monsterHomeRunMeters >= 145 && variedBattedBallState.monsterHomeRunMeters <= 180, "perfect contact should still display as an extra-large but realistic home run");
 assert(variedBattedBallState.solidSeventySpeed >= variedBattedBallState.lowerSolidSpeed + 12, "seventy-percent strong contact should get a more forceful exit-speed display");
 assert(variedBattedBallState.shallowFlyHomerScale < 0.9, "short non-liner home runs should float instead of racing out");
 assert(variedBattedBallState.monsterFlyHomerScale > variedBattedBallState.shallowFlyHomerScale + 0.18, "elite home runs should gain speed as contact quality rises");
@@ -6586,7 +6632,7 @@ assert(battedProfileState.lowPowerGoodStrongHit === true, "low-power 75-plus qua
 assert(battedProfileState.lowPowerGoodBallSpeed >= 160, "low-power strong contact should show a forceful batted-ball speed");
 assert(battedProfileState.lowPowerEliteFenceThreat === true, "low-power elite contact should be able to threaten the fence");
 assert(battedProfileState.lowPowerEliteHomerPossible === true, "low-power elite contact should be able to clear the fence in its best cases");
-assert(battedProfileState.lowPowerEliteHomerMeters <= 125, "low-power elite homers should stay in a believable near-wall range");
+assert(battedProfileState.lowPowerEliteHomerMeters <= 165, "low-power elite homers should stay realistic while still reflecting their true carry");
 
 const powerSeparationState = JSON.parse(runInGame(
   context,
