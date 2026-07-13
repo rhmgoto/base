@@ -496,8 +496,26 @@ const stadiumPresets = {
     hasMountains: false,
     hasDome: false,
     hasRiver: true,
-    riverCenterMeters: 92,
+    riverInPlay: false,
+    riverCenterMeters: 190,
     riverWidthMeters: 40,
+    riverBankMeters: 24,
+    koiVariants: 64,
+    airCarryScale: 1
+  },
+  americanRoyal: {
+    id: "americanRoyal",
+    name: "アメリカンロイヤルパーク",
+    surface: "royalGrass",
+    centerFenceMeters: 112,
+    lineFenceMeters: 112,
+    fenceHeight: baseDefenseField.fenceHeight * 1.42,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: false,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    royalEnclosed: true,
     airCarryScale: 1
   },
   nextDome: {
@@ -671,11 +689,14 @@ function outfielderStartPoint(side, depthRatio = 0.92) {
   const center = defenseField.bases.home;
   const angle = side === "L" ? -132 : side === "R" ? -48 : -90;
   const radians = degreesToRadians(angle);
-  const depth = defenseField.fenceDistance * depthRatio;
-  return clampOutfielderBeyondRiversideRiver({
+  const activeDepthRatio = getCurrentStadium().hasRiver && getCurrentStadium().riverInPlay === false
+    ? Math.min(depthRatio, 0.9)
+    : depthRatio;
+  const depth = defenseField.fenceDistance * activeDepthRatio;
+  return clampOutfielderBeyondRiversideRiver(clampPointInsideFence({
     x: center.x + Math.cos(radians) * depth,
     y: center.y + Math.sin(radians) * depth
-  }, side);
+  }, 42), side);
 }
 
 function infielderStartPoint(role) {
@@ -9197,7 +9218,7 @@ function getRiversideRiverDistanceForMeters(meters) {
 
 function getRiversideRiverMetrics() {
   const stadium = getCurrentStadium();
-  if (!stadium.hasRiver) return null;
+  if (!stadium.hasRiver || stadium.riverInPlay === false) return null;
   return {
     centerDistance: getRiversideRiverDistanceForMeters(stadium.riverCenterMeters ?? 64),
     halfWidth: getRiversideRiverDistanceForMeters(stadium.riverWidthMeters ?? 40) / 2,
@@ -9235,7 +9256,8 @@ function isPointInRiversideRiver(point) {
 }
 
 function getRiversideRiverEntryPoint(start, end) {
-  if (!getCurrentStadium().hasRiver || !start || !end) return null;
+  const stadium = getCurrentStadium();
+  if (!stadium.hasRiver || stadium.riverInPlay === false || !start || !end) return null;
   const samples = 54;
   for (let i = 0; i <= samples; i += 1) {
     const t = i / samples;
@@ -9249,14 +9271,16 @@ function getRiversideRiverEntryPoint(start, end) {
 }
 
 function clampOutfielderBeyondRiversideRiver(point, role = "") {
-  if (!getCurrentStadium().hasRiver || !outfielderRoles.includes(role) || !point) return point;
+  const stadium = getCurrentStadium();
+  if (!stadium.hasRiver || stadium.riverInPlay === false || !outfielderRoles.includes(role) || !point) return point;
   const farEdgeY = getRiversideRiverFarEdgeY(point.x) - 28;
   if (!Number.isFinite(farEdgeY) || point.y <= farEdgeY) return point;
   return { ...point, y: farEdgeY };
 }
 
 function clampFielderOutsideRiversideRiver(point, role = "") {
-  if (!getCurrentStadium().hasRiver || !point || !isPointInRiversideRiver(point)) return point;
+  const stadium = getCurrentStadium();
+  if (!stadium.hasRiver || stadium.riverInPlay === false || !point || !isPointInRiversideRiver(point)) return point;
   if (outfielderRoles.includes(role)) {
     return { ...point, y: getRiversideRiverFarEdgeY(point.x) - 18 };
   }
@@ -12720,8 +12744,10 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
     }
     return;
   }
-  ctx.fillStyle = stadium.surface === "premiumGrass"
-    ? "#64ad5f"
+  ctx.fillStyle = stadium.surface === "royalGrass"
+    ? "#2f7148"
+    : stadium.surface === "premiumGrass"
+      ? "#64ad5f"
     : stadium.surface === "artificialTurf"
         ? "#3aa65f"
         : stadium.surface === "riverGrass"
@@ -12730,9 +12756,20 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < canvas.width; i += 56) {
     ctx.fillStyle = i % 112 === 0
-      ? (stadium.surface === "premiumGrass" ? "rgba(220,255,220,0.09)" : stadium.surface === "artificialTurf" ? "rgba(190,255,220,0.11)" : stadium.surface === "riverGrass" ? "rgba(220,255,205,0.075)" : "rgba(255,255,255,0.05)")
-      : "rgba(0,0,0,0.045)";
+      ? (stadium.surface === "royalGrass" ? "rgba(200,239,191,0.105)" : stadium.surface === "premiumGrass" ? "rgba(220,255,220,0.09)" : stadium.surface === "artificialTurf" ? "rgba(190,255,220,0.11)" : stadium.surface === "riverGrass" ? "rgba(220,255,205,0.075)" : "rgba(255,255,255,0.05)")
+      : (stadium.surface === "royalGrass" ? "rgba(4,42,24,0.075)" : "rgba(0,0,0,0.045)");
     ctx.fillRect(i, 0, 56, canvas.height);
+  }
+  if (stadium.surface === "royalGrass") {
+    ctx.save();
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 420; i += 1) {
+      const x = (i * 83 + (i % 7) * 19) % canvas.width;
+      const y = (i * 47 + (i % 11) * 13) % canvas.height;
+      ctx.strokeStyle = i % 4 === 0 ? "rgba(208,239,184,0.13)" : "rgba(8,66,35,0.16)";
+      drawLine(x, y + 5, x + ((i % 3) - 1) * 2, y - 4 - (i % 4));
+    }
+    ctx.restore();
   }
   if (stadium.surface === "riverGrass") {
     for (let i = 0; i < 220; i += 1) {
@@ -12743,6 +12780,33 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
       drawLine(x, y, x + 18, y - 4);
     }
   }
+}
+
+function drawAmericanRoyalGrassDetails(centerX, homeY, radius) {
+  if (getCurrentStadium().surface !== "royalGrass") return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, homeY, radius, Math.PI, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  for (let x = centerX - radius; x <= centerX + radius; x += 74) {
+    const stripeIndex = Math.floor((x - centerX + radius) / 74);
+    ctx.fillStyle = stripeIndex % 2 === 0 ? "rgba(171,222,151,0.075)" : "rgba(5,56,29,0.065)";
+    ctx.fillRect(x, homeY - radius, 38, radius);
+  }
+
+  const span = Math.max(1, Math.floor(radius * 2));
+  const depth = Math.max(1, Math.floor(radius));
+  for (let i = 0; i < 560; i += 1) {
+    const x = centerX - radius + ((i * 149 + (i % 9) * 17) % span);
+    const y = homeY - ((i * 101 + (i % 13) * 11) % depth);
+    if (Math.hypot(x - centerX, y - homeY) > radius - 4) continue;
+    ctx.strokeStyle = i % 5 === 0 ? "rgba(218,241,190,0.18)" : "rgba(7,70,34,0.2)";
+    ctx.lineWidth = 1.2;
+    drawLine(x, y + 6, x + ((i % 3) - 1) * 2, y - 5 - (i % 4));
+  }
+  ctx.restore();
 }
 
 function drawNextDomeRoofScreen() {
@@ -13196,19 +13260,329 @@ function drawNextDomeBeyondOutfield() {
   ctx.restore();
 }
 
+function drawAmericanRoyalBattingBackdrop() {
+  if (!getCurrentStadium().royalEnclosed) return;
+  ctx.save();
+  const backdropHeight = 66;
+  const wall = ctx.createLinearGradient(0, 0, 0, 390);
+  if (wall?.addColorStop) {
+    wall.addColorStop(0, "#101715");
+    wall.addColorStop(0.48, "#283428");
+    wall.addColorStop(1, "#4a3d2b");
+    ctx.fillStyle = wall;
+  } else {
+    ctx.fillStyle = "#283428";
+  }
+  ctx.fillRect(0, 0, canvas.width, backdropHeight);
+  ctx.fillStyle = "#141d1a";
+  ctx.fillRect(0, 0, canvas.width, 40);
+  ctx.fillStyle = "#c99b4c";
+  ctx.fillRect(0, backdropHeight - 8, canvas.width, 6);
+  for (let x = 0; x < canvas.width; x += 160) {
+    const column = ctx.createLinearGradient(x, 0, x + 22, 0);
+    if (column?.addColorStop) {
+      column.addColorStop(0, "rgba(91,55,28,0.84)");
+      column.addColorStop(0.42, "rgba(176,113,55,0.78)");
+      column.addColorStop(1, "rgba(67,39,22,0.88)");
+      ctx.fillStyle = column;
+    } else {
+      ctx.fillStyle = "rgba(112,70,37,0.82)";
+    }
+    roundRect(x + 22, 6, 22, backdropHeight - 10, 6);
+    ctx.fill();
+    ctx.fillStyle = "rgba(232,194,106,0.54)";
+    ctx.fillRect(x + 28, 14, 4, backdropHeight - 24);
+  }
+  for (let x = 0; x <= canvas.width; x += 80) {
+    ctx.fillStyle = "rgba(4,11,10,0.34)";
+    ctx.fillRect(x, 0, 8, backdropHeight);
+  }
+  ctx.restore();
+}
+
+function drawAmericanRoyalBeyondOutfield() {
+  if (!getCurrentStadium().royalEnclosed) return;
+  const center = getFenceCenter();
+  const innerRadius = defenseField.fenceDistance + 26;
+  const standsOuterRadius = innerRadius + 430;
+  const wallOuterRadius = standsOuterRadius + 520;
+  const left = center.x - wallOuterRadius - 360;
+  const top = center.y - wallOuterRadius - 520;
+  const width = wallOuterRadius * 2 + 720;
+  const height = wallOuterRadius + 760;
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.arc(center.x, center.y, defenseField.fenceDistance + 4, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip("evenodd");
+
+  const wall = ctx.createLinearGradient(center.x, top, center.x, center.y - defenseField.fenceDistance);
+  if (wall?.addColorStop) {
+    wall.addColorStop(0, "#111816");
+    wall.addColorStop(0.58, "#26372f");
+    wall.addColorStop(1, "#4a3d2b");
+    ctx.fillStyle = wall;
+  } else {
+    ctx.fillStyle = "#26372f";
+  }
+  ctx.fillRect(left, top, width, height);
+
+  traceRiversideOutfieldAnnulus(standsOuterRadius, wallOuterRadius, 176, 364);
+  ctx.fillStyle = "#18231f";
+  ctx.fill();
+  for (let radius = standsOuterRadius + 48; radius < wallOuterRadius; radius += 74) {
+    ctx.strokeStyle = radius % 148 < 74 ? "rgba(107,91,63,0.34)" : "rgba(10,18,15,0.42)";
+    ctx.lineWidth = 42;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  traceRiversideOutfieldAnnulus(innerRadius, standsOuterRadius, 177, 363);
+  ctx.fillStyle = "#2a3931";
+  ctx.fill();
+  for (let row = 0; row < 8; row += 1) {
+    const radius = innerRadius + 32 + row * 48;
+    ctx.strokeStyle = row % 2 === 0 ? "#182923" : "#3a4b3f";
+    ctx.lineWidth = 34;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    for (let angle = 182; angle <= 358; angle += 3) {
+      const rad = degreesToRadians(angle + (row % 2) * 1.4);
+      const palette = ["#efd494", "#d9e6d7", "#a94c49", "#7196aa", "#f4eee0"];
+      ctx.fillStyle = palette[(row + Math.floor(angle / 3)) % palette.length];
+      ctx.beginPath();
+      ctx.arc(center.x + Math.cos(rad) * radius, center.y + Math.sin(rad) * radius, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.strokeStyle = "#c99b4c";
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, standsOuterRadius + 8, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  for (let angle = 180; angle <= 360; angle += 10) {
+    const rad = degreesToRadians(angle);
+    const innerX = center.x + Math.cos(rad) * innerRadius;
+    const innerY = center.y + Math.sin(rad) * innerRadius;
+    const outerX = center.x + Math.cos(rad) * wallOuterRadius;
+    const outerY = center.y + Math.sin(rad) * wallOuterRadius;
+    ctx.strokeStyle = "rgba(12,20,16,0.5)";
+    ctx.lineWidth = 7;
+    drawLine(innerX, innerY, outerX, outerY);
+  }
+  ctx.restore();
+}
+
 function drawRiversideBeyondOutfield() {
   if (!getCurrentStadium().hasRiver) return;
   const center = getFenceCenter();
-  const standY = center.y - defenseField.fenceDistance - 170;
+  const stadium = getCurrentStadium();
+  const bankWidth = getRiversideHomeRunZoneUnits(stadium.riverBankMeters ?? 24);
+  const riverWidth = getRiversideHomeRunZoneUnits(stadium.riverWidthMeters ?? 40);
+  const nearBankInner = defenseField.fenceDistance + 24;
+  const nearBankOuter = nearBankInner + bankWidth;
+  const riverOuter = nearBankOuter + riverWidth;
+  const farBankOuter = riverOuter + bankWidth;
   ctx.save();
-  ctx.fillStyle = "rgba(80, 58, 39, 0.34)";
-  roundRect(field.plateX - defenseField.fenceDistance * 0.72, standY - 16, defenseField.fenceDistance * 1.44, 86, 18);
-  ctx.fill();
-  for (let row = 0; row < 5; row += 1) {
-    ctx.fillStyle = row % 2 === 0 ? "rgba(255,235,137,0.76)" : "rgba(127,185,226,0.7)";
-    roundRect(field.plateX - defenseField.fenceDistance * 0.64, standY + row * 17, defenseField.fenceDistance * 1.28, 8, 5);
+
+  if (traceRiversideOutfieldAnnulus(nearBankInner, nearBankOuter, 178, 362, 16)) {
+    ctx.fillStyle = "#a77b4f";
     ctx.fill();
   }
+  if (traceRiversideOutfieldAnnulus(nearBankOuter, riverOuter, 178, 362, 22)) {
+    const water = ctx.createLinearGradient(field.plateX, center.y - nearBankOuter, field.plateX, center.y - riverOuter);
+    if (water?.addColorStop) {
+      water.addColorStop(0, "#2f93bd");
+      water.addColorStop(0.52, "#58bbd3");
+      water.addColorStop(1, "#1f719f");
+      ctx.fillStyle = water;
+    } else {
+      ctx.fillStyle = "#399bc1";
+    }
+    ctx.fill();
+  }
+  if (traceRiversideOutfieldAnnulus(riverOuter, farBankOuter, 178, 362, 18)) {
+    ctx.fillStyle = "#b58a5a";
+    ctx.fill();
+  }
+
+  drawRiversideRiverFlowLines(nearBankOuter, riverOuter);
+  drawRiversideKoi(nearBankOuter, riverOuter);
+  drawRiversideRiverbankDetails(nearBankInner, nearBankOuter, riverOuter, farBankOuter);
+
+  ctx.restore();
+}
+
+function getRiversideHomeRunZoneUnits(meters) {
+  const stadium = getCurrentStadium();
+  const centerMeters = Number.isFinite(stadium.centerFenceMeters) ? stadium.centerFenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  return defenseField.fenceDistance * (meters / centerMeters);
+}
+
+function traceRiversideOutfieldAnnulus(innerRadius, outerRadius, startDegrees = 180, endDegrees = 360, curve = 0) {
+  const center = getFenceCenter();
+  const samples = 48;
+  ctx.beginPath();
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples;
+    const angle = degreesToRadians(startDegrees + (endDegrees - startDegrees) * t);
+    const wobble = Math.sin(t * Math.PI * 3.1) * curve;
+    const x = center.x + Math.cos(angle) * (innerRadius + wobble);
+    const y = center.y + Math.sin(angle) * (innerRadius + wobble);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  for (let i = samples; i >= 0; i -= 1) {
+    const t = i / samples;
+    const angle = degreesToRadians(startDegrees + (endDegrees - startDegrees) * t);
+    const wobble = Math.sin(t * Math.PI * 2.4 + 0.7) * curve;
+    const x = center.x + Math.cos(angle) * (outerRadius + wobble);
+    const y = center.y + Math.sin(angle) * (outerRadius + wobble);
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  return true;
+}
+
+function getRiversideArcPoint(radius, t, curve = 0) {
+  const center = getFenceCenter();
+  const angle = degreesToRadians(180 + 180 * t);
+  const wobble = Math.sin(t * Math.PI * 2.7) * curve;
+  return {
+    x: center.x + Math.cos(angle) * (radius + wobble),
+    y: center.y + Math.sin(angle) * (radius + wobble)
+  };
+}
+
+function drawRiversideRiverFlowLines(innerRadius, outerRadius) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(235, 252, 255, 0.36)";
+  ctx.lineWidth = 4;
+  for (let lane = 0.18; lane <= 0.84; lane += 0.22) {
+    const radius = innerRadius + (outerRadius - innerRadius) * lane;
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i += 1) {
+      const t = i / 40;
+      const point = getRiversideArcPoint(radius, t, 18);
+      point.y += Math.sin(t * Math.PI * 8 + lane * 5) * 5;
+      if (i === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function getRiversideKoiVariant(index) {
+  const palettes = [
+    ["#f8f5e8", "#d94831"],
+    ["#fff7d6", "#111827"],
+    ["#f7f7f2", "#e69f2e"],
+    ["#1f2937", "#f8f5e8"],
+    ["#f97316", "#ffffff"],
+    ["#f8fafc", "#b91c1c"],
+    ["#fde68a", "#7c2d12"],
+    ["#e5e7eb", "#2563eb"]
+  ];
+  const palette = palettes[index % palettes.length];
+  return {
+    body: palette[0],
+    spot: palette[1],
+    size: 0.72 + ((index * 7) % 8) * 0.055,
+    speed: 0.8 + ((index * 11) % 9) * 0.12,
+    wiggle: 0.12 + ((index * 5) % 7) * 0.035,
+    spotCount: 1 + (index % 4),
+    direction: index % 2 === 0 ? 1 : -1
+  };
+}
+
+function getRiversideKoiSchool(innerRadius, outerRadius, elapsedSeconds = 0) {
+  return Array.from({ length: getCurrentStadium().koiVariants ?? 64 }, (_, index) => {
+    const variant = getRiversideKoiVariant(index);
+    const lane = ((index * 13) % 61) / 60;
+    const baseT = ((index * 17) % 64) / 64;
+    const motion = elapsedSeconds * 0.007 * variant.speed * variant.direction;
+    const t = ((baseT + motion) % 1 + 1) % 1;
+    const radius = innerRadius + (outerRadius - innerRadius) * (0.12 + lane * 0.76);
+    const point = getRiversideArcPoint(radius, t, 14);
+    return {
+      ...variant,
+      id: index,
+      x: point.x,
+      y: point.y + Math.sin(elapsedSeconds * variant.speed + index) * 8,
+      angle: degreesToRadians(180 + 180 * t) + (variant.direction > 0 ? Math.PI / 2 : -Math.PI / 2)
+    };
+  });
+}
+
+function drawRiversideKoi(innerRadius, outerRadius) {
+  const elapsedSeconds = defenseState.active ? (performance.now() - defenseState.startTime) / 1000 : performance.now() / 1000;
+  const koiSchool = getRiversideKoiSchool(innerRadius, outerRadius, elapsedSeconds);
+  koiSchool.forEach((koi) => drawRiversideKoiFish(koi));
+}
+
+function drawRiversideKoiFish(koi) {
+  ctx.save();
+  ctx.translate(koi.x, koi.y);
+  ctx.rotate(koi.angle);
+  ctx.scale(koi.size, koi.size);
+  ctx.globalAlpha = 0.84;
+  ctx.fillStyle = "rgba(4, 28, 42, 0.22)";
+  ctx.beginPath();
+  ctx.ellipse(3, 5, 18, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = koi.body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 18, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = koi.spot;
+  for (let i = 0; i < koi.spotCount; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(-8 + i * 6, Math.sin(i + koi.id) * 2, 4, 3, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = koi.body;
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(30, -7);
+  ctx.lineTo(27, 0);
+  ctx.lineTo(30, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.beginPath();
+  ctx.ellipse(-12, -5, 4, 2, -0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRiversideRiverbankDetails(nearInner, nearOuter, riverOuter, farOuter) {
+  ctx.save();
+  const detailRadii = [nearInner + (nearOuter - nearInner) * 0.55, riverOuter + (farOuter - riverOuter) * 0.48];
+  detailRadii.forEach((radius, bankIndex) => {
+    for (let i = 0; i < 22; i += 1) {
+      const t = (i + bankIndex * 0.37) / 22;
+      const point = getRiversideArcPoint(radius + ((i % 4) - 1.5) * 9, t, 14);
+      if (i % 5 === 0) {
+        ctx.fillStyle = "rgba(60, 105, 57, 0.86)";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 14 + (i % 3) * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#6d4e2f";
+        ctx.fillRect(point.x - 2, point.y + 10, 4, 16);
+      } else {
+        ctx.fillStyle = "rgba(185, 173, 132, 0.76)";
+        ctx.beginPath();
+        ctx.ellipse(point.x, point.y, 6, 4, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  });
   ctx.restore();
 }
 
@@ -13325,6 +13699,7 @@ function drawField() {
   const stadium = getCurrentStadium();
   drawStadiumTurfPattern(stadium);
   drawNextDomeRoofScreen();
+  drawAmericanRoyalBattingBackdrop();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
   ctx.fillStyle = "#d89548";
@@ -13334,10 +13709,15 @@ function drawField() {
   ctx.lineTo(1256, 836);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = stadium.surface === "dirt" ? "rgba(255, 232, 170, 0.16)" : "#68b560";
+  ctx.fillStyle = stadium.surface === "dirt"
+    ? "rgba(255, 232, 170, 0.16)"
+    : stadium.surface === "royalGrass"
+      ? "rgba(47, 119, 70, 0.94)"
+      : "#68b560";
   ctx.beginPath();
   ctx.arc(field.centerX, 754, 405, Math.PI, Math.PI * 2);
   ctx.fill();
+  drawAmericanRoyalGrassDetails(field.centerX, 754, 405);
   ctx.strokeStyle = "rgba(255,255,255,0.76)";
   ctx.lineWidth = 5;
   const plateTopY = field.plateY - 12 * field.plateScale;
@@ -13380,12 +13760,16 @@ function drawDefenseView() {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = stadium.surface === "dirt" ? "rgba(255, 235, 174, 0.14)" : "#6ebf69";
+  ctx.fillStyle = stadium.surface === "dirt"
+    ? "rgba(255, 235, 174, 0.14)"
+    : stadium.surface === "royalGrass"
+      ? "rgba(45, 116, 67, 0.94)"
+      : "#6ebf69";
   ctx.beginPath();
   ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
   ctx.fill();
-
-  drawRiversideRiver();
+  drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
+  drawAmericanRoyalBeyondOutfield();
 
   ctx.strokeStyle = "rgba(255,255,255,0.78)";
   ctx.lineWidth = 5;
@@ -13576,42 +13960,51 @@ function drawOutfieldWall() {
   const wallHeight = defenseField.fenceHeight;
   const stadium = getCurrentStadium();
   const lowFence = stadium.id === "aozora" || stadium.id === "riverside";
+  const royalWall = stadium.royalEnclosed === true;
   ctx.save();
 
-  ctx.strokeStyle = "rgba(18, 34, 47, 0.32)";
-  ctx.lineWidth = lowFence ? 36 : 70;
+  ctx.strokeStyle = royalWall ? "rgba(5, 14, 20, 0.58)" : "rgba(18, 34, 47, 0.32)";
+  ctx.lineWidth = lowFence ? 36 : royalWall ? 94 : 70;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance + 12, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = lowFence ? "#587b5e" : "#254b55";
-  ctx.lineWidth = lowFence ? 28 : 58;
+  if (royalWall) {
+    drawAmericanRoyalWoodFence(homeY, wallHeight);
+    ctx.restore();
+    return;
+  }
+
+  ctx.strokeStyle = lowFence ? "#587b5e" : royalWall ? "#183d38" : "#254b55";
+  ctx.lineWidth = lowFence ? 28 : royalWall ? 78 : 58;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = lowFence ? "#33543e" : "#173340";
-  ctx.lineWidth = lowFence ? 10 : 22;
+  ctx.strokeStyle = lowFence ? "#33543e" : royalWall ? "#0c2928" : "#173340";
+  ctx.lineWidth = lowFence ? 10 : royalWall ? 30 : 22;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
   for (let layer = 0; layer <= 5; layer += 1) {
     const t = layer / 5;
-    ctx.strokeStyle = `rgba(37, 75, 85, ${0.34 - t * 0.035})`;
-    ctx.lineWidth = 12;
+    ctx.strokeStyle = royalWall
+      ? `rgba(30, 79, 67, ${0.5 - t * 0.045})`
+      : `rgba(37, 75, 85, ${0.34 - t * 0.035})`;
+    ctx.lineWidth = royalWall ? 18 : 12;
     ctx.beginPath();
     ctx.arc(field.plateX, homeY - wallHeight * t, defenseField.fenceDistance, Math.PI, Math.PI * 2);
     ctx.stroke();
   }
 
-  ctx.strokeStyle = lowFence ? "#f4dc7b" : "#7fc7b0";
-  ctx.lineWidth = lowFence ? 6 : 9;
+  ctx.strokeStyle = lowFence ? "#f4dc7b" : royalWall ? "#d8bb68" : "#7fc7b0";
+  ctx.lineWidth = lowFence ? 6 : royalWall ? 13 : 9;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY - wallHeight, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255, 240, 184, 0.8)";
+  ctx.strokeStyle = royalWall ? "rgba(255, 232, 157, 0.94)" : "rgba(255, 240, 184, 0.8)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY - wallHeight - 10, defenseField.fenceDistance - 2, Math.PI, Math.PI * 2);
@@ -13621,12 +14014,94 @@ function drawOutfieldWall() {
     const rad = degreesToRadians(angle);
     const x = field.plateX + Math.cos(rad) * defenseField.fenceDistance;
     const y = homeY + Math.sin(rad) * defenseField.fenceDistance;
-    ctx.strokeStyle = lowFence ? "#38563f" : "#102833";
-    ctx.lineWidth = lowFence ? 5 : 8;
+    ctx.strokeStyle = lowFence ? "#38563f" : royalWall ? "#071d1e" : "#102833";
+    ctx.lineWidth = lowFence ? 5 : royalWall ? 11 : 8;
     drawLine(x, y - wallHeight - 14, x, y + 24);
     ctx.strokeStyle = "rgba(255, 240, 184, 0.55)";
     ctx.lineWidth = 2;
     drawLine(x - 3, y - wallHeight - 8, x - 3, y + 18);
+  }
+  ctx.restore();
+}
+
+function drawAmericanRoyalWoodFence(homeY, wallHeight) {
+  const radius = defenseField.fenceDistance;
+  const baseY = homeY;
+  const topY = homeY - wallHeight;
+  const woodLayers = [
+    { t: 0.08, color: "#3b2415", width: 78 },
+    { t: 0.28, color: "#5b351c", width: 74 },
+    { t: 0.48, color: "#6e4324", width: 70 },
+    { t: 0.68, color: "#4f2e19", width: 66 },
+    { t: 0.88, color: "#7a4b28", width: 62 }
+  ];
+
+  ctx.save();
+  for (const layer of woodLayers) {
+    const y = baseY - wallHeight * layer.t;
+    ctx.strokeStyle = layer.color;
+    ctx.lineWidth = layer.width;
+    ctx.beginPath();
+    ctx.arc(field.plateX, y, radius, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  for (let grain = 0; grain < 7; grain += 1) {
+    const t = 0.1 + grain * 0.13;
+    const y = baseY - wallHeight * t;
+    ctx.strokeStyle = grain % 2 === 0 ? "rgba(235, 169, 88, 0.34)" : "rgba(42, 22, 12, 0.28)";
+    ctx.lineWidth = grain % 2 === 0 ? 4 : 3;
+    ctx.beginPath();
+    ctx.arc(field.plateX, y + Math.sin(grain) * 5, radius + (grain % 3) * 3 - 3, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "#2c190f";
+  ctx.lineWidth = 14;
+  ctx.beginPath();
+  ctx.arc(field.plateX, baseY + 18, radius, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#d8ad5a";
+  ctx.lineWidth = 15;
+  ctx.beginPath();
+  ctx.arc(field.plateX, topY, radius, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 237, 177, 0.88)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(field.plateX, topY - 10, radius - 2, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  for (let angle = 184; angle <= 356; angle += 12) {
+    const rad = degreesToRadians(angle);
+    const x = field.plateX + Math.cos(rad) * radius;
+    const y = homeY + Math.sin(rad) * radius;
+    const postGradient = ctx.createLinearGradient(x - 8, y - wallHeight - 20, x + 12, y + 20);
+    if (postGradient?.addColorStop) {
+      postGradient.addColorStop(0, "#2c170c");
+      postGradient.addColorStop(0.45, "#8a552b");
+      postGradient.addColorStop(1, "#32190d");
+      ctx.strokeStyle = postGradient;
+    } else {
+      ctx.strokeStyle = "#6b3d20";
+    }
+    ctx.lineWidth = 12;
+    drawLine(x, y - wallHeight - 16, x, y + 25);
+    ctx.strokeStyle = "rgba(255, 226, 143, 0.58)";
+    ctx.lineWidth = 2.5;
+    drawLine(x - 4, y - wallHeight - 8, x - 4, y + 16);
+  }
+
+  for (let angle = 188; angle <= 352; angle += 28) {
+    const rad = degreesToRadians(angle);
+    const x = field.plateX + Math.cos(rad) * radius;
+    const y = homeY + Math.sin(rad) * radius - wallHeight * 0.52;
+    ctx.fillStyle = "rgba(226, 182, 91, 0.38)";
+    ctx.beginPath();
+    ctx.ellipse(x, y, 22, 5, rad, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }

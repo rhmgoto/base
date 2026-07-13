@@ -221,6 +221,7 @@ function assertHtmlShell() {
     'value="aozora"',
     'value="hyperOcean"',
     'value="riverside"',
+    'value="americanRoyal"',
     'value="nextDome"',
     'value="5"',
     'value="9"',
@@ -311,86 +312,101 @@ const riversideStadiumState = JSON.parse(runInGame(
     readMenu();
     const centerMeters = getBattedBallDistanceMeters(defenseField.fenceDistance, { direction: { x: 0, y: -1 } });
     const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
-    const riverCenter = {
-      x: field.plateX,
-      y: getFenceCenter().y - getRiversideRiverDistanceForMeters(stadiumPresets.riverside.riverCenterMeters)
+    const riverMetrics = getRiversideRiverMetrics();
+    const bankWidth = getRiversideHomeRunZoneUnits(stadiumPresets.riverside.riverBankMeters);
+    const riverWidth = getRiversideHomeRunZoneUnits(stadiumPresets.riverside.riverWidthMeters);
+    const koiSchool = getRiversideKoiSchool(defenseField.fenceDistance + bankWidth, defenseField.fenceDistance + bankWidth + riverWidth, 3.2);
+    const koiVariantKeys = new Set(Array.from({ length: 64 }, (_, index) => JSON.stringify(getRiversideKoiVariant(index))));
+    const oldDefenseState = defenseState;
+    const oldGamePhase = gamePhase;
+    defenseState = {
+      ...createDefenseState(),
+      active: false,
+      fielders: [],
+      chosenFielder: { role: "C", x: field.plateX, y: getFenceCenter().y - defenseField.fenceDistance * 0.8 }
     };
-    const riverStart = { x: field.plateX, y: riverCenter.y + 160 };
-    const riverEnd = { x: field.plateX, y: riverCenter.y - 160 };
-    const riverBall = {
-      isFoulBall: false,
-      fenceOver: false,
-      wallHit: false,
-      groundRuleDouble: false,
-      isGrounder: true,
-      isLiner: false,
-      target: riverStart,
-      direction: normalize({ x: 0, y: -1 }),
-      flightDistance: getFenceDistance(riverStart),
-      landingDistance: getFenceDistance(riverStart),
-      power: 0.78,
-      ballTime: 0.45
-    };
-    const riverTarget = getDefenseFieldingTarget(riverBall, { kind: "single", scoreType: "single", caught: false });
-    const outfielders = getDefensiveLineup("away").filter((fielder) => ["L", "C", "R"].includes(fielder.role));
-    const riverCenterInside = isPointInRiversideRiver(riverCenter);
-    const riverEntryFound = Boolean(getRiversideRiverEntryPoint(riverStart, riverEnd));
-    const riverTargetInside = isPointInRiversideRiver(riverTarget);
-    const outfieldersBeyondRiver = outfielders.every((fielder) => fielder.y <= getRiversideRiverFarEdgeY(fielder.x) - 20);
-    bases = {
-      first: makeBaseRunner({ name: "R1", responsiblePitcherId: "p1" }),
-      second: makeBaseRunner({ name: "R2", responsiblePitcherId: "p2" }),
-      third: null
-    };
-    const riverRuns = advanceRunners("double", { name: "BAT" }, { groundRuleDouble: true }, { kind: "double", scoreType: "double" });
-    const riverBasesAfter = {
-      first: Boolean(bases.first),
-      second: bases.second?.name ?? null,
-      third: bases.third?.name ?? null
-    };
-    const clampedInfielder = clampFielderOutsideRiversideRiver(riverCenter, "SS");
-    const clampedOutfielder = clampFielderOutsideRiversideRiver(riverCenter, "C");
-    const clampedInfielderInRiver = isPointInRiversideRiver(clampedInfielder);
-    const clampedOutfielderInRiver = isPointInRiversideRiver(clampedOutfielder);
+    gamePhase = "defense";
+    drawDefenseView();
+    defenseState = oldDefenseState;
+    gamePhase = oldGamePhase;
     stadiumSelect.value = "fireworks";
     readMenu();
     return JSON.stringify({
       hasRiver: stadiumPresets.riverside.hasRiver,
+      riverInPlay: stadiumPresets.riverside.riverInPlay,
       centerMeters,
       lineMeters,
       lowFence: stadiumPresets.riverside.fenceHeight < baseDefenseField.fenceHeight * 0.5,
       riverCenterMeters: stadiumPresets.riverside.riverCenterMeters,
       riverWidthMeters: stadiumPresets.riverside.riverWidthMeters,
-      riverCenterInside,
-      riverEntryFound,
-      riverGroundRuleDouble: riverBall.groundRuleDouble,
-      riverTargetInside,
-      outfieldersBeyondRiver,
-      riverRuns,
-      riverBasesAfter,
-      clampedInfielderInRiver,
-      clampedOutfielderInRiver
+      riverBankMeters: stadiumPresets.riverside.riverBankMeters,
+      riverMetricsDisabled: riverMetrics === null,
+      drawDefenseViewOk: true,
+      koiCount: koiSchool.length,
+      koiVariantCount: koiVariantKeys.size,
+      koiMoved: Math.hypot(koiSchool[0].x - getRiversideKoiSchool(defenseField.fenceDistance + bankWidth, defenseField.fenceDistance + bankWidth + riverWidth, 8.2)[0].x, koiSchool[0].y - getRiversideKoiSchool(defenseField.fenceDistance + bankWidth, defenseField.fenceDistance + bankWidth + riverWidth, 8.2)[0].y) > 3
     });
   })()`
 ));
 
-assert(riversideStadiumState.hasRiver === true, "Riverside Park should enable a river hazard");
+assert(riversideStadiumState.hasRiver === true, "Riverside Park should enable a river home-run zone");
+assert(riversideStadiumState.riverInPlay === false, "Riverside Park river should be beyond the fence, not an in-play hazard");
 assert(riversideStadiumState.centerMeters === 160, "Riverside Park center fence should be 160 meters");
 assert(riversideStadiumState.lineMeters === 160, "Riverside Park line fences should be 160 meters");
 assert(riversideStadiumState.lowFence === true, "Riverside Park should use a low fence");
-assert(riversideStadiumState.riverCenterMeters === 92, "Riverside Park river should be moved back to about 92 meters from home");
+assert(riversideStadiumState.riverCenterMeters === 190, "Riverside Park river should sit in the home-run zone beyond the 160m fence");
 assert(riversideStadiumState.riverWidthMeters === 40, "Riverside Park river should be about 40 meters wide");
-assert(riversideStadiumState.riverCenterInside === true, "Riverside Park river center should be inside the river band");
-assert(riversideStadiumState.riverEntryFound === true, "Riverside Park should detect batted balls entering the river");
-assert(riversideStadiumState.riverGroundRuleDouble === true, "Riverside Park river balls should become ground-rule doubles");
-assert(riversideStadiumState.riverTargetInside === true, "Riverside Park river fielding target should stop at the river");
-assert(riversideStadiumState.outfieldersBeyondRiver === true, "Riverside Park outfielders should start beyond the river");
-assert(riversideStadiumState.riverRuns === 1, "Riverside Park river ground-rule doubles should advance runners two bases with home as the cap");
-assert(riversideStadiumState.riverBasesAfter.first === false, "Riverside Park river ground-rule doubles should leave first base empty");
-assert(riversideStadiumState.riverBasesAfter.second === "BAT", "Riverside Park river ground-rule doubles should put the batter on second");
-assert(riversideStadiumState.riverBasesAfter.third === "R1", "Riverside Park river ground-rule doubles should put a first-base runner on third");
-assert(riversideStadiumState.clampedInfielderInRiver === false, "Riverside Park infielders should be kept out of the river");
-assert(riversideStadiumState.clampedOutfielderInRiver === false, "Riverside Park outfielders should be kept out of the river");
+assert(riversideStadiumState.riverBankMeters === 24, "Riverside Park should keep visible bank areas on both sides of the river");
+assert(riversideStadiumState.riverMetricsDisabled === true, "Riverside Park should not use the river as an in-play fielding boundary");
+assert(riversideStadiumState.drawDefenseViewOk === true, "Riverside Park defense view should render without stopping on a green screen");
+assert(riversideStadiumState.koiCount === 64, "Riverside Park should draw a 64-koi school");
+assert(riversideStadiumState.koiVariantCount === 64, "Riverside Park should provide 64 koi variants");
+assert(riversideStadiumState.koiMoved === true, "Riverside Park koi should move at a visible speed");
+
+const americanRoyalStadiumState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const baseFirst = { ...defenseField.bases.first };
+    stadiumSelect.value = "americanRoyal";
+    readMenu();
+    const centerMeters = getBattedBallDistanceMeters(defenseField.fenceDistance, { direction: { x: 0, y: -1 } });
+    const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
+    const oldDefenseState = defenseState;
+    const oldGamePhase = gamePhase;
+    defenseState = {
+      ...createDefenseState(),
+      active: false,
+      fielders: [],
+      chosenFielder: { role: "C", x: field.plateX, y: getFenceCenter().y - defenseField.fenceDistance * 0.8 }
+    };
+    gamePhase = "defense";
+    drawDefenseView();
+    drawField();
+    defenseState = oldDefenseState;
+    gamePhase = oldGamePhase;
+    stadiumSelect.value = "fireworks";
+    readMenu();
+    return JSON.stringify({
+      centerMeters,
+      lineMeters,
+      highFence: stadiumPresets.americanRoyal.fenceHeight > baseDefenseField.fenceHeight * 1.35,
+      surface: stadiumPresets.americanRoyal.surface,
+      enclosed: stadiumPresets.americanRoyal.royalEnclosed,
+      diamondUnchanged: defenseField.bases.first.x === baseFirst.x && defenseField.bases.first.y === baseFirst.y,
+      drawViewsOk: true,
+      restoredId: currentStadiumId
+    });
+  })()`
+));
+
+assert(americanRoyalStadiumState.centerMeters === 112, "American Royal Park center fence should be 112 meters");
+assert(americanRoyalStadiumState.lineMeters === 112, "American Royal Park foul-line fences should be 112 meters");
+assert(americanRoyalStadiumState.highFence === true, "American Royal Park should use a high outfield fence");
+assert(americanRoyalStadiumState.surface === "royalGrass", "American Royal Park should use its premium real-grass treatment");
+assert(americanRoyalStadiumState.enclosed === true, "American Royal Park should hide the outside behind stands and a giant wall");
+assert(americanRoyalStadiumState.diamondUnchanged === true, "American Royal Park should keep the standard diamond dimensions");
+assert(americanRoyalStadiumState.drawViewsOk === true, "American Royal Park batting and defense views should render without errors");
+assert(americanRoyalStadiumState.restoredId === "fireworks", "stadium selection should restore cleanly after American Royal Park checks");
 
 const nextDomeRoofState = JSON.parse(runInGame(
   context,
