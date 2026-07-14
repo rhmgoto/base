@@ -518,6 +518,22 @@ const stadiumPresets = {
     royalEnclosed: true,
     airCarryScale: 1
   },
+  spaceStadium: {
+    id: "spaceStadium",
+    name: "スペーススタジアム",
+    surface: "spaceGlow",
+    centerFenceMeters: 110,
+    lineFenceMeters: 110,
+    fenceHeight: baseDefenseField.fenceHeight * 1.16,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: false,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasSpaceStadium: true,
+    fireworkScale: 1.18,
+    airCarryScale: 1
+  },
   nextDome: {
     id: "nextDome",
     name: "ネクストドーム",
@@ -816,8 +832,8 @@ const pitcherSpriteSets = {
 let gameMode = "versus";
 let practicePitcherControl = "auto";
 let practicePitcherType = "A";
-let practiceBatterId = batters[0]?.id ?? "";
-let practicePitcherId = pitchers[0]?.id ?? "";
+let practiceBatterId = getDefaultPracticeBatterId();
+let practicePitcherId = getDefaultPracticePitcherId();
 let selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
 let practiceActiveBatter = null;
 let practiceActivePitcher = null;
@@ -1038,6 +1054,14 @@ function renderPracticePlayerSelects() {
 
 function getPracticePitchers() {
   return [...practiceOnlyPitchers, ...pitchers];
+}
+
+function getDefaultPracticeBatterId() {
+  return findById(getAllHitters(), "ruth")?.id || getAllHitters()[0]?.id || "";
+}
+
+function getDefaultPracticePitcherId() {
+  return findById(getPracticePitchers(), "battingpractice")?.id || getPracticePitchers()[0]?.id || "";
 }
 
 function renderPracticePlayerSelect(select, list, selectedId, kind) {
@@ -1345,8 +1369,8 @@ function resetRosterToDefaults() {
   menuSelection = cloneMenuSelection(defaultMenuSelection);
   activeLineupOrderPicker = null;
   playerEditorState = { kind: playerEditorState.kind, playerId: getPlayerEditorList()[0]?.id ?? "", isNew: false };
-  practiceBatterId = getAllHitters()[0]?.id ?? "";
-  practicePitcherId = pitchers[0]?.id ?? "";
+  practiceBatterId = getDefaultPracticeBatterId();
+  practicePitcherId = getDefaultPracticePitcherId();
   renderPracticePlayerSelects();
   renderPlayerEditor();
   updateMenuAbilityPanels();
@@ -7468,6 +7492,7 @@ function createHomeRunFireworks(battedBall) {
   const colors = ["#fff2a8", "#ff6f61", "#aee7ff", "#d6f2df", "#ffb3f0"];
   const boatCatch = getHomeRunBoatCatch(battedBall);
   const oceanBoats = getHomeRunOceanWaitingBoats(battedBall, boatCatch);
+  const rockets = createSpaceHomeRunRockets(battedBall, homerRuns, duration);
   const bursts = Array.from({ length: burstCount }, (_, burstIndex) => {
     const standDistance = defenseField.fenceDistance + randomBetween(70, homerRuns >= 4 ? 430 : 260);
     const lateral = randomBetween(homerRuns >= 4 ? -720 : -420, homerRuns >= 4 ? 720 : 420);
@@ -7491,13 +7516,44 @@ function createHomeRunFireworks(battedBall) {
       })
     };
   });
+  const rocketDuration = rockets.reduce((max, rocket) => Math.max(max, rocket.delay + rocket.duration + 0.7), 0);
   return {
     startDelay: Math.max(0.15, battedBall.ballTime ?? 0.7),
-    duration: boatCatch ? Math.max(duration, 5.8) : duration,
+    duration: Math.max(boatCatch ? 5.8 : duration, rocketDuration),
     bursts,
+    rockets,
     oceanBoats,
     boatCatch
   };
+}
+
+function createSpaceHomeRunRockets(battedBall, homerRuns, duration) {
+  if (!getCurrentStadium().hasSpaceStadium || !battedBall?.fenceOver) return [];
+  const center = getFenceCenter();
+  const direction = normalize({
+    x: (battedBall.target?.x ?? field.centerX) - center.x,
+    y: (battedBall.target?.y ?? center.y - defenseField.fenceDistance) - center.y
+  });
+  const side = normalize({ x: -direction.y, y: direction.x });
+  const standDistance = defenseField.fenceDistance + 260;
+  const lateral = randomBetween(-180, 180);
+  const start = {
+    x: center.x + direction.x * standDistance + side.x * lateral,
+    y: center.y + direction.y * standDistance + side.y * lateral
+  };
+  const end = {
+    x: start.x + side.x * randomBetween(120, 240) + direction.x * 480,
+    y: start.y + direction.y * 360 - 640
+  };
+  return [{
+    start,
+    end,
+    delay: 0.12,
+    duration: clamp(duration * 0.92, 2.4, 4.2),
+    color: "#ffef8a",
+    wobble: randomBetween(34, 54),
+    size: homerRuns >= 4 ? 1.28 : homerRuns >= 2 ? 1.14 : 1
+  }];
 }
 
 function getHomeRunBoatCatch(battedBall) {
@@ -12728,6 +12784,42 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
     }
     return;
   }
+  if (stadium.surface === "spaceGlow") {
+    const base = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    if (base?.addColorStop) {
+      base.addColorStop(0, "#010205");
+      base.addColorStop(0.42, "#03070b");
+      base.addColorStop(1, "#050b0e");
+      ctx.fillStyle = base;
+    } else {
+      ctx.fillStyle = "#03070b";
+    }
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let x = 0; x < canvas.width; x += 52) {
+      ctx.fillStyle = x % 104 === 0 ? "rgba(90, 255, 244, 0.055)" : "rgba(0, 0, 0, 0.24)";
+      ctx.fillRect(x, 0, 52, canvas.height);
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 520; i += 1) {
+      const x = (i * 79 + (i % 9) * 17) % canvas.width;
+      const y = (i * 43 + (i % 13) * 29) % canvas.height;
+      const pulse = 0.35 + ((i % 5) * 0.12);
+      ctx.fillStyle = i % 3 === 0
+        ? `rgba(138, 255, 246, ${0.12 + pulse * 0.1})`
+        : `rgba(255, 221, 111, ${0.08 + pulse * 0.06})`;
+      ctx.beginPath();
+      ctx.arc(x, y, i % 7 === 0 ? 2.2 : 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(134, 255, 247, 0.1)";
+    ctx.lineWidth = 1;
+    for (let y = 34; y < canvas.height; y += 72) {
+      drawLine(0, y, canvas.width, y + Math.sin(y * 0.04) * 16);
+    }
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle = stadium.surface === "royalGrass"
     ? "#2f7148"
     : stadium.surface === "premiumGrass"
@@ -13244,6 +13336,179 @@ function drawNextDomeBeyondOutfield() {
   ctx.restore();
 }
 
+function drawSpaceStadiumStars(left, top, width, height, count = 90) {
+  for (let i = 0; i < count; i += 1) {
+    const x = left + ((i * 97 + (i % 11) * 23) % Math.max(1, width));
+    const y = top + ((i * 53 + (i % 7) * 19) % Math.max(1, height));
+    const alpha = 0.38 + (i % 5) * 0.12;
+    ctx.fillStyle = `rgba(235, 252, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, i % 9 === 0 ? 2.4 : 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    if (i % 13 === 0) {
+      ctx.strokeStyle = `rgba(138, 255, 246, ${alpha * 0.42})`;
+      ctx.lineWidth = 1;
+      drawLine(x - 7, y, x + 7, y);
+      drawLine(x, y - 7, x, y + 7);
+    }
+  }
+}
+
+function drawSpaceStadiumMoon(x, y, radius) {
+  const glow = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 2.6);
+  if (glow?.addColorStop) {
+    glow.addColorStop(0, "rgba(230, 248, 255, 0.72)");
+    glow.addColorStop(0.36, "rgba(112, 222, 255, 0.22)");
+    glow.addColorStop(1, "rgba(112, 222, 255, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#e8f8ff";
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(7, 18, 31, 0.22)";
+  ctx.beginPath();
+  ctx.arc(x + radius * 0.35, y - radius * 0.12, radius * 0.92, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSpaceStadiumBattingBackdrop() {
+  if (!getCurrentStadium().hasSpaceStadium) return;
+  ctx.save();
+  const skyHeight = 96;
+  const sky = ctx.createLinearGradient(0, 0, 0, skyHeight);
+  if (sky?.addColorStop) {
+    sky.addColorStop(0, "#030613");
+    sky.addColorStop(0.58, "#081728");
+    sky.addColorStop(1, "#102836");
+    ctx.fillStyle = sky;
+  } else {
+    ctx.fillStyle = "#081728";
+  }
+  ctx.fillRect(0, 0, canvas.width, skyHeight);
+  drawSpaceStadiumStars(0, 4, canvas.width, 86, 100);
+  drawSpaceStadiumMoon(canvas.width - 126, 34, 23);
+  ctx.globalCompositeOperation = "lighter";
+  for (let x = 70; x < canvas.width; x += 170) {
+    ctx.strokeStyle = "rgba(114, 255, 246, 0.16)";
+    ctx.lineWidth = 3;
+    drawLine(x, skyHeight - 8, x + 28, 10);
+  }
+  ctx.restore();
+}
+
+function drawSpaceStadiumFieldLights(centerX, homeY, radius) {
+  if (!getCurrentStadium().hasSpaceStadium) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, homeY, radius, Math.PI, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  const shine = ctx.createLinearGradient(centerX - radius, homeY - radius, centerX + radius, homeY);
+  if (shine?.addColorStop) {
+    shine.addColorStop(0, "rgba(255, 255, 255, 0.025)");
+    shine.addColorStop(0.38, "rgba(255, 255, 255, 0.13)");
+    shine.addColorStop(0.55, "rgba(138, 255, 246, 0.15)");
+    shine.addColorStop(1, "rgba(255, 255, 255, 0.018)");
+    ctx.fillStyle = shine;
+    ctx.fillRect(centerX - radius, homeY - radius, radius * 2, radius);
+  }
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+  ctx.fillRect(centerX - radius, homeY - radius, radius * 2, radius);
+  ctx.globalCompositeOperation = "lighter";
+  for (let ring = 0.28; ring <= 0.96; ring += 0.17) {
+    ctx.strokeStyle = ring > 0.75 ? "rgba(255, 221, 111, 0.16)" : "rgba(114, 255, 246, 0.14)";
+    ctx.lineWidth = ring > 0.75 ? 3 : 2;
+    ctx.beginPath();
+    ctx.arc(centerX, homeY, radius * ring, Math.PI + 0.05, Math.PI * 2 - 0.05);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 150; i += 1) {
+    const angle = Math.PI + ((i * 29) % 180) * Math.PI / 180;
+    const distance = radius * (0.18 + ((i * 37) % 78) / 100);
+    const x = centerX + Math.cos(angle) * distance;
+    const y = homeY + Math.sin(angle) * distance;
+    ctx.fillStyle = i % 4 === 0 ? "rgba(255, 230, 120, 0.42)" : "rgba(126, 255, 248, 0.36)";
+    ctx.beginPath();
+    ctx.arc(x, y, i % 6 === 0 ? 2.4 : 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSpaceStadiumBeyondOutfield() {
+  if (!getCurrentStadium().hasSpaceStadium) return;
+  const center = getFenceCenter();
+  const innerRadius = defenseField.fenceDistance + 18;
+  const standsOuterRadius = innerRadius + 440;
+  const skyOuterRadius = standsOuterRadius + 680;
+  const left = center.x - skyOuterRadius - 260;
+  const top = center.y - skyOuterRadius - 430;
+  const width = skyOuterRadius * 2 + 520;
+  const height = skyOuterRadius + 620;
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.arc(center.x, center.y, defenseField.fenceDistance + 4, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip("evenodd");
+
+  const sky = ctx.createLinearGradient(center.x, top, center.x, center.y - defenseField.fenceDistance);
+  if (sky?.addColorStop) {
+    sky.addColorStop(0, "#030510");
+    sky.addColorStop(0.62, "#09192a");
+    sky.addColorStop(1, "#123141");
+    ctx.fillStyle = sky;
+  } else {
+    ctx.fillStyle = "#09192a";
+  }
+  ctx.fillRect(left, top, width, height);
+  drawSpaceStadiumStars(left, top + 40, width, Math.max(120, height * 0.54), 180);
+  drawSpaceStadiumMoon(center.x + defenseField.fenceDistance * 0.64, center.y - defenseField.fenceDistance - 360, 42);
+
+  traceRiversideOutfieldAnnulus(innerRadius, standsOuterRadius, 177, 363, 18);
+  ctx.fillStyle = "rgba(5, 12, 24, 0.92)";
+  ctx.fill();
+  for (let row = 0; row < 11; row += 1) {
+    const radius = innerRadius + 34 + row * 45;
+    ctx.strokeStyle = row % 2 === 0 ? "rgba(24, 54, 73, 0.92)" : "rgba(9, 22, 39, 0.96)";
+    ctx.lineWidth = 34;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    for (let angle = 181; angle <= 359; angle += 2) {
+      const rad = degreesToRadians(angle + (row % 2) * 1.5);
+      const palette = ["#fff2a8", "#aee7ff", "#ff8dc7", "#d6f2df", "#bca7ff", "#ff6f61"];
+      ctx.fillStyle = palette[(row + Math.floor(angle / 2)) % palette.length];
+      ctx.beginPath();
+      ctx.arc(center.x + Math.cos(rad) * radius, center.y + Math.sin(rad) * radius, angle % 8 === 0 ? 5.6 : 3.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.globalCompositeOperation = "lighter";
+  for (let radius = innerRadius + 26; radius < standsOuterRadius; radius += 54) {
+    ctx.strokeStyle = radius % 108 < 54 ? "rgba(124, 255, 246, 0.26)" : "rgba(255, 238, 120, 0.24)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, Math.PI + 0.01, Math.PI * 2 - 0.01);
+    ctx.stroke();
+  }
+  for (let angle = 188; angle <= 352; angle += 18) {
+    const rad = degreesToRadians(angle);
+    const x = center.x + Math.cos(rad) * (standsOuterRadius + 16);
+    const y = center.y + Math.sin(rad) * (standsOuterRadius + 16);
+    ctx.strokeStyle = "rgba(119, 255, 247, 0.28)";
+    ctx.lineWidth = 7;
+    drawLine(x, y, center.x + Math.cos(rad) * innerRadius, center.y + Math.sin(rad) * innerRadius);
+  }
+  ctx.restore();
+}
+
 function drawAmericanRoyalBattingBackdrop() {
   if (!getCurrentStadium().royalEnclosed) return;
   ctx.save();
@@ -13683,10 +13948,10 @@ function drawField() {
   const stadium = getCurrentStadium();
   drawStadiumTurfPattern(stadium);
   drawNextDomeRoofScreen();
-  drawAmericanRoyalBattingBackdrop();
+  drawSpaceStadiumBattingBackdrop();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
-  ctx.fillStyle = "#d89548";
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#05070a" : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
   ctx.lineTo(24, 836);
@@ -13695,6 +13960,8 @@ function drawField() {
   ctx.fill();
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 232, 170, 0.16)"
+    : stadium.surface === "spaceGlow"
+      ? "rgba(8, 38, 44, 0.94)"
     : stadium.surface === "royalGrass"
       ? "rgba(47, 119, 70, 0.94)"
       : "#68b560";
@@ -13702,15 +13969,21 @@ function drawField() {
   ctx.arc(field.centerX, 754, 405, Math.PI, Math.PI * 2);
   ctx.fill();
   drawAmericanRoyalGrassDetails(field.centerX, 754, 405);
+  drawSpaceStadiumFieldLights(field.centerX, 754, 405);
   ctx.strokeStyle = "rgba(255,255,255,0.76)";
   ctx.lineWidth = 5;
   const plateTopY = field.plateY - 12 * field.plateScale;
   const plateHalfTop = 36 * field.plateScale;
   const lineEndY = 92;
   const lineDx = Math.tan(55 * Math.PI / 180) * (plateTopY - lineEndY);
-  drawLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY);
-  drawLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY);
-  ctx.fillStyle = "#c8793b";
+  if (stadium.hasSpaceStadium) {
+    drawSpaceElectricLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY, "#74fff5");
+    drawSpaceElectricLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY, "#ff7ec8");
+  } else {
+    drawLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY);
+    drawLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY);
+  }
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#0b1118" : "#c8793b";
   ctx.beginPath();
   ctx.ellipse(pitcher.x, pitcher.y + 18, 68, 30, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -13733,10 +14006,11 @@ function drawDefenseView() {
   drawHyperOceanBeyondOutfield();
   drawNextDomeBeyondOutfield();
   drawRiversideBeyondOutfield();
+  drawSpaceStadiumBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
 
-  ctx.fillStyle = "#d89548";
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#05070a" : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.plateX, field.plateY + 42);
   ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
@@ -13746,6 +14020,8 @@ function drawDefenseView() {
 
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 235, 174, 0.14)"
+    : stadium.surface === "spaceGlow"
+      ? "rgba(8, 38, 44, 0.94)"
     : stadium.surface === "royalGrass"
       ? "rgba(45, 116, 67, 0.94)"
       : "#6ebf69";
@@ -13753,6 +14029,7 @@ function drawDefenseView() {
   ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
   ctx.fill();
   drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
+  drawSpaceStadiumFieldLights(field.plateX, field.plateY + 42, defenseField.grassRadius);
   drawAmericanRoyalBeyondOutfield();
 
   ctx.strokeStyle = "rgba(255,255,255,0.78)";
@@ -13823,7 +14100,156 @@ function drawHomeRunFireworks() {
     ctx.arc(x, y, 18 + progress * 36, 0, Math.PI * 2);
     ctx.fill();
   });
+  drawSpaceHomeRunRockets(fireworks, elapsedSeconds);
   drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds);
+  ctx.restore();
+}
+
+function drawSpaceHomeRunRockets(fireworks, elapsedSeconds) {
+  const rockets = fireworks?.rockets || [];
+  if (!rockets.length) return;
+  rockets.forEach((rocket) => {
+    const age = elapsedSeconds - rocket.delay;
+    if (age < 0 || age > rocket.duration + 0.7) return;
+    const progress = clamp(age / rocket.duration, 0, 1);
+    const ease = 1 - Math.pow(1 - progress, 2.4);
+    const arc = Math.sin(progress * Math.PI) * rocket.wobble;
+    const x = rocket.start.x + (rocket.end.x - rocket.start.x) * ease + arc;
+    const y = rocket.start.y + (rocket.end.y - rocket.start.y) * ease - Math.sin(progress * Math.PI) * 120;
+    const prevProgress = clamp((age - 0.08) / rocket.duration, 0, 1);
+    const prevEase = 1 - Math.pow(1 - prevProgress, 2.4);
+    const prevArc = Math.sin(prevProgress * Math.PI) * rocket.wobble;
+    const px = rocket.start.x + (rocket.end.x - rocket.start.x) * prevEase + prevArc;
+    const py = rocket.start.y + (rocket.end.y - rocket.start.y) * prevEase - Math.sin(prevProgress * Math.PI) * 120;
+    const alpha = age > rocket.duration ? 1 - clamp((age - rocket.duration) / 0.7, 0, 1) : 1;
+    const angle = Math.atan2(y - py, x - px);
+
+    ctx.strokeStyle = hexToRgba(rocket.color, 0.72 * alpha);
+    ctx.lineWidth = 8;
+    drawLine(px, py, x, y);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 * alpha})`;
+    ctx.lineWidth = 3;
+    drawLine(px - Math.cos(angle) * 18, py - Math.sin(angle) * 18, x, y);
+
+    drawSpaceCartoonRocket(x, y, angle, alpha, rocket.size ?? 1);
+
+    if (progress >= 0.98) {
+      const burstAge = age - rocket.duration;
+      const burstAlpha = 1 - clamp(burstAge / 0.7, 0, 1);
+      ctx.strokeStyle = hexToRgba(rocket.color, 0.86 * burstAlpha);
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 8; i += 1) {
+        const burstAngle = (Math.PI * 2 * i) / 8 + burstAge;
+        const length = 30 + burstAge * 96;
+        drawLine(x, y, x + Math.cos(burstAngle) * length, y + Math.sin(burstAngle) * length);
+      }
+    }
+  });
+}
+
+function drawSpaceCartoonRocket(x, y, angle, alpha = 1, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.globalAlpha = alpha;
+
+  const flame = ctx.createLinearGradient(-74, 0, -130, 0);
+  if (flame?.addColorStop) {
+    flame.addColorStop(0, "#fff36d");
+    flame.addColorStop(0.5, "#ff9f3a");
+    flame.addColorStop(1, "#ff6f2c");
+    ctx.fillStyle = flame;
+  } else {
+    ctx.fillStyle = "#ff9f3a";
+  }
+  ctx.beginPath();
+  ctx.moveTo(-64, -18);
+  ctx.lineTo(-118, -36);
+  ctx.lineTo(-101, -14);
+  ctx.lineTo(-136, 0);
+  ctx.lineTo(-101, 14);
+  ctx.lineTo(-118, 36);
+  ctx.lineTo(-64, 18);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#d8d5cb";
+  ctx.strokeStyle = "#703221";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-52, -20);
+  ctx.lineTo(-84, -36);
+  ctx.lineTo(-74, -6);
+  ctx.lineTo(-52, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-52, 20);
+  ctx.lineTo(-84, 36);
+  ctx.lineTo(-74, 6);
+  ctx.lineTo(-52, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#ef5757";
+  ctx.beginPath();
+  ctx.moveTo(-12, -34);
+  ctx.quadraticCurveTo(-62, -62, -78, -18);
+  ctx.lineTo(-35, -10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-12, 34);
+  ctx.quadraticCurveTo(-62, 62, -78, 18);
+  ctx.lineTo(-35, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#fff5e6";
+  ctx.beginPath();
+  ctx.moveTo(-64, -28);
+  ctx.quadraticCurveTo(-10, -68, 58, -28);
+  ctx.quadraticCurveTo(92, -8, 98, 0);
+  ctx.quadraticCurveTo(92, 8, 58, 28);
+  ctx.quadraticCurveTo(-10, 68, -64, 28);
+  ctx.quadraticCurveTo(-38, 0, -64, -28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#f45b5b";
+  ctx.beginPath();
+  ctx.moveTo(58, -28);
+  ctx.quadraticCurveTo(92, -8, 98, 0);
+  ctx.quadraticCurveTo(92, 8, 58, 28);
+  ctx.quadraticCurveTo(72, 0, 58, -28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#aee7ff";
+  ctx.strokeStyle = "#703221";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(16, 0, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.beginPath();
+  ctx.arc(9, -6, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = "rgba(255, 242, 168, 0.64)";
+  ctx.lineWidth = 8;
+  drawLine(-116, 0, -174, 0);
   ctx.restore();
 }
 
@@ -13908,6 +14334,10 @@ function hexToRgba(hex, alpha) {
 
 function drawDefenseBases() {
   const { home, first, second, third } = defenseField.bases;
+  if (getCurrentStadium().hasSpaceStadium) {
+    drawSpaceStadiumBases(home, first, second, third);
+    return;
+  }
   ctx.save();
   ctx.strokeStyle = "rgba(255,255,255,0.72)";
   ctx.lineWidth = 4;
@@ -13919,6 +14349,92 @@ function drawDefenseBases() {
   drawBaseDiamond(second.x, second.y, "2", "#fff8df");
   drawBaseDiamond(third.x, third.y, "3", "#fff8df");
   ctx.restore();
+}
+
+function drawSpaceElectricLine(x1, y1, x2, y2, color = "#74fff5") {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba(color, 0.22);
+  ctx.lineWidth = 20;
+  drawLine(x1, y1, x2, y2);
+  ctx.strokeStyle = hexToRgba(color, 0.78);
+  ctx.lineWidth = 7;
+  drawLine(x1, y1, x2, y2);
+  ctx.strokeStyle = "rgba(255,255,255,0.92)";
+  ctx.lineWidth = 2;
+  drawLine(x1, y1, x2, y2);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const nx = -dy / length;
+  const ny = dx / length;
+  const palette = ["#74fff5", "#fff07a", "#ff7ec8", "#9f83ff"];
+  for (let i = 0; i <= length; i += 46) {
+    const t = i / length;
+    const x = x1 + dx * t + nx * ((i / 46) % 2 === 0 ? 7 : -7);
+    const y = y1 + dy * t + ny * ((i / 46) % 2 === 0 ? 7 : -7);
+    ctx.fillStyle = hexToRgba(palette[Math.floor(i / 46) % palette.length], 0.86);
+    ctx.beginPath();
+    ctx.arc(x, y, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSpaceStadiumBases(home, first, second, third) {
+  ctx.save();
+  [
+    [home, first],
+    [first, second],
+    [second, third],
+    [third, home]
+  ].forEach(([from, to], index) => {
+    const colors = ["#74fff5", "#fff07a", "#ff7ec8", "#9f83ff"];
+    drawSpaceElectricLine(from.x, from.y, to.x, to.y, colors[index % colors.length]);
+  });
+  drawSpaceBaseDiamond(home.x, home.y, "H", 0);
+  drawSpaceBaseDiamond(first.x, first.y, "1", 1);
+  drawSpaceBaseDiamond(second.x, second.y, "2", 2);
+  drawSpaceBaseDiamond(third.x, third.y, "3", 3);
+  ctx.restore();
+}
+
+function drawSpaceBaseDiamond(x, y, label, index) {
+  const colors = ["#74fff5", "#fff07a", "#ff7ec8", "#9f83ff", "#ff6f61"];
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  colors.forEach((color, colorIndex) => {
+    const angle = (Math.PI * 2 * colorIndex) / colors.length + index * 0.45;
+    ctx.fillStyle = hexToRgba(color, 0.72);
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.translate(x, y);
+  ctx.rotate(Math.PI / 4);
+  const glow = ctx.createLinearGradient(-18, -18, 18, 18);
+  if (glow?.addColorStop) {
+    glow.addColorStop(0, "#ffffff");
+    glow.addColorStop(0.36, colors[index % colors.length]);
+    glow.addColorStop(0.72, colors[(index + 2) % colors.length]);
+    glow.addColorStop(1, "#ffffff");
+    ctx.fillStyle = glow;
+  } else {
+    ctx.fillStyle = "#ffffff";
+  }
+  ctx.shadowColor = colors[index % colors.length];
+  ctx.shadowBlur = 22;
+  ctx.fillRect(-17, -17, 34, 34);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-17, -17, 34, 34);
+  ctx.restore();
+
+  ctx.fillStyle = "#06101c";
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x, y + 1);
 }
 
 function drawBaseDiamond(x, y, label, color) {
@@ -13945,10 +14461,11 @@ function drawOutfieldWall() {
   const stadium = getCurrentStadium();
   const lowFence = stadium.id === "aozora" || stadium.id === "riverside";
   const royalWall = stadium.royalEnclosed === true;
+  const spaceWall = stadium.hasSpaceStadium === true;
   ctx.save();
 
-  ctx.strokeStyle = royalWall ? "rgba(5, 14, 20, 0.58)" : "rgba(18, 34, 47, 0.32)";
-  ctx.lineWidth = lowFence ? 36 : royalWall ? 94 : 70;
+  ctx.strokeStyle = royalWall ? "rgba(5, 14, 20, 0.58)" : spaceWall ? "rgba(1, 8, 20, 0.72)" : "rgba(18, 34, 47, 0.32)";
+  ctx.lineWidth = lowFence ? 36 : royalWall ? 94 : spaceWall ? 82 : 70;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance + 12, Math.PI, Math.PI * 2);
   ctx.stroke();
@@ -13959,14 +14476,14 @@ function drawOutfieldWall() {
     return;
   }
 
-  ctx.strokeStyle = lowFence ? "#587b5e" : royalWall ? "#183d38" : "#254b55";
-  ctx.lineWidth = lowFence ? 28 : royalWall ? 78 : 58;
+  ctx.strokeStyle = lowFence ? "#587b5e" : royalWall ? "#183d38" : spaceWall ? "#092332" : "#254b55";
+  ctx.lineWidth = lowFence ? 28 : royalWall ? 78 : spaceWall ? 66 : 58;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = lowFence ? "#33543e" : royalWall ? "#0c2928" : "#173340";
-  ctx.lineWidth = lowFence ? 10 : royalWall ? 30 : 22;
+  ctx.strokeStyle = lowFence ? "#33543e" : royalWall ? "#0c2928" : spaceWall ? "#061423" : "#173340";
+  ctx.lineWidth = lowFence ? 10 : royalWall ? 30 : spaceWall ? 24 : 22;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY + 18, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
@@ -13975,6 +14492,8 @@ function drawOutfieldWall() {
     const t = layer / 5;
     ctx.strokeStyle = royalWall
       ? `rgba(30, 79, 67, ${0.5 - t * 0.045})`
+      : spaceWall
+        ? `rgba(106, 255, 247, ${0.28 - t * 0.025})`
       : `rgba(37, 75, 85, ${0.34 - t * 0.035})`;
     ctx.lineWidth = royalWall ? 18 : 12;
     ctx.beginPath();
@@ -13982,13 +14501,13 @@ function drawOutfieldWall() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = lowFence ? "#f4dc7b" : royalWall ? "#d8bb68" : "#7fc7b0";
-  ctx.lineWidth = lowFence ? 6 : royalWall ? 13 : 9;
+  ctx.strokeStyle = lowFence ? "#f4dc7b" : royalWall ? "#d8bb68" : spaceWall ? "#7dfff2" : "#7fc7b0";
+  ctx.lineWidth = lowFence ? 6 : royalWall ? 13 : spaceWall ? 11 : 9;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY - wallHeight, defenseField.fenceDistance, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = royalWall ? "rgba(255, 232, 157, 0.94)" : "rgba(255, 240, 184, 0.8)";
+  ctx.strokeStyle = royalWall ? "rgba(255, 232, 157, 0.94)" : spaceWall ? "rgba(255, 230, 120, 0.9)" : "rgba(255, 240, 184, 0.8)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(field.plateX, homeY - wallHeight - 10, defenseField.fenceDistance - 2, Math.PI, Math.PI * 2);
@@ -13998,8 +14517,8 @@ function drawOutfieldWall() {
     const rad = degreesToRadians(angle);
     const x = field.plateX + Math.cos(rad) * defenseField.fenceDistance;
     const y = homeY + Math.sin(rad) * defenseField.fenceDistance;
-    ctx.strokeStyle = lowFence ? "#38563f" : royalWall ? "#071d1e" : "#102833";
-    ctx.lineWidth = lowFence ? 5 : royalWall ? 11 : 8;
+    ctx.strokeStyle = lowFence ? "#38563f" : royalWall ? "#071d1e" : spaceWall ? "#03101f" : "#102833";
+    ctx.lineWidth = lowFence ? 5 : royalWall ? 11 : spaceWall ? 9 : 8;
     drawLine(x, y - wallHeight - 14, x, y + 24);
     ctx.strokeStyle = "rgba(255, 240, 184, 0.55)";
     ctx.lineWidth = 2;
@@ -14778,6 +15297,10 @@ function getDefenseVisibleWorldBounds() {
 }
 
 function drawPlateAndZone() {
+  if (getCurrentStadium().hasSpaceStadium) {
+    drawSpaceHomePlate();
+    return;
+  }
   const scale = field.plateScale;
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
@@ -14788,6 +15311,66 @@ function drawPlateAndZone() {
   ctx.lineTo(field.plateX - 26 * scale, field.plateY + 22 * scale);
   ctx.closePath();
   ctx.fill();
+}
+
+function drawSpaceHomePlate() {
+  const points = getHomePlatePoints();
+  const palette = ["#74fff5", "#fff07a", "#ff7ec8", "#9f83ff", "#ff6f61"];
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.24);
+    ctx.lineWidth = 20;
+    drawLine(point.x, point.y, next.x, next.y);
+    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.94);
+    ctx.lineWidth = 6;
+    drawLine(point.x, point.y, next.x, next.y);
+  });
+
+  const plateGlow = ctx.createRadialGradient(field.plateX, field.plateY + 16, 8, field.plateX, field.plateY + 16, 92);
+  if (plateGlow?.addColorStop) {
+    plateGlow.addColorStop(0, "rgba(255,255,255,0.72)");
+    plateGlow.addColorStop(0.36, "rgba(116,255,245,0.28)");
+    plateGlow.addColorStop(1, "rgba(116,255,245,0)");
+    ctx.fillStyle = plateGlow;
+    ctx.beginPath();
+    ctx.arc(field.plateX, field.plateY + 16, 92, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.closePath();
+  const fill = ctx.createLinearGradient(field.plateX - 48, field.plateY - 18, field.plateX + 48, field.plateY + 52);
+  if (fill?.addColorStop) {
+    fill.addColorStop(0, "#ffffff");
+    fill.addColorStop(0.34, "#fff07a");
+    fill.addColorStop(0.58, "#74fff5");
+    fill.addColorStop(0.78, "#ff7ec8");
+    fill.addColorStop(1, "#ffffff");
+    ctx.fillStyle = fill;
+  } else {
+    ctx.fillStyle = "#ffffff";
+  }
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  for (let i = 0; i < 18; i += 1) {
+    const angle = -Math.PI * 0.1 + (Math.PI * 1.2 * i) / 17;
+    const x = field.plateX + Math.cos(angle) * 58;
+    const y = field.plateY + 18 + Math.sin(angle) * 46;
+    ctx.fillStyle = hexToRgba(palette[i % palette.length], 0.96);
+    ctx.beginPath();
+    ctx.arc(x, y, i % 3 === 0 ? 5 : 3.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawGoodContactZone() {
