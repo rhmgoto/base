@@ -7496,7 +7496,9 @@ function formatRuns(runs) {
 function createHomeRunFireworks(battedBall) {
   if (!battedBall?.fenceOver) return null;
   const homerRuns = getPendingHomeRunRuns();
-  const fireworkScale = getCurrentStadium().fireworkScale ?? 1;
+  const stadium = getCurrentStadium();
+  const isBigFireworksStadium = stadium.id === "fireworks";
+  const fireworkScale = (stadium.fireworkScale ?? 1) * (isBigFireworksStadium ? 7 : 1);
   const burstCount = Math.round((homerRuns >= 4 ? 28 : homerRuns === 3 ? 20 : homerRuns === 2 ? 15 : 10) * fireworkScale);
   const sparkBase = Math.round((homerRuns >= 4 ? 36 : homerRuns === 3 ? 30 : homerRuns === 2 ? 26 : 22) * Math.sqrt(fireworkScale));
   const duration = (homerRuns >= 4 ? 4.2 : homerRuns === 3 ? 3.6 : homerRuns === 2 ? 3.2 : 3) * (fireworkScale > 1 ? 1.12 : 1);
@@ -7514,14 +7516,17 @@ function createHomeRunFireworks(battedBall) {
   const bursts = Array.from({ length: burstCount }, (_, burstIndex) => {
     const standDistance = defenseField.fenceDistance + randomBetween(70, homerRuns >= 4 ? 430 : 260);
     const lateral = randomBetween(homerRuns >= 4 ? -720 : -420, homerRuns >= 4 ? 720 : 420);
-    const origin = {
-      x: center.x + direction.x * standDistance + side.x * lateral,
-      y: center.y + direction.y * standDistance + side.y * lateral
-    };
+    const origin = isBigFireworksStadium
+      ? getBigFireworksVisibleOrigin(burstIndex, burstCount)
+      : {
+          x: center.x + direction.x * standDistance + side.x * lateral,
+          y: center.y + direction.y * standDistance + side.y * lateral
+        };
     const sparkCount = sparkBase + Math.floor(randomBetween(0, homerRuns >= 4 ? 24 : 13));
     return {
       origin,
-      delay: burstIndex * (homerRuns >= 4 ? 0.15 : 0.24) + randomBetween(0, 0.18),
+      screenLocked: isBigFireworksStadium,
+      delay: burstIndex * (isBigFireworksStadium ? 0.035 : homerRuns >= 4 ? 0.15 : 0.24) + randomBetween(0, isBigFireworksStadium ? 0.09 : 0.18),
       color: colors[burstIndex % colors.length],
       sparks: Array.from({ length: sparkCount }, () => {
         const angle = randomBetween(0, Math.PI * 2);
@@ -7534,11 +7539,12 @@ function createHomeRunFireworks(battedBall) {
       })
     };
   });
+  const burstDuration = bursts.reduce((max, burst) => Math.max(max, burst.delay + 1.08), 0);
   const rocketDuration = rockets.reduce((max, rocket) => Math.max(max, rocket.delay + rocket.duration + 0.7), 0);
   const trainDuration = trains.reduce((max, train) => Math.max(max, train.delay + train.duration + 0.4), 0);
   return {
     startDelay: Math.max(0.15, battedBall.ballTime ?? 0.7),
-    duration: Math.max(boatCatch ? 5.8 : duration, rocketDuration, trainDuration),
+    duration: Math.max(boatCatch ? 5.8 : duration, burstDuration, rocketDuration, trainDuration),
     bursts,
     rockets,
     trains,
@@ -7547,10 +7553,27 @@ function createHomeRunFireworks(battedBall) {
   };
 }
 
+function getBigFireworksVisibleOrigin(burstIndex, burstCount) {
+  const marginX = 96;
+  const top = 92;
+  const bottom = Math.min(canvas.height * 0.62, 520);
+  const columns = 7;
+  const rows = 4;
+  const column = burstIndex % columns;
+  const row = Math.floor(burstIndex / columns) % rows;
+  const cycle = Math.floor(burstIndex / (columns * rows));
+  const xStep = (canvas.width - marginX * 2) / Math.max(1, columns - 1);
+  const yStep = (bottom - top) / Math.max(1, rows - 1);
+  return {
+    x: clamp(marginX + column * xStep + randomBetween(-54, 54) + (cycle % 2 ? xStep * 0.34 : 0), marginX, canvas.width - marginX),
+    y: clamp(top + row * yStep + randomBetween(-34, 34), top, bottom)
+  };
+}
+
 function createAozoraHomeRunTrains(battedBall, duration = 3) {
   if (getCurrentStadium().id !== "aozora" || !battedBall?.fenceOver) return [];
   const center = getFenceCenter();
-  const trackY = center.y - defenseField.fenceDistance - 115;
+  const trackY = center.y - defenseField.fenceDistance - 310;
   const leftStart = center.x - defenseField.fenceDistance - 620;
   const rightStart = center.x + defenseField.fenceDistance + 620;
   const travel = defenseField.fenceDistance * 2 + 1240;
@@ -7567,7 +7590,7 @@ function createAozoraHomeRunTrains(battedBall, duration = 3) {
     {
       startX: rightStart,
       endX: rightStart - travel,
-      y: trackY + 58,
+      y: trackY + 46,
       delay: 0.65,
       duration: Math.max(3.4, duration + 1.1),
       direction: -1,
@@ -9218,10 +9241,9 @@ function getThrowBouncePoint(throwState) {
 
 function getArmThrowSpeed(armRating) {
   const value = clamp(armRating ?? 5, 1, 10);
-  const boosted = boostLowActualAbilityRating(1, 10);
-  const boostedLowSpeedRating = (abilitySpeedBaseRating + boosted.boostedRatingOne) * 1.3 - abilitySpeedBaseRating;
-  const effectiveArm = boostedLowSpeedRating + ((value - 1) / 9) * (boosted.maxRating - boostedLowSpeedRating);
-  return (abilitySpeedBaseRating + effectiveArm) * throwSpeedUnit;
+  const minThrowSpeed = 800;
+  const maxThrowSpeed = 1100;
+  return minThrowSpeed + ((value - 1) / 9) * (maxThrowSpeed - minThrowSpeed);
 }
 
 function resolveGrounderPickupThrow(fielder, battedBall, outcome, fieldingTarget, runner) {
@@ -13897,12 +13919,23 @@ function drawAozoraRuralBeyondOutfield() {
   }
   ctx.fillRect(left, top, width, height);
 
-  ctx.fillStyle = "#8fbd5b";
+  const rural = ctx.createLinearGradient(center.x, top, center.x, top + height);
+  if (rural?.addColorStop) {
+    rural.addColorStop(0, "#cfe878");
+    rural.addColorStop(0.45, "#bfe36a");
+    rural.addColorStop(1, "#a9d957");
+    ctx.fillStyle = rural;
+  } else {
+    ctx.fillStyle = "#bfe36a";
+  }
   ctx.fillRect(left, top, width, height);
-  ctx.fillStyle = "rgba(225, 218, 119, 0.42)";
-  ctx.fillRect(left, center.y - fieldOuterRadius * 0.84, width, fieldOuterRadius * 0.28);
-  ctx.fillStyle = "rgba(112, 177, 83, 0.48)";
-  ctx.fillRect(left, center.y - fieldOuterRadius * 0.54, width, fieldOuterRadius * 0.36);
+
+  ctx.strokeStyle = "rgba(245, 255, 190, 0.28)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 18; i += 1) {
+    const x = left + (i / 17) * width;
+    drawLine(x, top, x + 140, top + height);
+  }
 
   const flowers = ["#fff7a8", "#ff8fb3", "#f2f6ff", "#b687ff"];
   for (let i = 0; i < 160; i += 1) {
@@ -14393,8 +14426,9 @@ function drawHomeRunFireworks() {
     const progress = clamp(age / 1.08, 0, 1);
     const alpha = 1 - progress;
     const rise = 42 + progress * 82;
-    const x = burst.origin.x;
-    const y = burst.origin.y - rise;
+    const camera = burst.screenLocked ? getDefenseCameraOffset() : { x: 0, y: 0 };
+    const x = burst.origin.x - camera.x;
+    const y = burst.origin.y - camera.y - rise;
 
     ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 * alpha})`;
     ctx.lineWidth = 4;
@@ -15022,6 +15056,20 @@ function getHomeRunStandFocusPoint() {
     return {
       x: fireworks.boatCatch.x ?? fireworks.boatCatch.ballX,
       y: (fireworks.boatCatch.y ?? fireworks.boatCatch.ballY) - 60
+    };
+  }
+  if (fireworks?.rockets?.length) {
+    const rocket = fireworks.rockets[0];
+    return {
+      x: (rocket.start.x + rocket.end.x) / 2,
+      y: Math.min(rocket.start.y, rocket.end.y) - 70
+    };
+  }
+  if (fireworks?.trains?.length) {
+    const train = fireworks.trains[0];
+    return {
+      x: (train.startX + train.endX) / 2,
+      y: train.y
     };
   }
   const target = defenseState.battedBall?.target || {
