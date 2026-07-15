@@ -736,6 +736,21 @@ function infielderStartPoint(role) {
   };
 }
 
+function getFieldUnitsForMeters(meters, direction = { x: 0, y: -1 }) {
+  const metersPerUnit = getMetersPerBattedBallFieldUnit({
+    direction,
+    fenceTravelDistance: defenseField.fenceDistance
+  });
+  return meters / Math.max(0.001, metersPerUnit);
+}
+
+function getPitcherDefenseStartPoint(baseFielder) {
+  return {
+    ...baseFielder,
+    y: baseFielder.y + getFieldUnitsForMeters(3, { x: 0, y: -1 })
+  };
+}
+
 const defensiveLineups = {
   away: [
     { role: "P", name: "P", x: field.centerX, y: 250, speed: 8, fielding: 8, arm: 6 },
@@ -929,7 +944,8 @@ let swingState = {
   lastCheckProgress: 0,
   type: "strong",
   isBuntStance: false,
-  buntAimX: 0
+  buntAimX: 0,
+  buntAimY: 0
 };
 
 let defenseState = createDefenseState();
@@ -3224,6 +3240,7 @@ function resetSwing() {
   swingState.type = "strong";
   swingState.isBuntStance = false;
   swingState.buntAimX = 0;
+  swingState.buntAimY = 0;
 }
 
 function resetCountOnly() {
@@ -4054,7 +4071,9 @@ function startBuntStance(now = performance.now()) {
   if (swingState.isSwinging && !isBuntStanceActive()) return;
   if (swingState.didSwingThisPitch && !isBuntStanceActive()) return;
   if (isBuntStanceActive()) {
-    swingState.buntAimX = getBuntAimDirection();
+    const aim = getBuntAimInput();
+    swingState.buntAimX = aim.x;
+    swingState.buntAimY = aim.y;
     return;
   }
   swingState.isSwinging = true;
@@ -4065,7 +4084,9 @@ function startBuntStance(now = performance.now()) {
   swingState.lastCheckProgress = getBatSwingProgress();
   swingState.type = "bunt";
   swingState.isBuntStance = true;
-  swingState.buntAimX = getBuntAimDirection();
+  const aim = getBuntAimInput();
+  swingState.buntAimX = aim.x;
+  swingState.buntAimY = aim.y;
   if (!isPitching || pendingPitch) message = "バントの構え";
 }
 
@@ -4079,6 +4100,7 @@ function cancelBuntStance() {
   swingState.type = "strong";
   swingState.isBuntStance = false;
   swingState.buntAimX = 0;
+  swingState.buntAimY = 0;
 }
 
 function isBuntStanceActive() {
@@ -4091,14 +4113,31 @@ function isBuntButtonHeld() {
   return !!gamepad && isGamepadButtonDown(gamepad, gamepadButtons.X);
 }
 
-function getBuntAimDirection() {
+function getBuntAimInput() {
   const keyboardLeft = keysDown.has("ArrowLeft") || keysDown.has("a") || keysDown.has("A");
   const keyboardRight = keysDown.has("ArrowRight") || keysDown.has("d") || keysDown.has("D");
-  const keyboardAim = keyboardLeft === keyboardRight ? 0 : keyboardLeft ? -1 : 1;
+  const keyboardUp = keysDown.has("ArrowUp") || keysDown.has("w") || keysDown.has("W");
+  const keyboardDown = keysDown.has("ArrowDown") || keysDown.has("s") || keysDown.has("S");
+  const keyboardX = keyboardLeft === keyboardRight ? 0 : keyboardLeft ? -1 : 1;
+  const keyboardY = keyboardUp === keyboardDown ? 0 : keyboardUp ? -1 : 1;
   const gamepad = getGamepadForTeam(battingTeam);
-  const axis = gamepad?.axes?.[0] ?? 0;
-  const gamepadAim = Math.abs(axis) >= 0.32 ? Math.sign(axis) : 0;
-  return gamepadAim || keyboardAim;
+  const axisX = gamepad?.axes?.[0] ?? 0;
+  const axisY = gamepad?.axes?.[1] ?? 0;
+  const gamepadX = Math.abs(axisX) >= 0.32 ? axisX : 0;
+  const gamepadY = Math.abs(axisY) >= 0.32 ? axisY : 0;
+  const x = gamepadX || keyboardX;
+  const y = gamepadY || keyboardY;
+  const magnitude = clamp(Math.hypot(x, y), 0, 1);
+  if (magnitude <= 0) return { x: 0, y: 0, magnitude: 0 };
+  return {
+    x: clamp(x / magnitude, -1, 1),
+    y: clamp(y / magnitude, -1, 1),
+    magnitude
+  };
+}
+
+function getBuntAimDirection() {
+  return getBuntAimInput().x;
 }
 
 function getProjectedPitchPlatePosition() {
@@ -4682,7 +4721,7 @@ function update(delta) {
     ball.crossedPlate = true;
     judgePitchAtPlate();
   }
-  if (swingState.isSwinging && now - swingState.startTime > swingState.duration + swingState.followHoldDuration) swingState.isSwinging = false;
+  if (!isBuntStanceActive() && swingState.isSwinging && now - swingState.startTime > swingState.duration + swingState.followHoldDuration) swingState.isSwinging = false;
   if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
   if (hbpPose.active && now - hbpPose.startTime > hbpPose.duration) hbpPose.active = false;
 }
@@ -4907,6 +4946,7 @@ function showBattingFeedback(contact, result = {}) {
 }
 
 function buildBattingFeedbackLines(contact, result = {}) {
+  const isBunt = Boolean(result.battedProfile?.isBunt);
   const timingAbs = Math.abs(contact.timeDiff ?? 0);
   const timingLabel = contact.timeDiff < -35
     ? `${Math.round(timingAbs)}ms 早い`
@@ -4924,15 +4964,24 @@ function buildBattingFeedbackLines(contact, result = {}) {
     : contact.outsideStrikeZone
       ? `ゾーン: 外れ ${Math.round(contact.plateDistance ?? 0)}px`
       : `ゾーン: 端 ${Math.round((1 - clamp(contact.zoneScore ?? 0, 0, 1)) * 100)}%`;
-  const balancedScore = getBattingFeedbackBalancedScore({
-    timingScore,
-    sweetSpotScore: practicalSweetSpotScore,
-    barrelScore,
-    zoneScore,
-    quality,
-    profileScore: getBattedBallProfileScore(result.battedProfile)
-  });
+  const balancedScore = isBunt
+    ? getBuntFeedbackScore({ sweetSpotScore, zoneScore })
+    : getBattingFeedbackBalancedScore({
+      timingScore,
+      sweetSpotScore: practicalSweetSpotScore,
+      barrelScore,
+      zoneScore,
+      quality,
+      profileScore: getBattedBallProfileScore(result.battedProfile)
+    });
   const resultLabel = result.label || "接触";
+  if (isBunt) {
+    return [
+      `バント評価: ゾーン ${Math.round(zoneScore * 100)}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
+      zoneText,
+      `総合: ${Math.round(balancedScore * 100)}% / 結果: ${resultLabel}`
+    ];
+  }
   return [
     `タイミング: ${timingLabel}`,
     `スイートスポット: ${Math.round(practicalSweetSpotScore * 100)}% / 接触の深さ: ${Math.round(barrelScore * 100)}%`,
@@ -4943,6 +4992,12 @@ function buildBattingFeedbackLines(contact, result = {}) {
 
 function getBattingFeedbackBalancedScore(scores) {
   return getDisplayedBattingFeedbackScore(scores);
+}
+
+function getBuntFeedbackScore(scores = {}) {
+  const sweetSpot = clamp(scores.sweetSpotScore ?? 0, 0, 1);
+  const zone = clamp(scores.zoneScore ?? 0, 0, 1);
+  return clamp(zone * 0.58 + sweetSpot * 0.42, 0, 1);
 }
 
 function getBattedBallProfileScore(profile = null) {
@@ -5154,7 +5209,7 @@ function buildContactProfile(bestHit) {
   // 判定バットを太くした分、快打評価では中心線からの距離を少し戻す。
   const effectiveBatDistance = distanceToBat / batThicknessMultiplier;
   const barrelScore = Math.max(0, 1 - effectiveBatDistance / (78 + batterMeet * 4));
-  const sweetSpotScore = getSweetSpotScore(bestHit.batContact.t);
+  const sweetSpotScore = getContactSweetSpotScore(bestHit);
   const contactRange = baseContactRange * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
   const zoneReach = 68 + batterMeet * 12;
@@ -5177,6 +5232,7 @@ function buildContactProfile(bestHit) {
   const hittableShape = clamp(timingScore * 0.26 + barrelScore * 0.22 + sweetSpotScore * 0.2 + zoneScore * 0.32, 0, 1);
   const goodContactEase = Math.max(0, rawQuality) * (goodContactEaseScale - 1) * (0.55 + hittableShape * 0.45);
   const quality = clamp(rawQuality + goodContactEase, 0, 1);
+  const buntAim = isBuntStanceActive() ? getBuntAimInput() : { x: 0, y: 0, magnitude: 0 };
   return {
     isContact: nearPlate && distanceToBat <= contactRange,
     x: bestHit.x,
@@ -5192,7 +5248,9 @@ function buildContactProfile(bestHit) {
     inGoodContactZone,
     yellowZoneBoost,
     quality,
-    buntAimX: isBuntStanceActive() ? getBuntAimDirection() : 0
+    buntAimX: buntAim.x,
+    buntAimY: buntAim.y,
+    buntAimMagnitude: buntAim.magnitude
   };
 }
 
@@ -5205,6 +5263,13 @@ function getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrike
   const penalty = outsideStrikeZone ? pitcherAbilityTuning.insideChasePenalty : pitcherAbilityTuning.insideMishitPenalty;
   const floor = outsideStrikeZone ? pitcherAbilityTuning.insideChaseFloor : pitcherAbilityTuning.insideMishitFloor;
   return clamp(1 - sweetSpotMiss * depthFactor * penalty, floor, 1);
+}
+
+function getContactSweetSpotScore(bestHit) {
+  if (!isBuntStanceActive()) return getSweetSpotScore(bestHit.batContact.t);
+  const reference = getSweetSpotReferenceSegment();
+  const contact = closestPointOnSegment(bestHit.x, bestHit.y, reference.x1, reference.y1, reference.x2, reference.y2);
+  return getSweetSpotScore(contact.t);
 }
 
 function isInsideContactPoint(x) {
@@ -5262,6 +5327,9 @@ function decideHitResultFromBattedProfile(contact) {
   }
   if (profile.isBunt && profile.pitcherBuntPopup) {
     return makePopupFlyResultFromProfile(profile);
+  }
+  if (profile.isBunt) {
+    return makeBuntGrounderResultFromProfile(profile);
   }
 
   const feedbackScore = getContactFeedbackScore(contact);
@@ -6233,7 +6301,9 @@ function buildBattedBallProfile(contact) {
     sweetSpotScore,
     inGoodContactZone,
     yellowZoneBoost = 0,
-    buntAimX = 0
+    buntAimX = 0,
+    buntAimY = 0,
+    buntAimMagnitude = 0
   } = contact;
   const abs = Math.abs(timeDiff);
   const power = getEffectiveBatterPower(activeBatter);
@@ -6408,8 +6478,16 @@ function buildBattedBallProfile(contact) {
   });
   if (getCurrentSwingType() === "bunt") {
     const buntMeetSkill = clamp((meet - 3) / 9, 0, 1);
-    const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12 + buntMeetSkill * 0.14, 0, 1);
-    const buntContactScore = clamp(feedbackScore + buntMeetSkill * 0.08, 0, 1);
+    const aimMagnitude = clamp(buntAimMagnitude, 0, 1);
+    const hasAim = aimMagnitude >= 0.35;
+    const aimControlScore = hasAim ? aimMagnitude : 0;
+    const noAimPenalty = hasAim ? 0 : 0.24;
+    const buntCoreScore = getBuntFeedbackScore({
+      sweetSpotScore,
+      zoneScore: clamp(zoneScore ?? (inGoodContactZone ? 1 : 0), 0, 1)
+    });
+    const buntQuality = clamp(buntCoreScore + buntMeetSkill * 0.1 + aimControlScore * 0.12 - noAimPenalty, 0, 1);
+    const buntContactScore = clamp(buntCoreScore + buntMeetSkill * 0.05 + aimControlScore * 0.08 - noAimPenalty * 0.65, 0, 1);
     const goodBunt = buntContactScore >= buntTuning.goodFeedback;
     const greatBunt = buntContactScore >= buntTuning.greatFeedback;
     const solidBuntContact = buntContactScore >= buntTuning.solidFeedback;
@@ -6418,7 +6496,6 @@ function buildBattedBallProfile(contact) {
       : clamp(
           (buntTuning.popupFeedback - buntContactScore) / buntTuning.popupFeedback
             + Math.max(0, buntTuning.solidFeedback - buntContactScore) * 0.55
-            + Math.max(0, buntTuning.goodTiming - timingScore) * 0.24
             + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.18,
           0,
           1
@@ -6442,25 +6519,23 @@ function buildBattedBallProfile(contact) {
     const roll = Math.random();
     const aimedSide = Math.abs(buntAimX) >= 0.4 ? Math.sign(buntAimX) : 0;
     const side = aimedSide || (Math.random() < 0.5 ? -1 : 1);
-    const aimAssist = aimedSide ? 0.18 + buntMeetSkill * 0.12 : 0;
+    const aimAssist = aimedSide ? (0.12 + buntMeetSkill * 0.08) * aimControlScore : 0;
     const buntFoulChance = clamp(
       buntTuning.foulBase
         + (1 - buntQuality) * buntTuning.foulQualityScale
-        + Math.abs(timingPull) * buntTuning.foulTimingScale
-        + badBuntScore * buntTuning.foulBadContactScale,
+        + badBuntScore * (buntTuning.foulBadContactScale + 0.22),
       buntTuning.foulMin,
-      buntTuning.foulMax
-    );
-    const buntIsFoul = isFoul || Math.random() < buntFoulChance;
+      Math.min(0.82, buntTuning.foulMax + 0.12)
+    ) + (hasAim ? 0 : 0.04);
+    const buntIsFoul = Math.random() < buntFoulChance;
     const pitcherBuntPopupChance = clamp(
-      buntTuning.popupBase + badBuntScore * buntTuning.popupBadContactScale + Math.abs(timingPull) * buntTuning.popupTimingScale,
+      buntTuning.popupBase + 0.08 + badBuntScore * (buntTuning.popupBadContactScale + 0.22) + (hasAim ? 0 : 0.04),
       buntTuning.popupMin,
-      buntTuning.popupMax
+      Math.min(0.82, buntTuning.popupMax + 0.18)
     );
     const popupProtection = solidBuntContact
       ? clamp(
           ((buntContactScore - buntTuning.solidFeedback) / 0.2)
-            + ((timingScore - buntTuning.solidContactTiming) / 0.42) * 0.25
             + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.25,
           0,
           1
@@ -6470,10 +6545,22 @@ function buildBattedBallProfile(contact) {
     const forcePopup = buntContactScore <= buntTuning.forcePopupFeedback
       && (buntContactScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
       && !solidBuntContact;
-    const pitcherBuntPopup = !goodBunt && !isFoul && (forcePopup || Math.random() < protectedPopupChance);
+    const pitcherBuntPopup = !goodBunt && (forcePopup || Math.random() < protectedPopupChance);
     const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
+    const noAimPitcherFront = !hasAim && !pitcherBuntPopup;
+    const directionFromAim = hasAim
+      ? buntAimY > 0.4
+        ? normalize({ x: side * randomBetween(0.05, 0.28), y: -randomBetween(0.2, 0.42) })
+        : buntAimY < -0.4
+          ? normalize({ x: side * randomBetween(0.04, 0.18), y: -1 })
+          : null
+      : null;
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
+      : noAimPitcherFront
+      ? normalize({ x: randomBetween(-0.14, 0.14), y: -1 })
+      : directionFromAim
+      ? directionFromAim
       : roll < lineChance
       ? goodBunt
         ? normalize({ x: side * randomBetween(0.95 + aimAssist, 1.25 + aimAssist), y: -randomBetween(0.42, 0.66) })
@@ -6481,14 +6568,16 @@ function buildBattedBallProfile(contact) {
       : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92 + aimAssist, 1.18 + aimAssist), y: -randomBetween(0.38, 0.68) });
-    const buntPower = clamp(0.12 + buntQuality * 0.22, 0.1, 0.34);
+    const noAimPowerBoost = hasAim ? 0 : 0.08;
+    const deadenBonus = aimControlScore * 0.045 + (hasAim && buntAimY > 0.4 ? 0.025 : 0);
+    const buntPower = clamp(0.05 + buntQuality * 0.07 + noAimPowerBoost - deadenBonus, 0.045, 0.23);
     const badBuntLift = goodBunt ? 0 : clamp((0.62 - buntQuality) / 0.62, 0, 1) * randomBetween(0, 16);
     return {
-      exitVelocity: pitcherBuntPopup ? clamp(0.12 + buntQuality * 0.12, 0.12, 0.28) : clamp(0.18 + buntQuality * 0.18, 0.14, 0.42),
-      launchAngle: pitcherBuntPopup ? randomBetween(30, 58) : clamp(-6 + sweetSpotScore * 5 - Math.abs(timingPull) * 4 + badBuntLift, -10, goodBunt ? 3 : 18),
+      exitVelocity: pitcherBuntPopup ? clamp(0.1 + buntQuality * 0.08, 0.1, 0.22) : clamp(0.08 + buntQuality * 0.1 + noAimPowerBoost - deadenBonus, 0.07, 0.28),
+      launchAngle: pitcherBuntPopup ? randomBetween(30, 58) : clamp(-6 + sweetSpotScore * 5 + badBuntLift, -10, goodBunt ? 3 : 18),
       direction: buntDirection,
       spin: clamp(0.28 + (1 - sweetSpotScore) * 0.38, 0.18, 0.82),
-      carry: pitcherBuntPopup ? clamp(0.1 + badBuntScore * 0.12, 0.1, 0.22) : clamp(0.04 + buntQuality * 0.08, 0.04, 0.16),
+      carry: pitcherBuntPopup ? clamp(0.08 + badBuntScore * 0.08, 0.08, 0.18) : clamp(0.02 + buntQuality * 0.035, 0.02, 0.065),
       feedbackScore: buntContactScore,
       gapScore: 0,
       timingPull,
@@ -6511,6 +6600,9 @@ function buildBattedBallProfile(contact) {
       isFoul: finalBuntIsFoul,
       buntQuality,
       buntContactScore,
+      buntAimControl: aimControlScore,
+      buntHasAim: hasAim,
+      buntAimY,
       buntLineChance: lineChance,
       buntPitcherFrontChance: pitcherFrontChance,
       buntFoulChance,
@@ -6792,6 +6884,24 @@ function makeLineEdgeResultFromProfile(profile) {
 function makeLineEdgeGrounderResultFromProfile(profile) {
   const edgePower = clamp(profile.power + profile.carry * 0.1 + Math.abs(profile.timingPull ?? 0) * 0.12 + randomBetween(0.02, 0.16), 0.68, 1.16);
   return { label: hitLabels.lineEdgeGrounder, kind: "hit", power: edgePower, scoreType: "double", lineEdgeGrounder: true, direction: getLineBallDirection(profile, randomBetween(1.2, 1.34)), battedProfile: profile };
+}
+
+function makeBuntGrounderResultFromProfile(profile) {
+  const quality = clamp(profile?.buntQuality ?? profile?.buntContactScore ?? 0.45, 0, 1);
+  const profilePower = clamp(profile?.power ?? 0.08, 0.04, 0.28);
+  const deadenedPower = clamp(Math.max(profilePower * 0.92, 0.045 + quality * 0.05) + randomBetween(-0.008, 0.012), 0.04, 0.24);
+  return {
+    label: "バントゴロ",
+    kind: "out",
+    power: deadenedPower,
+    direction: profile?.direction ?? normalize({ x: 0, y: -1 }),
+    battedProfile: {
+      ...profile,
+      power: deadenedPower,
+      exitVelocity: Math.min(profile?.exitVelocity ?? deadenedPower, 0.2),
+      carry: Math.min(profile?.carry ?? 0.04, 0.08)
+    }
+  };
 }
 
 function makeGrounderOutResultFromProfile(profile, power = profile?.power, options = {}) {
@@ -8257,7 +8367,7 @@ function getDefensiveLineup(team) {
       : fielder;
     if (fielder.role === "P") {
       return clampFielderInsideFence({
-        ...stadiumFielder,
+        ...getPitcherDefenseStartPoint(stadiumFielder),
         name: pitcherInfo.name,
         speed: pitcherInfo.fielding ?? 5,
         fielding: pitcherInfo.fielding ?? 5,
@@ -9404,6 +9514,9 @@ function getDefenseFieldingTarget(battedBall, outcome) {
   if (battedBall.isLineEdge || battedBall.isLineEdgeGrounder) {
     return getLineEdgeRollTarget(battedBall, outcome);
   }
+  if (battedBall.isBunt) {
+    return getBuntRollTarget(battedBall);
+  }
   const hardGrounder = isHardGrounder(battedBall);
   const strongOutfieldRoll = (battedBall.isLiner || hardGrounder || battedBall.power >= 0.58) && battedBall.landingDistance > 620;
   const fenceRoom = Math.max(0, defenseField.fenceDistance - battedBall.flightDistance - 120);
@@ -9442,6 +9555,30 @@ function getDefenseFieldingTarget(battedBall, outcome) {
     return clampPointInsideFence(projectedTarget, outfieldFenceFieldingInset);
   }
   return clampPointInsideFence(projectedTarget, 12);
+}
+
+function getBuntRollTarget(battedBall) {
+  const quality = clamp(battedBall.battedProfile?.buntQuality ?? 0.45, 0, 1);
+  const rollDistanceScale = getBuntRollDistanceScale(quality);
+  const rollDistance = (randomBetween(24, 64) + (1 - quality) * randomBetween(20, 85)) * rollDistanceScale;
+  const projectedTarget = {
+    x: battedBall.target.x + (battedBall.direction?.x ?? 0) * rollDistance,
+    y: battedBall.target.y + (battedBall.direction?.y ?? -1) * rollDistance
+  };
+  const foulCrossing = !battedBall.isFoulBall && getFoulLineCrossingBeforeOutfield(battedBall.target, projectedTarget);
+  if (foulCrossing) {
+    battedBall.rolledFoulBeforeOutfield = true;
+    battedBall.foulCrossingPoint = foulCrossing;
+    return foulCrossing;
+  }
+  return clampPointInsideFence(projectedTarget, 12);
+}
+
+function getBuntRollDistanceScale(quality = 0.45) {
+  const q = clamp(quality, 0, 1);
+  if (q >= 0.82) return 1;
+  if (q >= 0.68) return 1 + (0.82 - q) / 0.14 * 0.35;
+  return clamp(2.1 - q * 0.55, 1.35, 2.1);
 }
 
 function getLineEdgeRollTarget(battedBall, outcome = {}) {
@@ -9730,9 +9867,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     && profileCarry >= 0.86;
   const isHardOutfieldBounce = isHardOutfieldBounceProfile;
   const rawDistance = isBunt && isPopupFly
-    ? randomBetween(180, 340)
+    ? randomBetween(120, 260)
     : isBunt
-    ? randomBetween(210, 455) + clamp(battedProfile?.buntQuality ?? 0.4, 0, 1) * 90
+    ? (randomBetween(72, 170) + (1 - clamp(battedProfile?.buntQuality ?? 0.4, 0, 1)) * 70) * getBuntRollDistanceScale(battedProfile?.buntQuality ?? 0.4)
     : isPopupFly
     ? randomBetween(220, 620)
     : isHardOutfieldBounce
@@ -9846,7 +9983,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     );
   }
   if (isBunt && !isPopupFly) {
-    landingDistance = Math.min(landingDistance, randomBetween(180, 405) + clamp(battedProfile?.buntQuality ?? 0.4, 0, 1) * 80);
+    const buntQuality = clamp(battedProfile?.buntQuality ?? 0.4, 0, 1);
+    const buntDistanceCap = (randomBetween(55, 120) + (1 - buntQuality) * randomBetween(20, 75)) * getBuntRollDistanceScale(buntQuality);
+    landingDistance = Math.min(landingDistance, buntDistanceCap);
   }
   const isHardOutfieldHit = isHardOutfieldBounce || (isLiner && power >= 0.78 && landingDistance > 620);
   const isHardBattedBall = (isGrounder && power >= hardGrounderTuning.minPower)
@@ -9888,6 +10027,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     * battedBallPaceMultiplier
     * (isHardBattedBall ? hardBattedBallSpeedScale : 1)
     * (isLineEdgeGrounder ? 1.22 : isLineEdge ? 1.12 : isLineLiner ? 1.08 : isFenceLiner ? 1.05 : isDeepDrive ? 1.45 * deepDriveBallSpeedScale * (!isSuperDeepDrive ? 1.12 : 1) : isFrontDrop ? 0.7 : isFenceEdgeFly ? 0.66 : isToweringFly ? 0.68 : isChaseFly ? 0.78 : isSoftDrop ? 0.74 : isGrounder && power >= hardGrounderTuning.minPower ? hardGrounderTuning.initialSpeedScale : isHardOutfieldBounce ? 1.08 : isHardOutfieldHit ? 0.88 : 1);
+  if (isBunt) {
+    baseBallSpeed *= isPopupFly ? 0.72 : 0.26;
+  }
   const possibleWallHit = isDeepDrive
     && power >= 1.34
     && distance > defenseField.deepHitDistance
@@ -10324,9 +10466,10 @@ function chooseDefenseFielder(fielders, battedBall) {
     const distance = Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
     const roleFit = getDefenseRoleFit(fielder, battedBall);
     const speed = getFielderSpeed(fielder);
-    const reactionDelay = getFielderReactionDelay(fielder);
+    const quickBuntReaction = fielder.role === "P" && isPitcherHandledGrounder(battedBall);
+    const reactionDelay = quickBuntReaction ? getFielderReactionDelay({ ...fielder, quickBuntReaction }) : getFielderReactionDelay(fielder);
     const score = reactionDelay + distance / speed - roleFit;
-    const candidate = { ...fielder, distanceToTarget: distance, fieldingPoint, roleFit, reactionDelay, score };
+    const candidate = { ...fielder, quickBuntReaction, distanceToTarget: distance, fieldingPoint, roleFit, reactionDelay, score };
     return !best || candidate.score < best.score ? candidate : best;
   }, null);
 }
@@ -10337,8 +10480,9 @@ function chooseBuntDefenseFielder(fielders, battedBall) {
   return (candidates.length ? candidates : fielders).reduce((best, fielder) => {
     const fieldingPoint = getClosestPointOnBattedBallRoute(fielder, battedBall) || target;
     const distanceToTarget = Math.hypot((fielder.x ?? 0) - fieldingPoint.x, (fielder.y ?? 0) - fieldingPoint.y);
-    const score = distanceToTarget + (fielder.role === "P" ? -120 : 0);
-    if (!best || score < best.score) return { ...fielder, fieldingPoint, distanceToTarget, score };
+    const pitcherChargeBonus = fielder.role === "P" ? -260 : 0;
+    const score = distanceToTarget + pitcherChargeBonus;
+    if (!best || score < best.score) return { ...fielder, quickBuntReaction: fielder.role === "P", fieldingPoint, distanceToTarget, score };
     return best;
   }, null) || chooseDefenseFielder(fielders, battedBall);
 }
@@ -10757,6 +10901,7 @@ function getFieldingMoveSpeed(fieldingRating) {
 }
 
 function getFielderReactionDelay(fielder) {
+  if (fielder?.quickBuntReaction) return 0.04;
   const fielding = clamp(fielder?.fielding ?? fielder?.speed ?? 5, 1, 10);
   const delay = fielding <= fielderReactionDelayTuning.midpointFielding
     ? fielderReactionDelayTuning.slowest - (fielding - 1) * ((fielderReactionDelayTuning.slowest - fielderReactionDelayTuning.midpointDelay) / 4)
@@ -13163,16 +13308,20 @@ function getBatSegment(progress = getBatSwingProgress()) {
 }
 
 function getBuntBatSegment() {
+  return getRawBuntBatSegment();
+}
+
+function getRawBuntBatSegment() {
   const side = activeBatterSide === "R" ? 1 : -1;
   const handleX = batter.x + side * 30;
   const handleY = batter.y - 44 * field.plateScale;
   const length = 150 * batLengthMultiplier * getMeetBatLengthScale();
-  return trimBatJudgmentSegment({
+  return {
     x1: handleX,
     y1: handleY,
     x2: handleX - side * length,
     y2: handleY + 5
-  });
+  };
 }
 
 function getMeetBatLengthScale(meet = activeBatter?.meet ?? 5) {
@@ -16458,6 +16607,7 @@ function getParabolicArcHeight(t, maxHeight) {
 
 function drawSwingEffect() {
   if (!swingState.isSwinging) return;
+  if (isBuntStanceActive()) return;
   drawBatDebugPath();
   const progress = getSwingProgress();
   ctx.strokeStyle = `rgba(255, 242, 168, ${1 - progress * 0.7})`;
@@ -16474,7 +16624,7 @@ function drawBatDebugPath() {
 
   const current = getBatSegment();
   const hitWidth = getVisibleBatHitWidth();
-  const sweetSpot = getSweetSpotSegment(current);
+  const sweetSpot = getSweetSpotSegment(getSweetSpotReferenceSegment(current));
 
   ctx.strokeStyle = "rgba(255, 255, 255, 0.055)";
   ctx.lineWidth = hitWidth;
@@ -17063,6 +17213,10 @@ function getSweetSpotScore(t) {
   }
   const outsideTailScore = 0.68 * Math.exp(-(normalizedDistance - 1) * 0.22);
   return clamp(Math.max(outsideTailScore, contactFloor), 0, 1);
+}
+
+function getSweetSpotReferenceSegment(currentSegment = getBatSegment()) {
+  return isBuntStanceActive() ? getRawBuntBatSegment() : currentSegment;
 }
 
 function getSweetSpotHalfWidth(type) {
