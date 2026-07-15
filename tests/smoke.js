@@ -351,10 +351,10 @@ const riversideStadiumState = JSON.parse(runInGame(
 
 assert(riversideStadiumState.hasRiver === true, "Riverside Park should enable a river home-run zone");
 assert(riversideStadiumState.riverInPlay === false, "Riverside Park river should be beyond the fence, not an in-play hazard");
-assert(riversideStadiumState.centerMeters === 160, "Riverside Park center fence should be 160 meters");
-assert(riversideStadiumState.lineMeters === 160, "Riverside Park line fences should be 160 meters");
+assert(riversideStadiumState.centerMeters === 112, "Riverside Park center fence should be 112 meters");
+assert(riversideStadiumState.lineMeters === 112, "Riverside Park line fences should be 112 meters");
 assert(riversideStadiumState.lowFence === true, "Riverside Park should use a low fence");
-assert(riversideStadiumState.riverCenterMeters === 190, "Riverside Park river should sit in the home-run zone beyond the 160m fence");
+assert(riversideStadiumState.riverCenterMeters === 190, "Riverside Park river should sit in the home-run zone beyond the 112m fence");
 assert(riversideStadiumState.riverWidthMeters === 40, "Riverside Park river should be about 40 meters wide");
 assert(riversideStadiumState.riverBankMeters === 24, "Riverside Park should keep visible bank areas on both sides of the river");
 assert(riversideStadiumState.riverMetricsDisabled === true, "Riverside Park should not use the river as an in-play fielding boundary");
@@ -1035,7 +1035,44 @@ const weakSwingState = JSON.parse(runInGame(
     }, "away");
     const button0StealActive = stealState.active;
     const button0StealTarget = stealState.targetBase;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget });
+    resetBall();
+    resetSwing();
+    bases = createEmptyBases();
+    stealState = createStealState();
+    battingTeam = "away";
+    gameMode = "versus";
+    gamePhase = "playing";
+    isPitching = false;
+    pendingPitch = false;
+    ball.active = false;
+    gamepadState.previousButtons.away = new Set();
+    gamepadState.previousButtons.home = new Set();
+    const sharedPitcherButtonOnePad = {
+      buttons: [{ pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
+      axes: [0, 0]
+    };
+    addGamepadVirtualKey("3");
+    const pitcherButton1VirtualKeyBuntHeld = isBuntButtonHeld();
+    clearGamepadVirtualKeys();
+    handleGamepadButtonPresses(sharedPitcherButtonOnePad, "away", { suppressBattingButtons: true });
+    handleGamepadButtonPresses(sharedPitcherButtonOnePad, "home");
+    const sharedButton1PitchType = pendingPitch?.typeKey;
+    const sharedButton1BatterSwung = swingState.didSwingThisPitch;
+    const batterButton3Pad = {
+      buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }],
+      axes: [0, 0]
+    };
+    navigator.getGamepads = () => [batterButton3Pad, sharedPitcherButtonOnePad];
+    gamepadState.teamIndexes.away = 0;
+    gamepadState.teamIndexes.home = 1;
+    resetSwing();
+    pendingPitch = { releaseTime: performance.now() + 200, typeKey: "normal" };
+    isPitching = true;
+    ball.inPitch = true;
+    updateBuntStance();
+    const batterButton3BuntHeld = isBuntButtonHeld();
+    const batterButton3BuntType = swingState.type;
+    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1068,6 +1105,10 @@ assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1W
 assert(weakSwingState.button2Type === "strong", "gamepad button 2 should keep starting the existing strong swing");
 assert(weakSwingState.button3Type === "bunt", "gamepad button 3 should start a bunt swing");
 assert(weakSwingState.button0StealActive === true && weakSwingState.button0StealTarget === "second", "gamepad button 0 plus a direction should start steals instead of weak swings");
+assert(weakSwingState.sharedButton1PitchType === "normal", "shared gamepad button 1 should start a straight pitch for the pitcher in two-player games");
+assert(weakSwingState.sharedButton1BatterSwung === false, "shared gamepad button 1 for the pitcher should not make the opposing batter swing");
+assert(weakSwingState.pitcherButton1VirtualKeyBuntHeld === false, "pitcher gamepad button 1 virtual key should not count as the batter bunt button");
+assert(weakSwingState.batterButton3BuntHeld === true && weakSwingState.batterButton3BuntType === "bunt", "batter gamepad button 3 should enter bunt stance in two-player games");
 
 const hbpAfterSwingState = JSON.parse(runInGame(
   context,

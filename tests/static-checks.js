@@ -59,6 +59,19 @@ assertNoMojibake(script, "script.js");
 assertBalancedHtmlTags(html, ["button", "option", "p", "h3", "span"]);
 assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria-label");
 
+assertIncludesAll(
+  script,
+  [
+    "const buntAimMemoryDuration = 650",
+    "function getBuntAimForContact",
+    "now - swingState.buntAimMemoryTime <= buntAimMemoryDuration",
+    "const gamepadX = Math.abs(axisX) >= 0.22 ? axisX : 0",
+    "const aimedSide = Math.abs(buntAimX) >= 0.22 ? Math.sign(buntAimX) : 0",
+    "const aimedFoulRelief = aimedSide ? 0.08 + aimControlScore * 0.12 : 0"
+  ],
+  "script.js bunt aim leniency"
+);
+
 ["normal", "slow", "fast", "special"].forEach((pitchType) => {
   assert(
     script.includes(`gamePhase === "playing" && isPlayerPitching()`) && script.includes(`startPitch("${pitchType}")`),
