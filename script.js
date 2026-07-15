@@ -4862,7 +4862,8 @@ function buildBattingFeedbackLines(contact, result = {}) {
     sweetSpotScore: practicalSweetSpotScore,
     barrelScore,
     zoneScore,
-    quality
+    quality,
+    profileScore: getBattedBallProfileScore(result.battedProfile)
   });
   const resultLabel = result.label || "接触";
   return [
@@ -4877,21 +4878,37 @@ function getBattingFeedbackBalancedScore(scores) {
   return getDisplayedBattingFeedbackScore(scores);
 }
 
+function getBattedBallProfileScore(profile = null) {
+  if (!profile) return null;
+  const exitVelocity = clamp(profile.exitVelocity ?? 0, 0, 1.75);
+  const carry = clamp(profile.carry ?? 0, 0, 1.85);
+  const launchAngle = Number.isFinite(profile.launchAngle) ? profile.launchAngle : 0;
+  const angleScore = clamp(1 - Math.abs(launchAngle - 22) / 38, 0, 1);
+  const lowLineScore = clamp(1 - Math.abs(launchAngle - 12) / 24, 0, 1) * clamp((exitVelocity - 0.42) / 0.5, 0, 1);
+  const flyDriveScore = clamp(1 - Math.abs(launchAngle - 30) / 30, 0, 1) * clamp((carry - 0.52) / 0.58, 0, 1);
+  const angleQuality = Math.max(angleScore, lowLineScore, flyDriveScore);
+  const distanceQuality = clamp((carry - 0.22) / 1.12, 0, 1);
+  const speedQuality = clamp((exitVelocity - 0.28) / 0.98, 0, 1);
+  return clamp(speedQuality * 0.4 + angleQuality * 0.26 + distanceQuality * 0.34, 0, 1);
+}
+
 function getRawBattingFeedbackScore(scores) {
   const timing = clamp(scores.timingScore ?? 0, 0, 1);
   const sweetSpot = clamp(scores.sweetSpotScore ?? 0, 0, 1);
   const barrel = clamp(scores.barrelScore ?? 0, 0, 1);
   const zone = clamp(scores.zoneScore ?? 0, 0, 1);
   const quality = clamp(scores.quality ?? 0, 0, 1);
-  const weighted = timing * 0.2 + sweetSpot * 0.1 + barrel * 0.13 + zone * 0.4 + quality * 0.17;
+  const profileScore = Number.isFinite(scores.profileScore) ? clamp(scores.profileScore, 0, 1) : null;
+  const hiddenResultScore = profileScore === null ? quality : clamp(quality * 0.58 + profileScore * 0.42, 0, 1);
+  const weighted = timing * 0.16 + sweetSpot * 0.12 + barrel * 0.11 + zone * 0.32 + hiddenResultScore * 0.29;
   const weakestCore = Math.min(timing, zone);
-  const cap = weakestCore < 0.4 ? 0.66 : weakestCore < 0.55 ? 0.78 : weakestCore < 0.72 ? 0.89 : 1;
+  const cap = weakestCore < 0.4 ? 0.66 : weakestCore < 0.55 ? 0.78 : weakestCore < 0.72 ? 0.9 : 1;
   return clamp(Math.min(weighted, cap), 0, 1);
 }
 
 function getDisplayedBattingFeedbackScore(scores) {
   const raw = getRawBattingFeedbackScore(scores);
-  return clamp(raw * 0.92 - 0.015 - battingFeedbackDisplayPenalty, 0, 1);
+  return clamp(raw, 0, 1);
 }
 
 function promoteLiftedContactResult(result) {
@@ -5168,6 +5185,7 @@ function decideHitResult(contact) {
 
 function decideHitResultFromBattedProfile(contact) {
   const profile = buildBattedBallProfile(contact);
+  contact.battedProfile = profile;
   const { outsideStrikeZone } = contact;
   const roll = Math.random();
 
@@ -5304,7 +5322,8 @@ function getContactFeedbackScore(contact) {
     sweetSpotScore: practicalSweetSpotScore,
     barrelScore,
     zoneScore: clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1),
-    quality
+    quality,
+    profileScore: getBattedBallProfileScore(contact.battedProfile)
   }) - battingFeedbackDisplayPenalty, 0, 1);
 }
 
@@ -6311,7 +6330,12 @@ function buildBattedBallProfile(contact) {
     sweetSpotScore,
     barrelScore,
     zoneScore: clamp(zoneScore ?? (inGoodContactZone ? 1 : 0), 0, 1),
-    quality
+    quality,
+    profileScore: getBattedBallProfileScore({
+      exitVelocity,
+      carry,
+      launchAngle
+    })
   });
   if (getCurrentSwingType() === "bunt") {
     const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12, 0, 1);
