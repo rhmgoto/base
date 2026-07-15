@@ -28,7 +28,6 @@
                   <option value="single">1人用</option>
                   <option value="versus" selected>2人用</option>
                   <option value="watch">観戦モード</option>
-                  <option value="practice">打撃練習</option>
                 </select>
               </label>
 
@@ -126,6 +125,13 @@
                     <option value="A" selected>A：真ん中直球</option>
                     <option value="B">B：コース丁寧</option>
                     <option value="C">C：通常CPU</option>
+                  </select>
+                </label>
+                <label>
+                  投球練習打者タイプ
+                  <select id="pitchingPracticeBatterTypeSelect">
+                    <option value="A" selected>A：打つ気なし</option>
+                    <option value="B">B：打ってくる</option>
                   </select>
                 </label>
               </div>
@@ -271,6 +277,7 @@
             <div class="menu-actions">
               <button id="startButton" type="button">試合開始</button>
               <button id="practiceStartButton" type="button">打撃練習開始</button>
+              <button id="pitchingPracticeStartButton" type="button">投球練習開始</button>
             </div>
             <section id="playerChooser" class="player-chooser hidden" aria-label="選手一覧">
               <div class="chooser-split">

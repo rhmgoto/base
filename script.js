@@ -14,6 +14,7 @@ const menu = byId("startMenu");
 const menuButton = byId("menuButton");
 const startButton = byId("startButton");
 const practiceStartButton = byId("practiceStartButton");
+const pitchingPracticeStartButton = byId("pitchingPracticeStartButton");
 const soundToggleButton = byId("soundToggleButton");
 const bgmToggleButton = byId("bgmToggleButton");
 const menuSoundToggleButton = byId("menuSoundToggleButton");
@@ -52,6 +53,7 @@ const awayPresetSelect = byId("awayPresetSelect");
 const homePresetSelect = byId("homePresetSelect");
 const practicePitcherControlSelect = byId("practicePitcherControlSelect");
 const practicePitcherTypeSelect = byId("practicePitcherTypeSelect");
+const pitchingPracticeBatterTypeSelect = byId("pitchingPracticeBatterTypeSelect");
 const practiceBatterSelect = byId("practiceBatterSelect");
 const practicePitcherSelect = byId("practicePitcherSelect");
 const menuPlayerCards = Array.from(document.querySelectorAll(".menu-player-card"));
@@ -853,6 +855,7 @@ const pitcherSpriteSets = {
 let gameMode = "versus";
 let practicePitcherControl = "auto";
 let practicePitcherType = "A";
+let pitchingPracticeBatterType = "A";
 let practiceBatterId = getDefaultPracticeBatterId();
 let practicePitcherId = getDefaultPracticePitcherId();
 let selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
@@ -1601,7 +1604,7 @@ function isDendosTeam(team) {
 }
 
 function doesMenuPointLimitApply(team) {
-  return gameMode !== "practice" && !isDendosTeam(team);
+  return !isAnyPracticeMode() && !isDendosTeam(team);
 }
 
 function applyTeamPresetMenuSelection(team, presetId) {
@@ -1698,12 +1701,12 @@ function adjustPitcherStamina(player, amount) {
 }
 
 function consumePitchStamina(player, pitch) {
-  if (gameMode === "practice") return;
+  if (isAnyPracticeMode()) return;
   adjustPitcherStamina(player, -(pitch?.staminaCost ?? 2) * staminaTuning.pitchCostMultiplier);
 }
 
 function consumePitchVariationStamina(axis) {
-  if (gameMode === "practice" || !ball.inPitch) return;
+  if (isAnyPracticeMode() || !ball.inPitch) return;
   const pitch = pitchTypes[currentPitchType];
   if (!pitch) return;
   const isHorizontal = axis === "horizontal";
@@ -1715,7 +1718,7 @@ function consumePitchVariationStamina(axis) {
 }
 
 function applyHomeRunPitcherStaminaPenalty(player) {
-  if (gameMode === "practice") return;
+  if (isAnyPracticeMode()) return;
   adjustPitcherStamina(player, -staminaTuning.homerRunPenalty);
 }
 
@@ -1774,6 +1777,7 @@ function readMenu() {
   if (nextHomePreset !== selectedTeamPresetBySide.home) applyTeamPresetMenuSelection("home", nextHomePreset);
   practicePitcherControl = practicePitcherControlSelect?.value === "manual" ? "manual" : "auto";
   practicePitcherType = ["A", "B", "C"].includes(practicePitcherTypeSelect?.value) ? practicePitcherTypeSelect.value : "A";
+  pitchingPracticeBatterType = ["A", "B"].includes(pitchingPracticeBatterTypeSelect?.value) ? pitchingPracticeBatterTypeSelect.value : "A";
   practiceBatterId = practiceBatterSelect?.value || practiceBatterId || batters[0]?.id || "";
   practicePitcherId = practicePitcherSelect?.value || practicePitcherId || getPracticePitchers()[0]?.id || "";
   firstBatTeam = firstBatSelect.value;
@@ -1789,6 +1793,18 @@ function readMenu() {
         home: getDefenseRunControlMode(p2DefenseSelect?.value)
       };
   selected = createSelectedTeams(menuSelection);
+}
+
+function isBattingPracticeMode() {
+  return gameMode === "practice";
+}
+
+function isPitchingPracticeMode() {
+  return gameMode === "pitchPractice";
+}
+
+function isAnyPracticeMode() {
+  return isBattingPracticeMode() || isPitchingPracticeMode();
 }
 
 function getDefenseRunControlMode(value) {
@@ -1814,7 +1830,7 @@ function getScoreLead(team, scoreState = scores) {
 }
 
 function ensurePitcherGameRecord(team, pitcherInfo = getTeamActivePitcher(team)) {
-  if (gameMode === "practice" || !team || !pitcherInfo) return null;
+  if (isAnyPracticeMode() || !team || !pitcherInfo) return null;
   const teamRecords = pitcherGameRecords[team] || (pitcherGameRecords[team] = {});
   const existingCount = Object.keys(teamRecords).length;
   const entryLead = getScoreLead(team);
@@ -1846,13 +1862,13 @@ function ensurePitcherGameRecord(team, pitcherInfo = getTeamActivePitcher(team))
 }
 
 function recordPitcherStat(team, pitcherInfo, stat, amount = 1) {
-  if (gameMode === "practice" || !stat || !amount) return;
+  if (isAnyPracticeMode() || !stat || !amount) return;
   const record = ensurePitcherGameRecord(team, pitcherInfo);
   if (record) record[stat] = (record[stat] || 0) + amount;
 }
 
 function applyPitcherEventStaminaPenalty(player, amount) {
-  if (gameMode === "practice" || !player || !amount || amount <= 0) return;
+  if (isAnyPracticeMode() || !player || !amount || amount <= 0) return;
   adjustPitcherStamina(player, -amount);
 }
 
@@ -1871,7 +1887,7 @@ function recordCurrentPitcherStat(stat, amount = 1, pitcherInfo = activePitcher)
 }
 
 function recordPitcherOuts(team, pitcherInfo, outs) {
-  if (gameMode === "practice" || !outs || outs <= 0) return;
+  if (isAnyPracticeMode() || !outs || outs <= 0) return;
   recordPitcherStat(team, pitcherInfo, "outs", outs);
 }
 
@@ -1935,7 +1951,7 @@ function finalizePitcherAppearance(team, pitcherInfo = getTeamActivePitcher(team
 }
 
 function recordPitcherDecisionEvent(team, runs, beforeScores, afterScores, responsiblePitcherIds = []) {
-  if (gameMode === "practice" || !runs || runs <= 0) return;
+  if (isAnyPracticeMode() || !runs || runs <= 0) return;
   const fielding = team === "away" ? "home" : "away";
   const scoringPitcher = getTeamActivePitcher(team);
   const allowingPitcher = getTeamActivePitcher(fielding);
@@ -1958,7 +1974,7 @@ function recordPitcherDecisionEvent(team, runs, beforeScores, afterScores, respo
 }
 
 function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherIds = [], staminaPenaltyPerRun = staminaTuning.runPenalty) {
-  if (gameMode === "practice" || !runs || runs <= 0) return;
+  if (isAnyPracticeMode() || !runs || runs <= 0) return;
   const fallbackPitcher = getTeamActivePitcher(fielding);
   const totals = new Map();
   for (let index = 0; index < runs; index += 1) {
@@ -1974,7 +1990,7 @@ function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherI
 }
 
 function markPitcherSaveIfEligible() {
-  if (gameMode === "practice" || scores.away === scores.home) return null;
+  if (isAnyPracticeMode() || scores.away === scores.home) return null;
   const winner = scores.away > scores.home ? "away" : "home";
   const loser = winner === "away" ? "home" : "away";
   const finalPitcher = getTeamActivePitcher(winner);
@@ -2008,7 +2024,7 @@ function getStarterWinMinimumOuts() {
 }
 
 function markPitcherWinLossAndHolds() {
-  if (gameMode === "practice") return;
+  if (isAnyPracticeMode()) return;
   if (scores.away === scores.home) {
     markPitcherHolds();
     return;
@@ -2822,7 +2838,7 @@ function updateSidebarAbilityPanels() {
   ].join("");
 
   activeBatterName.textContent = `${activeBatter.name} ${handLabel(activeBatter.bats)}`;
-  const activeRole = gameMode === "practice" ? null : getCurrentBatterRole(battingTeam);
+  const activeRole = isAnyPracticeMode() ? null : getCurrentBatterRole(battingTeam);
   const activeIsCatcher = isCatcherRole(activeRole) || isCatcherLikePlayer(activeBatter);
   activeBatterStats.innerHTML = (activeIsCatcher ? [
     statRow("パワー", activeBatter.power),
@@ -2966,20 +2982,21 @@ function pitchCross(player, sortable = false) {
   `;
 }
 
-function startGame() {
+function startGame(modeOverride = null) {
   readMenu();
-  if (gameMode !== "practice" && (!isMenuTeamComplete("away") || !isMenuTeamComplete("home"))) {
+  if (modeOverride) gameMode = modeOverride;
+  if (!isAnyPracticeMode() && (!isMenuTeamComplete("away") || !isMenuTeamComplete("home"))) {
     message = "全選手を選択してください";
     updateMenuPointStatus();
     return;
   }
-  if (gameMode !== "practice" && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit))) {
+  if (!isAnyPracticeMode() && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit))) {
     message = `獲得ポイントは各チーム合計${teamPointLimit}以内`;
     updateMenuPointStatus();
     return;
   }
-  practiceActiveBatter = gameMode === "practice" ? findById(getAllHitters(), practiceBatterId) : null;
-  practiceActivePitcher = gameMode === "practice" ? createMatchPitcher(findById(getPracticePitchers(), practicePitcherId)) : null;
+  practiceActiveBatter = isAnyPracticeMode() ? findById(getAllHitters(), practiceBatterId) : null;
+  practiceActivePitcher = isAnyPracticeMode() ? createMatchPitcher(findById(getPracticePitchers(), practicePitcherId)) : null;
   scores = { away: 0, home: 0 };
   pitcherGameRecords = createPitcherGameRecords();
   pitcherDecisionEvents = [];
@@ -2988,7 +3005,7 @@ function startGame() {
   lastOutBatterByTeam = { away: null, home: null };
   inning = 1;
   half = "top";
-  battingTeam = gameMode === "practice" ? "away" : firstBatTeam;
+  battingTeam = isPitchingPracticeMode() ? "home" : isBattingPracticeMode() ? "away" : firstBatTeam;
   count = { strikes: 0, balls: 0, outs: 0 };
   inputLockedUntil = 0;
   resetDefenseState();
@@ -3002,8 +3019,10 @@ function startGame() {
   ensurePitcherGameRecord(fieldingTeam(), activePitcher);
   resetBall();
   resetSwing();
-  message = gameMode === "practice"
+  message = isBattingPracticeMode()
     ? `打撃練習: ${activeBatter.name} vs ${activePitcher.name}`
+    : isPitchingPracticeMode()
+      ? `投球練習: ${activePitcher.name} vs ${activeBatter.name}`
     : `${teamLabel(battingTeam)}攻撃: ${activeBatter.name} vs ${activePitcher.name}`;
   updateCurrentBgm(true);
   scheduleNextPitch();
@@ -3024,7 +3043,7 @@ function showMenu() {
 }
 
 function setMatchup() {
-  if (gameMode === "practice") {
+  if (isAnyPracticeMode()) {
     activeBatter = practiceActiveBatter || findById(getAllHitters(), practiceBatterId);
     activePitcher = practiceActivePitcher || createMatchPitcher(findById(getPracticePitchers(), practicePitcherId));
     practiceActiveBatter = activeBatter;
@@ -3052,12 +3071,12 @@ function getCurrentBatterRole(team) {
 }
 
 function advanceBattingOrder() {
-  if (gameMode === "practice") return;
+  if (isAnyPracticeMode()) return;
   battingOrderIndex[battingTeam] = (battingOrderIndex[battingTeam] + 1) % selected[battingTeam].batters.length;
 }
 
 function recordLastOutBatter(team = battingTeam, player = activeBatter) {
-  if (gameMode === "practice" || !team || !player) return;
+  if (isAnyPracticeMode() || !team || !player) return;
   lastOutBatterByTeam[team] = {
     id: player.id,
     name: player.name,
@@ -3087,14 +3106,14 @@ function getTiebreakRunner(team) {
 }
 
 function applyExtraInningTiebreakRunner() {
-  if (gameMode === "practice" || inning <= maxInnings) return;
+  if (isAnyPracticeMode() || inning <= maxInnings) return;
   const runner = getTiebreakRunner(battingTeam);
   bases = createEmptyBases();
   if (runner) bases.second = makeBaseRunner(runner);
 }
 
 function resetPracticePlateAppearance() {
-  if (gameMode !== "practice") return false;
+  if (!isAnyPracticeMode()) return false;
   bases = createEmptyBases();
   count = { strikes: 0, balls: 0, outs: 0 };
   battingOrderIndex = { away: 0, home: 0 };
@@ -3118,17 +3137,19 @@ function fieldingTeam() {
 }
 
 function isComputerControlledGameMode() {
-  return gameMode === "single" || gameMode === "practice" || gameMode === "watch";
+  return gameMode === "single" || isAnyPracticeMode() || gameMode === "watch";
 }
 
 function isPlayerBatting() {
-  if (gameMode === "practice") return true;
+  if (isBattingPracticeMode()) return true;
+  if (isPitchingPracticeMode()) return false;
   if (gameMode === "watch") return false;
   return gameMode === "versus" || battingTeam === playerTeam;
 }
 
 function isPlayerPitching() {
-  if (gameMode === "practice") return practicePitcherControl === "manual";
+  if (isBattingPracticeMode()) return practicePitcherControl === "manual";
+  if (isPitchingPracticeMode()) return true;
   if (gameMode === "watch") return false;
   return gameMode === "versus" || fieldingTeam() === playerTeam;
 }
@@ -3145,7 +3166,7 @@ function isManualDefenseControl() {
 }
 
 function isManualBaserunningControl(team = battingTeam) {
-  if (gameMode === "practice") return false;
+  if (isAnyPracticeMode()) return false;
   if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
   return isPlayerBatting() && (defenseControlMode[team] === "manual" || defenseControlMode[team] === "semiauto");
@@ -3236,6 +3257,12 @@ function releasePitchControlLockout(key = null) {
   pitchControlLockoutKeys.delete(key);
 }
 
+function releaseInactivePitchControlLockouts() {
+  pitchControlLockoutKeys.forEach((key) => {
+    if (!isKeyHeld(key)) pitchControlLockoutKeys.delete(key);
+  });
+}
+
 function resetSwing() {
   swingState.isSwinging = false;
   swingState.startTime = 0;
@@ -3308,7 +3335,7 @@ function startPitch(typeKey, options = {}) {
     pitcher.x = clamp(options.pitcherX, pitcher.minX, pitcher.maxX);
   }
   const now = performance.now();
-  if (gameMode === "practice") battingFeedback.active = false;
+  if (isAnyPracticeMode()) battingFeedback.active = false;
   const startX = pitcher.x;
   const startY = pitcher.y + 96;
   const pitchRadius = getPitchRadius(typeKey);
@@ -3370,7 +3397,7 @@ function startPitch(typeKey, options = {}) {
   currentPitchSpeedKmh = null;
   isPitching = true;
   pitcher.windupTime = now;
-  pendingPitch = { releaseTime: now + pitchWindupDuration, typeKey, startX, startY, targetX, targetY, framesToPlate, speedKmh, controlMissType: controlMiss.type, staminaMistake, pitchAbilityMultiplier };
+  pendingPitch = { releaseTime: now + pitchWindupDuration, typeKey, startX, startY, targetX, targetY, framesToPlate, speedKmh, controlMissType: controlMiss.type, staminaMistake, pitchAbilityMultiplier, courseDirection: course.direction || 0 };
   autoPitchTimer = Number.POSITIVE_INFINITY;
   if (isBuntButtonHeld()) startBuntStance(now);
   message = `${pitch.label}、モーション開始`;
@@ -3382,7 +3409,10 @@ function startPitch(typeKey, options = {}) {
 
 function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const wildness = clamp((10 - (control ?? 5)) / 9, 0, 1);
-  const edgeFastballPressure = options.pitchType === "fast" && options.courseDirection !== 0 ? wildness : 0;
+  const edgeCommandPitch = options.courseDirection !== 0 && isEdgeCommandPitch(options.pitchType);
+  const edgeFastballPressure = edgeCommandPitch
+    ? wildness * (options.pitchType === "fast" ? 1.08 : options.pitchType === "normal" ? 0.92 : 0.78)
+    : 0;
   const fatigueSpread = 1 + staminaFatigue * staminaTuning.controlSpreadBonus;
   const severeWildness = Math.pow(wildness, 1.18);
   const countPressure = clamp(options.countPressure ?? 0, 0, 1);
@@ -3390,14 +3420,14 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const verticalTightening = 1 - countPressure * 0.64;
   const missTightening = 1 - countPressure * 0.74;
   const wildMissTightening = 1 - countPressure * 0.82;
-  const totalMajorMissChance = clamp((severeWildness * 0.55 + edgeFastballPressure * 0.13 + staminaFatigue * 0.065) * missTightening, 0, 0.73);
+  const totalMajorMissChance = clamp((severeWildness * 0.55 + edgeFastballPressure * 0.2 + staminaFatigue * 0.065) * missTightening, 0, 0.78);
   return {
     wildness,
     edgeDirection: options.courseDirection || 0,
     edgeFastballPressure,
     countPressure,
-    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.46) * fatigueSpread * commandTightening, 0.34, 5.45),
-    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.28) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.85),
+    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.74) * fatigueSpread * commandTightening, 0.34, 5.85),
+    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.36) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.95),
     wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
   };
@@ -3459,12 +3489,15 @@ function isEdgeCommandPitch(typeKey) {
 function getPitchCourseTargetX(course, pitchRadius = 8, typeKey = "normal") {
   if (!course?.direction || !isEdgeCommandPitch(typeKey)) return field.plateX + (course?.offset ?? 0);
   const plateEdgeX = getHomePlateEdgeXAtY(field.plateY, course.direction);
-  return plateEdgeX + course.direction * (pitchRadius - 0.5);
+  return plateEdgeX + course.direction * Math.max(1.5, pitchRadius - 3.5);
 }
 
 function getPitchCourseBaseSpread(course, typeKey, pitch) {
   if (!course?.direction) return pitch.targetSpread;
-  return isEdgeCommandPitch(typeKey) ? 2 : 8;
+  if (!isEdgeCommandPitch(typeKey)) return 8;
+  if (typeKey === "normal") return 1.8;
+  if (typeKey === "fast") return 2.1;
+  return 1.6;
 }
 
 function getHomePlateEdgeXAtY(y, direction = 1) {
@@ -3541,12 +3574,9 @@ function releasePendingPitch() {
   lastPitchSpeedKmh = pendingPitch.speedKmh;
   ball.staminaMistake = pendingPitch.staminaMistake === true;
   ball.pitchAbilityMultiplier = pendingPitch.pitchAbilityMultiplier ?? 1;
-  const controlMissType = pendingPitch.controlMissType;
   armPitchControlLockout();
-  if (controlMissType && controlMissType !== "none") {
-    pitchControlLockoutKeys.delete("4");
-    pitchControlLockoutKeys.delete("6");
-  }
+  if (pendingPitch.courseDirection < 0) pitchControlLockoutKeys.add("4");
+  if (pendingPitch.courseDirection > 0) pitchControlLockoutKeys.add("6");
   pendingPitch = null;
   message = ball.staminaMistake ? `失投気味 ${currentPitchSpeedKmh}km/h` : `${pitchTypes[currentPitchType].label} ${currentPitchSpeedKmh}km/h`;
 }
@@ -4214,7 +4244,8 @@ function getComputerSwingStrikeConfidence() {
 }
 
 function computerSwingBat() {
-  if ((gameMode !== "single" && gameMode !== "watch") || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
+  if (isPitchingPracticeMode() && pitchingPracticeBatterType !== "B") return;
+  if ((gameMode !== "single" && gameMode !== "watch" && !isPitchingPracticeMode()) || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
   const progress = getPitchProgress();
   if (progress < 0.72 || progress > 1.08) return;
   const strikeConfidence = getComputerSwingStrikeConfidence();
@@ -4236,7 +4267,7 @@ function pollGamepadInput() {
   clearGamepadVirtualKeys();
   syncGamepadAssignments();
 
-  const pitchingTeam = gameMode === "practice" ? "away" : fieldingTeam();
+  const pitchingTeam = isBattingPracticeMode() ? "away" : fieldingTeam();
   const pitchingGamepad = getGamepadForTeam(pitchingTeam);
   const pitchStartButtonPressed = gamePhase === "playing"
     && isPlayerPitching()
@@ -4246,6 +4277,10 @@ function pollGamepadInput() {
     const directions = getGamepadDirections(pitchingGamepad);
 
     if (isPlayerPitching() && gamePhase === "playing") {
+      if (!isPitching && !pendingPitch && pitchStartButtonPressed) {
+        if (directions.has("left")) addGamepadVirtualKey("4");
+        if (directions.has("right")) addGamepadVirtualKey("6");
+      }
       if (isGamepadButtonDown(pitchingGamepad, gamepadButtons.X)) addGamepadVirtualKey("0");
       if (isGamepadButtonDown(pitchingGamepad, gamepadButtons.B) || directions.has("down")) addGamepadVirtualKey("3");
     }
@@ -4277,6 +4312,7 @@ function pollGamepadInput() {
     });
     gamepadState.previousDirections[team] = getGamepadDirections(gamepad);
   });
+  releaseInactivePitchControlLockouts();
   releaseIntentionalWalkCommandLockout();
   updateMenuGamepadCursorVisibility();
 }
@@ -4519,7 +4555,7 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
     }
   }
 
-  const pitchingTeam = gameMode === "practice" ? "away" : fieldingTeam();
+  const pitchingTeam = isBattingPracticeMode() ? "away" : fieldingTeam();
   if (gamePhase === "playing" && isPlayerPitching() && team === pitchingTeam) {
     if (tryDeclareIntentionalWalk()) {
       gamepadState.previousButtons[team] = pressed;
@@ -7510,7 +7546,7 @@ function getSecondBatTeam() {
 function isFinalBottomSecondBatTeamLeading() {
   const secondHalfTeam = getSecondBatTeam();
   const firstHalfTeam = firstBatTeam;
-  return gameMode !== "practice"
+  return !isAnyPracticeMode()
     && inning >= maxInnings
     && half === "bottom"
     && battingTeam === secondHalfTeam
@@ -7781,8 +7817,8 @@ function makeBaseRunner(player) {
     id: player.id,
     name: player.name,
     run: player.run ?? 5,
-    responsiblePitcherId: player.responsiblePitcherId ?? (gameMode !== "practice" ? getTeamActivePitcher(fieldingTeam())?.id : null),
-    responsibleTeam: player.responsibleTeam ?? (gameMode !== "practice" ? fieldingTeam() : null)
+    responsiblePitcherId: player.responsiblePitcherId ?? (!isAnyPracticeMode() ? getTeamActivePitcher(fieldingTeam())?.id : null),
+    responsibleTeam: player.responsibleTeam ?? (!isAnyPracticeMode() ? fieldingTeam() : null)
   };
 }
 
@@ -13022,7 +13058,7 @@ function checkCountEnd() {
       setMatchup();
     }
   }
-  if (gameMode !== "practice" && count.outs >= 3) changeSide();
+  if (!isAnyPracticeMode() && count.outs >= 3) changeSide();
 }
 
 function changeSide() {
@@ -13274,8 +13310,9 @@ function nextPitch() {
   if (gamePhase === "playing" && (isPitching || pendingPitch || ball.inPitch)) return;
   resetBall();
   resetSwing();
-  message = gameMode === "practice"
+  message = isBattingPracticeMode()
     ? practicePitcherControl === "manual" ? "打撃練習: 5/8/2で投球してください" : "打撃練習: 次の投球を待っています"
+    : isPitchingPracticeMode() ? "投球練習: 5/8/2で投球してください"
     : gameMode === "single" ? "次の投球を待っています" : "5/8/2で投球してください";
   scheduleNextPitch(700);
 }
@@ -16775,7 +16812,7 @@ function drawHud() {
   drawPanel(18, 18, 360, 164, "#233047");
   ctx.fillStyle = "#fff2a8";
   ctx.font = "bold 24px monospace";
-  const modeLabel = gameMode === "practice" ? "MODE: 打撃練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : gameMode === "watch" ? "MODE: 観戦モード" : "MODE: 2人用";
+  const modeLabel = isBattingPracticeMode() ? "MODE: 打撃練習" : isPitchingPracticeMode() ? "MODE: 投球練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : gameMode === "watch" ? "MODE: 観戦モード" : "MODE: 2人用";
   ctx.fillText(modeLabel, 38, 52);
   ctx.fillStyle = "#f8f3d8";
   ctx.font = "bold 22px monospace";
@@ -17039,11 +17076,11 @@ function drawPlayersInfo() {
 function drawBattingFeedback() {
   if (!battingFeedback.active || !battingFeedback.lines?.length) return;
   const age = performance.now() - battingFeedback.startTime;
-  if (gameMode !== "practice" && age > 5200) {
+  if (!isAnyPracticeMode() && age > 5200) {
     battingFeedback.active = false;
     return;
   }
-  const alpha = gameMode === "practice" ? 1 : age > 4300 ? clamp(1 - (age - 4300) / 900, 0, 1) : 1;
+  const alpha = isAnyPracticeMode() ? 1 : age > 4300 ? clamp(1 - (age - 4300) / 900, 0, 1) : 1;
   const width = 410;
   const height = 132;
   const x = 18;
@@ -17606,7 +17643,7 @@ function handleLineupOrderButtonClick(event) {
   return true;
 }
 
-startButton.addEventListener("click", startGame);
+startButton.addEventListener("click", () => startGame());
 modeSelect?.addEventListener("change", () => {
   readMenu();
   updateMenuAbilityPanels();
@@ -17625,14 +17662,19 @@ homePresetSelect?.addEventListener("change", () => {
   updateMenuAbilityPanels();
 });
 practiceStartButton?.addEventListener("click", () => {
-  modeSelect.value = "practice";
-  startGame();
+  startGame("practice");
+});
+pitchingPracticeStartButton?.addEventListener("click", () => {
+  startGame("pitchPractice");
 });
 practiceBatterSelect?.addEventListener("change", () => {
   practiceBatterId = practiceBatterSelect.value;
 });
 practicePitcherSelect?.addEventListener("change", () => {
   practicePitcherId = practicePitcherSelect.value;
+});
+pitchingPracticeBatterTypeSelect?.addEventListener("change", () => {
+  pitchingPracticeBatterType = ["A", "B"].includes(pitchingPracticeBatterTypeSelect.value) ? pitchingPracticeBatterTypeSelect.value : "A";
 });
 menuButton.addEventListener("click", showMenu);
 playerEditorButton?.addEventListener("click", openPlayerEditor);
