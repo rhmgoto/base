@@ -927,7 +927,9 @@ let swingState = {
   didSwingThisPitch: false,
   madeContact: false,
   lastCheckProgress: 0,
-  type: "strong"
+  type: "strong",
+  isBuntStance: false,
+  buntAimX: 0
 };
 
 let defenseState = createDefenseState();
@@ -3220,6 +3222,8 @@ function resetSwing() {
   swingState.madeContact = false;
   swingState.lastCheckProgress = 0;
   swingState.type = "strong";
+  swingState.isBuntStance = false;
+  swingState.buntAimX = 0;
 }
 
 function resetCountOnly() {
@@ -4033,6 +4037,70 @@ function startSwing(now = performance.now(), type = "strong") {
   if (!isPitching || pendingPitch) message = "まだ投球されていません";
 }
 
+function updateBuntStance(now = performance.now()) {
+  if (gamePhase !== "playing" || !isPlayerBatting()) {
+    cancelBuntStance();
+    return;
+  }
+  if (isBuntButtonHeld()) {
+    startBuntStance(now);
+  } else if (isBuntStanceActive()) {
+    cancelBuntStance();
+  }
+}
+
+function startBuntStance(now = performance.now()) {
+  if (isInputLocked(now) || swingState.madeContact || ball.crossedPlate) return;
+  if (swingState.isSwinging && !isBuntStanceActive()) return;
+  if (swingState.didSwingThisPitch && !isBuntStanceActive()) return;
+  if (isBuntStanceActive()) {
+    swingState.buntAimX = getBuntAimDirection();
+    return;
+  }
+  swingState.isSwinging = true;
+  swingState.startTime = now;
+  swingState.cooldownUntil = 0;
+  swingState.didSwingThisPitch = true;
+  swingState.madeContact = false;
+  swingState.lastCheckProgress = getBatSwingProgress();
+  swingState.type = "bunt";
+  swingState.isBuntStance = true;
+  swingState.buntAimX = getBuntAimDirection();
+  if (!isPitching || pendingPitch) message = "バントの構え";
+}
+
+function cancelBuntStance() {
+  if (!isBuntStanceActive()) return;
+  if (isPitching && ball.inPitch && hasBallPassedHomePlate()) return;
+  swingState.isSwinging = false;
+  swingState.didSwingThisPitch = false;
+  swingState.madeContact = false;
+  swingState.lastCheckProgress = 0;
+  swingState.type = "strong";
+  swingState.isBuntStance = false;
+  swingState.buntAimX = 0;
+}
+
+function isBuntStanceActive() {
+  return swingState.isSwinging && swingState.type === "bunt" && swingState.isBuntStance;
+}
+
+function isBuntButtonHeld() {
+  if (isKeyHeld("3")) return true;
+  const gamepad = getGamepadForTeam(battingTeam);
+  return !!gamepad && isGamepadButtonDown(gamepad, gamepadButtons.X);
+}
+
+function getBuntAimDirection() {
+  const keyboardLeft = keysDown.has("ArrowLeft") || keysDown.has("a") || keysDown.has("A");
+  const keyboardRight = keysDown.has("ArrowRight") || keysDown.has("d") || keysDown.has("D");
+  const keyboardAim = keyboardLeft === keyboardRight ? 0 : keyboardLeft ? -1 : 1;
+  const gamepad = getGamepadForTeam(battingTeam);
+  const axis = gamepad?.axes?.[0] ?? 0;
+  const gamepadAim = Math.abs(axis) >= 0.32 ? Math.sign(axis) : 0;
+  return gamepadAim || keyboardAim;
+}
+
 function getProjectedPitchPlatePosition() {
   if (!ball.inPitch || !Number.isFinite(ball.vy) || Math.abs(ball.vy) < 0.001) {
     return { x: ball.x, y: ball.y };
@@ -4343,9 +4411,6 @@ function handleGamepadButtonPresses(gamepad, team) {
         tryStartSteal(getGamepadThrowTarget(directions));
       }
     }
-    if (justPressed(gamepadButtons.X)) {
-      swingBat("bunt");
-    }
   }
 
   const pitchingTeam = gameMode === "practice" ? "away" : fieldingTeam();
@@ -4585,6 +4650,7 @@ function update(delta) {
     return;
   }
   if (gamePhase === "playing" && isPlayerBatting()) updateBatter(delta);
+  updateBuntStance(now);
   if (shouldAutoScheduleComputerPitch() && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && !stealState.active && !Number.isFinite(autoPitchTimer)) {
     scheduleNextComputerPitchAfterJudgment();
   }
@@ -4662,6 +4728,7 @@ function getBatterGamepadMove() {
 }
 
 function isBatInJudgmentWindow(now = performance.now()) {
+  if (isBuntStanceActive()) return true;
   return swingState.isSwinging && now - swingState.startTime <= swingState.duration;
 }
 
@@ -5124,7 +5191,8 @@ function buildContactProfile(bestHit) {
     outsideReachUse,
     inGoodContactZone,
     yellowZoneBoost,
-    quality
+    quality,
+    buntAimX: isBuntStanceActive() ? getBuntAimDirection() : 0
   };
 }
 
@@ -6164,7 +6232,8 @@ function buildBattedBallProfile(contact) {
     outsideStrikeZone,
     sweetSpotScore,
     inGoodContactZone,
-    yellowZoneBoost = 0
+    yellowZoneBoost = 0,
+    buntAimX = 0
   } = contact;
   const abs = Math.abs(timeDiff);
   const power = getEffectiveBatterPower(activeBatter);
@@ -6338,38 +6407,42 @@ function buildBattedBallProfile(contact) {
     })
   });
   if (getCurrentSwingType() === "bunt") {
-    const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12, 0, 1);
-    const goodBunt = feedbackScore >= buntTuning.goodFeedback;
-    const greatBunt = feedbackScore >= buntTuning.greatFeedback;
-    const solidBuntContact = feedbackScore >= buntTuning.solidFeedback;
+    const buntMeetSkill = clamp((meet - 3) / 9, 0, 1);
+    const buntQuality = clamp(readableQuality + sweetSpotScore * 0.12 + buntMeetSkill * 0.14, 0, 1);
+    const buntContactScore = clamp(feedbackScore + buntMeetSkill * 0.08, 0, 1);
+    const goodBunt = buntContactScore >= buntTuning.goodFeedback;
+    const greatBunt = buntContactScore >= buntTuning.greatFeedback;
+    const solidBuntContact = buntContactScore >= buntTuning.solidFeedback;
     const badBuntScore = goodBunt
       ? 0
       : clamp(
-          (buntTuning.popupFeedback - feedbackScore) / buntTuning.popupFeedback
-            + Math.max(0, buntTuning.solidFeedback - feedbackScore) * 0.55
+          (buntTuning.popupFeedback - buntContactScore) / buntTuning.popupFeedback
+            + Math.max(0, buntTuning.solidFeedback - buntContactScore) * 0.55
             + Math.max(0, buntTuning.goodTiming - timingScore) * 0.24
             + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.18,
           0,
           1
         );
     const lineChance = greatBunt
-      ? clamp(0.9 + (feedbackScore - buntTuning.greatFeedback) * 0.4, 0.9, buntTuning.goodLineChance)
+      ? clamp(0.9 + (buntContactScore - buntTuning.greatFeedback) * 0.4, 0.9, buntTuning.goodLineChance)
       : goodBunt
-      ? clamp(0.72 + (feedbackScore - buntTuning.goodFeedback) * 3.6, 0.72, 0.9)
+      ? clamp(0.72 + (buntContactScore - buntTuning.goodFeedback) * 3.6, 0.72, 0.9)
       : solidBuntContact
-      ? clamp(buntTuning.solidLineChance + (feedbackScore - buntTuning.solidFeedback) * 0.24, 0.18, 0.26)
+      ? clamp(buntTuning.solidLineChance + (buntContactScore - buntTuning.solidFeedback) * 0.24, 0.18, 0.26)
       : clamp(
-          buntTuning.badLineBase + feedbackScore * 0.2 + sweetSpotScore * 0.08,
+          buntTuning.badLineBase + buntContactScore * 0.2 + sweetSpotScore * 0.08,
           buntTuning.badLineMin,
           Math.min(0.28, buntTuning.badLineMax)
         );
     const pitcherFrontChance = goodBunt
-      ? greatBunt ? clamp(0.04 - (feedbackScore - buntTuning.greatFeedback) * 0.3, 0.01, 0.04) : 0.12
+      ? greatBunt ? clamp(0.04 - (buntContactScore - buntTuning.greatFeedback) * 0.3, 0.01, 0.04) : 0.12
       : solidBuntContact
-      ? clamp(buntTuning.solidPitcherFrontChance + (feedbackScore - buntTuning.solidFeedback) * 0.42, 0.68, 0.76)
-      : clamp(0.32 + feedbackScore * 0.5, 0.32, 0.52);
+      ? clamp(buntTuning.solidPitcherFrontChance + (buntContactScore - buntTuning.solidFeedback) * 0.42, 0.68, 0.76)
+      : clamp(0.32 + buntContactScore * 0.5, 0.32, 0.52);
     const roll = Math.random();
-    const side = Math.random() < 0.5 ? -1 : 1;
+    const aimedSide = Math.abs(buntAimX) >= 0.4 ? Math.sign(buntAimX) : 0;
+    const side = aimedSide || (Math.random() < 0.5 ? -1 : 1);
+    const aimAssist = aimedSide ? 0.18 + buntMeetSkill * 0.12 : 0;
     const buntFoulChance = clamp(
       buntTuning.foulBase
         + (1 - buntQuality) * buntTuning.foulQualityScale
@@ -6386,7 +6459,7 @@ function buildBattedBallProfile(contact) {
     );
     const popupProtection = solidBuntContact
       ? clamp(
-          ((feedbackScore - buntTuning.solidFeedback) / 0.2)
+          ((buntContactScore - buntTuning.solidFeedback) / 0.2)
             + ((timingScore - buntTuning.solidContactTiming) / 0.42) * 0.25
             + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.25,
           0,
@@ -6394,8 +6467,8 @@ function buildBattedBallProfile(contact) {
         )
       : 0;
     const protectedPopupChance = pitcherBuntPopupChance * (1 - popupProtection * buntTuning.solidContactPopupReduction);
-    const forcePopup = feedbackScore <= buntTuning.forcePopupFeedback
-      && (feedbackScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
+    const forcePopup = buntContactScore <= buntTuning.forcePopupFeedback
+      && (buntContactScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
       && !solidBuntContact;
     const pitcherBuntPopup = !goodBunt && !isFoul && (forcePopup || Math.random() < protectedPopupChance);
     const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
@@ -6403,11 +6476,11 @@ function buildBattedBallProfile(contact) {
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : roll < lineChance
       ? goodBunt
-        ? normalize({ x: side * randomBetween(0.95, 1.25), y: -randomBetween(0.42, 0.66) })
-        : normalize({ x: side * randomBetween(0.72, 1.02), y: -randomBetween(0.58, 0.82) })
+        ? normalize({ x: side * randomBetween(0.95 + aimAssist, 1.25 + aimAssist), y: -randomBetween(0.42, 0.66) })
+        : normalize({ x: side * randomBetween(0.72 + aimAssist * 0.7, 1.02 + aimAssist * 0.7), y: -randomBetween(0.58, 0.82) })
       : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
-        : normalize({ x: side * randomBetween(0.92, 1.18), y: -randomBetween(0.38, 0.68) });
+        : normalize({ x: side * randomBetween(0.92 + aimAssist, 1.18 + aimAssist), y: -randomBetween(0.38, 0.68) });
     const buntPower = clamp(0.12 + buntQuality * 0.22, 0.1, 0.34);
     const badBuntLift = goodBunt ? 0 : clamp((0.62 - buntQuality) / 0.62, 0, 1) * randomBetween(0, 16);
     return {
@@ -6416,7 +6489,7 @@ function buildBattedBallProfile(contact) {
       direction: buntDirection,
       spin: clamp(0.28 + (1 - sweetSpotScore) * 0.38, 0.18, 0.82),
       carry: pitcherBuntPopup ? clamp(0.1 + badBuntScore * 0.12, 0.1, 0.22) : clamp(0.04 + buntQuality * 0.08, 0.04, 0.16),
-      feedbackScore,
+      feedbackScore: buntContactScore,
       gapScore: 0,
       timingPull,
       oppositeFieldContact: 0,
@@ -6437,6 +6510,7 @@ function buildBattedBallProfile(contact) {
       yellowZoneBoost,
       isFoul: finalBuntIsFoul,
       buntQuality,
+      buntContactScore,
       buntLineChance: lineChance,
       buntPitcherFrontChance: pitcherFrontChance,
       buntFoulChance,
@@ -13073,6 +13147,7 @@ function getPitchProgress() {
 }
 
 function getBatSegment(progress = getBatSwingProgress()) {
+  if (isBuntStanceActive()) return getBuntBatSegment();
   const side = activeBatterSide === "R" ? 1 : -1;
   const handleX = batter.x + side * 46;
   const handleY = batter.y - 2 - (36 * field.plateScale);
@@ -13084,6 +13159,19 @@ function getBatSegment(progress = getBatSwingProgress()) {
     y1: handleY,
     x2: handleX + Math.cos(angle) * length,
     y2: handleY + Math.sin(angle) * length
+  });
+}
+
+function getBuntBatSegment() {
+  const side = activeBatterSide === "R" ? 1 : -1;
+  const handleX = batter.x + side * 30;
+  const handleY = batter.y - 44 * field.plateScale;
+  const length = 150 * batLengthMultiplier * getMeetBatLengthScale();
+  return trimBatJudgmentSegment({
+    x1: handleX,
+    y1: handleY,
+    x2: handleX - side * length,
+    y2: handleY + 5
   });
 }
 
@@ -13112,11 +13200,13 @@ function trimBatJudgmentSegment(segment) {
 
 function getSwingProgress() {
   if (!swingState.isSwinging) return 0;
+  if (isBuntStanceActive()) return 0;
   return clamp((performance.now() - swingState.startTime) / swingState.duration, 0, 1);
 }
 
 function getBatSwingProgress() {
   if (!swingState.isSwinging) return 0;
+  if (isBuntStanceActive()) return 1;
   return clamp((performance.now() - swingState.startTime) / (swingState.duration / batJudgmentSpeedMultiplier), 0, 1);
 }
 
@@ -16057,6 +16147,7 @@ function drawBatterSprite(team) {
 
 function getBatterPoseLayers() {
   if (hbpPose.active) return [{ pose: "hbp", alpha: 1 }];
+  if (isBuntStanceActive()) return [{ pose: "swing", alpha: 1 }];
   if (!swingState.isSwinging) return [{ pose: "stance", alpha: 1 }];
   const elapsed = performance.now() - swingState.startTime;
   if (elapsed < 200) return [{ pose: "stance", alpha: 1 }];
