@@ -663,8 +663,8 @@ const fielderReactionDelayTuning = {
 };
 const showFielderCatchRangeDebug = true;
 const fielderCatchRangeDebugStyle = {
-  fill: "rgba(255, 104, 180, 0.12)",
-  stroke: "rgba(255, 104, 180, 0.34)"
+  fill: "rgba(255, 104, 180, 0.07)",
+  stroke: "rgba(255, 104, 180, 0.2)"
 };
 const wallReboundTuning = {
   minDistance: 96,
@@ -11379,6 +11379,7 @@ function updateDefensePlay(now) {
   defenseState.lastMovementElapsedSeconds = elapsedSeconds;
 
   resolveLiveInfielderContactCatch(elapsedSeconds);
+  resolveLivePostLandingPickup(elapsedSeconds);
 
   if (shouldResolveDefensePlayNow(elapsedSeconds)) {
     finishDefensePlay();
@@ -11397,7 +11398,8 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
   if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
   const canLiveInfielderCatch = battedBall.isGrounder
     || battedBall.isLineDrop
-    || (battedBall.isLiner && !isDeepLineLinerPastInfield(battedBall));
+    || (battedBall.isLiner && !isDeepLineLinerPastInfield(battedBall))
+    || (!battedBall.isGrounder && !isDeepOutfieldBall(battedBall));
   if (!canLiveInfielderCatch) return false;
   if (defenseState.outcome?.caught || defenseState.throw) return false;
   const height = getDefenseBallHeightAtPoint(
@@ -11408,7 +11410,9 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
     ? 56
     : battedBall.isLineDrop
       ? 78
-      : 66;
+      : battedBall.trajectory === "fly"
+        ? 74
+        : 66;
   if (height > maxContactHeight) return false;
   const fielders = defenseState.fielders || [];
   const candidates = fielders
@@ -11420,10 +11424,13 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
       };
       const distance = Math.hypot(current.x - ball.x, current.y - ball.y);
       const radius = getLiveInfielderContactRadius(fielder, battedBall);
+      const playableHeight = battedBall.isGrounder
+        ? true
+        : isInfielderPlayableRouteHeight(fielder, battedBall, { x: ball.x, y: ball.y }, battedBall.trajectory === "fly" ? -10 : 0);
       const ready = elapsedSeconds >= getFielderReactionDelay(fielder) * 0.72;
-      return { fielder, current, distance, radius, ready };
+      return { fielder, current, distance, radius, ready, playableHeight };
     })
-    .filter((candidate) => candidate.ready && candidate.distance <= candidate.radius)
+    .filter((candidate) => candidate.ready && candidate.playableHeight && candidate.distance <= candidate.radius)
     .sort((a, b) => a.distance - b.distance);
   const best = candidates[0];
   if (!best) return false;
@@ -11475,6 +11482,85 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   } else {
     defenseState.throw = null;
   }
+  defenseState.duration = Math.max(
+    defenseState.duration,
+    elapsedSeconds * 1000 + 1400,
+    getDefenseDuration(battedBall, outcome, defenseState.runner, defenseState.throw, fieldingPoint)
+  );
+  const metricText = getBattedBallMetricText(battedBall);
+  message = metricText ? `${outcome.label} / ${metricText}` : outcome.label;
+}
+
+function resolveLivePostLandingPickup(elapsedSeconds) {
+  if (!defenseState.active || defenseState.resolved || defenseState.manualFielding) return false;
+  if (defenseState.livePostLandingPickupComplete) return false;
+  const battedBall = defenseState.battedBall;
+  if (!battedBall || battedBall.isGrounder || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
+  if (defenseState.outcome?.caught || defenseState.throw) return false;
+  const ballTime = Math.max(0.1, battedBall.ballTime ?? 1);
+  if (elapsedSeconds < ballTime + 0.04) return false;
+  const height = getDefenseBallHeightAtPoint(
+    clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1),
+    elapsedSeconds
+  );
+  if (height > 42) return false;
+  const candidates = (defenseState.fielders || [])
+    .map((fielder) => {
+      const current = {
+        x: fielder.currentX ?? fielder.x,
+        y: fielder.currentY ?? fielder.y
+      };
+      const distance = Math.hypot(current.x - ball.x, current.y - ball.y);
+      const radius = getFielderCatchRangeRadius(fielder, battedBall);
+      const ready = elapsedSeconds >= getFielderReactionDelay(fielder) * 0.72;
+      return { fielder, current, distance, radius, ready };
+    })
+    .filter((candidate) => candidate.ready && candidate.distance <= candidate.radius)
+    .sort((a, b) => a.distance - b.distance);
+  const best = candidates[0];
+  if (!best) return false;
+  completeLivePostLandingPickup(best.fielder, best.current, elapsedSeconds);
+  return true;
+}
+
+function completeLivePostLandingPickup(fielder, fieldingPoint, elapsedSeconds) {
+  const battedBall = defenseState.battedBall;
+  const scoreType = defenseState.outcome?.scoreType || defenseState.outcome?.kind || (battedBall?.isDeep ? "double" : "single");
+  const outcome = {
+    kind: "force",
+    label: `${fielder.role} バウンド処理`,
+    scoreType,
+    caught: true,
+    needsThrow: true,
+    targetBase: getBatterRunnerTargetBase(defenseState.outcome || { scoreType }, battedBall, fieldingPoint, fielder, defenseState.runner),
+    fieldingTime: elapsedSeconds,
+    fieldingPoint,
+    postLandingPickup: true
+  };
+  const chosenFielder = {
+    ...fielder,
+    x: fieldingPoint.x,
+    y: fieldingPoint.y,
+    currentX: fieldingPoint.x,
+    currentY: fieldingPoint.y,
+    fieldingPoint,
+    distanceToTarget: 0
+  };
+  defenseState.livePostLandingPickupComplete = true;
+  defenseState.chosenFielder = chosenFielder;
+  defenseState.target = fieldingPoint;
+  defenseState.outcome = outcome;
+  defenseState.fielders = defenseState.fielders.map((entry) => entry.role === fielder.role
+    ? { ...entry, currentX: fieldingPoint.x, currentY: fieldingPoint.y, fieldingPoint }
+    : entry);
+  defenseState.baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
+  defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
+  defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
+    manualWait: isManualDefenseControl(),
+    targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner),
+    baseRunners: defenseState.baseRunners,
+    minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder)
+  });
   defenseState.duration = Math.max(
     defenseState.duration,
     elapsedSeconds * 1000 + 1400,
@@ -11675,7 +11761,7 @@ function getFielderCatchRangeRadius(fielder, battedBall) {
 
 function getStableFielderCatchRangeRadius(fielder) {
   const fielding = getFielderRangeFieldingRating(fielder);
-  return 42 + fielding * 5.2;
+  return (42 + fielding * 5.2) * 1.2;
 }
 
 function getFielderRangeFieldingRating(fielder) {
@@ -15171,20 +15257,7 @@ function getBattedBallFirstLandingTime(battedBall) {
 }
 
 function getDefenseVisualLandingTarget(battedBall) {
-  if (!battedBall?.target || !battedBall?.origin) return battedBall?.target || null;
-  if (battedBall.isGrounder || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return battedBall.target;
-  const frontLanding = isDeepDriveFrontLandingBall(battedBall) || isOutfieldFrontLandingBall(battedBall);
-  if (!frontLanding) return battedBall.target;
-  const dx = battedBall.target.x - battedBall.origin.x;
-  const dy = battedBall.target.y - battedBall.origin.y;
-  const distance = Math.hypot(dx, dy);
-  if (distance <= 1) return battedBall.target;
-  const pullBack = clamp(distance * (isDeepDriveFrontLandingBall(battedBall) ? 0.18 : 0.12), 90, isDeepDriveFrontLandingBall(battedBall) ? 320 : 220);
-  const ratio = Math.max(0, (distance - pullBack) / distance);
-  return {
-    x: battedBall.origin.x + dx * ratio,
-    y: battedBall.origin.y + dy * ratio
-  };
+  return battedBall?.target || null;
 }
 
 function drawDefenseTarget() {
