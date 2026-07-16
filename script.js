@@ -5560,6 +5560,15 @@ function isStrongHitResult(result) {
     || result?.hardOutfieldBounce);
 }
 
+function getGoodContactZoneEdgeStage(contact = {}) {
+  if (!contact.inGoodContactZone) return "outside";
+  const zoneScore = clamp(contact.zoneScore ?? 0, 0, 1);
+  if (zoneScore >= 0.9) return "center";
+  if (zoneScore >= 0.74) return "middle";
+  if (zoneScore >= 0.56) return "edge";
+  return "thinEdge";
+}
+
 function judgePitchAtPlate() {
   if (swingState.madeContact) return;
   if (swingState.didSwingThisPitch) {
@@ -5594,6 +5603,9 @@ function decideHitResultFromBattedProfile(contact) {
   if (shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll)) {
     return makeBattingPracticeHomeRunResult(profile, feedbackScore);
   }
+  if (shouldMakeCenterZoneHomeRunCandidate(contact, profile, feedbackScore, roll)) {
+    return applyFinalHitResultBalance(makeCenterZoneHomeRunCandidateResult(profile, feedbackScore), profile, contact);
+  }
   const scoreDrivenLongBall = tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll);
   if (scoreDrivenLongBall) {
     return applyFinalHitResultBalance(scoreDrivenLongBall, scoreDrivenLongBall.battedProfile ?? profile, contact);
@@ -5622,7 +5634,12 @@ function decideHitResultFromBattedProfile(contact) {
 }
 
 function applyFinalHitResultBalance(result, profile, contact = null) {
-  return applyOverallHitResultReduction(applyGoodContactZoneMissResultPenalty(applyOutfieldHitGrounderReduction(result, profile), profile, contact), profile, contact);
+  const zoneAdjusted = applyGoodContactZoneEdgeResultPenalty(
+    applyGoodContactZoneMissResultPenalty(applyOutfieldHitGrounderReduction(result, profile), profile, contact),
+    profile,
+    contact
+  );
+  return applyOverallHitResultReduction(zoneAdjusted, profile, contact);
 }
 
 function applyOverallHitResultReduction(result, profile, contact = null, roll = Math.random()) {
@@ -5695,6 +5712,47 @@ function shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackSco
   return roll < chance;
 }
 
+function shouldMakeCenterZoneHomeRunCandidate(contact, profile, feedbackScore, roll = Math.random()) {
+  if (!contact?.inGoodContactZone || !profile || profile.isFoul || profile.isBunt || contact.outsideStrikeZone) return false;
+  const zoneScore = clamp(contact.zoneScore ?? 0, 0, 1);
+  if (zoneScore < 0.92) return false;
+  const power = getEffectiveBatterPower(activeBatter);
+  const powerDriveScore = getPowerDriveScore(power);
+  const timing = clamp(contact.timingScore ?? 0, 0, 1);
+  const sweetSpot = clamp(contact.sweetSpotScore ?? 0, 0, 1);
+  const barrel = clamp(contact.barrelScore ?? 0, 0, 1);
+  const quality = clamp(contact.quality ?? 0, 0, 1);
+  const centerScore = clamp((zoneScore - 0.92) / 0.08, 0, 1);
+  const contactScore = clamp(feedbackScore * 0.34 + timing * 0.18 + Math.max(sweetSpot, barrel) * 0.22 + quality * 0.16 + centerScore * 0.1, 0, 1);
+  if (contactScore < 0.62 || powerDriveScore < 0.18 || profile.exitVelocity < 0.62 || profile.carry < 0.56) return false;
+  const chance = clamp(
+    0.14
+      + centerScore * 0.24
+      + clamp((contactScore - 0.62) / 0.28, 0, 1) * 0.3
+      + powerDriveScore * 0.32
+      + clamp((profile.carry - 0.62) / 0.54, 0, 1) * 0.18,
+    0.12,
+    0.82
+  );
+  return roll < chance;
+}
+
+function makeCenterZoneHomeRunCandidateResult(profile, feedbackScore = profile?.feedbackScore ?? profile?.quality ?? 0.72) {
+  const powerDriveScore = getPowerDriveScore();
+  const boostedProfile = {
+    ...profile,
+    centerZoneHomerCandidate: true,
+    feedbackScore: Math.max(feedbackScore, profile.feedbackScore ?? 0, 0.78),
+    power: Math.max(profile.power ?? 1, 1.7 + powerDriveScore * 0.64),
+    exitVelocity: Math.max(profile.exitVelocity ?? 0.8, 1.02 + powerDriveScore * 0.36),
+    carry: Math.max(profile.carry ?? 0.72, 1.02 + powerDriveScore * 0.46),
+    launchAngle: clamp(Math.max(profile.launchAngle ?? 24, 23), 22, 38),
+    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 0.76 + powerDriveScore * 0.16),
+    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.42 + powerDriveScore * 0.24)
+  };
+  return makeDeepDriveResultFromProfile(boostedProfile);
+}
+
 function makeBattingPracticeHomeRunResult(profile, feedbackScore = profile?.feedbackScore ?? profile?.quality ?? 0.7) {
   const boostedProfile = {
     ...profile,
@@ -5717,6 +5775,7 @@ function tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll 
   if (score < 0.56) return null;
   const zoneCenter = clamp(((contact.zoneScore ?? 0) - 0.88) / 0.12, 0, 1);
   if (zoneCenter <= 0.12) return null;
+  if ((contact.zoneScore ?? 0) < 0.82 && score < 0.78) return null;
   const timing = clamp(contact.timingScore ?? 0, 0, 1);
   const sweetSpot = clamp(contact.sweetSpotScore ?? 0, 0, 1);
   const barrel = clamp(contact.barrelScore ?? 0, 0, 1);
@@ -5994,6 +6053,25 @@ function applyGoodContactZoneMissResultPenalty(result, profile, contact = null, 
       : clamp(0.28 + missUnits * 0.28 - score * 0.1, 0.18, 0.48);
   if (roll >= suppressionChance) return result;
   return makeZoneMissWeakContactResult(profile, missUnits, roll, missStage);
+}
+
+function applyGoodContactZoneEdgeResultPenalty(result, profile, contact = null, roll = Math.random()) {
+  if (!result || result.kind !== "hit" || !contact?.inGoodContactZone) return result;
+  if (result.scoreType === "homer" && getGoodContactZoneEdgeStage(contact) === "center") return result;
+  const stage = getGoodContactZoneEdgeStage(contact);
+  if (stage === "center") return result;
+  const score = clamp(getContactFeedbackScore(contact), 0, 1);
+  const reductionChance = stage === "thinEdge"
+    ? clamp(0.86 - score * 0.18, 0.62, 0.9)
+    : stage === "edge"
+      ? clamp(0.58 - score * 0.14, 0.36, 0.66)
+      : clamp(0.22 - score * 0.08, 0.08, 0.26);
+  if (roll >= reductionChance) return result;
+  if (isStrongHitResult(result)) {
+    return makeZoneMissWeakContactResult(profile, 0.35, roll, stage === "thinEdge" ? "forcedWeak" : "clear");
+  }
+  if ((profile?.launchAngle ?? 0) >= 22) return makeRoutineFlyResultFromProfile(profile);
+  return makeGrounderOutResultFromProfile(profile, clamp((result.power ?? profile?.power ?? 0.48) * 0.78, 0.28, 0.68));
 }
 
 function applyFeedbackQualityHitUpgrade(result, profile, contact) {
