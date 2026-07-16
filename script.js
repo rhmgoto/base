@@ -1761,6 +1761,7 @@ function createDefenseState() {
     manualFieldingComplete: false,
     manualFieldingMissed: false,
     manualCatchRadius: 0,
+    unifiedCircleCatchComplete: false,
     trailResetAtLanding: false
   };
 }
@@ -8075,7 +8076,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
     startFairBattedBallFoulPlay(battedBall, battedBall.target);
     return;
   }
-  const fielders = getDefensiveLineup(fieldingTeam()).map((fielder) => ({ ...fielder, currentX: fielder.x, currentY: fielder.y }));
+  const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
   const manualFielding = isManualDefenseControl() && !shouldAutoFieldFlyInManualDefense(battedBall) && !battedBall.fenceOver && !battedBall.wallHit && !battedBall.groundRuleDouble;
   let chosenFielder = battedBall.isBunt ? chooseBuntDefenseFielder(fielders, battedBall) : chooseDefenseFielder(fielders, battedBall);
   const runner = createBatterRunner(activeBatter);
@@ -8148,6 +8149,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   if (!throwState) {
     throwState = createTagUpVisualThrowState(chosenFielder, fieldingTarget, outcome, battedBall, baseRunners);
   }
+  if (outcome.caught) throwState = null;
 
   gamePhase = "defense";
   isPitching = false;
@@ -8205,7 +8207,7 @@ function startFoulBallPlay(label, power, timeDiff, hitDirection = null, battedPr
   const direction = hitDirection || getHitDirection(timeDiff, true);
   const battedBall = createFoulBattedBall(power, direction, label, battedProfile);
   appendBattedBallFeedback(battedBall);
-  const fielders = getDefensiveLineup(fieldingTeam()).map((fielder) => ({ ...fielder, currentX: fielder.x, currentY: fielder.y }));
+  const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
   let chosenFielder = chooseFoulDefenseFielder(fielders, battedBall);
   let outcome = resolveFoulDefenseOutcome(chosenFielder, battedBall);
   let fieldingTarget = outcome.caught ? battedBall.target : getFoulBallFieldingTarget(battedBall);
@@ -8271,7 +8273,7 @@ function startFairBattedBallFoulPlay(sourceBattedBall, fieldingTarget = null) {
     landingDistance: Math.hypot(target.x - sourceBattedBall.origin.x, target.y - sourceBattedBall.origin.y),
     flightDistance: Math.hypot(target.x - sourceBattedBall.origin.x, target.y - sourceBattedBall.origin.y)
   };
-  const fielders = getDefensiveLineup(fieldingTeam()).map((fielder) => ({ ...fielder, currentX: fielder.x, currentY: fielder.y }));
+  const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
   const chosenFielder = chooseFoulDefenseFielder(fielders, battedBall);
   let outcome = resolveFoulDefenseOutcome(chosenFielder, battedBall);
   let finalTarget = outcome.caught ? battedBall.target : getFoulBallFieldingTarget(battedBall);
@@ -11723,7 +11725,9 @@ function updateDefensePlay(now) {
 
   updateBatterRunner(elapsedSeconds);
   updateDefenseBaseRunners(elapsedSeconds);
-  updateThrowState(elapsedSeconds);
+  if (defenseState.unifiedCircleCatchComplete || !defenseState.outcome?.caught) {
+    updateThrowState(elapsedSeconds);
+  }
   refreshDefenseThrowSafety();
   updateHomeRunFireworksSound(elapsedSeconds);
   const ballPoint = getDefenseBallPoint(progress, eased, elapsedSeconds);
@@ -11784,8 +11788,8 @@ function updateDefensePlay(now) {
   }
   defenseState.lastMovementElapsedSeconds = elapsedSeconds;
 
-  resolveLiveInfielderContactCatch(elapsedSeconds);
-  resolveLivePostLandingPickup(elapsedSeconds);
+  resolveUnifiedFielderCircleCatch(elapsedSeconds);
+  resolveUnifiedCircleMissAfterArrival(elapsedSeconds);
 
   if (shouldResolveDefensePlayNow(elapsedSeconds)) {
     finishDefensePlay();
@@ -11828,6 +11832,121 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
   return true;
 }
 
+function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
+  if (!defenseState.active || defenseState.resolved || defenseState.unifiedCircleCatchComplete) return false;
+  const battedBall = defenseState.battedBall;
+  if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
+  if (defenseState.throw?.active) return false;
+
+  const progress = clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1);
+  const height = getDefenseBallHeightAtPoint(progress, elapsedSeconds);
+  if (height > 124) return false;
+
+  const visualBallY = ball.y - getDefenseBallVisualHeightOffset(height, battedBall);
+  const ballRadius = ball?.radius ?? 8;
+  const candidates = (defenseState.fielders || [])
+    .map((fielder) => {
+      const current = getDefenseFielderDrawPosition(fielder);
+      const circleRadius = getVisibleFielderCatchRangeRadius(fielder, battedBall);
+      const distance = Math.hypot(current.x - ball.x, current.y - visualBallY);
+      return { fielder, current, distance, circleRadius };
+    })
+    .filter((candidate) => candidate.distance <= candidate.circleRadius + ballRadius)
+    .sort((a, b) => a.distance - b.distance);
+
+  const best = candidates[0];
+  if (!best) return false;
+  completeUnifiedCircleCatch(best.fielder, best.current, elapsedSeconds);
+  return true;
+}
+
+function completeUnifiedCircleCatch(fielder, fieldingPoint, elapsedSeconds) {
+  const battedBall = defenseState.battedBall;
+  const caughtInAir = !battedBall?.isGrounder
+    && elapsedSeconds <= (battedBall?.ballTime ?? elapsedSeconds) + 0.04;
+
+  defenseState.unifiedCircleCatchComplete = true;
+  defenseState.throw = null;
+
+  if (battedBall?.isFoulBall && !caughtInAir) {
+    defenseState.target = fieldingPoint;
+    defenseState.chosenFielder = { ...fielder, x: fieldingPoint.x, y: fieldingPoint.y, currentX: fieldingPoint.x, currentY: fieldingPoint.y };
+    defenseState.outcome = {
+      kind: "foul",
+      label: "ファウル",
+      caught: false,
+      needsThrow: false,
+      fieldingTime: elapsedSeconds,
+      fieldingPoint
+    };
+    defenseState.duration = Math.max(defenseState.duration, elapsedSeconds * 1000 + 700);
+    message = `${fielder.role} ファウルボール処理`;
+    return;
+  }
+
+  if (defenseState.manualFielding) {
+    completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPoint);
+    return;
+  }
+  completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAir);
+}
+
+function resolveUnifiedCircleMissAfterArrival(elapsedSeconds) {
+  if (!defenseState.active || defenseState.resolved || defenseState.unifiedCircleCatchComplete) return false;
+  const outcome = defenseState.outcome;
+  const battedBall = defenseState.battedBall;
+  if (!outcome?.caught || !battedBall || battedBall.fenceOver || battedBall.wallHit) return false;
+  const expectedArrival = Math.max(battedBall.ballTime ?? 0, outcome.fieldingTime ?? 0);
+  if (elapsedSeconds <= expectedArrival + 0.12) return false;
+
+  defenseState.throw = null;
+  if (battedBall.isFoulBall) {
+    defenseState.outcome = {
+      kind: "foul",
+      label: "ファウル",
+      caught: false,
+      needsThrow: false,
+      fieldingTime: elapsedSeconds
+    };
+    defenseState.target = getFoulBallFieldingTarget(battedBall);
+    return true;
+  }
+
+  const scoreType = battedBall.isDeep || battedBall.distance > defenseField.doubleDistance ? "double" : "single";
+  const missedOutcome = {
+    kind: scoreType,
+    label: getHitLabelByScoreType(scoreType),
+    scoreType,
+    caught: false,
+    needsThrow: false,
+    fieldingTime: elapsedSeconds
+  };
+  defenseState.outcome = missedOutcome;
+  defenseState.target = getManualDefenseUnfieldedTarget(battedBall, missedOutcome);
+  if (defenseState.runner) {
+    setBatterRunnerDestination(defenseState.runner, getBatterRunnerTargetBase(
+      missedOutcome,
+      battedBall,
+      defenseState.target,
+      defenseState.chosenFielder,
+      defenseState.runner
+    ));
+  }
+  defenseState.baseRunners = createDefenseBaseRunnerAnimations(
+    missedOutcome,
+    battedBall,
+    null,
+    defenseState.chosenFielder,
+    defenseState.target
+  );
+  defenseState.forceTargets = createForceTargetsForPlay(battedBall, missedOutcome);
+  defenseState.duration = Math.max(
+    defenseState.duration,
+    getDefenseDuration(battedBall, missedOutcome, defenseState.runner, null, defenseState.target)
+  );
+  return true;
+}
+
 function getLiveCircleCatchMaxHeight(battedBall) {
   if (!battedBall) return 0;
   if (battedBall.isGrounder) return 72;
@@ -11843,14 +11962,10 @@ function getLiveCircleCatchRadius(fielder, battedBall) {
   return base + ballRadius + 8;
 }
 
-function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds) {
+function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null) {
   const battedBall = defenseState.battedBall;
-  const relation = getBattedBallFielderRelation(fielder, { ...battedBall, target: fieldingPoint });
-  const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-  const caughtInAir = !battedBall.isGrounder && elapsedSeconds <= (battedBall.ballTime ?? elapsedSeconds) + 0.08;
-  const outcome = fieldingError.error
-    ? makeFieldingErrorOutcome(fielder, battedBall, elapsedSeconds, fieldingPoint)
-    : {
+  const caughtInAir = caughtInAirOverride ?? (!battedBall.isGrounder && elapsedSeconds <= (battedBall.ballTime ?? elapsedSeconds) + 0.08);
+  const outcome = {
       kind: caughtInAir ? "out" : "force",
       label: `${fielder.role} 捕球処理`,
       caught: true,
@@ -12093,28 +12208,9 @@ function resolveManualDefenseFielding(elapsedSeconds) {
   if (!closest) return;
   defenseState.chosenFielder = closest.fielder;
   defenseState.manualCatchRadius = getManualDefenseCatchRadius(closest.fielder, battedBall);
-  const flyCatch = getManualFlyLandingCatch(elapsedSeconds);
-  if (flyCatch.caught) {
-    defenseState.chosenFielder = flyCatch.fielder;
-    defenseState.manualCatchRadius = getManualDefenseCatchRadius(flyCatch.fielder, battedBall);
-    completeManualDefenseFielding(flyCatch.fielder, Math.max(elapsedSeconds, battedBall.ballTime ?? elapsedSeconds), defenseState.landingTarget || battedBall.target);
-    return;
-  }
   const ballHasLanded = elapsedSeconds > (battedBall.ballTime ?? 0) + 0.18;
-  if (battedBall.trajectory === "fly" && !battedBall.isLiner && !ballHasLanded) {
-    const missDeadline = Math.max(5.2, (battedBall.ballTime ?? 1) + getManualDefenseMissGrace(battedBall));
-    if (elapsedSeconds >= missDeadline && isBatterRunnerSettledForResolution()) {
-      completeManualDefenseMiss(elapsedSeconds);
-    }
-    return;
-  }
-  const pickupRadius = getManualDefensePickupRadius(closest.fielder, battedBall, elapsedSeconds);
-  if (closest.distance <= pickupRadius) {
-    completeManualDefenseFielding(closest.fielder, elapsedSeconds, ballHasLanded ? { x: ball.x, y: ball.y } : null);
-    return;
-  }
   const missDeadline = Math.max(5.2, (battedBall.ballTime ?? 1) + getManualDefenseMissGrace(battedBall));
-  if (elapsedSeconds >= missDeadline && isBatterRunnerSettledForResolution()) {
+  if (ballHasLanded && elapsedSeconds >= missDeadline && isBatterRunnerSettledForResolution()) {
     completeManualDefenseMiss(elapsedSeconds);
   }
 }
@@ -12168,8 +12264,22 @@ function getFielderCatchRangeRadius(fielder, battedBall) {
 }
 
 function getStableFielderCatchRangeRadius(fielder) {
+  if (Number.isFinite(fielder?.catchRangeRadius)) return fielder.catchRangeRadius;
+  return calculateFielderCatchRangeRadius(fielder);
+}
+
+function calculateFielderCatchRangeRadius(fielder) {
   const fielding = getFielderRangeFieldingRating(fielder);
   return (42 + fielding * 5.2) * 1.2;
+}
+
+function initializeFielderCatchRanges(fielders) {
+  return (fielders || []).map((fielder) => ({
+    ...fielder,
+    currentX: fielder.x,
+    currentY: fielder.y,
+    catchRangeRadius: calculateFielderCatchRangeRadius(fielder)
+  }));
 }
 
 function getFielderRangeFieldingRating(fielder) {
@@ -12365,6 +12475,7 @@ function shouldInfielderAttemptRollingRoute(fielder, battedBall, fieldingTarget)
 function showImmediateCatchOutCall(elapsedSeconds) {
   const outcome = defenseState.outcome;
   if (!outcome || defenseState.outCallShown) return;
+  if (!defenseState.unifiedCircleCatchComplete) return;
   if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return;
   const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
   if (elapsedSeconds < fieldingTime) return;
@@ -12414,6 +12525,7 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   }
 
   if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) {
+    if (!defenseState.unifiedCircleCatchComplete) return false;
     const tagUpThrowHold = defenseState.throw?.visualOnly && Number.isFinite(defenseState.throw.holdDeadline)
       ? defenseState.throw.holdDeadline
       : outcome.fieldingTime + defenseThrowResultHoldSeconds;
@@ -12785,8 +12897,7 @@ function finishDefensePlay() {
   gamePhase = "playing";
   ball.active = false;
   if (defenseState.foulPlay) {
-    const forcedFoulFlyOut = isObviousFoulFlyOut(defenseState.battedBall);
-    if (outcome?.caught || forcedFoulFlyOut) {
+    if (outcome?.caught) {
       count.outs += 1;
       recordLastOutBatter(battingTeam, activeBatter);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
