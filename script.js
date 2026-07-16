@@ -3408,6 +3408,7 @@ function startPitch(typeKey, options = {}) {
 }
 
 function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
+  const effectiveControl = clamp(control ?? 5, 1, 10);
   const wildness = clamp((10 - (control ?? 5)) / 9, 0, 1);
   const edgeCommandPitch = options.courseDirection !== 0 && isEdgeCommandPitch(options.pitchType);
   const edgeFastballPressure = edgeCommandPitch
@@ -3420,17 +3421,50 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const verticalTightening = 1 - countPressure * 0.64;
   const missTightening = 1 - countPressure * 0.74;
   const wildMissTightening = 1 - countPressure * 0.82;
-  const totalMajorMissChance = clamp((severeWildness * 0.55 + edgeFastballPressure * 0.2 + staminaFatigue * 0.065) * missTightening, 0, 0.78);
+  const edgeMajorMissChance = getEdgeCommandMajorMissChance(effectiveControl, staminaFatigue) * missTightening;
+  const regularMajorMissChance = (severeWildness * 0.55 + staminaFatigue * 0.065) * missTightening;
+  const totalMajorMissChance = clamp(edgeCommandPitch ? edgeMajorMissChance : regularMajorMissChance, 0, 0.78);
+  const edgeSpread = getEdgeCommandHorizontalSpread(effectiveControl) * (1 + staminaFatigue * 0.28) * commandTightening;
   return {
     wildness,
     edgeDirection: options.courseDirection || 0,
     edgeFastballPressure,
     countPressure,
-    spread: clamp((0.38 + wildness * 3.35 + edgeFastballPressure * 0.74) * fatigueSpread * commandTightening, 0.34, 5.85),
+    spread: edgeCommandPitch
+      ? clamp(edgeSpread, 2.2, 46)
+      : clamp((0.38 + wildness * 3.35) * fatigueSpread * commandTightening, 0.34, 5.85),
     verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.36) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.95),
     wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
   };
+}
+
+function getEdgeCommandMajorMissChance(control, staminaFatigue = 0) {
+  const command = clamp(control ?? 5, 1, 10);
+  const base = command <= 5
+    ? 0.3 - (command - 1) * 0.05
+    : 0.1 - (command - 5) * 0.016;
+  return clamp(base + staminaFatigue * 0.04, 0.02, 0.34);
+}
+
+function getEdgeCommandHorizontalSpread(control) {
+  const command = clamp(control ?? 5, 1, 10);
+  const points = [
+    { control: 1, spread: 40 },
+    { control: 3, spread: 28 },
+    { control: 5, spread: 18 },
+    { control: 8, spread: 7 },
+    { control: 10, spread: 2.5 }
+  ];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const from = points[i];
+    const to = points[i + 1];
+    if (command <= to.control) {
+      const t = (command - from.control) / (to.control - from.control);
+      return from.spread + (to.spread - from.spread) * t;
+    }
+  }
+  return points[points.length - 1].spread;
 }
 
 function getStaminaAdjustedControl(player) {
@@ -3495,9 +3529,7 @@ function getPitchCourseTargetX(course, pitchRadius = 8, typeKey = "normal") {
 function getPitchCourseBaseSpread(course, typeKey, pitch) {
   if (!course?.direction) return pitch.targetSpread;
   if (!isEdgeCommandPitch(typeKey)) return 8;
-  if (typeKey === "normal") return 1.8;
-  if (typeKey === "fast") return 2.1;
-  return 1.6;
+  return 1;
 }
 
 function getHomePlateEdgeXAtY(y, direction = 1) {
