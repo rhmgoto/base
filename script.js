@@ -5113,19 +5113,18 @@ function buildBattingFeedbackLines(contact, result = {}) {
       quality,
       profileScore: getBattedBallProfileScore(result.battedProfile)
     });
-  const resultLabel = result.label || "接触";
   if (isBunt) {
     return [
       `バント評価: ゾーン ${Math.round(zoneScore * 100)}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
       zoneText,
-      `総合: ${Math.round(balancedScore * 100)}% / 結果: ${resultLabel}`
+      `総合: ${Math.round(balancedScore * 100)}%`
     ];
   }
   return [
     `タイミング: ${timingLabel}`,
     `スイートスポット: ${Math.round(practicalSweetSpotScore * 100)}% / 接触の深さ: ${Math.round(barrelScore * 100)}%`,
     zoneText,
-    `総合: ${Math.round(balancedScore * 100)}% / 結果: ${resultLabel}`
+    `総合: ${Math.round(balancedScore * 100)}%`
   ];
 }
 
@@ -5353,21 +5352,21 @@ function buildContactProfile(bestHit) {
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
   const zoneReach = (68 + batterMeet * 12) * battingGoodContactZoneScale;
   const zoneScore = inGoodContactZone ? getGoodContactZoneCenterScore(bestHit.x, bestHit.y) : clamp(1 - plateDistance / zoneReach, 0, 1);
-  const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 3.1) * 0.3 : 0;
-  const zoneEdgePenalty = inGoodContactZone ? Math.pow(1 - zoneScore, 0.92) * 0.5 : 0;
-  const chasePenalty = inGoodContactZone ? clamp((1 - zoneScore) * 0.62, 0, 0.62) : clamp(plateDistance / (58 + batterMeet * 6), 0, outsideStrikeZone ? 1.08 : 0.74);
+  const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 4.2) * 0.42 : 0;
+  const zoneEdgePenalty = inGoodContactZone ? Math.pow(1 - zoneScore, 0.72) * 0.82 + clamp((0.48 - zoneScore) / 0.48, 0, 1) * 0.18 : 0;
+  const chasePenalty = inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 0.9, 0, 0.9) : clamp(plateDistance / (46 + batterMeet * 4.8), 0, outsideStrikeZone ? 1.32 : 0.88);
   const stuffPenalty = getPitcherStuffPressure(activePitcher);
   const outsideReachUse = outsideStrikeZone && outsideContactPoint
     ? clamp((distanceToBat - preExtensionContactRange * 0.86) / Math.max(1, baseContactRange - preExtensionContactRange * 0.86), 0, 1)
     : 0;
-  const edgePenalty = (inGoodContactZone ? zoneEdgePenalty : outsideStrikeZone ? 0.62 : 0.3) + outsideReachUse * 0.38;
+  const edgePenalty = (inGoodContactZone ? zoneEdgePenalty : outsideStrikeZone ? 0.86 : 0.42) + outsideReachUse * 0.46;
   const yellowZoneBoost = getYellowZoneContactBoost(inGoodContactZone, outsideStrikeZone, zoneScore);
   const lowMeetPressure = clamp((10 - batterMeet) / 7, 0, 1);
   const sweetSpotMiss = 1 - sweetSpotScore;
   const sweetSpotPenalty = (sweetSpotMiss * (inGoodContactZone ? 0.1 : 0.24)
     + Math.pow(sweetSpotMiss, 1.18) * lowMeetPressure * (inGoodContactZone ? 0.18 : 0.34)) * 1.2;
   const lowMeetQualityDrag = sweetSpotMiss * lowMeetPressure * 0.132;
-  const rawQuality = timingScore * 0.34 + barrelScore * 0.2 + sweetSpotScore * 0.16 + zoneScore * 0.28 + 0.1 + (inGoodContactZone ? 0.08 + Math.pow(zoneScore, 2.4) * 0.22 + zoneCenterBonus : 0) + yellowZoneBoost - chasePenalty - stuffPenalty - edgePenalty - sweetSpotPenalty - lowMeetQualityDrag;
+  const rawQuality = timingScore * 0.34 + barrelScore * 0.2 + sweetSpotScore * 0.16 + zoneScore * 0.22 + 0.1 + (inGoodContactZone ? 0.02 + Math.pow(zoneScore, 3.35) * 0.16 + zoneCenterBonus : 0) + yellowZoneBoost - chasePenalty - stuffPenalty - edgePenalty - sweetSpotPenalty - lowMeetQualityDrag;
   const hittableShape = clamp(timingScore * 0.26 + barrelScore * 0.22 + sweetSpotScore * 0.2 + zoneScore * 0.32, 0, 1);
   const goodContactEase = Math.max(0, rawQuality) * (goodContactEaseScale - 1) * (0.55 + hittableShape * 0.45);
   const quality = clamp(rawQuality + goodContactEase, 0, 1);
@@ -5436,7 +5435,7 @@ function getInsideContactDepth(x) {
 function getYellowZoneContactBoost(inGoodContactZone, outsideStrikeZone, zoneScore) {
   if (inGoodContactZone) {
     const centeredScore = clamp(zoneScore ?? 0, 0, 1);
-    return yellowZoneHitTuning.maxContactBoost * Math.pow(centeredScore, 1.55);
+    return yellowZoneHitTuning.maxContactBoost * Math.pow(centeredScore, 2.45);
   }
   return 0;
 }
@@ -6450,7 +6449,7 @@ function buildBattedBallProfile(contact) {
   const powerDriveScore = getPowerDriveScore(power);
   const stuffPressure = getPitcherStuffPressure(activePitcher);
   const lowStuffProfileBoost = getLowPitcherStuffProfileBoost(activePitcher);
-  const chasePenalty = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.92) * 0.18 : (1 - zoneScore) * 0.86 + (outsideStrikeZone ? 0.72 : 0.34);
+  const chasePenalty = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.74) * 0.48 : (1 - zoneScore) * 1.08 + (outsideStrikeZone ? 0.92 : 0.48);
   const timingPenaltyScale = inGoodContactZone ? 0.45 : yellowZoneBoost > 0 ? 0.68 : 1;
   const timingPenalty = (abs > 260 ? 0.18 : abs > 150 ? 0.08 : 0) * timingPenaltyScale;
   const powerBoost = (power - 5) * 0.035;
@@ -6458,11 +6457,11 @@ function buildBattedBallProfile(contact) {
   const handednessContactMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
   const handednessContactBoost = handednessContactMultiplier - 1;
   const practicePitcherContactBoost = gameMode === "practice" && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
-  const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 3.2) * 0.46 : 0;
-  const zoneEdgeDrag = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.9) * 0.58 : 0;
+  const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 4.1) * 0.62 : 0;
+  const zoneEdgeDrag = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22 : 0;
   const centerSweetSpotDriveBoost = inGoodContactZone ? zoneCenterBoost * clamp((sweetSpotScore - 0.42) / 0.48, 0, 1) : 0;
-  const pitchQualityBoost = inGoodContactZone ? 0.08 + Math.pow(zoneScore, 2.35) * 0.2 + zoneCenterBoost : outsideStrikeZone ? -0.56 - (1 - zoneScore) * 0.4 : -0.26 + yellowZoneBoost * 0.18;
-  const outsideZoneDrag = outsideStrikeZone && !inGoodContactZone ? clamp(0.34 + (1 - zoneScore) * 0.48, 0.34, 0.82) : 0;
+  const pitchQualityBoost = inGoodContactZone ? -0.02 + Math.pow(zoneScore, 3.25) * 0.16 + zoneCenterBoost : outsideStrikeZone ? -0.82 - (1 - zoneScore) * 0.62 : -0.42 + yellowZoneBoost * 0.08;
+  const outsideZoneDrag = outsideStrikeZone && !inGoodContactZone ? clamp(0.55 + (1 - zoneScore) * 0.65, 0.55, 1.15) : 0;
   const sweetSpotCenterBoost = clamp((sweetSpotScore - 0.82) / 0.18, 0, 1) * 0.1;
   const lowPowerMastery = getLowPowerGoodContactMastery({ power, quality, timingScore, sweetSpotScore, barrelScore, zoneScore, inGoodContactZone });
   const profileEase = quality * (goodContactEaseScale - 1) * clamp((timingScore + barrelScore + sweetSpotScore) / 2.2, 0, 1);
@@ -6477,11 +6476,11 @@ function buildBattedBallProfile(contact) {
   const yellowDriveScore = yellowZoneBoost > 0
     ? yellowZoneBoost * clamp((quality - 0.42) / 0.36, 0, 1) * clamp((sweetSpotScore - 0.52) / 0.34, 0, 1)
     : 0;
-  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.25 + stuffPressure + outsideZoneDrag + zoneEdgeDrag;
+  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.36 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.18;
   const centerDriveScore = inGoodContactZone
     ? clamp((zoneScore - 0.68) / 0.32, 0, 1) * clamp((quality - 0.1) / 0.38, 0, 1) * clamp((sweetSpotScore - 0.1) / 0.54, 0, 1)
     : 0;
-  const exitVelocity = clamp(0.4 + readableQuality * 0.88 + powerBoost * 1.7 + practicePitcherContactBoost * 0.72 + lowStuffProfileBoost * 0.2 + handednessContactBoost * 0.22 + sweetSpotCenterBoost * 0.08 + yellowDriveScore * 0.18 + centerDriveScore * 0.4 + zoneCenterBoost * 0.48 + centerSweetSpotDriveBoost * 0.22 + lowPowerMastery * 0.24 - qualityDrag * 1.08, 0.12, 1.75);
+  const exitVelocity = clamp(0.4 + readableQuality * 0.88 + powerBoost * 1.7 + practicePitcherContactBoost * 0.72 + lowStuffProfileBoost * 0.2 + handednessContactBoost * 0.22 + sweetSpotCenterBoost * 0.08 + yellowDriveScore * 0.12 + centerDriveScore * 0.4 + zoneCenterBoost * 0.48 + centerSweetSpotDriveBoost * 0.22 + lowPowerMastery * 0.24 - qualityDrag * 1.22, 0.12, 1.75);
   const hardLiftScore = clamp((exitVelocity - 0.78) / 0.58, 0, 1)
     * clamp((quality + barrelScore + timingScore) / 2.15, 0, 1)
     * clamp(zoneScore + (inGoodContactZone ? 0.18 : 0), 0, 1)
@@ -6494,7 +6493,7 @@ function buildBattedBallProfile(contact) {
     : 0;
   const yellowDriveLiftAssist = yellowDriveScore * yellowZoneHitTuning.driveLiftAssist;
   const hardContactLiftAssist = hardLiftScore * (inGoodContactZone ? 22 : 14);
-  const liftBoost = hittableLiftBoost + readableQuality * 9.4 + sweetSpotScore * 6.6 + sweetSpotCenterBoost * 10 + centerDriveLiftAssist + yellowDriveLiftAssist + hardContactLiftAssist + lowStuffProfileBoost * 12 - yellowLiftDamping - outsideZoneDrag * 34 - zoneEdgeDrag * 24;
+  const liftBoost = hittableLiftBoost + readableQuality * 9.4 + sweetSpotScore * 6.6 + sweetSpotCenterBoost * 10 + centerDriveLiftAssist + yellowDriveLiftAssist + hardContactLiftAssist + lowStuffProfileBoost * 12 - yellowLiftDamping - outsideZoneDrag * 46 - zoneEdgeDrag * 38;
   const mishitLift = Math.max(0, sweetSpotMiss - 0.6) * 20 + lowMeetPressure * sweetSpotMiss * 5;
   const launchAngle = clamp(
     2
@@ -6513,7 +6512,7 @@ function buildBattedBallProfile(contact) {
     68
   );
   const spin = clamp((1 - sweetSpotScore) * 0.58 + Math.abs(timingPull) * 0.3 + (outsideStrikeZone && !inGoodContactZone ? 0.18 : 0), 0, 1.35);
-  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.04 + Math.pow(zoneScore, 2.3) * 0.1 + centerDriveScore * (0.24 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.76) + zoneCenterBoost * 0.5 + centerSweetSpotDriveBoost * 0.2 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.18 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.86 - outsideZoneDrag * 0.78 - zoneEdgeDrag * 0.48 - weakGrounderBias * 0.045, 0.08, 1.85);
+  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.02 + Math.pow(zoneScore, 3.25) * 0.08 + centerDriveScore * (0.24 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.76) + zoneCenterBoost * 0.5 + centerSweetSpotDriveBoost * 0.2 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.1 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.62 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 0.78 - weakGrounderBias * 0.045, 0.08, 1.85);
   const direction = getPhysicsHitDirection(timingPull, spin, launchAngle);
   const gapScore = clamp(exitVelocity * 0.46 + sweetSpotScore * 0.3 + zoneScore * 0.22 - spin * 0.18 + Math.abs(direction.x) * 0.14, 0, 1);
   const lineContact = clamp((Math.abs(timingPull) - 0.28) / 0.58, 0, 1);
@@ -8405,26 +8404,7 @@ function getFoulBallFieldingTarget(battedBall) {
 }
 
 function appendBattedBallFeedback(battedBall) {
-  if (!battingFeedback.active || !battedBall) return;
-  const launchAngle = getDisplayLaunchAngleDegrees(battedBall);
-  const exitSpeed = battedBall.exitSpeedKmh ?? getDisplayExitSpeedKmh({
-    power: battedBall.power,
-    profile: battedBall.battedProfile,
-    trajectory: battedBall.trajectory,
-    isGrounder: battedBall.isGrounder,
-    isLiner: battedBall.isLiner,
-    isDeepDrive: battedBall.isDeepDrive,
-    isFenceLiner: battedBall.isFenceLiner,
-    isLineEdgeGrounder: battedBall.isLineEdgeGrounder,
-    fenceOver: battedBall.fenceOver,
-    flightDistanceMeters: battedBall.flightDistanceMeters,
-    ballTime: battedBall.ballTime,
-    launchAngle
-  });
-  battingFeedback.lines = [
-    ...(battingFeedback.lines || []),
-    `打球速度: ${exitSpeed}km/h / 打球角度: ${launchAngle}° / 飛距離: ${Math.round(battedBall.flightDistanceMeters ?? getBattedBallDistanceMeters(battedBall.flightDistance ?? 0))}m`
-  ];
+  return;
 }
 
 function getDisplayLaunchAngleDegrees(battedBall) {
