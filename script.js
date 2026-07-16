@@ -3358,9 +3358,10 @@ function startPitch(typeKey, options = {}) {
   const controlMiss = staminaMistake
     ? getStaminaMistakeTarget(intendedX, intendedY)
     : getPitchControlMiss(controlProfile, intendedX, intendedY);
-  const fatigueDrift = getStaminaFatigueDrift(activePitcher);
-  const targetX = controlMiss.x + randomBetween(-targetSpread, targetSpread) + fatigueDrift;
-  const targetY = controlMiss.y + randomBetween(-30, 34) * controlProfile.verticalSpread;
+  const lockTarget = options.lockTarget === true;
+  const fatigueDrift = lockTarget ? 0 : getStaminaFatigueDrift(activePitcher);
+  const targetX = controlMiss.x + (lockTarget ? 0 : randomBetween(-targetSpread, targetSpread)) + fatigueDrift;
+  const targetY = controlMiss.y + (lockTarget ? 0 : randomBetween(-30, 34) * controlProfile.verticalSpread);
   const speedKmh = Math.max(40, Math.round((activePitcher.fastKmh - getStaminaSpeedDrop(activePitcher)) * pitch.baseKmhFactor * randomBetween(0.9, 1.1)));
   const referenceKmh = 150 * pitch.baseKmhFactor;
   const baseGameSpeed = 8.05 * pitch.speedFactor;
@@ -4014,9 +4015,10 @@ function choosePracticePitchPlan() {
     return syncComputerPitchPlanLegacyFields({
       type: pitchType,
       course: { direction: side, offset: side * 42, intent: "plainEdge" },
-      targetX: field.plateX + side * randomBetween(32, 48),
+      targetX: getPitchCourseTargetX({ direction: side }, getPitchRadius(pitchType), pitchType),
       targetY: field.plateY + randomBetween(-8, 10),
-      targetSpread: 6,
+      targetSpread: 0,
+      lockTarget: true,
       bendSegments: [],
       speedChangeSegments: []
     });
@@ -4112,7 +4114,8 @@ function chooseComputerPitchPlan() {
     const side = course.direction || awayFromBatter;
     plan.targetX = edgeTargetX(side);
     plan.targetY = field.plateY + randomBetween(-8, 10);
-    plan.targetSpread = 1;
+    plan.targetSpread = 0;
+    plan.lockTarget = true;
   } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
     plan.targetX = field.plateX + randomBetween(-18, 18);
     plan.targetY = field.plateY + randomBetween(-10, 10);
@@ -4129,6 +4132,8 @@ function constrainComputerPitchPlanToPlayerReach(plan) {
   plan.targetX = clamp(plan.targetX, leftEdge, rightEdge);
   if (plan.course?.intent === "plainEdge" && plan.course?.direction) {
     plan.targetX = plan.course.direction < 0 ? leftEdge : rightEdge;
+    plan.targetSpread = 0;
+    plan.lockTarget = true;
   }
   if (plan.course?.direction) plan.targetSpread = Math.min(plan.targetSpread ?? 1, getComputerStrikeCommandLevel() >= 0.68 ? 0.5 : 1);
 }
@@ -5243,6 +5248,7 @@ function getDisplayedBattingFeedbackScore(scores) {
 function promoteLiftedContactResult(result) {
   const profile = result?.battedProfile;
   if (!profile || result.kind !== "hit") return result;
+  if (["forcedWeak", "severe"].includes(getGoodContactZoneMissStage(profile.plateDistance ?? 0))) return result;
   if (result.deepDrive || result.fenceEdgeFly || result.fenceLiner || result.chaseFly || result.lineLiner) return result;
   const powerDriveScore = getPowerDriveScore();
   if (profile.isFoul || profile.launchAngle < 16 || profile.exitVelocity < 0.78 || profile.carry < 0.62) return result;
@@ -5419,6 +5425,7 @@ function buildContactProfile(bestHit) {
   const sweetSpotScore = getContactSweetSpotScore(bestHit);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
   const zoneMissUnits = getGoodContactZoneMissUnits(plateDistance, ball.radius);
+  const zoneMissStage = getGoodContactZoneMissStage(plateDistance);
   const zoneMissPenalty = getGoodContactZoneMissPenalty(zoneMissUnits);
   const contactRange = baseContactRange
     * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone)
@@ -5455,6 +5462,7 @@ function buildContactProfile(bestHit) {
     zoneScore,
     plateDistance,
     zoneMissUnits,
+    zoneMissStage,
     outsideStrikeZone,
     outsideReachUse,
     inGoodContactZone,
@@ -5530,6 +5538,26 @@ function getGoodContactZoneMissPenalty(missUnits = 0) {
   const units = clamp(missUnits, 0, 3);
   if (units <= 0) return 0;
   return clamp(units * 0.46 + Math.max(0, units - 1) * 0.34, 0, 1.45);
+}
+
+function getGoodContactZoneMissStage(distance = 0) {
+  const px = Math.max(0, distance);
+  if (px >= 40) return "severe";
+  if (px >= 30) return "forcedWeak";
+  if (px >= 16) return "clear";
+  if (px > 0) return "slight";
+  return "inside";
+}
+
+function isStrongHitResult(result) {
+  return Boolean(result?.scoreType === "homer"
+    || result?.deepDrive
+    || result?.fenceLiner
+    || result?.fenceEdgeFly
+    || result?.chaseFly
+    || result?.lineLiner
+    || result?.hardOutfieldHit
+    || result?.hardOutfieldBounce);
 }
 
 function judgePitchAtPlate() {
@@ -5936,29 +5964,40 @@ function makeModerateContactVarietyResult(profile, score, roll = Math.random()) 
   return makeHardOutfieldBounceHitResultFromProfile(cleanProfile);
 }
 
-function makeZoneMissWeakContactResult(profile, missUnits = 0, roll = Math.random()) {
+function makeZoneMissWeakContactResult(profile, missUnits = 0, roll = Math.random(), stage = "clear") {
+  const severe = stage === "severe";
+  if (severe && roll < 0.42) {
+    return { label: hitLabels.foul, kind: "foul", power: clamp(profile?.power ?? 0.24, 0.12, 0.42), direction: profile?.direction, battedProfile: profile };
+  }
   if (roll < 0.26 + clamp(missUnits, 0, 3) * 0.12) {
     return { label: hitLabels.foul, kind: "foul", power: clamp(profile?.power ?? 0.34, 0.18, 0.56), direction: profile?.direction, battedProfile: profile };
   }
+  if (severe) return makePopupFlyResultFromProfile({ ...profile, power: Math.min(profile?.power ?? 0.34, 0.42), launchAngle: Math.max(profile?.launchAngle ?? 24, 24) });
   if ((profile?.launchAngle ?? 0) >= 22 || roll > 0.72) return makePopupFlyResultFromProfile(profile);
   return makeGrounderOutResultFromProfile(profile, clamp((profile?.power ?? 0.48) * 0.72, 0.22, 0.62));
 }
 
 function applyGoodContactZoneMissResultPenalty(result, profile, contact = null, roll = Math.random()) {
   const missUnits = contact?.zoneMissUnits ?? profile?.zoneMissUnits ?? 0;
+  const missDistance = contact?.plateDistance ?? profile?.plateDistance ?? 0;
+  const missStage = contact?.zoneMissStage ?? getGoodContactZoneMissStage(missDistance);
   if (!result || missUnits <= 0 || result.kind === "foul" || result.kind === "out") return result;
   const score = clamp(contact ? getContactFeedbackScore(contact) : profile?.feedbackScore ?? profile?.quality ?? 0.5, 0, 1);
+  if (missStage === "severe") return makeZoneMissWeakContactResult(profile, missUnits, roll, missStage);
+  if (missStage === "forcedWeak" && (isStrongHitResult(result) || result.kind === "hit")) {
+    return makeZoneMissWeakContactResult(profile, missUnits, roll, missStage);
+  }
   const suppressionChance = missUnits >= 2
     ? clamp(0.9 - score * 0.12, 0.76, 0.94)
     : missUnits >= 1
       ? clamp(0.7 - score * 0.16, 0.5, 0.78)
       : clamp(0.28 + missUnits * 0.28 - score * 0.1, 0.18, 0.48);
   if (roll >= suppressionChance) return result;
-  return makeZoneMissWeakContactResult(profile, missUnits, roll);
+  return makeZoneMissWeakContactResult(profile, missUnits, roll, missStage);
 }
 
 function applyFeedbackQualityHitUpgrade(result, profile, contact) {
-  if ((contact?.zoneMissUnits ?? 0) >= 1) return result;
+  if ((contact?.plateDistance ?? 0) >= 16 || (contact?.zoneMissUnits ?? 0) >= 1) return result;
   const score = Math.max(getContactFeedbackScore(contact), profile?.feedbackScore ?? 0);
   const powerDriveScore = getPowerDriveScore();
   const lowPowerMastery = getLowPowerGoodContactMastery({
@@ -6971,6 +7010,7 @@ function buildBattedBallProfile(contact) {
       outsideZoneDrag,
       pitchQualityBoost,
       yellowZoneBoost,
+      plateDistance,
       zoneMissUnits,
       isFoul: finalBuntIsFoul,
       buntQuality,
@@ -7014,6 +7054,7 @@ function buildBattedBallProfile(contact) {
     outsideZoneDrag,
     pitchQualityBoost,
     yellowZoneBoost,
+    plateDistance,
     zoneMissUnits,
     isFoul
   };
