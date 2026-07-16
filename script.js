@@ -5166,27 +5166,14 @@ function buildBattingFeedbackLines(contact, result = {}) {
     : contact.timeDiff > 35
       ? `${Math.round(timingAbs)}ms 遅い`
       : `${Math.round(timingAbs)}ms ほぼ合い`;
-  const quality = clamp(contact.quality ?? 0, 0, 1);
   const sweetSpotScore = clamp(contact.sweetSpotScore ?? 0, 0, 1);
   const barrelScore = clamp(contact.barrelScore ?? 0, 0, 1);
-  const timingScore = clamp(contact.timingScore ?? 0, 0, 1);
-  const zoneScore = clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1);
-  const practicalSweetSpotScore = clamp(Math.max(sweetSpotScore, Math.min(barrelScore, quality) * 0.72), 0, 1);
-  const zoneText = contact.inGoodContactZone && zoneScore >= 0.9
-    ? "ゾーン: 最高"
-    : contact.outsideStrikeZone
-      ? `ゾーン: 外れ ${Math.round(contact.plateDistance ?? 0)}px`
-      : `ゾーン: 端 ${Math.round((1 - clamp(contact.zoneScore ?? 0, 0, 1)) * 100)}%`;
+  const zoneScore = getFeedbackZoneScore(contact);
+  const practicalSweetSpotScore = getPracticalSweetSpotScore(contact);
+  const zoneText = getFeedbackZoneText(contact);
   const balancedScore = isBunt
     ? getBuntFeedbackScore({ sweetSpotScore, zoneScore })
-    : getBattingFeedbackBalancedScore({
-      timingScore,
-      sweetSpotScore: practicalSweetSpotScore,
-      barrelScore,
-      zoneScore,
-      quality,
-      profileScore: getBattedBallProfileScore(result.battedProfile)
-    });
+    : getBattingFeedbackBalancedScore(getBattingFeedbackScoreInput(contact, result.battedProfile));
   if (isBunt) {
     return [
       `バント評価: ゾーン ${Math.round(zoneScore * 100)}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
@@ -5204,6 +5191,35 @@ function buildBattingFeedbackLines(contact, result = {}) {
 
 function getBattingFeedbackBalancedScore(scores) {
   return getDisplayedBattingFeedbackScore(scores);
+}
+
+function getFeedbackZoneScore(contact = {}) {
+  return clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1);
+}
+
+function getPracticalSweetSpotScore(contact = {}) {
+  const sweetSpotScore = clamp(contact.sweetSpotScore ?? 0, 0, 1);
+  const barrelScore = clamp(contact.barrelScore ?? 0, 0, 1);
+  const quality = clamp(contact.quality ?? 0, 0, 1);
+  return clamp(Math.max(sweetSpotScore, Math.min(barrelScore, quality) * 0.72), 0, 1);
+}
+
+function getFeedbackZoneText(contact = {}) {
+  const zoneScore = getFeedbackZoneScore(contact);
+  if (contact.inGoodContactZone && zoneScore >= 0.9) return "ゾーン: 最高";
+  if (contact.outsideStrikeZone) return `ゾーン: 外れ ${Math.round(contact.plateDistance ?? 0)}px`;
+  return `ゾーン: 端 ${Math.round((1 - zoneScore) * 100)}%`;
+}
+
+function getBattingFeedbackScoreInput(contact = {}, profile = null) {
+  return {
+    timingScore: clamp(contact.timingScore ?? 0, 0, 1),
+    sweetSpotScore: getPracticalSweetSpotScore(contact),
+    barrelScore: clamp(contact.barrelScore ?? 0, 0, 1),
+    zoneScore: getFeedbackZoneScore(contact),
+    quality: clamp(contact.quality ?? 0, 0, 1),
+    profileScore: getBattedBallProfileScore(profile)
+  };
 }
 
 function getBuntFeedbackScore(scores = {}) {
@@ -5957,18 +5973,7 @@ function makeScoreDrivenLongBallProfile(profile, { score = 0.6, zoneCenter = 0, 
 }
 
 function getContactFeedbackScore(contact) {
-  const sweetSpotScore = clamp(contact.sweetSpotScore ?? 0, 0, 1);
-  const barrelScore = clamp(contact.barrelScore ?? 0, 0, 1);
-  const quality = clamp(contact.quality ?? 0, 0, 1);
-  const practicalSweetSpotScore = clamp(Math.max(sweetSpotScore, Math.min(barrelScore, quality) * 0.72), 0, 1);
-  return clamp(getRawBattingFeedbackScore({
-    timingScore: clamp(contact.timingScore ?? 0, 0, 1),
-    sweetSpotScore: practicalSweetSpotScore,
-    barrelScore,
-    zoneScore: clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1),
-    quality,
-    profileScore: getBattedBallProfileScore(contact.battedProfile)
-  }) - battingFeedbackDisplayPenalty, 0, 1);
+  return clamp(getRawBattingFeedbackScore(getBattingFeedbackScoreInput(contact, contact?.battedProfile)) - battingFeedbackDisplayPenalty, 0, 1);
 }
 
 function shouldTurnModerateLiftIntoStrongHit(profile, score = profile?.feedbackScore ?? profile?.quality ?? 0) {
