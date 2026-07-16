@@ -3431,8 +3431,8 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
     edgeFastballPressure,
     countPressure,
     spread: edgeCommandPitch
-      ? clamp(edgeSpread, 2.2, 46)
-      : clamp((0.38 + wildness * 3.35) * fatigueSpread * commandTightening, 0.34, 5.85),
+      ? clamp(edgeSpread, 3.3, 69)
+      : clamp((0.38 + wildness * 3.35) * fatigueSpread * commandTightening * 1.5, 0.51, 8.78),
     verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.36) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.95),
     wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
@@ -3458,11 +3458,11 @@ function getCenterCommandMajorMissChance(control, staminaFatigue = 0) {
 function getEdgeCommandHorizontalSpread(control) {
   const command = clamp(control ?? 5, 1, 10);
   const points = [
-    { control: 1, spread: 80 },
-    { control: 3, spread: 56 },
-    { control: 5, spread: 36 },
-    { control: 8, spread: 14 },
-    { control: 10, spread: 5 }
+    { control: 1, spread: 120 },
+    { control: 3, spread: 84 },
+    { control: 5, spread: 54 },
+    { control: 8, spread: 21 },
+    { control: 10, spread: 7.5 }
   ];
   for (let i = 0; i < points.length - 1; i += 1) {
     const from = points[i];
@@ -4044,40 +4044,46 @@ function chooseComputerPitchPlan() {
   const edgeTargetX = (side) => getPitchCourseTargetX({ direction: side || 0 }, getPitchRadius(type), type);
   if (course.intent === "awayBall") {
     const side = awayFromBatter;
-    const edgeX = edgeTargetX(side);
-    plan.targetX = edgeX + side * randomBetween(4, countPressure >= 0.55 ? 10 : 14);
+    plan.targetX = edgeTargetX(side);
     plan.targetY = field.plateY + randomBetween(-12, 14);
-    plan.targetSpread = countPressure >= 0.55 ? 6 : type === "fast" ? 8 : 9;
+    plan.targetSpread = 1;
   } else if (course.intent === "ballToStrikeBurst" || course.intent === "acceleratingStrike") {
     const side = course.direction || awayFromBatter;
     const edgeX = edgeTargetX(side);
     plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 4));
     plan.targetY = field.plateY + randomBetween(-8, 10);
-    plan.targetSpread = countPressure >= 0.55 ? 6 : 8;
+    plan.targetSpread = 1;
   } else if (course.intent === "strikeToBallBurst" || course.intent === "strikeToBall") {
     const side = course.direction || awayFromBatter;
-    const edgeX = edgeTargetX(side);
-    plan.targetX = edgeX + side * randomBetween(2, countPressure >= 0.55 ? 8 : 12);
+    plan.targetX = edgeTargetX(side);
     plan.targetY = field.plateY + randomBetween(-12, 14);
-    plan.targetSpread = countPressure >= 0.55 ? 6 : 8;
+    plan.targetSpread = 1;
   } else if (course.intent === "hbpBackdoor") {
     const side = dangerousDirection;
     const edgeX = edgeTargetX(side);
     plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 8));
     plan.targetY = field.plateY + randomBetween(-8, 12);
-    plan.targetSpread = 6;
+    plan.targetSpread = 1;
   } else if (course.intent === "plainEdge") {
     const side = course.direction || awayFromBatter;
-    const edgeX = edgeTargetX(side);
-    plan.targetX = edgeX + side * randomBetween(-4, 4);
+    plan.targetX = edgeTargetX(side);
     plan.targetY = field.plateY + randomBetween(-8, 10);
-    plan.targetSpread = countPressure >= 0.55 ? 5 : type === "fast" ? 6 : 7;
+    plan.targetSpread = 1;
   } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
     plan.targetX = field.plateX + randomBetween(-18, 18);
     plan.targetY = field.plateY + randomBetween(-10, 10);
     plan.targetSpread = 7;
   }
+  constrainComputerPitchPlanToPlayerReach(plan);
   return buildComputerPitchShape(plan, planPitcher);
+}
+
+function constrainComputerPitchPlanToPlayerReach(plan) {
+  if (!plan || !Number.isFinite(plan.targetX) || !isEdgeCommandPitch(plan.type)) return;
+  const leftEdge = getPitchCourseTargetX({ direction: -1 }, getPitchRadius(plan.type), plan.type);
+  const rightEdge = getPitchCourseTargetX({ direction: 1 }, getPitchRadius(plan.type), plan.type);
+  plan.targetX = clamp(plan.targetX, leftEdge, rightEdge);
+  if (plan.course?.direction) plan.targetSpread = Math.min(plan.targetSpread ?? 1, 1);
 }
 
 function getComputerPitcherPlateX(course, player = activePitcher) {
@@ -5112,9 +5118,9 @@ function buildBattingFeedbackLines(contact, result = {}) {
   const sweetSpotScore = clamp(contact.sweetSpotScore ?? 0, 0, 1);
   const barrelScore = clamp(contact.barrelScore ?? 0, 0, 1);
   const timingScore = clamp(contact.timingScore ?? 0, 0, 1);
-  const zoneScore = contact.inGoodContactZone ? 1 : clamp(contact.zoneScore ?? 0, 0, 1);
+  const zoneScore = clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1);
   const practicalSweetSpotScore = clamp(Math.max(sweetSpotScore, Math.min(barrelScore, quality) * 0.72), 0, 1);
-  const zoneText = contact.inGoodContactZone
+  const zoneText = contact.inGoodContactZone && zoneScore >= 0.9
     ? "ゾーン: 最高"
     : contact.outsideStrikeZone
       ? `ゾーン: 外れ ${Math.round(contact.plateDistance ?? 0)}px`
@@ -5359,18 +5365,18 @@ function buildContactProfile(bestHit) {
   const baseContactRange = preExtensionContactRange + outsideReachBonus * batThicknessMultiplier * meetZoneWidthScale;
 
   const timeDiff = performance.now() - ball.plateTime;
-  const timingScore = Math.max(0, 1 - Math.abs(timeDiff) / ((360 + batterMeet * 7) * 0.8));
+  const timingScore = Math.max(0, 1 - Math.abs(timeDiff) / ((360 + batterMeet * 7) * 0.7));
   // 判定バットを太くした分、快打評価では中心線からの距離を少し戻す。
   const effectiveBatDistance = distanceToBat / batThicknessMultiplier;
-  const barrelScore = Math.max(0, 1 - effectiveBatDistance / ((78 + batterMeet * 4) * 0.8));
+  const barrelScore = Math.max(0, 1 - effectiveBatDistance / ((78 + batterMeet * 4) * 1.05));
   const sweetSpotScore = getContactSweetSpotScore(bestHit);
   const contactRange = baseContactRange * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
   const zoneReach = (68 + batterMeet * 12) * battingGoodContactZoneScale;
   const zoneScore = inGoodContactZone ? getGoodContactZoneCenterScore(bestHit.x, bestHit.y) : clamp(1 - plateDistance / zoneReach, 0, 1);
-  const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 4.2) * 0.42 : 0;
-  const zoneEdgePenalty = inGoodContactZone ? Math.pow(1 - zoneScore, 0.72) * 0.82 + clamp((0.48 - zoneScore) / 0.48, 0, 1) * 0.18 : 0;
-  const chasePenalty = inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 0.9, 0, 0.9) : clamp(plateDistance / (46 + batterMeet * 4.8), 0, outsideStrikeZone ? 1.32 : 0.88);
+  const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 5.2) * 0.62 : 0;
+  const zoneEdgePenalty = inGoodContactZone ? (Math.pow(1 - zoneScore, 0.72) * 0.82 + clamp((0.48 - zoneScore) / 0.48, 0, 1) * 0.18) * 1.5 : 0;
+  const chasePenalty = inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 1.35, 0, 1.35) : clamp(plateDistance / (46 + batterMeet * 4.8), 0, outsideStrikeZone ? 1.32 : 0.88);
   const stuffPenalty = getPitcherStuffPressure(activePitcher);
   const outsideReachUse = outsideStrikeZone && outsideContactPoint
     ? clamp((distanceToBat - preExtensionContactRange * 0.86) / Math.max(1, baseContactRange - preExtensionContactRange * 0.86), 0, 1)
@@ -5490,6 +5496,10 @@ function decideHitResultFromBattedProfile(contact) {
   if (shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll)) {
     return makeBattingPracticeHomeRunResult(profile, feedbackScore);
   }
+  const scoreDrivenLongBall = tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll);
+  if (scoreDrivenLongBall) {
+    return applyFinalHitResultBalance(scoreDrivenLongBall, scoreDrivenLongBall.battedProfile ?? profile, contact);
+  }
   if (shouldForceLowPowerCleanHit(contact, profile, feedbackScore)) {
     return applyFinalHitResultBalance(makeLowPowerCleanHitResult(profile, feedbackScore), profile, contact);
   }
@@ -5600,6 +5610,111 @@ function makeBattingPracticeHomeRunResult(profile, feedbackScore = profile?.feed
     toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.78)
   };
   return makeDeepDriveResultFromProfile(boostedProfile);
+}
+
+function tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll = Math.random()) {
+  if (!contact || !profile || profile.isFoul || profile.isBunt || contact.outsideStrikeZone) return null;
+  if (!contact.inGoodContactZone) return null;
+  const score = clamp(feedbackScore ?? profile.feedbackScore ?? profile.quality ?? 0, 0, 1);
+  if (score < 0.56) return null;
+  const zoneCenter = clamp(((contact.zoneScore ?? 0) - 0.88) / 0.12, 0, 1);
+  if (zoneCenter <= 0.12) return null;
+  const timing = clamp(contact.timingScore ?? 0, 0, 1);
+  const sweetSpot = clamp(contact.sweetSpotScore ?? 0, 0, 1);
+  const barrel = clamp(contact.barrelScore ?? 0, 0, 1);
+  const quality = clamp(contact.quality ?? 0, 0, 1);
+  const contactFloor = Math.min(timing, Math.max(sweetSpot, barrel), quality);
+  if (contactFloor < 0.3 && score < 0.66) return null;
+
+  const power = getEffectiveBatterPower(activeBatter);
+  const powerDriveScore = getPowerDriveScore(power);
+  const scoreTier = clamp((score - 0.56) / 0.24, 0, 1);
+  const greatScore = clamp((score - 0.66) / 0.22, 0, 1);
+  const superScore = clamp((score - 0.8) / 0.2, 0, 1);
+  const lowPower = clamp((4.4 - power) / 3.4, 0, 1);
+  const ordinaryPower = clamp((power - 4.2) / 3.8, 0, 1);
+  const longBallChance = clamp(
+    0.22
+      + scoreTier * 0.34
+      + greatScore * 0.22
+      + superScore * 0.2
+      + zoneCenter * 0.26
+      + powerDriveScore * 0.34
+      - lowPower * 0.24,
+    0.2,
+    0.94
+  );
+  if (roll > longBallChance) return null;
+
+  const boostedProfile = makeScoreDrivenLongBallProfile(profile, {
+    score,
+    zoneCenter,
+    powerDriveScore,
+    lowPower,
+    ordinaryPower,
+    superScore
+  });
+  const deepDriveChance = clamp(
+    0.04
+      + scoreTier * 0.28
+      + greatScore * 0.24
+      + superScore * 0.28
+      + zoneCenter * 0.22
+      + powerDriveScore * 0.38
+      - lowPower * 0.3,
+    0.08,
+    0.92
+  );
+  const fenceLinerChance = clamp(0.08 + greatScore * 0.12 + powerDriveScore * 0.18 - lowPower * 0.08, 0.06, 0.34);
+  const secondRoll = Math.random();
+  if (secondRoll < deepDriveChance) return makeDeepDriveResultFromProfile(boostedProfile);
+  if (secondRoll < deepDriveChance + fenceLinerChance && boostedProfile.launchAngle <= 30) {
+    return makeFenceLinerResultFromProfile(boostedProfile);
+  }
+  return makeFenceEdgeFlyResultFromProfile(boostedProfile);
+}
+
+function makeScoreDrivenLongBallProfile(profile, { score = 0.6, zoneCenter = 0, powerDriveScore = 0, lowPower = 0, ordinaryPower = 0, superScore = 0 } = {}) {
+  const scoreLift = clamp((score - 0.54) / 0.34, 0, 1);
+  const nonPowerWallBias = lowPower * clamp((score - 0.74) / 0.22, 0, 1);
+  const launchFloor = 17 + zoneCenter * 6 + powerDriveScore * 4 + superScore * 4 - lowPower * 2;
+  const launchCeiling = 36 + powerDriveScore * 5 + superScore * 4;
+  const targetLaunch = clamp(profile.launchAngle ?? 20, launchFloor, launchCeiling);
+  return {
+    ...profile,
+    scoreDrivenLongBall: true,
+    feedbackScore: Math.max(profile.feedbackScore ?? 0, score),
+    power: Math.max(
+      profile.power ?? 0.8,
+      1.18
+        + scoreLift * 0.74
+        + zoneCenter * 0.28
+        + powerDriveScore * 0.86
+        + ordinaryPower * 0.16
+        - nonPowerWallBias * 0.24
+    ),
+    exitVelocity: Math.max(
+      profile.exitVelocity ?? 0.6,
+      0.88
+        + scoreLift * 0.3
+        + zoneCenter * 0.18
+        + powerDriveScore * 0.38
+        - nonPowerWallBias * 0.08
+    ),
+    carry: Math.max(
+      profile.carry ?? 0.58,
+      0.9
+        + scoreLift * 0.38
+        + zoneCenter * 0.28
+        + powerDriveScore * 0.54
+        + superScore * 0.12
+        - nonPowerWallBias * 0.18
+    ),
+    launchAngle: targetLaunch,
+    fenceLinerScore: Math.max(profile.fenceLinerScore ?? 0, 0.22 + scoreLift * 0.2 + powerDriveScore * 0.16),
+    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 0.42 + scoreLift * 0.34 + powerDriveScore * 0.2),
+    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.24 + superScore * 0.34 + powerDriveScore * 0.18)
+  };
 }
 
 function getContactFeedbackScore(contact) {
@@ -6035,13 +6150,13 @@ function decideNormalZoneHitResult(profile, contact, roll) {
     inGoodContactZone
   });
   const easyCenterDrive = inGoodContactZone
-    && zoneScore >= 0.86
+    && zoneScore >= 0.9
     && profile.exitVelocity >= 0.5
     && profile.carry >= 0.42
     && quality >= 0.16
     && sweetSpotScore >= 0.16;
   const easyCenterHomerDrive = inGoodContactZone
-    && zoneScore >= 0.92
+    && zoneScore >= 0.94
     && powerDriveScore >= 0.35
     && profile.exitVelocity >= 0.84
     && profile.carry >= 0.78
@@ -6465,7 +6580,7 @@ function buildBattedBallProfile(contact) {
   const powerDriveScore = getPowerDriveScore(power);
   const stuffPressure = getPitcherStuffPressure(activePitcher);
   const lowStuffProfileBoost = getLowPitcherStuffProfileBoost(activePitcher);
-  const chasePenalty = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.74) * 0.48 : (1 - zoneScore) * 1.08 + (outsideStrikeZone ? 0.92 : 0.48);
+  const chasePenalty = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.74) * 0.72 : (1 - zoneScore) * 1.08 + (outsideStrikeZone ? 0.92 : 0.48);
   const timingPenaltyScale = inGoodContactZone ? 0.45 : yellowZoneBoost > 0 ? 0.68 : 1;
   const timingPenalty = (abs > 260 ? 0.18 : abs > 150 ? 0.08 : 0) * timingPenaltyScale;
   const powerBoost = (power - 5) * 0.035;
@@ -6473,10 +6588,10 @@ function buildBattedBallProfile(contact) {
   const handednessContactMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
   const handednessContactBoost = handednessContactMultiplier - 1;
   const practicePitcherContactBoost = gameMode === "practice" && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
-  const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 4.1) * 0.62 : 0;
-  const zoneEdgeDrag = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22 : 0;
+  const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 5.1) * 0.88 : 0;
+  const zoneEdgeDrag = inGoodContactZone ? (Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22) * 1.5 : 0;
   const centerSweetSpotDriveBoost = inGoodContactZone ? zoneCenterBoost * clamp((sweetSpotScore - 0.42) / 0.48, 0, 1) : 0;
-  const pitchQualityBoost = inGoodContactZone ? -0.02 + Math.pow(zoneScore, 3.25) * 0.16 + zoneCenterBoost : outsideStrikeZone ? -0.82 - (1 - zoneScore) * 0.62 : -0.42 + yellowZoneBoost * 0.08;
+  const pitchQualityBoost = inGoodContactZone ? -0.04 + Math.pow(zoneScore, 4.1) * 0.2 + zoneCenterBoost : outsideStrikeZone ? -0.82 - (1 - zoneScore) * 0.62 : -0.42 + yellowZoneBoost * 0.08;
   const outsideZoneDrag = outsideStrikeZone && !inGoodContactZone ? clamp(0.55 + (1 - zoneScore) * 0.65, 0.55, 1.15) : 0;
   const sweetSpotCenterBoost = clamp((sweetSpotScore - 0.82) / 0.18, 0, 1) * 0.1;
   const lowPowerMastery = getLowPowerGoodContactMastery({ power, quality, timingScore, sweetSpotScore, barrelScore, zoneScore, inGoodContactZone });
@@ -6492,20 +6607,26 @@ function buildBattedBallProfile(contact) {
   const yellowDriveScore = yellowZoneBoost > 0
     ? yellowZoneBoost * clamp((quality - 0.42) / 0.36, 0, 1) * clamp((sweetSpotScore - 0.52) / 0.34, 0, 1)
     : 0;
-  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.36 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.18;
+  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.42 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.28;
   const centerDriveScore = inGoodContactZone
-    ? clamp((zoneScore - 0.68) / 0.32, 0, 1) * clamp((quality - 0.1) / 0.38, 0, 1) * clamp((sweetSpotScore - 0.1) / 0.54, 0, 1)
+    ? clamp((zoneScore - 0.74) / 0.26, 0, 1) * clamp((quality - 0.1) / 0.38, 0, 1) * clamp((sweetSpotScore - 0.1) / 0.54, 0, 1)
     : 0;
-  const exitVelocity = clamp(0.4 + readableQuality * 0.88 + powerBoost * 1.7 + practicePitcherContactBoost * 0.72 + lowStuffProfileBoost * 0.2 + handednessContactBoost * 0.22 + sweetSpotCenterBoost * 0.08 + yellowDriveScore * 0.12 + centerDriveScore * 0.4 + zoneCenterBoost * 0.48 + centerSweetSpotDriveBoost * 0.22 + lowPowerMastery * 0.24 - qualityDrag * 1.22, 0.12, 1.75);
+  const centerMistakeDrive = inGoodContactZone
+    ? Math.pow(clamp(zoneScore, 0, 1), 5.2)
+      * clamp((timingScore + barrelScore + sweetSpotScore + quality) / 2.35, 0, 1)
+      * clamp((sweetSpotScore + barrelScore) / 1.1, 0, 1)
+    : 0;
+  const exitVelocity = clamp(0.4 + readableQuality * 0.88 + powerBoost * 1.7 + practicePitcherContactBoost * 0.72 + lowStuffProfileBoost * 0.2 + handednessContactBoost * 0.22 + sweetSpotCenterBoost * 0.08 + yellowDriveScore * 0.12 + centerDriveScore * 0.58 + centerMistakeDrive * (0.18 + powerDriveScore * 0.1) + zoneCenterBoost * 0.62 + centerSweetSpotDriveBoost * 0.28 + lowPowerMastery * 0.24 - qualityDrag * 1.22, 0.12, 1.75);
   const hardLiftScore = clamp((exitVelocity - 0.78) / 0.58, 0, 1)
     * clamp((quality + barrelScore + timingScore) / 2.15, 0, 1)
     * clamp(zoneScore + (inGoodContactZone ? 0.18 : 0), 0, 1)
     * (0.28 + Math.max(powerDriveScore, lowPowerMastery * 0.38) * 0.72);
-  const hittableLiftBoost = inGoodContactZone ? 4 + Math.pow(zoneScore, 2.2) * 9 + zoneCenterBoost * 28 + sweetSpotScore * 5 : 0;
+  const hittableLiftBoost = inGoodContactZone ? 1 + Math.pow(zoneScore, 4.2) * 11 + zoneCenterBoost * 36 + sweetSpotScore * 5 : 0;
   const yellowLiftDamping = yellowZoneBoost * yellowZoneHitTuning.liftDamping * (1 - clamp((sweetSpotScore - 0.56) / 0.34, 0, 1));
   const timingLiftPenalty = Math.abs(timingPull) * (inGoodContactZone ? 2.2 : yellowZoneBoost > 0 ? 3.6 : 6);
   const centerDriveLiftAssist = inGoodContactZone
     ? centerDriveScore * (18 + Math.max(powerDriveScore, lowPowerMastery * 0.42) * 44)
+      + centerMistakeDrive * (10 + powerDriveScore * 18 + clamp((quality - 0.48) / 0.32, 0, 1) * 10)
     : 0;
   const yellowDriveLiftAssist = yellowDriveScore * yellowZoneHitTuning.driveLiftAssist;
   const hardContactLiftAssist = hardLiftScore * (inGoodContactZone ? 22 : 14);
@@ -6528,7 +6649,7 @@ function buildBattedBallProfile(contact) {
     68
   );
   const spin = clamp((1 - sweetSpotScore) * 0.58 + Math.abs(timingPull) * 0.3 + (outsideStrikeZone && !inGoodContactZone ? 0.18 : 0), 0, 1.35);
-  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.02 + Math.pow(zoneScore, 3.25) * 0.08 + centerDriveScore * (0.24 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.76) + zoneCenterBoost * 0.5 + centerSweetSpotDriveBoost * 0.2 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.1 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.62 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 0.78 - weakGrounderBias * 0.045, 0.08, 1.85);
+  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.01 + Math.pow(zoneScore, 4.2) * 0.12 + centerDriveScore * (0.3 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.86) + centerMistakeDrive * (0.16 + powerDriveScore * 0.28) + zoneCenterBoost * 0.72 + centerSweetSpotDriveBoost * 0.24 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.08 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.56 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 1.05 - weakGrounderBias * 0.045, 0.08, 1.85);
   const direction = getPhysicsHitDirection(timingPull, spin, launchAngle);
   const gapScore = clamp(exitVelocity * 0.46 + sweetSpotScore * 0.3 + zoneScore * 0.22 - spin * 0.18 + Math.abs(direction.x) * 0.14, 0, 1);
   const lineContact = clamp((Math.abs(timingPull) - 0.28) / 0.58, 0, 1);
@@ -9989,6 +10110,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const isSuperDeepDrive = label === superDeepDriveLabel || (label === deepDriveLabel && power >= 2.45);
   const isDeepDrive = label === deepDriveLabel || isSuperDeepDrive;
   const isBattingPracticeHomerCandidate = Boolean(battedProfile?.battingPracticeHomerCandidate);
+  const isScoreDrivenLongBall = Boolean(battedProfile?.scoreDrivenLongBall);
   if (isLineLiner) {
     direction = getLineLinerDirection({ ...(battedProfile || {}), direction });
   }
@@ -10043,8 +10165,13 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isRoutineFly
     ? randomBetween(980, 1820)
     : 180 + Math.pow(Math.max(power, 0.08), 0.86) * 1040;
-  const battingPracticeHomerDistanceBonus = isBattingPracticeHomerCandidate && isDeepDrive
-    ? fenceDistance * 0.24 + Math.max(0, profileExitVelocity - 1.1) * 260 + Math.max(0, profileCarry - 1.05) * 260
+  const scoreDrivenHomerPush = isScoreDrivenLongBall
+    && contactScore >= 0.6
+    && (isDeepDrive || isFenceEdgeFly || isFenceLiner);
+  const battingPracticeHomerDistanceBonus = (isBattingPracticeHomerCandidate || scoreDrivenHomerPush) && isDeepDrive
+    ? fenceDistance * (isBattingPracticeHomerCandidate ? 0.24 : 0.18) + Math.max(0, profileExitVelocity - 1.1) * 260 + Math.max(0, profileCarry - 1.05) * 260
+    : scoreDrivenHomerPush
+    ? fenceDistance * 0.12 + Math.max(0, profileExitVelocity - 1.0) * 180 + Math.max(0, profileCarry - 0.95) * 180
     : 0;
   const boostedRawDistance = rawDistance + battingPracticeHomerDistanceBonus;
   let distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
@@ -10171,6 +10298,8 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     baseBallSpeed *= isPopupFly ? 0.72 : 0.26;
   }
   const possibleWallHit = isDeepDrive
+    && !isBattingPracticeHomerCandidate
+    && !scoreDrivenHomerPush
     && power >= 1.34
     && distance > defenseField.deepHitDistance
     && Math.random() < 0.36;
@@ -10230,6 +10359,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (isBattingPracticeHomerCandidate && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 180) {
     fenceOver = true;
   }
+  if (scoreDrivenHomerPush && fairDeepFlight && fenceIntersection && contactScore >= 0.6 && power >= 1.36 && distance > fenceTravelDistance - 180) {
+    fenceOver = true;
+  }
   const reducedPowerHitterHomer = shouldReducePowerHitterHomeRunToWallHit({
     fenceOver,
     isFenceEdgeFly,
@@ -10242,7 +10374,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     profileCarry,
     power
   });
-  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && domeRule?.kind !== "homer") fenceOver = false;
+  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && !scoreDrivenHomerPush && domeRule?.kind !== "homer") fenceOver = false;
   const flyWallHit = trajectory === "fly"
     ? distance >= fenceTravelDistance - (isFenceEdgeFly ? 38 : isDeepDrive ? 52 : 24)
     : isFenceLiner
@@ -13430,7 +13562,7 @@ function getGoodContactZoneCenterScore(x = ball.x, y = ball.y) {
   }), { x: 0, y: 0 });
   const maxDistance = points.reduce((max, point) => Math.max(max, Math.hypot(point.x - center.x, point.y - center.y)), 1);
   const distance = Math.hypot(x - center.x, y - center.y);
-  return clamp(1 - Math.pow(distance / maxDistance, 1.65), 0.04, 1);
+  return clamp(1 - Math.pow(distance / maxDistance, 1.18), 0.02, 1);
 }
 
 function distanceToGoodContactZone(x = ball.x, y = ball.y, radius = ball.radius) {
@@ -17374,7 +17506,7 @@ function closestPointOnSegment(px, py, x1, y1, x2, y2) {
 
 function getSweetSpotScore(t) {
   const center = 0.68;
-  const halfWidth = getSweetSpotHalfWidth("score");
+  const halfWidth = getSweetSpotHalfWidth("score") * 1.5;
   const normalizedDistance = Math.abs(t - center) / Math.max(halfWidth, 0.0001);
   const contactFloor = 0.15;
   if (normalizedDistance <= 1) {
