@@ -132,6 +132,7 @@ const batterMoveTuning = {
   moundSideShrink: (42 * field.plateScale) / 3,
   horizontalRangeScale: 0.5,
   plateSideNudge: 10,
+  cpuPlateSideNudge: 9,
   plateSideExtraReach: 18,
   shoeLimitOffsetY: -12,
   keyboardMoveSpeed: 5.2
@@ -3055,9 +3056,16 @@ function setMatchup() {
   }
   activeBatterSide = resolveBatterSide(activeBatter, activePitcher);
   const box = getBatterMoveBox();
-  batter.x = (box.left + box.right) / 2;
+  batter.x = getInitialBatterX(box);
   batter.y = 738;
   updateSidebarAbilityPanels();
+}
+
+function getInitialBatterX(box) {
+  const center = (box.left + box.right) / 2;
+  if (isPlayerBatting()) return center;
+  const towardPlate = activeBatterSide === "R" ? 1 : -1;
+  return clamp(center + towardPlate * batterMoveTuning.cpuPlateSideNudge, box.left, box.right);
 }
 
 function getCurrentBatter(team) {
@@ -5176,17 +5184,24 @@ function buildBattingFeedbackLines(contact, result = {}) {
     : getBattingFeedbackBalancedScore(getBattingFeedbackScoreInput(contact, result.battedProfile));
   if (isBunt) {
     return [
-      `バント評価: ゾーン ${Math.round(zoneScore * 100)}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
+      getBattingFeedbackResultText(result),
+      `バント評価: ゾーン到達率 ${Math.round(getFeedbackZoneRate(contact))}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
       zoneText,
       `総合: ${Math.round(balancedScore * 100)}%`
     ];
   }
   return [
+    getBattingFeedbackResultText(result),
     `タイミング: ${timingLabel}`,
     `スイートスポット: ${Math.round(practicalSweetSpotScore * 100)}% / 接触の深さ: ${Math.round(barrelScore * 100)}%`,
     zoneText,
     `総合: ${Math.round(balancedScore * 100)}%`
   ];
+}
+
+function getBattingFeedbackResultText(result = {}) {
+  const label = result?.label || result?.battedProfile?.label || "打球";
+  return `打球: ${label}`;
 }
 
 function getBattingFeedbackBalancedScore(scores) {
@@ -5197,6 +5212,11 @@ function getFeedbackZoneScore(contact = {}) {
   return clamp(contact.zoneScore ?? (contact.inGoodContactZone ? 1 : 0), 0, 1);
 }
 
+function getFeedbackZoneRate(contact = {}) {
+  if (Number.isFinite(contact.zoneDistanceRate)) return Math.max(0, contact.zoneDistanceRate);
+  return Math.max(0, (1 - getFeedbackZoneScore(contact)) * 100);
+}
+
 function getPracticalSweetSpotScore(contact = {}) {
   const sweetSpotScore = clamp(contact.sweetSpotScore ?? 0, 0, 1);
   const barrelScore = clamp(contact.barrelScore ?? 0, 0, 1);
@@ -5205,10 +5225,17 @@ function getPracticalSweetSpotScore(contact = {}) {
 }
 
 function getFeedbackZoneText(contact = {}) {
-  const zoneScore = getFeedbackZoneScore(contact);
-  if (contact.inGoodContactZone && zoneScore >= 0.9) return "ゾーン: 最高";
-  if (!contact.inGoodContactZone) return `ゾーン: 外れ ${Math.round(contact.plateDistance ?? 0)}px`;
-  return `ゾーン: 端 ${Math.round((1 - zoneScore) * 100)}%`;
+  const rate = Math.round(getFeedbackZoneRate(contact));
+  return `ゾーン: ${getZoneRateLabel(rate)} ${rate}%`;
+}
+
+function getZoneRateLabel(rate = 0) {
+  if (rate <= 30) return "中心";
+  if (rate <= 70) return "中間";
+  if (rate <= 100) return "端";
+  if (rate <= 130) return "少し外れ";
+  if (rate <= 170) return "外れ";
+  return "大外れ";
 }
 
 function getBattingFeedbackScoreInput(contact = {}, profile = null) {
@@ -5440,6 +5467,7 @@ function buildContactProfile(bestHit) {
   const barrelScore = Math.max(0, 1 - effectiveBatDistance / ((78 + batterMeet * 4) * 1.05));
   const sweetSpotScore = getContactSweetSpotScore(bestHit);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
+  const zoneDistanceRate = getGoodContactZoneDistanceRate(bestHit.x, bestHit.y, ball.radius);
   const zoneMissUnits = getGoodContactZoneMissUnits(plateDistance, ball.radius);
   const zoneMissStage = getGoodContactZoneMissStage(plateDistance);
   const zoneMissPenalty = getGoodContactZoneMissPenalty(zoneMissUnits);
@@ -5447,8 +5475,8 @@ function buildContactProfile(bestHit) {
     * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone)
     * getGoodContactZoneMissContactMultiplier(zoneMissUnits);
   const zoneReach = (68 + batterMeet * 12) * battingGoodContactZoneScale;
-  const zoneScore = inGoodContactZone ? getGoodContactZoneCenterScore(bestHit.x, bestHit.y) : clamp(1 - zoneMissUnits * 0.68, 0, 1);
-  const zoneBand = getContactZoneBand({ inGoodContactZone, plateDistance, zoneScore });
+  const zoneScore = getZoneScoreFromDistanceRate(zoneDistanceRate);
+  const zoneBand = getContactZoneBand({ inGoodContactZone, plateDistance, zoneScore, zoneDistanceRate });
   const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 5.2) * 0.62 : 0;
   const zoneEdgePenalty = inGoodContactZone ? (Math.pow(1 - zoneScore, 0.72) * 0.82 + clamp((0.48 - zoneScore) / 0.48, 0, 1) * 0.18) * 1.5 : 0;
   const chasePenalty = inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 1.35, 0, 1.35) : clamp(zoneMissPenalty, 0, 1.45);
@@ -5477,6 +5505,7 @@ function buildContactProfile(bestHit) {
     barrelScore,
     sweetSpotScore,
     zoneScore,
+    zoneDistanceRate,
     zoneBand,
     plateDistance,
     zoneMissUnits,
@@ -5579,11 +5608,13 @@ function isStrongHitResult(result) {
 }
 
 function getContactZoneBand(contact = {}) {
-  if (!contact.inGoodContactZone || (contact.plateDistance ?? 0) > 0) return "outside";
-  const zoneScore = clamp(contact.zoneScore ?? 0, 0, 1);
-  if (zoneScore >= 0.9) return "center";
-  if (zoneScore >= 0.74) return "middle";
-  return "edge";
+  const rate = getFeedbackZoneRate(contact);
+  if (rate <= 30) return "center";
+  if (rate <= 70) return "middle";
+  if (rate <= 100) return "edge";
+  if (rate <= 130) return "slightOutside";
+  if (rate <= 170) return "outside";
+  return "farOutside";
 }
 
 function getZoneBandContactScore(contact = {}, profile = null) {
@@ -5616,7 +5647,9 @@ function decideZoneBandHitResult(contact, profile, feedbackScore, roll = Math.ra
   if (zoneBand === "center") return decideCenterZoneBandResult(contact, profile, feedbackScore, roll);
   if (zoneBand === "middle") return decideMiddleZoneBandResult(contact, profile, feedbackScore, roll);
   if (zoneBand === "edge") return decideEdgeZoneBandResult(contact, profile, feedbackScore, roll);
-  return decideOutsideZoneBandResult(contact, profile, feedbackScore, roll);
+  if (zoneBand === "slightOutside") return decideSlightOutsideZoneBandResult(contact, profile, feedbackScore, roll);
+  if (zoneBand === "outside") return decideOutsideZoneBandResult(contact, profile, feedbackScore, roll);
+  return decideFarOutsideZoneBandResult(contact, profile, feedbackScore, roll);
 }
 
 function decideCenterZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
@@ -5658,17 +5691,26 @@ function decideEdgeZoneBandResult(contact, profile, feedbackScore, roll = Math.r
   return profile.launchAngle >= 15 ? makeRoutineFlyResultFromProfile(profile) : makeGrounderOutResultFromProfile(profile, Math.min(profile.power ?? 0.58, 0.68));
 }
 
-function decideOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const missDistance = contact.plateDistance ?? 0;
+function decideSlightOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
   const score = getZoneBandContactScore(contact, profile);
-  if (missDistance >= 40) return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 2.4, roll, "severe");
-  if (missDistance >= 30) return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 1.8, roll, "forcedWeak");
-  if (missDistance >= 16) {
-    if (score >= 0.9 && profile.exitVelocity >= 0.76 && roll < 0.02) return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.52, 0.56) });
-    return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 1.1, roll, "clear");
+  if (score >= 0.9 && profile.exitVelocity >= 0.74 && roll < 0.08) {
+    return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.62, 0.66) });
   }
-  if (score >= 0.88 && profile.exitVelocity >= 0.72 && roll < 0.05) return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.62, 0.66) });
-  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 0.4, roll, "slight");
+  if (roll < 0.36) return { label: hitLabels.foul, kind: "foul", power: clamp(profile.power ?? 0.34, 0.16, 0.54), direction: profile.direction, battedProfile: profile };
+  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 0.45, roll, "slight");
+}
+
+function decideOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
+  const score = getZoneBandContactScore(contact, profile);
+  if (score >= 0.94 && profile.exitVelocity >= 0.78 && roll < 0.025) {
+    return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.54, 0.58) });
+  }
+  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 1.2, roll, "clear");
+}
+
+function decideFarOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
+  if (roll < 0.52) return { label: hitLabels.foul, kind: "foul", power: clamp(profile.power ?? 0.24, 0.1, 0.38), direction: profile.direction, battedProfile: profile };
+  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 2.4, roll, "severe");
 }
 
 function decideHitResultFromBattedProfile(contact) {
@@ -5702,7 +5744,7 @@ function applyZoneBandResultCap(result, profile, contact = null, roll = Math.ran
   const missDistance = source.plateDistance ?? profile?.plateDistance ?? 0;
   const missUnits = source.zoneMissUnits ?? profile?.zoneMissUnits ?? 0;
   if (zoneBand === "center") return result;
-  if (zoneBand === "outside") {
+  if (zoneBand === "slightOutside" || zoneBand === "outside" || zoneBand === "farOutside") {
     if (missDistance >= 40) return makeZoneMissWeakContactResult(profile, Math.max(missUnits, 2.4), roll, "severe");
     if (missDistance >= 30) return makeZoneMissWeakContactResult(profile, Math.max(missUnits, 1.8), roll, "forcedWeak");
     if (missDistance >= 16 && (isStrongHitResult(result) || result.scoreType === "double" || result.scoreType === "homer")) {
@@ -13422,6 +13464,58 @@ function getGoodContactZoneCenterScore(x = ball.x, y = ball.y) {
   return clamp(1 - Math.pow(distance / maxDistance, 1.18), 0.02, 1);
 }
 
+function getZoneScoreFromDistanceRate(rate = 100) {
+  return clamp(1 - Math.max(0, rate) / 100, 0, 1);
+}
+
+function getGoodContactZoneDistanceRate(x = ball.x, y = ball.y, radius = ball.radius) {
+  const points = getGoodContactZonePoints();
+  const center = getPolygonCenter(points);
+  const dx = x - center.x;
+  const dy = y - center.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.0001) return 0;
+  const boundaryDistance = getPolygonBoundaryDistanceFromCenter(points, center, dx / distance, dy / distance);
+  const adjustedDistance = Math.max(0, distance - (isPointInPolygon(x, y, points) ? 0 : radius));
+  return Math.max(0, adjustedDistance / Math.max(1, boundaryDistance) * 100);
+}
+
+function getPolygonCenter(points = []) {
+  return points.reduce((sum, point) => ({
+    x: sum.x + point.x / Math.max(1, points.length),
+    y: sum.y + point.y / Math.max(1, points.length)
+  }), { x: 0, y: 0 });
+}
+
+function getPolygonBoundaryDistanceFromCenter(points, center, dirX, dirY) {
+  let best = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const hit = getRaySegmentIntersectionDistance(center.x, center.y, dirX, dirY, a.x, a.y, b.x, b.y);
+    if (Number.isFinite(hit) && hit > 0) best = Math.min(best, hit);
+  }
+  if (Number.isFinite(best)) return best;
+  return points.reduce((max, point) => Math.max(max, Math.hypot(point.x - center.x, point.y - center.y)), 1);
+}
+
+function getRaySegmentIntersectionDistance(originX, originY, dirX, dirY, ax, ay, bx, by) {
+  const segX = bx - ax;
+  const segY = by - ay;
+  const denom = cross2d(dirX, dirY, segX, segY);
+  if (Math.abs(denom) < 0.000001) return null;
+  const relX = ax - originX;
+  const relY = ay - originY;
+  const t = cross2d(relX, relY, segX, segY) / denom;
+  const u = cross2d(relX, relY, dirX, dirY) / denom;
+  if (t < 0 || u < -0.000001 || u > 1.000001) return null;
+  return t;
+}
+
+function cross2d(ax, ay, bx, by) {
+  return ax * by - ay * bx;
+}
+
 function distanceToGoodContactZone(x = ball.x, y = ball.y, radius = ball.radius) {
   const points = getGoodContactZonePoints();
   if (isPointInPolygon(x, y, points)) return 0;
@@ -17097,7 +17191,8 @@ function drawBattingFeedback() {
   }
   const alpha = isAnyPracticeMode() ? 1 : age > 4300 ? clamp(1 - (age - 4300) / 900, 0, 1) : 1;
   const width = 410;
-  const height = 132;
+  const lineHeight = 22;
+  const height = 54 + battingFeedback.lines.length * lineHeight + 16;
   const x = 18;
   const y = canvas.height - height - 18;
   ctx.save();
@@ -17114,7 +17209,7 @@ function drawBattingFeedback() {
   ctx.fillStyle = "#ffffff";
   ctx.font = "14px sans-serif";
   battingFeedback.lines.forEach((line, index) => {
-    fitText(line, x + 16, y + 52 + index * 22, width - 32);
+    fitText(line, x + 16, y + 52 + index * lineHeight, width - 32);
   });
   ctx.restore();
 }
