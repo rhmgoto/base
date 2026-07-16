@@ -11775,46 +11775,45 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
   if (defenseState.liveInfielderContactCatchComplete) return false;
   const battedBall = defenseState.battedBall;
   if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
-  const canLiveInfielderCatch = battedBall.isGrounder
-    || battedBall.isLineDrop
-    || (battedBall.isLiner && !isDeepLineLinerPastInfield(battedBall))
-    || (!battedBall.isGrounder && !isDeepOutfieldBall(battedBall));
-  if (!canLiveInfielderCatch) return false;
   if (defenseState.outcome?.caught || defenseState.throw) return false;
   const height = getDefenseBallHeightAtPoint(
     clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1),
     elapsedSeconds
   );
-  const maxContactHeight = battedBall.isGrounder
-    ? 56
-    : battedBall.isLineDrop
-      ? 78
-      : battedBall.trajectory === "fly"
-        ? 74
-        : 66;
+  const maxContactHeight = getLiveCircleCatchMaxHeight(battedBall);
   if (height > maxContactHeight) return false;
   const fielders = defenseState.fielders || [];
   const candidates = fielders
-    .filter((fielder) => isInfielderRole(fielder.role))
     .map((fielder) => {
       const current = {
         x: fielder.currentX ?? fielder.x,
         y: fielder.currentY ?? fielder.y
       };
       const distance = Math.hypot(current.x - ball.x, current.y - ball.y);
-      const radius = getLiveInfielderContactRadius(fielder, battedBall);
-      const playableHeight = battedBall.isGrounder
-        ? true
-        : isInfielderPlayableRouteHeight(fielder, battedBall, { x: ball.x, y: ball.y }, battedBall.trajectory === "fly" ? -10 : 0);
-      const ready = elapsedSeconds >= getFielderReactionDelay(fielder) * 0.72;
-      return { fielder, current, distance, radius, ready, playableHeight };
+      const radius = getLiveCircleCatchRadius(fielder, battedBall);
+      return { fielder, current, distance, radius };
     })
-    .filter((candidate) => candidate.ready && candidate.playableHeight && candidate.distance <= candidate.radius)
+    .filter((candidate) => candidate.distance <= candidate.radius)
     .sort((a, b) => a.distance - b.distance);
   const best = candidates[0];
   if (!best) return false;
   completeLiveInfielderContactCatch(best.fielder, best.current, elapsedSeconds);
   return true;
+}
+
+function getLiveCircleCatchMaxHeight(battedBall) {
+  if (!battedBall) return 0;
+  if (battedBall.isGrounder) return 72;
+  if (battedBall.isLineDrop || battedBall.isSoftDrop) return 106;
+  if (battedBall.isLiner) return 118;
+  if (battedBall.trajectory === "fly" || battedBall.isPopupFly || battedBall.isRoutineFly) return 124;
+  return 104;
+}
+
+function getLiveCircleCatchRadius(fielder, battedBall) {
+  const base = getLiveInfielderContactRadius(fielder, battedBall);
+  const ballRadius = ball?.radius ?? 8;
+  return base + ballRadius + 8;
 }
 
 function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds) {
@@ -11877,12 +11876,12 @@ function resolveLivePostLandingPickup(elapsedSeconds) {
   if (!battedBall || battedBall.isGrounder || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
   if (defenseState.outcome?.caught || defenseState.throw) return false;
   const ballTime = Math.max(0.1, battedBall.ballTime ?? 1);
-  if (elapsedSeconds < ballTime + 0.04) return false;
+  if (elapsedSeconds < ballTime + 0.02) return false;
   const height = getDefenseBallHeightAtPoint(
     clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1),
     elapsedSeconds
   );
-  if (height > 42) return false;
+  if (height > 72) return false;
   const candidates = (defenseState.fielders || [])
     .map((fielder) => {
       const current = {
@@ -11893,11 +11892,10 @@ function resolveLivePostLandingPickup(elapsedSeconds) {
       const pickupBonus = !isInfielderRole(fielder.role) && (isOutfieldFrontLandingBall(battedBall) || isDeepDriveFrontLandingBall(battedBall))
         ? 42
         : 0;
-      const radius = getFielderCatchRangeRadius(fielder, battedBall) + pickupBonus;
-      const ready = elapsedSeconds >= getFielderReactionDelay(fielder) * 0.72;
-      return { fielder, current, distance, radius, ready };
+      const radius = getFielderCatchRangeRadius(fielder, battedBall) + pickupBonus + 8;
+      return { fielder, current, distance, radius };
     })
-    .filter((candidate) => candidate.ready && candidate.distance <= candidate.radius)
+    .filter((candidate) => candidate.distance <= candidate.radius)
     .sort((a, b) => a.distance - b.distance);
   const best = candidates[0];
   if (!best) return false;
