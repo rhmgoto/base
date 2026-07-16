@@ -3442,19 +3442,19 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
 function getEdgeCommandMajorMissChance(control, staminaFatigue = 0) {
   const command = clamp(control ?? 5, 1, 10);
   const base = command <= 5
-    ? 0.3 - (command - 1) * 0.05
-    : 0.1 - (command - 5) * 0.016;
-  return clamp(base + staminaFatigue * 0.04, 0.02, 0.34);
+    ? 0.15 - (command - 1) * 0.025
+    : 0.05 - (command - 5) * 0.008;
+  return clamp(base + staminaFatigue * 0.02, 0.01, 0.17);
 }
 
 function getEdgeCommandHorizontalSpread(control) {
   const command = clamp(control ?? 5, 1, 10);
   const points = [
-    { control: 1, spread: 40 },
-    { control: 3, spread: 28 },
-    { control: 5, spread: 18 },
-    { control: 8, spread: 7 },
-    { control: 10, spread: 2.5 }
+    { control: 1, spread: 80 },
+    { control: 3, spread: 56 },
+    { control: 5, spread: 36 },
+    { control: 8, spread: 14 },
+    { control: 10, spread: 5 }
   ];
   for (let i = 0; i < points.length - 1; i += 1) {
     const from = points[i];
