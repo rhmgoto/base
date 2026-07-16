@@ -3422,7 +3422,7 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const missTightening = 1 - countPressure * 0.74;
   const wildMissTightening = 1 - countPressure * 0.82;
   const edgeMajorMissChance = getEdgeCommandMajorMissChance(effectiveControl, staminaFatigue) * missTightening;
-  const regularMajorMissChance = (severeWildness * 0.55 + staminaFatigue * 0.065) * missTightening;
+  const regularMajorMissChance = getCenterCommandMajorMissChance(effectiveControl, staminaFatigue) * missTightening;
   const totalMajorMissChance = clamp(edgeCommandPitch ? edgeMajorMissChance : regularMajorMissChance, 0, 0.78);
   const edgeSpread = getEdgeCommandHorizontalSpread(effectiveControl) * (1 + staminaFatigue * 0.28) * commandTightening;
   return {
@@ -3445,6 +3445,14 @@ function getEdgeCommandMajorMissChance(control, staminaFatigue = 0) {
     ? 0.15 - (command - 1) * 0.025
     : 0.05 - (command - 5) * 0.008;
   return clamp(base + staminaFatigue * 0.02, 0.01, 0.17);
+}
+
+function getCenterCommandMajorMissChance(control, staminaFatigue = 0) {
+  const command = clamp(control ?? 5, 1, 10);
+  const base = command <= 5
+    ? 0.08 - (command - 1) * 0.0125
+    : 0.03 - (command - 5) * 0.004;
+  return clamp(base + staminaFatigue * 0.014, 0.006, 0.1);
 }
 
 function getEdgeCommandHorizontalSpread(control) {
@@ -4033,27 +4041,35 @@ function chooseComputerPitchPlan() {
     bendSegments: [],
     speedChangeSegments: []
   };
+  const edgeTargetX = (side) => getPitchCourseTargetX({ direction: side || 0 }, getPitchRadius(type), type);
   if (course.intent === "awayBall") {
-    const outsideMin = countPressure >= 0.55 ? 28 : 44;
-    const outsideMax = countPressure >= 0.55 ? 42 : 60;
-    plan.targetX = field.plateX + awayFromBatter * randomBetween(outsideMin, outsideMax);
+    const side = awayFromBatter;
+    const edgeX = edgeTargetX(side);
+    plan.targetX = edgeX + side * randomBetween(4, countPressure >= 0.55 ? 10 : 14);
     plan.targetY = field.plateY + randomBetween(-12, 14);
     plan.targetSpread = countPressure >= 0.55 ? 6 : type === "fast" ? 8 : 9;
   } else if (course.intent === "ballToStrikeBurst" || course.intent === "acceleratingStrike") {
-    plan.targetX = field.plateX + course.direction * randomBetween(18, countPressure >= 0.55 ? 32 : 38);
+    const side = course.direction || awayFromBatter;
+    const edgeX = edgeTargetX(side);
+    plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 4));
     plan.targetY = field.plateY + randomBetween(-8, 10);
     plan.targetSpread = countPressure >= 0.55 ? 6 : 8;
   } else if (course.intent === "strikeToBallBurst" || course.intent === "strikeToBall") {
-    plan.targetX = field.plateX + course.direction * randomBetween(countPressure >= 0.55 ? 30 : 42, countPressure >= 0.55 ? 44 : 58);
+    const side = course.direction || awayFromBatter;
+    const edgeX = edgeTargetX(side);
+    plan.targetX = edgeX + side * randomBetween(2, countPressure >= 0.55 ? 8 : 12);
     plan.targetY = field.plateY + randomBetween(-12, 14);
     plan.targetSpread = countPressure >= 0.55 ? 6 : 8;
   } else if (course.intent === "hbpBackdoor") {
-    plan.targetX = field.plateX + dangerousDirection * randomBetween(22, 38);
+    const side = dangerousDirection;
+    const edgeX = edgeTargetX(side);
+    plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 8));
     plan.targetY = field.plateY + randomBetween(-8, 12);
     plan.targetSpread = 6;
   } else if (course.intent === "plainEdge") {
     const side = course.direction || awayFromBatter;
-    plan.targetX = field.plateX + side * randomBetween(countPressure >= 0.55 ? 24 : 32, countPressure >= 0.55 ? 38 : 48);
+    const edgeX = edgeTargetX(side);
+    plan.targetX = edgeX + side * randomBetween(-4, 4);
     plan.targetY = field.plateY + randomBetween(-8, 10);
     plan.targetSpread = countPressure >= 0.55 ? 5 : type === "fast" ? 6 : 7;
   } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
@@ -5343,10 +5359,10 @@ function buildContactProfile(bestHit) {
   const baseContactRange = preExtensionContactRange + outsideReachBonus * batThicknessMultiplier * meetZoneWidthScale;
 
   const timeDiff = performance.now() - ball.plateTime;
-  const timingScore = Math.max(0, 1 - Math.abs(timeDiff) / (360 + batterMeet * 7));
+  const timingScore = Math.max(0, 1 - Math.abs(timeDiff) / ((360 + batterMeet * 7) * 0.8));
   // 判定バットを太くした分、快打評価では中心線からの距離を少し戻す。
   const effectiveBatDistance = distanceToBat / batThicknessMultiplier;
-  const barrelScore = Math.max(0, 1 - effectiveBatDistance / (78 + batterMeet * 4));
+  const barrelScore = Math.max(0, 1 - effectiveBatDistance / ((78 + batterMeet * 4) * 0.8));
   const sweetSpotScore = getContactSweetSpotScore(bestHit);
   const contactRange = baseContactRange * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
