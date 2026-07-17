@@ -102,6 +102,12 @@ const result = JSON.parse(runInGame(context, `(() => {
     gameMode = "watch";
     count.balls = 0;
     count.strikes = 0;
+    const zonePoints = getGoodContactZonePoints();
+    const zoneCenter = getPolygonCenter(zonePoints);
+    const centerMarkerRadius = getGoodContactZoneCenterMarkerRadius();
+    const centerZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x, zoneCenter.y, 0);
+    const markerEdgeZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x + centerMarkerRadius, zoneCenter.y, 0);
+    const outsideMarkerZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x + centerMarkerRadius + 4 * field.plateScale, zoneCenter.y, 0);
     const planChecks = [];
     for (let index = 0; index < 10000; index += 1) {
       const plan = chooseComputerPitchPlan();
@@ -153,6 +159,11 @@ const result = JSON.parse(runInGame(context, `(() => {
       maximumPlanTargetYDifference: Math.max(...planChecks.map((item) => item.targetYDifference)),
       maximumPlanSpreadDifference: Math.max(...planChecks.map((item) => item.spreadDifference)),
       lockedPlanCount: planChecks.filter((item) => item.locked).length,
+      fixedPitchTargetY: getPitchVerticalTarget(),
+      expectedPitchTargetY: field.plateY,
+      centerZoneRate,
+      markerEdgeZoneRate,
+      outsideMarkerZoneRate,
       byControl
     });
   } finally {
@@ -165,6 +176,9 @@ assert(result.maximumPlanTargetDifference < 0.0001, "CPU and player target X sho
 assert(result.maximumPlanTargetYDifference < 0.0001, "CPU and player target Y should match");
 assert(result.maximumPlanSpreadDifference < 0.0001, "CPU and player base spread should match");
 assert(result.lockedPlanCount === 0, "CPU should not lock targets outside the player control rules");
+assert(result.fixedPitchTargetY === result.expectedPitchTargetY, "all pitches should use the single fixed vertical target");
+assert(result.centerZoneRate === 0 && result.markerEdgeZoneRate === 0, "the complete center marker should receive the best zone score");
+assert(result.outsideMarkerZoneRate > 0, "zone score should fall after contact leaves the center marker");
 assert(result.byControl.every((item) => item.normalPitchCount > 30000), "each control rating needs enough normal pitches");
 assert(result.byControl.every((item) => item.maximumDeviation <= 69.001), "normal straight pitches must stay inside the shared spread limit");
 
