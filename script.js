@@ -15,6 +15,7 @@ const menuButton = byId("menuButton");
 const startButton = byId("startButton");
 const practiceStartButton = byId("practiceStartButton");
 const pitchingPracticeStartButton = byId("pitchingPracticeStartButton");
+const homeRunDerbyStartButton = byId("homeRunDerbyStartButton");
 const soundToggleButton = byId("soundToggleButton");
 const bgmToggleButton = byId("bgmToggleButton");
 const menuSoundToggleButton = byId("menuSoundToggleButton");
@@ -56,6 +57,9 @@ const practicePitcherTypeSelect = byId("practicePitcherTypeSelect");
 const pitchingPracticeBatterTypeSelect = byId("pitchingPracticeBatterTypeSelect");
 const practiceBatterSelect = byId("practiceBatterSelect");
 const practicePitcherSelect = byId("practicePitcherSelect");
+const homeRunDerbyPlayerCountSelect = byId("homeRunDerbyPlayerCountSelect");
+const homeRunDerbyAwayBatterSelect = byId("homeRunDerbyAwayBatterSelect");
+const homeRunDerbyHomeBatterSelect = byId("homeRunDerbyHomeBatterSelect");
 const menuPlayerCards = Array.from(document.querySelectorAll(".menu-player-card"));
 const awayBatterSSName = byId("awayBatterSSName");
 const awayBatter2BName = byId("awayBatter2BName");
@@ -859,9 +863,13 @@ let practicePitcherType = "A";
 let pitchingPracticeBatterType = "A";
 let practiceBatterId = getDefaultPracticeBatterId();
 let practicePitcherId = getDefaultPracticePitcherId();
+let homeRunDerbyPlayerCount = 1;
+let homeRunDerbyBatterIds = { away: getDefaultPracticeBatterId(), home: getDefaultPracticeBatterId() };
+const HOME_RUN_DERBY_REGULATION_BALLS = 5;
 let selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
 let practiceActiveBatter = null;
 let practiceActivePitcher = null;
+let homeRunDerbyState = createHomeRunDerbyState();
 let defenseControlMode = { away: "auto", home: "auto" };
 let gamePhase = "menu";
 let maxInnings = 1;
@@ -1013,6 +1021,21 @@ function createStealState() {
   };
 }
 
+function createHomeRunDerbyState() {
+  return {
+    active: false,
+    playerCount: 1,
+    currentTeam: "away",
+    round: "regulation",
+    balls: { away: 0, home: 0 },
+    suddenBalls: { away: 0, home: 0 },
+    suddenRound: 0,
+    batters: { away: null, home: null },
+    lastPitchPoints: 0,
+    lastPitchHomer: false
+  };
+}
+
 const sounds = {
   swing: new Audio("audio/swing.wav"),
   hit: new Audio("audio/hit2.mp3"),
@@ -1112,8 +1135,14 @@ function populateSelects() {
 function renderPracticePlayerSelects() {
   renderPracticePlayerSelect(practiceBatterSelect, getAllHitters(), practiceBatterId, "batter");
   renderPracticePlayerSelect(practicePitcherSelect, getPracticePitchers(), practicePitcherId, "pitcher");
+  renderPracticePlayerSelect(homeRunDerbyAwayBatterSelect, getAllHitters(), homeRunDerbyBatterIds.away, "batter");
+  renderPracticePlayerSelect(homeRunDerbyHomeBatterSelect, getAllHitters(), homeRunDerbyBatterIds.home, "batter");
   practiceBatterId = practiceBatterSelect?.value || getAllHitters()[0]?.id || "";
   practicePitcherId = practicePitcherSelect?.value || getPracticePitchers()[0]?.id || "";
+  homeRunDerbyBatterIds = {
+    away: homeRunDerbyAwayBatterSelect?.value || getAllHitters()[0]?.id || "",
+    home: homeRunDerbyHomeBatterSelect?.value || getAllHitters()[0]?.id || ""
+  };
 }
 
 function getPracticePitchers() {
@@ -1813,6 +1842,11 @@ function readMenu() {
   pitchingPracticeBatterType = ["A", "B"].includes(pitchingPracticeBatterTypeSelect?.value) ? pitchingPracticeBatterTypeSelect.value : "A";
   practiceBatterId = practiceBatterSelect?.value || practiceBatterId || batters[0]?.id || "";
   practicePitcherId = practicePitcherSelect?.value || practicePitcherId || getPracticePitchers()[0]?.id || "";
+  homeRunDerbyPlayerCount = homeRunDerbyPlayerCountSelect?.value === "2" ? 2 : 1;
+  homeRunDerbyBatterIds = {
+    away: homeRunDerbyAwayBatterSelect?.value || homeRunDerbyBatterIds.away || getAllHitters()[0]?.id || "",
+    home: homeRunDerbyHomeBatterSelect?.value || homeRunDerbyBatterIds.home || getAllHitters()[0]?.id || ""
+  };
   firstBatTeam = firstBatSelect.value;
   maxInnings = Number(inningsSelect.value);
   if (gameMode === "watch") {
@@ -1836,8 +1870,12 @@ function isPitchingPracticeMode() {
   return gameMode === "pitchPractice";
 }
 
+function isHomeRunDerbyMode() {
+  return gameMode === "homerDerby";
+}
+
 function isAnyPracticeMode() {
-  return isBattingPracticeMode() || isPitchingPracticeMode();
+  return isBattingPracticeMode() || isPitchingPracticeMode() || isHomeRunDerbyMode();
 }
 
 function getDefenseRunControlMode(value) {
@@ -3028,8 +3066,16 @@ function startGame(modeOverride = null) {
     updateMenuPointStatus();
     return;
   }
-  practiceActiveBatter = isAnyPracticeMode() ? findById(getAllHitters(), practiceBatterId) : null;
-  practiceActivePitcher = isAnyPracticeMode() ? createMatchPitcher(findById(getPracticePitchers(), practicePitcherId)) : null;
+  practiceActiveBatter = (isBattingPracticeMode() || isPitchingPracticeMode()) ? findById(getAllHitters(), practiceBatterId) : null;
+  practiceActivePitcher = (isBattingPracticeMode() || isPitchingPracticeMode()) ? createMatchPitcher(findById(getPracticePitchers(), practicePitcherId)) : null;
+  homeRunDerbyState = isHomeRunDerbyMode()
+    ? {
+      ...createHomeRunDerbyState(),
+      active: true,
+      playerCount: homeRunDerbyPlayerCount,
+      batters: { ...homeRunDerbyBatterIds }
+    }
+    : createHomeRunDerbyState();
   scores = { away: 0, home: 0 };
   pitcherGameRecords = createPitcherGameRecords();
   pitcherDecisionEvents = [];
@@ -3038,7 +3084,7 @@ function startGame(modeOverride = null) {
   lastOutBatterByTeam = { away: null, home: null };
   inning = 1;
   half = "top";
-  battingTeam = isPitchingPracticeMode() ? "home" : isBattingPracticeMode() ? "away" : firstBatTeam;
+  battingTeam = isPitchingPracticeMode() ? "home" : (isBattingPracticeMode() || isHomeRunDerbyMode()) ? "away" : firstBatTeam;
   count = { strikes: 0, balls: 0, outs: 0 };
   inputLockedUntil = 0;
   resetDefenseState();
@@ -3052,7 +3098,9 @@ function startGame(modeOverride = null) {
   ensurePitcherGameRecord(fieldingTeam(), activePitcher);
   resetBall();
   resetSwing();
-  message = isBattingPracticeMode()
+  message = isHomeRunDerbyMode()
+    ? getHomeRunDerbyStatusMessage()
+    : isBattingPracticeMode()
     ? `打撃練習: ${activeBatter.name} vs ${activePitcher.name}`
     : isPitchingPracticeMode()
       ? `投球練習: ${activePitcher.name} vs ${activeBatter.name}`
@@ -3076,7 +3124,10 @@ function showMenu() {
 }
 
 function setMatchup() {
-  if (isAnyPracticeMode()) {
+  if (isHomeRunDerbyMode()) {
+    activeBatter = findById(getAllHitters(), homeRunDerbyState.batters?.[battingTeam] || homeRunDerbyBatterIds[battingTeam]);
+    activePitcher = createMatchPitcher(findById(getPracticePitchers(), "battingpractice"));
+  } else if (isAnyPracticeMode()) {
     activeBatter = practiceActiveBatter || findById(getAllHitters(), practiceBatterId);
     activePitcher = practiceActivePitcher || createMatchPitcher(findById(getPracticePitchers(), practicePitcherId));
     practiceActiveBatter = activeBatter;
@@ -3161,6 +3212,104 @@ function resetPracticePlateAppearance() {
   return true;
 }
 
+function getHomeRunDerbyStatusMessage() {
+  if (!isHomeRunDerbyMode()) return "";
+  const team = homeRunDerbyState.currentTeam || battingTeam;
+  const batter = findById(getAllHitters(), homeRunDerbyState.batters?.[team] || homeRunDerbyBatterIds[team]);
+  if (homeRunDerbyState.round === "sudden") {
+    return `ホームラン競争 サドンデス${homeRunDerbyState.suddenRound || 1}: ${teamLabel(team)} ${batter.name}`;
+  }
+  const ballNumber = (homeRunDerbyState.balls?.[team] || 0) + 1;
+  const bonus = ballNumber === HOME_RUN_DERBY_REGULATION_BALLS ? " / 最終球HRは2点" : "";
+  return `ホームラン競争 ${teamLabel(team)} ${ballNumber}/${HOME_RUN_DERBY_REGULATION_BALLS}球 ${batter.name}${bonus}`;
+}
+
+function getHomeRunDerbyModeLabel() {
+  if (!isHomeRunDerbyMode()) return "";
+  return homeRunDerbyState.playerCount === 2 ? "MODE: HR競争 2人用" : "MODE: HR競争 1人用";
+}
+
+function isHomeRunDerbyLastRegulationBall(team = battingTeam) {
+  return isHomeRunDerbyMode()
+    && homeRunDerbyState.round === "regulation"
+    && (homeRunDerbyState.balls?.[team] || 0) === HOME_RUN_DERBY_REGULATION_BALLS - 1;
+}
+
+function handleHomeRunDerbyPitchResult(isHomer, metricText = "") {
+  if (!isHomeRunDerbyMode() || !homeRunDerbyState.active) return false;
+  const team = battingTeam;
+  const points = isHomer ? (isHomeRunDerbyLastRegulationBall(team) ? 2 : 1) : 0;
+  scores[team] += points;
+  homeRunDerbyState.lastPitchPoints = points;
+  homeRunDerbyState.lastPitchHomer = Boolean(isHomer);
+  const resultText = isHomer
+    ? `ホームラン +${points}`
+    : "ホームランならず";
+  const detailText = metricText ? ` / ${metricText}` : "";
+  message = `${resultText}${detailText} / A ${scores.away} - B ${scores.home}`;
+  showEffect(resultText, isHomer ? "#ff6f61" : "#aee7ff");
+  advanceHomeRunDerbyTurn();
+  resetPracticePlateAppearance();
+  if (gamePhase === "playing" && !isInputLocked()) scheduleNextPitch(isHomer ? 1100 : 800);
+  return true;
+}
+
+function advanceHomeRunDerbyTurn() {
+  const team = battingTeam;
+  if (homeRunDerbyState.round === "regulation") {
+    homeRunDerbyState.balls[team] = (homeRunDerbyState.balls[team] || 0) + 1;
+    const awayDone = (homeRunDerbyState.balls.away || 0) >= HOME_RUN_DERBY_REGULATION_BALLS;
+    const homeDone = (homeRunDerbyState.balls.home || 0) >= HOME_RUN_DERBY_REGULATION_BALLS;
+    if (!awayDone || !homeDone) {
+      const nextTeam = team === "away" ? "home" : "away";
+      if ((homeRunDerbyState.balls[nextTeam] || 0) < HOME_RUN_DERBY_REGULATION_BALLS) {
+        battingTeam = nextTeam;
+        homeRunDerbyState.currentTeam = nextTeam;
+        return;
+      }
+      return;
+    }
+    if (scores.away === scores.home) {
+      homeRunDerbyState.round = "sudden";
+      homeRunDerbyState.suddenRound = 1;
+      homeRunDerbyState.suddenBalls = { away: 0, home: 0 };
+      battingTeam = "away";
+      homeRunDerbyState.currentTeam = "away";
+      message = `同点、サドンデスへ / A ${scores.away} - B ${scores.home}`;
+      return;
+    }
+    endHomeRunDerby();
+    return;
+  }
+
+  homeRunDerbyState.suddenBalls[team] = 1;
+  if (team === "away") {
+    battingTeam = "home";
+    homeRunDerbyState.currentTeam = "home";
+    return;
+  }
+  if (scores.away !== scores.home) {
+    endHomeRunDerby();
+    return;
+  }
+  homeRunDerbyState.suddenRound += 1;
+  homeRunDerbyState.suddenBalls = { away: 0, home: 0 };
+  battingTeam = "away";
+  homeRunDerbyState.currentTeam = "away";
+  message = `サドンデス継続 / A ${scores.away} - B ${scores.home}`;
+}
+
+function endHomeRunDerby() {
+  gamePhase = "gameover";
+  ball.active = false;
+  pendingPitch = null;
+  isPitching = false;
+  autoPitchTimer = Number.POSITIVE_INFINITY;
+  const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "A勝利" : "B勝利";
+  message = `ホームラン競争終了 A ${scores.away} - B ${scores.home} ${result}`;
+  showEffect(result, "#ff6f61");
+}
+
 function resolveBatterSide(batterInfo, pitcherInfo) {
   if (batterInfo.bats === "S") return pitcherInfo.throws === "R" ? "L" : "R";
   return batterInfo.bats;
@@ -3182,6 +3331,7 @@ function isComputerControlledGameMode() {
 
 function isPlayerBatting() {
   if (isBattingPracticeMode()) return true;
+  if (isHomeRunDerbyMode()) return homeRunDerbyState.playerCount === 2 || battingTeam === "away";
   if (isPitchingPracticeMode()) return false;
   if (gameMode === "watch") return false;
   return gameMode === "versus" || battingTeam === playerTeam;
@@ -3189,6 +3339,7 @@ function isPlayerBatting() {
 
 function isPlayerPitching() {
   if (isBattingPracticeMode()) return practicePitcherControl === "manual";
+  if (isHomeRunDerbyMode()) return false;
   if (isPitchingPracticeMode()) return true;
   if (gameMode === "watch") return false;
   return gameMode === "versus" || fieldingTeam() === playerTeam;
@@ -4055,7 +4206,7 @@ function getPracticePitcherType() {
 }
 
 function choosePracticePitchPlan() {
-  const type = getPracticePitcherType();
+  const type = isHomeRunDerbyMode() ? "A" : getPracticePitcherType();
   if (type === "A") {
     const pitchType = Math.random() < 0.82 ? "normal" : "fast";
     return syncComputerPitchPlanLegacyFields({
@@ -4103,7 +4254,7 @@ function getComputerPlanPitcherProfile(player = activePitcher) {
 }
 
 function chooseComputerPitchPlan() {
-  if (gameMode === "practice") {
+  if (gameMode === "practice" || isHomeRunDerbyMode()) {
     const practicePlan = choosePracticePitchPlan();
     if (practicePlan) return practicePlan;
   }
@@ -4427,11 +4578,17 @@ function getComputerSwingStrikeConfidence() {
 
 function computerSwingBat() {
   if (isPitchingPracticeMode() && pitchingPracticeBatterType !== "B") return;
-  if ((gameMode !== "single" && gameMode !== "watch" && !isPitchingPracticeMode()) || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
+  if ((gameMode !== "single" && gameMode !== "watch" && !isPitchingPracticeMode() && !isHomeRunDerbyMode()) || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
   const progress = getPitchProgress();
   if (progress < 0.72 || progress > 1.08) return;
   const strikeConfidence = getComputerSwingStrikeConfidence();
   const timingWindow = Math.max(0, 1 - Math.abs(progress - 0.92) / 0.26);
+  if (isHomeRunDerbyMode()) {
+    if (strikeConfidence < 0.18 && Math.random() > 0.18) return;
+    const derbySwingChance = timingWindow * clamp(0.42 + strikeConfidence * 0.7 + activeBatter.meet * 0.025, 0.18, 0.96);
+    if (Math.random() < derbySwingChance) startSwing(performance.now(), "strong");
+    return;
+  }
   const chaseChance = timingWindow * clamp((activeBatter.meet - 6) / 220, 0.002, 0.02);
   if (strikeConfidence < 0.36 && Math.random() >= chaseChance) return;
   const swingChance = 0.006 + timingWindow * (0.04 + strikeConfidence * 0.31 + activeBatter.meet * 0.004);
@@ -5421,7 +5578,7 @@ function updateAudioToggleButtons() {
     button.setAttribute("aria-pressed", String(audioSettings.soundEffects));
   });
   bgmToggleButtons.forEach((button) => {
-    button.textContent = audioSettings.bgm && bgmNeedsUserGesture ? "BGM開始" : audioSettings.bgm ? "BGM ON" : "BGM OFF";
+    button.textContent = audioSettings.bgm ? "BGM開始" : "BGM OFF";
     button.setAttribute("aria-pressed", String(audioSettings.bgm));
   });
 }
@@ -6166,7 +6323,7 @@ function applyOutfieldHitGrounderReduction(result, profile, roll = Math.random()
 }
 
 function shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll = Math.random()) {
-  if (gameMode !== "practice" || !activePitcher?.practiceOnly || getCurrentSwingType() === "bunt") return false;
+  if (!(gameMode === "practice" || isHomeRunDerbyMode()) || !activePitcher?.practiceOnly || getCurrentSwingType() === "bunt") return false;
   if (!contact?.inGoodContactZone || contact.outsideStrikeZone || profile?.isFoul) return false;
   const lowStuffBoost = getLowPitcherStuffProfileBoost(activePitcher);
   const veryLowStuff = lowStuffBoost >= pitcherAbilityTuning.lowStuffProfileBoost * 0.8;
@@ -6807,7 +6964,7 @@ function buildBattedBallProfile(contact) {
   const meetBoost = (meet - 5) * 0.018;
   const handednessContactMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
   const handednessContactBoost = handednessContactMultiplier - 1;
-  const practicePitcherContactBoost = gameMode === "practice" && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
+  const practicePitcherContactBoost = (gameMode === "practice" || isHomeRunDerbyMode()) && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
   const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 5.1) * 0.88 : 0;
   const zoneEdgeDrag = inGoodContactZone ? (Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22) * 1.5 : 0;
   const centerSweetSpotDriveBoost = inGoodContactZone ? zoneCenterBoost * clamp((sweetSpotScore - 0.42) / 0.48, 0, 1) : 0;
@@ -7814,6 +7971,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     message = `${label}${suffix}`;
     showEffect(label, "#f9f871");
     ball.active = false;
+    if (handleHomeRunDerbyPitchResult(false)) return;
   } else if (kind === "foul") {
     stealState = createStealState();
     const isBuntFoul = battedProfile?.isBunt || getCurrentSwingType() === "bunt";
@@ -7842,8 +8000,10 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     message = "ボール";
     showEffect("ボール", "#aee7ff");
     ball.active = false;
+    if (handleHomeRunDerbyPitchResult(false)) return;
   } else if (kind === "hbp") {
     stealState = createStealState();
+    if (handleHomeRunDerbyPitchResult(false)) return;
     const runs = advanceRunners("walk", activeBatter);
     recordCurrentPitcherWalkAllowed(1);
     message = runs > 0 ? `デッドボール: ${runs}点` : "デッドボール";
@@ -10619,6 +10779,20 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (scoreDrivenHomerPush && fairDeepFlight && fenceIntersection && contactScore >= 0.6 && power >= 1.36 && distance > fenceTravelDistance - 180) {
     fenceOver = true;
   }
+  let nearFenceZoneHomerPush = false;
+  const zoneBand = battedProfile?.zoneBand;
+  const nearFenceZoneHomerPushEligible = !fenceOver
+    && (zoneBand === "center" || zoneBand === "middle")
+    && fairDeepFlight
+    && fenceIntersection
+    && !isGrounder
+    && distance > fenceTravelDistance - 180
+    && possibleHomerFlightDistance > fenceTravelDistance - 120
+    && heightAtFence >= defenseField.fenceHeight * 0.62;
+  if (nearFenceZoneHomerPushEligible && Math.random() < 0.3) {
+    nearFenceZoneHomerPush = true;
+    fenceOver = true;
+  }
   if (forceUnifiedWallHit && domeRule?.kind !== "groundRuleDouble") {
     fenceOver = false;
   }
@@ -10636,7 +10810,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     unifiedHomerCandidate: Boolean(battedProfile?.unifiedHomerCandidate),
     displayOverallScore: battedProfile?.displayOverallScore
   });
-  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && !centerZoneHomerPush && !scoreDrivenHomerPush && domeRule?.kind !== "homer") fenceOver = false;
+  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && !centerZoneHomerPush && !scoreDrivenHomerPush && !nearFenceZoneHomerPush && domeRule?.kind !== "homer") fenceOver = false;
   const flyWallHit = trajectory === "fly"
     ? distance >= fenceTravelDistance - (isFenceEdgeFly ? 38 : isDeepDrive ? 52 : 24)
     : isFenceLiner
@@ -13269,6 +13443,7 @@ function finishDefensePlay() {
   gamePhase = "playing";
   ball.active = false;
   if (defenseState.foulPlay) {
+    if (handleHomeRunDerbyPitchResult(false, metricText)) return;
     if (outcome?.caught) {
       count.outs += 1;
       recordLastOutBatter(battingTeam, activeBatter);
@@ -13293,6 +13468,12 @@ function finishDefensePlay() {
     return;
   }
   resetCountOnly();
+
+  if (isHomeRunDerbyMode()) {
+    const isHomer = outcome?.scoreType === "homer" || defenseState.battedBall?.fenceOver;
+    handleHomeRunDerbyPitchResult(isHomer, metricText);
+    return;
+  }
 
   const forceOutBasesFromThrow = getForceOutBasesFromThrowState(defenseState.throw);
   const completedForceOutBases = defenseState.completedForceOutBases || [];
@@ -13850,7 +14031,9 @@ function nextPitch() {
   if (gamePhase === "playing" && (isPitching || pendingPitch || ball.inPitch)) return;
   resetBall();
   resetSwing();
-  message = isBattingPracticeMode()
+  message = isHomeRunDerbyMode()
+    ? getHomeRunDerbyStatusMessage()
+    : isBattingPracticeMode()
     ? practicePitcherControl === "manual" ? "打撃練習: 5/8/2で投球してください" : "打撃練習: 次の投球を待っています"
     : isPitchingPracticeMode() ? "投球練習: 5/8/2で投球してください"
     : gameMode === "single" ? "次の投球を待っています" : "5/8/2で投球してください";
@@ -14226,16 +14409,26 @@ function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
   if (stadium.surface === "spaceGlow") {
     const base = ctx.createLinearGradient(0, 0, 0, canvas.height);
     if (base?.addColorStop) {
-      base.addColorStop(0, "#edf4f8");
-      base.addColorStop(0.48, "#c8d4dc");
-      base.addColorStop(1, "#9eabb5");
+      base.addColorStop(0, "#020309");
+      base.addColorStop(0.42, "#090d14");
+      base.addColorStop(0.72, "#111720");
+      base.addColorStop(1, "#04060b");
       ctx.fillStyle = base;
     } else {
-      ctx.fillStyle = "#c8d4dc";
+      ctx.fillStyle = "#090d14";
     }
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    const gloss = ctx.createRadialGradient(field.plateX, field.plateY + 120, 40, field.plateX, field.plateY + 120, canvas.width * 0.72);
+    if (gloss?.addColorStop) {
+      gloss.addColorStop(0, "rgba(88, 122, 150, 0.16)");
+      gloss.addColorStop(0.42, "rgba(42, 64, 82, 0.08)");
+      gloss.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = gloss;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.fillStyle = "rgba(255, 255, 255, 0.018)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height * 0.22);
     ctx.restore();
     return;
   }
@@ -14828,34 +15021,58 @@ function drawSpaceStadiumFieldLights(centerX, homeY, radius) {
   ctx.clip();
   const shine = ctx.createLinearGradient(centerX - radius, homeY - radius, centerX + radius, homeY);
   if (shine?.addColorStop) {
-    shine.addColorStop(0, "rgba(255, 255, 255, 0.025)");
-    shine.addColorStop(0.38, "rgba(255, 255, 255, 0.13)");
-    shine.addColorStop(0.55, "rgba(138, 255, 246, 0.15)");
-    shine.addColorStop(1, "rgba(255, 255, 255, 0.018)");
+    shine.addColorStop(0, "rgba(255, 255, 255, 0.012)");
+    shine.addColorStop(0.38, "rgba(125, 155, 180, 0.06)");
+    shine.addColorStop(0.55, "rgba(72, 210, 218, 0.055)");
+    shine.addColorStop(1, "rgba(255, 255, 255, 0.008)");
     ctx.fillStyle = shine;
     ctx.fillRect(centerX - radius, homeY - radius, radius * 2, radius);
   }
-  ctx.fillStyle = "rgba(220, 238, 248, 0.12)";
+  ctx.fillStyle = "rgba(16, 24, 32, 0.18)";
   ctx.fillRect(centerX - radius, homeY - radius, radius * 2, radius);
   ctx.globalCompositeOperation = "lighter";
   for (let ring = 0.28; ring <= 0.96; ring += 0.17) {
-    ctx.strokeStyle = ring > 0.75 ? "rgba(255, 221, 111, 0.16)" : "rgba(114, 255, 246, 0.14)";
-    ctx.lineWidth = ring > 0.75 ? 3 : 2;
+    ctx.strokeStyle = ring > 0.75 ? "rgba(181, 148, 80, 0.075)" : "rgba(82, 205, 214, 0.07)";
+    ctx.lineWidth = ring > 0.75 ? 2 : 1.4;
     ctx.beginPath();
     ctx.arc(centerX, homeY, radius * ring, Math.PI + 0.05, Math.PI * 2 - 0.05);
     ctx.stroke();
   }
-  for (let i = 0; i < 150; i += 1) {
+  for (let i = 0; i < 105; i += 1) {
     const angle = Math.PI + ((i * 29) % 180) * Math.PI / 180;
     const distance = radius * (0.18 + ((i * 37) % 78) / 100);
     const x = centerX + Math.cos(angle) * distance;
     const y = homeY + Math.sin(angle) * distance;
-    ctx.fillStyle = i % 4 === 0 ? "rgba(255, 230, 120, 0.42)" : "rgba(126, 255, 248, 0.36)";
+    ctx.fillStyle = i % 4 === 0 ? "rgba(195, 166, 88, 0.22)" : "rgba(96, 215, 220, 0.2)";
     ctx.beginPath();
-    ctx.arc(x, y, i % 6 === 0 ? 2.4 : 1.5, 0, Math.PI * 2);
+    ctx.arc(x, y, i % 6 === 0 ? 1.8 : 1.1, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
+}
+
+function getSpaceInfieldFill(centerX, topY, bottomY) {
+  const fill = ctx.createLinearGradient(centerX, topY, centerX, bottomY);
+  if (fill?.addColorStop) {
+    fill.addColorStop(0, "#030409");
+    fill.addColorStop(0.35, "#080b11");
+    fill.addColorStop(0.68, "#151a22");
+    fill.addColorStop(1, "#05070c");
+    return fill;
+  }
+  return "#080b11";
+}
+
+function getSpaceOutfieldFill(centerX, homeY, radius) {
+  const fill = ctx.createRadialGradient(centerX, homeY - radius * 0.3, radius * 0.08, centerX, homeY, radius);
+  if (fill?.addColorStop) {
+    fill.addColorStop(0, "rgba(22, 30, 40, 0.98)");
+    fill.addColorStop(0.45, "rgba(9, 14, 22, 0.96)");
+    fill.addColorStop(0.78, "rgba(18, 24, 32, 0.94)");
+    fill.addColorStop(1, "rgba(3, 5, 10, 0.96)");
+    return fill;
+  }
+  return "rgba(9, 14, 22, 0.96)";
 }
 
 function drawSpaceStadiumBeyondOutfield() {
@@ -15456,7 +15673,7 @@ function drawField() {
   drawNextDomeRoofScreen();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#9caab5" : "#d89548";
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.centerX, 70, 836) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
   ctx.lineTo(24, 836);
@@ -15466,7 +15683,7 @@ function drawField() {
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 232, 170, 0.16)"
     : stadium.surface === "spaceGlow"
-      ? "rgba(190, 205, 216, 0.94)"
+      ? getSpaceOutfieldFill(field.centerX, 754, 405)
     : stadium.surface === "royalGrass"
       ? "rgba(47, 119, 70, 0.94)"
       : "#68b560";
@@ -15488,7 +15705,7 @@ function drawField() {
     drawLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY);
     drawLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY);
   }
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#b8c4cd" : "#c8793b";
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? "rgba(28, 34, 42, 0.92)" : "#c8793b";
   ctx.beginPath();
   ctx.ellipse(pitcher.x, pitcher.y + 18, 68, 30, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -15516,7 +15733,7 @@ function drawDefenseView() {
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
 
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? "#9caab5" : "#d89548";
+  ctx.fillStyle = stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.plateX, field.plateY + 42);
   ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
@@ -15527,7 +15744,7 @@ function drawDefenseView() {
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 235, 174, 0.14)"
     : stadium.surface === "spaceGlow"
-      ? "rgba(190, 205, 216, 0.94)"
+      ? getSpaceOutfieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
     : stadium.surface === "royalGrass"
       ? "rgba(45, 116, 67, 0.94)"
       : "#6ebf69";
@@ -16036,14 +16253,14 @@ function drawDefenseBases() {
 function drawSpaceElectricLine(x1, y1, x2, y2, color = "#74fff5") {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = hexToRgba(color, 0.22);
-  ctx.lineWidth = 20;
+  ctx.strokeStyle = hexToRgba(color, 0.065);
+  ctx.lineWidth = 13;
   drawLine(x1, y1, x2, y2);
-  ctx.strokeStyle = hexToRgba(color, 0.78);
-  ctx.lineWidth = 7;
+  ctx.strokeStyle = hexToRgba(color, 0.3);
+  ctx.lineWidth = 4;
   drawLine(x1, y1, x2, y2);
-  ctx.strokeStyle = "rgba(255,255,255,0.92)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(210, 235, 245, 0.36)";
+  ctx.lineWidth = 1.2;
   drawLine(x1, y1, x2, y2);
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -16055,9 +16272,9 @@ function drawSpaceElectricLine(x1, y1, x2, y2, color = "#74fff5") {
     const t = i / length;
     const x = x1 + dx * t + nx * ((i / 46) % 2 === 0 ? 7 : -7);
     const y = y1 + dy * t + ny * ((i / 46) % 2 === 0 ? 7 : -7);
-    ctx.fillStyle = hexToRgba(palette[Math.floor(i / 46) % palette.length], 0.86);
+    ctx.fillStyle = hexToRgba(palette[Math.floor(i / 46) % palette.length], 0.28);
     ctx.beginPath();
-    ctx.arc(x, y, 4.2, 0, Math.PI * 2);
+    ctx.arc(x, y, 2.6, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -16084,35 +16301,35 @@ function drawSpaceStadiumBases(home, first, second, third) {
 function drawSpaceBaseDiamond(x, y, label, index) {
   const colors = ["#74fff5", "#fff07a", "#ff7ec8", "#9f83ff", "#ff6f61"];
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   colors.forEach((color, colorIndex) => {
     const angle = (Math.PI * 2 * colorIndex) / colors.length + index * 0.45;
-    ctx.fillStyle = hexToRgba(color, 0.72);
+    ctx.fillStyle = hexToRgba(color, 0.22);
     ctx.beginPath();
-    ctx.arc(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, 5.5, 0, Math.PI * 2);
+    ctx.arc(x + Math.cos(angle) * 20, y + Math.sin(angle) * 20, 3.2, 0, Math.PI * 2);
     ctx.fill();
   });
   ctx.translate(x, y);
   ctx.rotate(Math.PI / 4);
   const glow = ctx.createLinearGradient(-18, -18, 18, 18);
   if (glow?.addColorStop) {
-    glow.addColorStop(0, "#ffffff");
-    glow.addColorStop(0.36, colors[index % colors.length]);
-    glow.addColorStop(0.72, colors[(index + 2) % colors.length]);
-    glow.addColorStop(1, "#ffffff");
+    glow.addColorStop(0, "#27303c");
+    glow.addColorStop(0.36, hexToRgba(colors[index % colors.length], 0.44));
+    glow.addColorStop(0.72, "#111821");
+    glow.addColorStop(1, "#303846");
     ctx.fillStyle = glow;
   } else {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#1b2430";
   }
   ctx.shadowColor = colors[index % colors.length];
-  ctx.shadowBlur = 22;
+  ctx.shadowBlur = 7;
   ctx.fillRect(-17, -17, 34, 34);
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(210, 232, 242, 0.55)";
+  ctx.lineWidth = 2;
   ctx.strokeRect(-17, -17, 34, 34);
   ctx.restore();
 
-  ctx.fillStyle = "#06101c";
+  ctx.fillStyle = "#d7edf4";
   ctx.font = "bold 15px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -17036,22 +17253,22 @@ function drawSpaceHomePlate() {
   ctx.globalCompositeOperation = "lighter";
   points.forEach((point, index) => {
     const next = points[(index + 1) % points.length];
-    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.24);
-    ctx.lineWidth = 20;
+    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.07);
+    ctx.lineWidth = 13;
     drawLine(point.x, point.y, next.x, next.y);
-    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.94);
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = hexToRgba(palette[index % palette.length], 0.34);
+    ctx.lineWidth = 3.8;
     drawLine(point.x, point.y, next.x, next.y);
   });
 
   const plateGlow = ctx.createRadialGradient(field.plateX, field.plateY + 16, 8, field.plateX, field.plateY + 16, 92);
   if (plateGlow?.addColorStop) {
-    plateGlow.addColorStop(0, "rgba(255,255,255,0.72)");
-    plateGlow.addColorStop(0.36, "rgba(116,255,245,0.28)");
+    plateGlow.addColorStop(0, "rgba(180, 220, 230, 0.2)");
+    plateGlow.addColorStop(0.36, "rgba(76, 190, 205, 0.09)");
     plateGlow.addColorStop(1, "rgba(116,255,245,0)");
     ctx.fillStyle = plateGlow;
     ctx.beginPath();
-    ctx.arc(field.plateX, field.plateY + 16, 92, 0, Math.PI * 2);
+    ctx.arc(field.plateX, field.plateY + 16, 72, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -17063,27 +17280,27 @@ function drawSpaceHomePlate() {
   ctx.closePath();
   const fill = ctx.createLinearGradient(field.plateX - 48, field.plateY - 18, field.plateX + 48, field.plateY + 52);
   if (fill?.addColorStop) {
-    fill.addColorStop(0, "#ffffff");
-    fill.addColorStop(0.34, "#fff07a");
-    fill.addColorStop(0.58, "#74fff5");
-    fill.addColorStop(0.78, "#ff7ec8");
-    fill.addColorStop(1, "#ffffff");
+    fill.addColorStop(0, "#303745");
+    fill.addColorStop(0.34, "#4a4930");
+    fill.addColorStop(0.58, "#24464e");
+    fill.addColorStop(0.78, "#3a2f4a");
+    fill.addColorStop(1, "#202833");
     ctx.fillStyle = fill;
   } else {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#26313c";
   }
   ctx.fill();
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(220, 240, 242, 0.48)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  for (let i = 0; i < 18; i += 1) {
+  for (let i = 0; i < 14; i += 1) {
     const angle = -Math.PI * 0.1 + (Math.PI * 1.2 * i) / 17;
     const x = field.plateX + Math.cos(angle) * 58;
     const y = field.plateY + 18 + Math.sin(angle) * 46;
-    ctx.fillStyle = hexToRgba(palette[i % palette.length], 0.96);
+    ctx.fillStyle = hexToRgba(palette[i % palette.length], 0.34);
     ctx.beginPath();
-    ctx.arc(x, y, i % 3 === 0 ? 5 : 3.6, 0, Math.PI * 2);
+    ctx.arc(x, y, i % 3 === 0 ? 3.2 : 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -17579,14 +17796,25 @@ function drawHud() {
   drawPanel(18, 18, 360, 164, "#233047");
   ctx.fillStyle = "#fff2a8";
   ctx.font = "bold 24px monospace";
-  const modeLabel = isBattingPracticeMode() ? "MODE: 打撃練習" : isPitchingPracticeMode() ? "MODE: 投球練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : gameMode === "watch" ? "MODE: 観戦モード" : "MODE: 2人用";
+  const modeLabel = isHomeRunDerbyMode() ? getHomeRunDerbyModeLabel() : isBattingPracticeMode() ? "MODE: 打撃練習" : isPitchingPracticeMode() ? "MODE: 投球練習" : gameMode === "single" ? `MODE: 1人用 vs ${teamLabel("home")}` : gameMode === "watch" ? "MODE: 観戦モード" : "MODE: 2人用";
   ctx.fillText(modeLabel, 38, 52);
   ctx.fillStyle = "#f8f3d8";
   ctx.font = "bold 22px monospace";
-  ctx.fillText(`${inning}${half === "top" ? "表" : "裏"}  A ${scores.away} - B ${scores.home}`, 38, 86);
-  ctx.fillText(`S ${Math.min(count.strikes, 2)}  B ${Math.min(count.balls, 3)}  O ${Math.min(count.outs, 2)}`, 38, 120);
-  drawBaseRunnerIndicator(306, 78);
-  drawBaseRunnerNames(38, 148);
+  if (isHomeRunDerbyMode()) {
+    const team = homeRunDerbyState.currentTeam || battingTeam;
+    const ballsText = homeRunDerbyState.round === "sudden"
+      ? `SD ${homeRunDerbyState.suddenRound || 1}  ${teamLabel(team)}`
+      : `${teamLabel(team)} ${(homeRunDerbyState.balls?.[team] || 0) + 1}/${HOME_RUN_DERBY_REGULATION_BALLS}球`;
+    ctx.fillText(`A ${scores.away} - B ${scores.home}`, 38, 86);
+    ctx.fillText(ballsText, 38, 120);
+    ctx.font = "bold 17px monospace";
+    ctx.fillText(isHomeRunDerbyLastRegulationBall(team) ? "最終球: HR 2点" : "HR 1点", 38, 150);
+  } else {
+    ctx.fillText(`${inning}${half === "top" ? "表" : "裏"}  A ${scores.away} - B ${scores.home}`, 38, 86);
+    ctx.fillText(`S ${Math.min(count.strikes, 2)}  B ${Math.min(count.balls, 3)}  O ${Math.min(count.outs, 2)}`, 38, 120);
+    drawBaseRunnerIndicator(306, 78);
+    drawBaseRunnerNames(38, 148);
+  }
   drawLastGamepadButton();
   if (gamePhase === "defense") drawDefenseHud();
 }
@@ -18461,6 +18689,9 @@ practiceStartButton?.addEventListener("click", () => {
 pitchingPracticeStartButton?.addEventListener("click", () => {
   startGame("pitchPractice");
 });
+homeRunDerbyStartButton?.addEventListener("click", () => {
+  startGame("homerDerby");
+});
 practiceBatterSelect?.addEventListener("change", () => {
   practiceBatterId = practiceBatterSelect.value;
 });
@@ -18469,6 +18700,15 @@ practicePitcherSelect?.addEventListener("change", () => {
 });
 pitchingPracticeBatterTypeSelect?.addEventListener("change", () => {
   pitchingPracticeBatterType = ["A", "B"].includes(pitchingPracticeBatterTypeSelect.value) ? pitchingPracticeBatterTypeSelect.value : "A";
+});
+homeRunDerbyPlayerCountSelect?.addEventListener("change", () => {
+  homeRunDerbyPlayerCount = homeRunDerbyPlayerCountSelect.value === "2" ? 2 : 1;
+});
+homeRunDerbyAwayBatterSelect?.addEventListener("change", () => {
+  homeRunDerbyBatterIds.away = homeRunDerbyAwayBatterSelect.value;
+});
+homeRunDerbyHomeBatterSelect?.addEventListener("change", () => {
+  homeRunDerbyBatterIds.home = homeRunDerbyHomeBatterSelect.value;
 });
 menuButton.addEventListener("click", showMenu);
 playerEditorButton?.addEventListener("click", openPlayerEditor);

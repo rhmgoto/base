@@ -290,11 +290,16 @@ canvas {
 }
 
 .menu-card label {
+  display: grid;
+  grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
+  align-items: center;
   gap: 4px;
   font-size: 13px;
 }
 
 .menu-card select {
+  width: 100%;
+  min-width: 0;
   min-height: 30px;
   padding: 1px 5px;
 }
@@ -306,12 +311,14 @@ canvas {
 }
 
 .menu-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(150px, 180px);
   align-items: end;
 }
 
 .mode-setting-field {
   grid-column: span 1;
+  grid-template-columns: minmax(58px, max-content) minmax(0, 1fr);
+  gap: 8px;
 }
 
 .team-setup-field {
@@ -336,6 +343,18 @@ canvas {
 .team-preset-away,
 .team-preset-home {
   grid-column: span 2;
+}
+
+.menu-audio-controls {
+  align-self: end;
+  gap: 6px;
+}
+
+.menu-audio-controls .audio-toggle {
+  min-height: 30px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.1;
 }
 
 .team-preset-away {
@@ -418,6 +437,13 @@ canvas {
   gap: 8px;
 }
 
+.team-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .team-header-actions {
   display: flex;
   align-items: center;
@@ -450,9 +476,10 @@ canvas {
 }
 
 .team-point-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .ability-board {
@@ -1134,10 +1161,13 @@ canvas {
 
 .team-point-status {
   margin-top: 0;
-  padding: 6px 10px;
-  font-size: 17px;
+  min-width: 108px;
+  padding: 3px 8px;
+  font-size: 13px;
   text-align: center;
-  border-width: 3px;
+  white-space: nowrap;
+  border-width: 2px;
+  border-radius: 7px;
 }
 
 .pitcher-point-status {
@@ -1882,13 +1912,22 @@ button {
 
 .menu-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 18px;
 }
 
+.team-setup-field label {
+  grid-template-columns: minmax(176px, max-content) minmax(0, 1fr);
+  gap: 8px;
+}
+
 .menu-actions button {
+  min-height: 36px;
   margin-top: 0;
+  padding: 0 8px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .practice-select-panel {
@@ -1902,9 +1941,26 @@ button {
   background: rgba(255, 255, 255, 0.72);
 }
 
-.practice-pitcher-settings {
+.practice-mode-settings,
+.practice-pitcher-settings,
+.home-run-derby-settings {
   display: grid;
-  gap: 5px;
+  gap: 6px;
+  align-content: start;
+}
+
+.practice-mode-settings label,
+.home-run-derby-settings label {
+  grid-template-columns: minmax(160px, max-content) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.practice-mode-settings,
+.home-run-derby-settings {
+  padding: 6px;
+  border: 2px solid rgba(46, 75, 91, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 240, 184, 0.42);
 }
 
 .menu-card > button {
@@ -1964,9 +2020,19 @@ button {
   .team-grid,
   .team-setup-field,
   .practice-select-panel,
+  .menu-actions,
   .player-picks,
   .ability-board {
     grid-template-columns: 1fr;
+  }
+
+  .menu-card label,
+  .mode-setting-field,
+  .team-setup-field label,
+  .practice-mode-settings label,
+  .home-run-derby-settings label {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .player-chooser {
