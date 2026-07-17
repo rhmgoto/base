@@ -3360,9 +3360,10 @@ function startPitch(typeKey, options = {}) {
     courseDirection: course.direction,
     countPressure: options.countPressure ?? 0
   });
-  const intendedX = options.targetX ?? getPitchCourseTargetX(course, pitchRadius, typeKey);
-  const intendedY = options.targetY ?? field.plateY;
-  const baseSpread = options.targetSpread ?? getPitchCourseBaseSpread(course, typeKey, pitch);
+  const sharedAim = getSharedPitchCourseAim(course, pitchRadius, typeKey, pitch);
+  const intendedX = options.targetX ?? sharedAim.targetX;
+  const intendedY = options.targetY ?? sharedAim.targetY;
+  const baseSpread = options.targetSpread ?? sharedAim.targetSpread;
   const targetSpread = baseSpread * controlProfile.spread;
   const controlMiss = staminaMistake
     ? getStaminaMistakeTarget(intendedX, intendedY)
@@ -3542,6 +3543,20 @@ function getPitchCourseTargetX(course, pitchRadius = 8, typeKey = "normal") {
   if (!course?.direction || !isEdgeCommandPitch(typeKey)) return field.plateX + (course?.offset ?? 0);
   const plateEdgeX = getHomePlateEdgeXAtY(field.plateY, course.direction);
   return plateEdgeX + course.direction * Math.max(1.5, pitchRadius - 3.5);
+}
+
+function getSharedPitchCourseAim(course, pitchRadius = 8, typeKey = "normal", pitch = pitchTypes[typeKey]) {
+  const direction = Math.sign(course?.direction || 0);
+  const sharedCourse = {
+    direction,
+    offset: direction * 48
+  };
+  return {
+    course: sharedCourse,
+    targetX: getPitchCourseTargetX(sharedCourse, pitchRadius, typeKey),
+    targetY: field.plateY,
+    targetSpread: getPitchCourseBaseSpread(sharedCourse, typeKey, pitch)
+  };
 }
 
 function getPitchCourseBaseSpread(course, typeKey, pitch) {
@@ -4021,13 +4036,14 @@ function choosePracticePitchPlan() {
   if (type === "B") {
     const pitchType = Math.random() < 0.56 ? "fast" : "normal";
     const side = Math.random() < 0.5 ? -1 : 1;
+    const sharedAim = getSharedPitchCourseAim({ direction: side }, getPitchRadius(pitchType), pitchType, pitchTypes[pitchType]);
     return syncComputerPitchPlanLegacyFields({
       type: pitchType,
       course: { direction: side, offset: side * 42, intent: "plainEdge" },
-      targetX: getPitchCourseTargetX({ direction: side }, getPitchRadius(pitchType), pitchType),
-      targetY: field.plateY + randomBetween(-8, 10),
-      targetSpread: 0,
-      lockTarget: true,
+      targetX: sharedAim.targetX,
+      targetY: sharedAim.targetY,
+      targetSpread: sharedAim.targetSpread,
+      lockTarget: false,
       bendSegments: [],
       speedChangeSegments: []
     });
@@ -4130,8 +4146,24 @@ function chooseComputerPitchPlan() {
     plan.targetY = field.plateY + randomBetween(-10, 10);
     plan.targetSpread = 7;
   }
+  applySharedComputerPitchAim(plan);
   constrainComputerPitchPlanToPlayerReach(plan);
   return buildComputerPitchShape(plan, planPitcher);
+}
+
+function applySharedComputerPitchAim(plan) {
+  if (!plan || !pitchTypes[plan.type]) return plan;
+  const sharedAim = getSharedPitchCourseAim(
+    plan.course,
+    getPitchRadius(plan.type),
+    plan.type,
+    pitchTypes[plan.type]
+  );
+  plan.targetX = sharedAim.targetX;
+  plan.targetY = sharedAim.targetY;
+  plan.targetSpread = sharedAim.targetSpread;
+  plan.lockTarget = false;
+  return plan;
 }
 
 function constrainComputerPitchPlanToPlayerReach(plan) {
@@ -4139,12 +4171,12 @@ function constrainComputerPitchPlanToPlayerReach(plan) {
   const leftEdge = getPitchCourseTargetX({ direction: -1 }, getPitchRadius(plan.type), plan.type);
   const rightEdge = getPitchCourseTargetX({ direction: 1 }, getPitchRadius(plan.type), plan.type);
   plan.targetX = clamp(plan.targetX, leftEdge, rightEdge);
-  if (plan.course?.intent === "plainEdge" && plan.course?.direction) {
-    plan.targetX = plan.course.direction < 0 ? leftEdge : rightEdge;
-    plan.targetSpread = 0;
-    plan.lockTarget = true;
+  if (plan.course?.direction) {
+    const sharedAim = getSharedPitchCourseAim(plan.course, getPitchRadius(plan.type), plan.type, pitchTypes[plan.type]);
+    plan.targetX = sharedAim.targetX;
+    plan.targetSpread = sharedAim.targetSpread;
+    plan.lockTarget = false;
   }
-  if (plan.course?.direction) plan.targetSpread = Math.min(plan.targetSpread ?? 1, getComputerStrikeCommandLevel() >= 0.68 ? 0.5 : 1);
 }
 
 function getComputerPitcherPlateX(course, player = activePitcher) {

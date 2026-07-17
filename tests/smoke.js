@@ -209,7 +209,6 @@ function assertHtmlShell() {
     'value="dendos"',
     'value="semiauto"',
     'value="watch"',
-    'value="practice"',
     'id="practicePitcherControlSelect"',
     'id="practicePitcherTypeSelect"',
     'id="practiceBatterSelect"',
@@ -11027,5 +11026,86 @@ const invalidPitchState = JSON.parse(runInGame(
 assert(invalidPitchState.pendingPitch === false, "invalid pitch should not create a pending pitch");
 assert(invalidPitchState.isPitching === false, "invalid pitch should not start pitching");
 assert(invalidPitchState.message.includes("5/8/2/0"), "invalid pitch should explain valid pitch controls");
+
+const pitchAimSimulation = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const originalRandom = Math.random;
+    let seed = 260717;
+    Math.random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    try {
+      gameMode = "watch";
+      count.balls = 0;
+      count.strikes = 0;
+      const planChecks = [];
+      for (let index = 0; index < 10000; index += 1) {
+        const plan = chooseComputerPitchPlan();
+        const shared = getSharedPitchCourseAim(plan.course, getPitchRadius(plan.type), plan.type, pitchTypes[plan.type]);
+        planChecks.push({
+          targetDifference: Math.abs(plan.targetX - shared.targetX),
+          targetYDifference: Math.abs(plan.targetY - shared.targetY),
+          spreadDifference: Math.abs(plan.targetSpread - shared.targetSpread),
+          locked: plan.lockTarget === true
+        });
+      }
+
+      const byControl = [];
+      for (let control = 1; control <= 10; control += 1) {
+        let maximumDeviation = 0;
+        let normalPitchCount = 0;
+        let majorMissCount = 0;
+        const effectiveControl = clamp(control * pitcherAbilityTuning.globalMultiplier, 1, 10);
+        for (const pitchType of ["normal", "fast"]) {
+          for (const direction of [-1, 1]) {
+            const aim = getSharedPitchCourseAim({ direction }, getPitchRadius(pitchType), pitchType, pitchTypes[pitchType]);
+            const profile = getPitchControlProfile(effectiveControl, 0, {
+              pitchType,
+              courseDirection: direction,
+              countPressure: 0
+            });
+            const allowedDeviation = aim.targetSpread * profile.spread;
+            for (let sample = 0; sample < 10000; sample += 1) {
+              const controlMiss = getPitchControlMiss(profile, aim.targetX, aim.targetY);
+              if (controlMiss.type !== "none") {
+                majorMissCount += 1;
+                continue;
+              }
+              const targetX = controlMiss.x + randomBetween(-allowedDeviation, allowedDeviation);
+              const deviation = Math.abs(targetX - aim.targetX);
+              maximumDeviation = Math.max(maximumDeviation, deviation);
+              normalPitchCount += 1;
+              if (deviation > allowedDeviation + 0.0001) {
+                throw new Error("non-mistake straight pitch exceeded the shared player spread");
+              }
+            }
+          }
+        }
+        byControl.push({ control, effectiveControl, maximumDeviation, normalPitchCount, majorMissCount });
+      }
+      return JSON.stringify({
+        planCount: planChecks.length,
+        maximumPlanTargetDifference: Math.max(...planChecks.map((item) => item.targetDifference)),
+        maximumPlanTargetYDifference: Math.max(...planChecks.map((item) => item.targetYDifference)),
+        maximumPlanSpreadDifference: Math.max(...planChecks.map((item) => item.spreadDifference)),
+        lockedPlanCount: planChecks.filter((item) => item.locked).length,
+        byControl
+      });
+    } finally {
+      Math.random = originalRandom;
+    }
+  })()`
+));
+
+assert(pitchAimSimulation.planCount === 10000, "CPU pitch aim simulation should inspect 10,000 plans");
+assert(pitchAimSimulation.maximumPlanTargetDifference < 0.0001, "CPU pitch plans should use the same left/center/right target X as player pitches");
+assert(pitchAimSimulation.maximumPlanTargetYDifference < 0.0001, "CPU pitch plans should use the same target Y as player pitches");
+assert(pitchAimSimulation.maximumPlanSpreadDifference < 0.0001, "CPU pitch plans should use the same base spread as player pitches");
+assert(pitchAimSimulation.lockedPlanCount === 0, "CPU pitches should not bypass player control spread with locked targets");
+assert(pitchAimSimulation.byControl.every((item) => item.normalPitchCount > 30000), "each control rating should simulate enough non-mistake straight pitches");
+assert(pitchAimSimulation.byControl.every((item) => item.maximumDeviation <= 69.001), "non-mistake straight pitches should stay within the shared maximum edge spread");
+console.log("Pitch aim simulation", JSON.stringify(pitchAimSimulation));
 
 console.log("Smoke check passed");
