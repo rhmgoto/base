@@ -975,7 +975,6 @@ let hbpPose = { active: false, startTime: 0, duration: 1800 };
 const keysDown = new Set();
 const pitchAdjustmentKeys = ["1", "3", "4", "6"];
 let pitchControlLockoutKeys = new Set();
-let intentionalWalkCommandLocked = false;
 let mouseAim = { active: false, x: 0, y: 0 };
 let lastFrameTime = performance.now();
 const gamepadState = {
@@ -995,7 +994,8 @@ const gamepadButtons = {
   X: 3,
   Y: 0,
   LB: 4,
-  RB: 5
+  RB: 5,
+  INTENTIONAL_WALK: 9
 };
 
 function createStealState() {
@@ -3484,23 +3484,6 @@ function canDeclareIntentionalWalk() {
     && !(stealState.active && !stealState.resolved);
 }
 
-function isIntentionalWalkCommandHeld() {
-  return isKeyHeld("0") && isKeyHeld("3");
-}
-
-function releaseIntentionalWalkCommandLockout() {
-  if (!isIntentionalWalkCommandHeld()) intentionalWalkCommandLocked = false;
-}
-
-function tryDeclareIntentionalWalk() {
-  if (!isIntentionalWalkCommandHeld()) return false;
-  if (intentionalWalkCommandLocked) return true;
-  intentionalWalkCommandLocked = true;
-  if (!canDeclareIntentionalWalk()) return true;
-  declareIntentionalWalk();
-  return true;
-}
-
 function declareIntentionalWalk() {
   resetBall();
   resetSwing();
@@ -4652,7 +4635,6 @@ function pollGamepadInput() {
     gamepadState.previousDirections[team] = getGamepadDirections(gamepad);
   });
   releaseInactivePitchControlLockouts();
-  releaseIntentionalWalkCommandLockout();
   updateMenuGamepadCursorVisibility();
 }
 
@@ -4898,7 +4880,8 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
 
   const pitchingTeam = isBattingPracticeMode() ? "away" : fieldingTeam();
   if (gamePhase === "playing" && isPlayerPitching() && team === pitchingTeam) {
-    if (tryDeclareIntentionalWalk()) {
+    if (justPressed(gamepadButtons.INTENTIONAL_WALK)) {
+      if (canDeclareIntentionalWalk()) declareIntentionalWalk();
       gamepadState.previousButtons[team] = pressed;
       return;
     }
@@ -17076,7 +17059,7 @@ function drawMiniRunner(x, y, runProgress, options = {}) {
 }
 
 function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0) {
-  const teamColor = fieldingTeam() === "away" ? "#153f24" : "#153f24";
+  const teamColor = fieldingTeam() === "away" ? "#153f24" : "#b8202d";
   const accentColor = isChosen ? "#ffcf70" : "#ffffff";
   const bob = isChosen ? Math.sin(runProgress * Math.PI * 10) * 3 : 0;
   const stride = isChosen ? Math.sin(runProgress * Math.PI * 12) : 0;
@@ -18518,10 +18501,6 @@ window.addEventListener("keydown", (event) => {
     modeSelect.value = "versus";
     if (gamePhase !== "menu") switchLiveMode("versus");
   }
-  if (tryDeclareIntentionalWalk()) {
-    event.preventDefault();
-    return;
-  }
   if (gamePhase === "playing" && isPlayerPitching() && event.key === "7") movePitcherOnPlate(-1);
   if (gamePhase === "playing" && isPlayerPitching() && event.key === "9") movePitcherOnPlate(1);
   if (gamePhase === "playing" && isPlayerPitching() && event.key === "5") startPitch("normal");
@@ -18540,7 +18519,6 @@ window.addEventListener("keyup", (event) => {
   keysDown.delete(event.key);
   const key = event.code.startsWith("Digit") || event.code.startsWith("Numpad") ? event.code.slice(-1) : event.key;
   releasePitchControlLockout(key);
-  releaseIntentionalWalkCommandLockout();
 });
 
 window.addEventListener("blur", () => {
@@ -18548,7 +18526,6 @@ window.addEventListener("blur", () => {
   gamepadState.virtualKeys.clear();
   clearTeamGamepadHistory();
   releasePitchControlLockout();
-  releaseIntentionalWalkCommandLockout();
 });
 
 document.addEventListener?.("visibilitychange", () => {
@@ -18557,7 +18534,6 @@ document.addEventListener?.("visibilitychange", () => {
     gamepadState.virtualKeys.clear();
     clearTeamGamepadHistory();
     releasePitchControlLockout();
-    releaseIntentionalWalkCommandLockout();
   }
 });
 
