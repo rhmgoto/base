@@ -122,6 +122,35 @@ const result = JSON.parse(runInGame(context, `(() => {
         profileScore: 1
       })
     }));
+    const grounderLabelChecks = {
+      forcedWeak: makeGrounderOutResultFromProfile(
+        { quality: 0.8, exitVelocity: 1, direction: { x: 0, y: -1 } },
+        0.8,
+        { classification: "weak", keepProfileDirection: true }
+      ).label,
+      weakQuality: makeGrounderOutResultFromProfile(
+        { quality: 0.2, exitVelocity: 0.55, direction: { x: 0, y: -1 } },
+        0.5,
+        { keepProfileDirection: true }
+      ).label,
+      ordinary: makeGrounderOutResultFromProfile(
+        { quality: 0.44, exitVelocity: 0.62, direction: { x: 0, y: -1 } },
+        0.62,
+        { keepProfileDirection: true }
+      ).label,
+      hard: makeGrounderOutResultFromProfile(
+        { quality: 0.58, exitVelocity: 0.74, direction: { x: 0, y: -1 } },
+        0.74,
+        { keepProfileDirection: true }
+      ).label,
+      scorching: makeGrounderOutResultFromProfile(
+        { quality: 0.78, exitVelocity: 0.96, direction: { x: 0, y: -1 } },
+        0.96,
+        { keepProfileDirection: true }
+      ).label,
+      gap: makeGapGrounderResult({ power: 0.7, direction: { x: 0, y: -1 } }).label,
+      convertedHard: makeStrongInfieldGrounderResultFromProfile({ power: 1.05, direction: { x: 0, y: -1 } }).label
+    };
     const planChecks = [];
     for (let index = 0; index < 10000; index += 1) {
       const plan = chooseComputerPitchPlan();
@@ -179,6 +208,7 @@ const result = JSON.parse(runInGame(context, `(() => {
       markerEdgeZoneRate,
       outsideMarkerZoneRate,
       zoneScoreChecks,
+      grounderLabelChecks,
       byControl
     });
   } finally {
@@ -200,6 +230,13 @@ assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 100).overall
 assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 130).overall - 0.7) < 0.0001, "slight outside contact should cap overall feedback at seventy");
 assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 170).overall - 0.5) < 0.0001, "outside contact should cap overall feedback at fifty");
 assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 190).overall - 0.3) < 0.0001, "far outside contact should cap overall feedback at thirty");
+assert(result.grounderLabelChecks.forcedWeak === "ボテボテのゴロ", "forced weak-contact routes should stay visibly weak regardless of raw speed");
+assert(result.grounderLabelChecks.weakQuality === "ボテボテのゴロ", "low-quality grounders should have a distinct feedback label");
+assert(result.grounderLabelChecks.ordinary === "平凡な内野ゴロ", "routine grounders should have a distinct feedback label");
+assert(result.grounderLabelChecks.hard === "強いゴロ", "good-quality grounders should have a distinct feedback label");
+assert(result.grounderLabelChecks.scorching === "痛烈なゴロ", "elite-quality grounders should have a distinct feedback label");
+assert(result.grounderLabelChecks.gap === "内野間へのゴロ", "gap grounders should describe their route before the fielding result");
+assert(result.grounderLabelChecks.convertedHard === "痛烈なゴロ", "converted long-ball contact should use the elite grounder feedback label");
 assert(result.byControl.every((item) => item.normalPitchCount > 30000), "each control rating needs enough normal pitches");
 assert(result.byControl.every((item) => item.maximumDeviation <= 69.001), "normal straight pitches must stay inside the shared spread limit");
 

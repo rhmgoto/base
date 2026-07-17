@@ -5856,7 +5856,7 @@ const infieldGrounderOutBoostState = JSON.parse(runInGame(
       centerLinerFlag: Boolean(centerLinerResult.centerReturnLiner),
       centerLinerBallLiner: centerLinerBall.isLiner,
       centerLinerX: Math.abs(centerLinerBall.direction.x),
-      isOut: secondSide.kind === "out" && secondSide.label === hitLabels.grounder
+      isOut: secondSide.kind === "out" && isStandardGrounderLabel(secondSide.label)
     });
   })()`
 ));
@@ -10406,7 +10406,7 @@ const homerCandidateGrounderState = JSON.parse(runInGame(
 
 assert(homerCandidateGrounderState.converted === true, "16% of homer candidates should be eligible to become strong infield grounders");
 assert(homerCandidateGrounderState.kept === false, "homer candidate grounder conversion should stop after the 16% window");
-assert(homerCandidateGrounderState.label === "内野ゴロ" && homerCandidateGrounderState.kind === "out", "converted homer candidates should become infield grounders");
+assert(homerCandidateGrounderState.label === "痛烈なゴロ" && homerCandidateGrounderState.kind === "out", "converted homer candidates should become scorching infield grounders");
 assert(homerCandidateGrounderState.isGrounder === true && homerCandidateGrounderState.fenceOver === false, "converted strong infield grounders should stay in the infield play path");
 assert(homerCandidateGrounderState.power >= 0.94, "converted strong infield grounders should be hard-hit balls");
 
@@ -10460,7 +10460,7 @@ const autoRunnerAndOutfieldHitReductionState = JSON.parse(runInGame(
 assert(autoRunnerAndOutfieldHitReductionState.firstRunnerTarget === "second", "auto baserunners should only advance one base on non-homer hits");
 assert(autoRunnerAndOutfieldHitReductionState.firstRunnerScored === false, "auto baserunners should not take extra bases on their own");
 assert(autoRunnerAndOutfieldHitReductionState.forceSafeSecond === "single", "auto baserunners should not treat safe second-base throws as extra-base advances");
-assert(autoRunnerAndOutfieldHitReductionState.convertedLabel === "内野ゴロ" && autoRunnerAndOutfieldHitReductionState.convertedKind === "out", "20% of outfield hits should convert into infield grounders");
+assert(autoRunnerAndOutfieldHitReductionState.convertedLabel === "強いゴロ" && autoRunnerAndOutfieldHitReductionState.convertedKind === "out", "20% of outfield hits should convert into strong infield grounders");
 assert(autoRunnerAndOutfieldHitReductionState.keptLabel === "クリーンヒット" && autoRunnerAndOutfieldHitReductionState.keptKind === "hit", "outfield hits outside the 20% window should stay hits");
 assert(autoRunnerAndOutfieldHitReductionState.overallReducedKind === "out", "60-point overall hit reduction should turn some non-homer hits into outs");
 assert(autoRunnerAndOutfieldHitReductionState.overallKeptKind === "hit", "60-point overall hit reduction should keep hits outside the adjusted window");

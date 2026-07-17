@@ -1047,11 +1047,14 @@ const audioSettings = {
 const hitLabels = {
   single: "ヒット",
   cleanHit: "クリーンヒット",
-  gapGrounder: "内野間ヒット",
+  gapGrounder: "内野間へのゴロ",
   double: "ツーベース",
   triple: "スリーベース",
   homer: "ホームラン",
-  grounder: "内野ゴロ",
+  softGrounder: "ボテボテのゴロ",
+  grounder: "平凡な内野ゴロ",
+  hardGrounder: "強いゴロ",
+  scorchingGrounder: "痛烈なゴロ",
   lineLiner: "ライン際ライナー",
   lineDrop: "ライン際ポテン",
   fenceLiner: "低いフェン直ライナー",
@@ -1068,6 +1071,32 @@ const hitLabels = {
   fly: "フライ",
   foul: "ファウル"
 };
+
+function getGrounderQualityLabel(profile = {}, classification = "quality") {
+  if (classification === "weak") return hitLabels.softGrounder;
+  if (classification === "routine") return hitLabels.grounder;
+  if (classification === "hard") return hitLabels.hardGrounder;
+  if (classification === "scorching") return hitLabels.scorchingGrounder;
+
+  const quality = clamp(profile?.feedbackScore ?? profile?.quality ?? 0.45, 0, 1);
+  const exitVelocity = clamp(profile?.exitVelocity ?? 0.5, 0, 1.75);
+  if (profile?.homerConvertedGrounder || (quality >= 0.72 && exitVelocity >= 0.88)) {
+    return hitLabels.scorchingGrounder;
+  }
+  if (profile?.outfieldHitConvertedGrounder || (quality >= 0.52 && exitVelocity >= 0.66)) {
+    return hitLabels.hardGrounder;
+  }
+  if (quality < 0.26 || exitVelocity < 0.4) return hitLabels.softGrounder;
+  return hitLabels.grounder;
+}
+
+function isStandardGrounderLabel(label) {
+  return label === hitLabels.softGrounder
+    || label === hitLabels.grounder
+    || label === hitLabels.hardGrounder
+    || label === hitLabels.scorchingGrounder
+    || label === hitLabels.gapGrounder;
+}
 
 const deepDriveLabel = "強烈な打球";
 const superDeepDriveLabel = "超強烈な打球";
@@ -6106,7 +6135,11 @@ function makeZoneMissWeakContactResult(profile, missUnits = 0, roll = Math.rando
   }
   if (severe) return makePopupFlyResultFromProfile({ ...profile, power: Math.min(profile?.power ?? 0.34, 0.42), launchAngle: Math.max(profile?.launchAngle ?? 24, 24) });
   if ((profile?.launchAngle ?? 0) >= 22 || roll > 0.72) return makePopupFlyResultFromProfile(profile);
-  return makeGrounderOutResultFromProfile(profile, clamp((profile?.power ?? 0.48) * 0.72, 0.22, 0.62));
+  return makeGrounderOutResultFromProfile(
+    profile,
+    clamp((profile?.power ?? 0.48) * 0.72, 0.22, 0.62),
+    { classification: "weak" }
+  );
 }
 
 function isInsideChaseContact(contact) {
@@ -7127,7 +7160,7 @@ function makeGrounderOutResultFromProfile(profile, power = profile?.power, optio
   const directionChoice = getGrounderOutDirectionChoice(profile, options);
   const adjustedPower = getGrounderOutPower(profile, power, directionChoice, options);
   return {
-    label: hitLabels.grounder,
+    label: getGrounderQualityLabel(profile, options.classification),
     kind: "out",
     power: adjustedPower,
     direction: directionChoice.direction,
@@ -7268,7 +7301,7 @@ function makeStrongInfieldGrounderResultFromProfile(profile) {
     homerConvertedGrounder: true
   };
   return {
-    label: hitLabels.grounder,
+    label: hitLabels.scorchingGrounder,
     kind: "out",
     power: clamp((profile.power ?? 0.78) + 0.22, 0.94, infieldGrounderTuning.hardPowerMax),
     direction,
@@ -7414,7 +7447,7 @@ function makeGapGrounderResult(profileOrPower) {
   const power = getProfileResultPower(profileOrPower);
   const profile = getProfileResultSource(profileOrPower);
   return {
-    label: hitLabels.grounder,
+    label: hitLabels.gapGrounder,
     kind: "hit",
     power: Math.max(power, 0.66),
     scoreType: "single",
@@ -10124,7 +10157,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   let distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
     ? boostedRawDistance * (isBattingPracticeHomerCandidate ? 1.04 : bigOutfieldFlyDistanceScale)
     : boostedRawDistance;
-  const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (label === hitLabels.grounder || power < 0.38));
+  const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (isStandardGrounderLabel(label) || power < 0.38));
   const isLiner = isHardOutfieldBounce || isCenterReturnLiner || isLineEdge || isLineLiner || isLineDrop || isFenceLiner || (isDeepDrive && !isSuperDeepDrive) || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
   const trajectory = isGrounder ? "grounder" : isLiner ? "liner" : "fly";
   if (!isGrounder && !isBunt) {
