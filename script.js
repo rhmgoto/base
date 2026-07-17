@@ -5877,11 +5877,13 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
   else if (trajectory === "liner" && trajectoryRoll > 0.82) trajectory = "fly";
   else if (trajectory === "fly" && trajectoryRoll < 0.1) trajectory = "liner";
 
-  if (quality >= 0.72 && (zoneBand === "center" || zoneBand === "middle") && trajectory !== "fly") {
+  const displayedOverall = clamp(feedbackScore, 0, 1);
+  const liftGrade = clamp(Math.max(quality, displayedOverall * 0.96), 0, 1);
+  if (liftGrade >= 0.6 && (zoneBand === "center" || zoneBand === "middle") && trajectory !== "fly") {
     const powerDrive = clamp(getPowerDriveScore(), 0, 1);
     const liftChance = clamp(
-      0.24 + ((quality - 0.72) / 0.28) * 0.5 + powerDrive * 0.14,
-      0.24,
+      0.18 + ((liftGrade - 0.6) / 0.4) * 0.55 + powerDrive * 0.14,
+      0.18,
       0.86
     );
     if (Math.random() < liftChance) trajectory = "fly";
@@ -5984,18 +5986,21 @@ function makeUnifiedLinerResult(profile, quality) {
 }
 
 function makeUnifiedFlyResult(profile, quality) {
-  if (quality < 0.34) {
+  const powerDrive = clamp(getPowerDriveScore(), 0, 1);
+  const displayedOverall = clamp(profile.displayOverallScore ?? quality, 0, 1);
+  const homeRunGrade = clamp(Math.max(quality, displayedOverall * 0.96), 0, 1);
+  if (homeRunGrade < 0.6 && quality < 0.34) {
     return Math.random() < 0.38
       ? makeUnifiedPopupResult(profile, quality)
       : makeUnifiedRoutineFlyResult(profile, randomBetween(0.24, 0.48));
   }
-  if (quality < 0.58) {
+  if (homeRunGrade < 0.6 && quality < 0.58) {
     const resultProfile = makeUnifiedResultProfile(profile, "fly", randomBetween(0.38, 0.68));
     return Math.random() < 0.72
       ? makeUnifiedRoutineFlyResult(resultProfile, resultProfile.unifiedDistanceRatio)
       : makeChaseFlyResultFromProfile(resultProfile);
   }
-  if (quality < 0.72) {
+  if (homeRunGrade < 0.6) {
     const resultProfile = makeUnifiedResultProfile(profile, "fly", randomBetween(0.64, 0.92));
     if (Math.random() < 0.68) {
       return makeChaseFlyResultFromProfile({
@@ -6011,13 +6016,10 @@ function makeUnifiedFlyResult(profile, quality) {
       unifiedOverFielderFly: true
     });
   }
-  const powerDrive = clamp(getPowerDriveScore(), 0, 1);
-  const displayedOverall = clamp(profile.displayOverallScore ?? quality, 0, 1);
-  const homeRunGrade = clamp(Math.max(quality, displayedOverall * 0.96), 0, 1);
   const homeRunCandidateChance = clamp(
-    0.24 + ((homeRunGrade - 0.72) / 0.28) * 0.58 + powerDrive * 0.12,
-    0.24,
-    0.88
+    0.12 + ((homeRunGrade - 0.6) / 0.4) * 0.68 + powerDrive * 0.12,
+    0.12,
+    0.9
   );
   const longBallRoll = Math.random();
   if (longBallRoll < homeRunCandidateChance) {
@@ -17089,9 +17091,9 @@ function drawGoodContactZone() {
   ctx.fill();
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(27, 52, 68, 0.88)";
-  ctx.fillStyle = "rgba(112, 244, 255, 0.98)";
-  ctx.lineWidth = Math.max(4, 4.5 * field.plateScale);
+  ctx.strokeStyle = "rgba(27, 52, 68, 0.16)";
+  ctx.fillStyle = "rgba(112, 244, 255, 0.24)";
+  ctx.lineWidth = Math.max(1.2, 1.5 * field.plateScale);
   ctx.beginPath();
   ctx.arc(center.x, center.y, markerRadius, 0, Math.PI * 2);
   ctx.moveTo(center.x - markerRadius * 1.5, center.y);
@@ -17099,8 +17101,8 @@ function drawGoodContactZone() {
   ctx.moveTo(center.x, center.y - markerRadius * 1.5);
   ctx.lineTo(center.x, center.y + markerRadius * 1.5);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(162, 250, 255, 0.98)";
-  ctx.lineWidth = Math.max(1.5, 2 * field.plateScale);
+  ctx.strokeStyle = "rgba(162, 250, 255, 0.3)";
+  ctx.lineWidth = Math.max(0.8, 1 * field.plateScale);
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(center.x, center.y, Math.max(2, 2.5 * field.plateScale), 0, Math.PI * 2);
