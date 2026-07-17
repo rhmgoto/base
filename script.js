@@ -17482,8 +17482,40 @@ function drawBall() {
     return;
   }
   const pitch = pitchTypes[currentPitchType];
+  if (currentPitchType === "special") drawSpecialPitchGlow(ball.x, ball.y, ball.radius);
   drawBaseballIcon(ball.x, ball.y, ball.radius, pitch ? pitch.color : "#ffffff", ball.spin);
   ctx.globalAlpha = 1;
+}
+
+function drawSpecialPitchGlow(x, y, radius = ball.radius) {
+  const time = performance.now();
+  const pulse = 0.5 + Math.sin(time / 82) * 0.5;
+  const outerRadius = radius + 18 + pulse * 7;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const glow = ctx.createRadialGradient(x, y, radius * 0.2, x, y, outerRadius);
+  if (glow?.addColorStop) {
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.72)");
+    glow.addColorStop(0.28, "rgba(255, 207, 112, 0.58)");
+    glow.addColorStop(0.62, "rgba(255, 111, 97, 0.24)");
+    glow.addColorStop(1, "rgba(255, 207, 112, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, outerRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = `rgba(255, 242, 168, ${0.62 + pulse * 0.24})`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 8 + pulse * 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 111, 97, 0.42)";
+  ctx.lineWidth = 5;
+  drawLine(x - 26, y + 5, x - 7, y + 1);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.54)";
+  ctx.lineWidth = 2;
+  drawLine(x - 18, y - 4, x - 5, y - 2);
+  ctx.restore();
 }
 
 function drawBaseballIcon(x, y, radius = ball.radius, fill = "#ffffff", spin = ball.spin) {
