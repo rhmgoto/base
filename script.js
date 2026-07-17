@@ -3362,7 +3362,7 @@ function startPitch(typeKey, options = {}) {
   });
   const sharedAim = getSharedPitchCourseAim(course, pitchRadius, typeKey, pitch);
   const intendedX = options.targetX ?? sharedAim.targetX;
-  const intendedY = options.targetY ?? sharedAim.targetY;
+  const intendedY = getPitchVerticalTarget();
   const baseSpread = options.targetSpread ?? sharedAim.targetSpread;
   const targetSpread = baseSpread * controlProfile.spread;
   const controlMiss = staminaMistake
@@ -3371,7 +3371,7 @@ function startPitch(typeKey, options = {}) {
   const lockTarget = options.lockTarget === true;
   const fatigueDrift = lockTarget ? 0 : getStaminaFatigueDrift(activePitcher);
   const targetX = controlMiss.x + (lockTarget ? 0 : randomBetween(-targetSpread, targetSpread)) + fatigueDrift;
-  const targetY = controlMiss.y + (lockTarget ? 0 : randomBetween(-30, 34) * controlProfile.verticalSpread);
+  const targetY = getPitchVerticalTarget();
   const speedKmh = Math.max(40, Math.round((activePitcher.fastKmh - getStaminaSpeedDrop(activePitcher)) * pitch.baseKmhFactor * randomBetween(0.9, 1.1)));
   const referenceKmh = 150 * pitch.baseKmhFactor;
   const baseGameSpeed = 8.05 * pitch.speedFactor;
@@ -3416,6 +3416,10 @@ function startPitch(typeKey, options = {}) {
     message = `${pitch.label}、盗塁スタートが早すぎます`;
   }
   updateSidebarAbilityPanels();
+}
+
+function getPitchVerticalTarget() {
+  return field.plateY;
 }
 
 function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
@@ -5277,6 +5281,7 @@ function getBattingFeedbackScoreInput(contact = {}, profile = null) {
     sweetSpotScore: getPracticalSweetSpotScore(contact),
     barrelScore: clamp(contact.barrelScore ?? 0, 0, 1),
     zoneScore: getFeedbackZoneScore(contact),
+    zoneDistanceRate: getFeedbackZoneRate(contact),
     quality: clamp(contact.quality ?? 0, 0, 1),
     profileScore: getBattedBallProfileScore(profile)
   };
@@ -5307,13 +5312,24 @@ function getRawBattingFeedbackScore(scores) {
   const sweetSpot = clamp(scores.sweetSpotScore ?? 0, 0, 1);
   const barrel = clamp(scores.barrelScore ?? 0, 0, 1);
   const zone = clamp(scores.zoneScore ?? 0, 0, 1);
+  const zoneDistanceRate = Number.isFinite(scores.zoneDistanceRate)
+    ? Math.max(0, scores.zoneDistanceRate)
+    : Math.max(0, (1 - zone) * 100);
   const quality = clamp(scores.quality ?? 0, 0, 1);
   const profileScore = Number.isFinite(scores.profileScore) ? clamp(scores.profileScore, 0, 1) : null;
   const hiddenResultScore = profileScore === null ? quality : clamp(quality * 0.58 + profileScore * 0.42, 0, 1);
   const weighted = timing * 0.16 + sweetSpot * 0.12 + barrel * 0.11 + zone * 0.32 + hiddenResultScore * 0.29;
-  const weakestCore = Math.min(timing, zone);
-  const cap = weakestCore < 0.4 ? 0.66 : weakestCore < 0.55 ? 0.78 : weakestCore < 0.72 ? 0.9 : 1;
-  return clamp(Math.min(weighted, cap), 0, 1);
+  const timingCap = timing < 0.4 ? 0.66 : timing < 0.55 ? 0.78 : timing < 0.72 ? 0.9 : 1;
+  const zoneCap = getZoneBattingFeedbackCap(zoneDistanceRate);
+  return clamp(Math.min(weighted, timingCap, zoneCap), 0, 1);
+}
+
+function getZoneBattingFeedbackCap(rate = 0) {
+  const zoneDistanceRate = Math.max(0, rate);
+  if (zoneDistanceRate <= 100) return 1;
+  if (zoneDistanceRate <= 130) return 0.7;
+  if (zoneDistanceRate <= 170) return 0.5;
+  return 0.3;
 }
 
 function getDisplayedBattingFeedbackScore(scores) {
@@ -6480,6 +6496,7 @@ function buildBattedBallProfile(contact) {
     timingScore = 0.5,
     barrelScore = 0.5,
     zoneScore,
+    zoneDistanceRate,
     plateDistance,
     zoneMissUnits = 0,
     outsideStrikeZone,
@@ -6662,6 +6679,7 @@ function buildBattedBallProfile(contact) {
     sweetSpotScore,
     barrelScore,
     zoneScore: clamp(zoneScore ?? (inGoodContactZone ? 1 : 0), 0, 1),
+    zoneDistanceRate,
     quality,
     profileScore: getBattedBallProfileScore({
       exitVelocity,
@@ -13544,12 +13562,13 @@ function getGoodContactZonePoints() {
   const sidePad = meetDelta * 1.7 * scale;
   const halfTop = clamp(((36 * scale) + sidePad) * zoneScale, 14 * scale, 50 * scale);
   const halfShoulder = clamp(((26 * scale) + sidePad * 0.85) * zoneScale, 10 * scale, 40 * scale);
+  const catcherSideY = field.plateY + 22 * scale + extension;
   return [
     { x: field.plateX - halfTop, y: plateTop - extension },
     { x: field.plateX + halfTop, y: plateTop - extension },
     { x: field.plateX + halfTop, y: plateTop },
-    { x: field.plateX + halfShoulder, y: field.plateY + 22 * scale },
-    { x: field.plateX - halfShoulder, y: field.plateY + 22 * scale },
+    { x: field.plateX + halfShoulder, y: catcherSideY },
+    { x: field.plateX - halfShoulder, y: catcherSideY },
     { x: field.plateX - halfTop, y: plateTop }
   ];
 }
@@ -13604,11 +13623,36 @@ function getGoodContactZoneCenterScore(x = ball.x, y = ball.y) {
   }), { x: 0, y: 0 });
   const maxDistance = points.reduce((max, point) => Math.max(max, Math.hypot(point.x - center.x, point.y - center.y)), 1);
   const distance = Math.hypot(x - center.x, y - center.y);
-  return clamp(1 - Math.pow(distance / maxDistance, 1.18), 0.02, 1);
+  const markerRadius = getGoodContactZoneCenterMarkerRadius();
+  const scoredDistance = Math.max(0, distance - markerRadius);
+  return clamp(1 - Math.pow(scoredDistance / Math.max(1, maxDistance - markerRadius), 1.18), 0.02, 1);
 }
 
 function getZoneScoreFromDistanceRate(rate = 100) {
-  return clamp(1 - Math.max(0, rate) / 100, 0, 1);
+  const zoneDistanceRate = Math.max(0, rate);
+  const scoreCurve = [
+    { rate: 0, score: 1 },
+    { rate: 20, score: 0.98 },
+    { rate: 50, score: 0.85 },
+    { rate: 80, score: 0.65 },
+    { rate: 100, score: 0.5 },
+    { rate: 130, score: 0.3 },
+    { rate: 170, score: 0.1 },
+    { rate: 190, score: 0 }
+  ];
+  if (zoneDistanceRate >= scoreCurve[scoreCurve.length - 1].rate) return 0;
+  for (let index = 1; index < scoreCurve.length; index += 1) {
+    const next = scoreCurve[index];
+    if (zoneDistanceRate > next.rate) continue;
+    const previous = scoreCurve[index - 1];
+    const progress = (zoneDistanceRate - previous.rate) / (next.rate - previous.rate);
+    return previous.score + (next.score - previous.score) * progress;
+  }
+  return 0;
+}
+
+function getGoodContactZoneCenterMarkerRadius() {
+  return 8 * field.plateScale;
 }
 
 function getGoodContactZoneDistanceRate(x = ball.x, y = ball.y, radius = ball.radius) {
@@ -13620,7 +13664,9 @@ function getGoodContactZoneDistanceRate(x = ball.x, y = ball.y, radius = ball.ra
   if (distance <= 0.0001) return 0;
   const boundaryDistance = getPolygonBoundaryDistanceFromCenter(points, center, dx / distance, dy / distance);
   const adjustedDistance = Math.max(0, distance - (isPointInPolygon(x, y, points) ? 0 : radius));
-  return Math.max(0, adjustedDistance / Math.max(1, boundaryDistance) * 100);
+  const markerRadius = getGoodContactZoneCenterMarkerRadius();
+  const scoredDistance = Math.max(0, adjustedDistance - markerRadius);
+  return Math.max(0, scoredDistance / Math.max(1, boundaryDistance - markerRadius) * 100);
 }
 
 function getPolygonCenter(points = []) {
@@ -16595,6 +16641,8 @@ function drawSpaceHomePlate() {
 
 function drawGoodContactZone() {
   const points = getGoodContactZonePoints();
+  const center = getPolygonCenter(points);
+  const markerRadius = getGoodContactZoneCenterMarkerRadius();
   ctx.save();
   ctx.fillStyle = "rgba(255, 238, 112, 0.18)";
   ctx.strokeStyle = "rgba(255, 248, 178, 0.32)";
@@ -16607,6 +16655,23 @@ function drawGoodContactZone() {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+
+  ctx.strokeStyle = "rgba(27, 52, 68, 0.88)";
+  ctx.fillStyle = "rgba(112, 244, 255, 0.98)";
+  ctx.lineWidth = Math.max(4, 4.5 * field.plateScale);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, markerRadius, 0, Math.PI * 2);
+  ctx.moveTo(center.x - markerRadius * 1.5, center.y);
+  ctx.lineTo(center.x + markerRadius * 1.5, center.y);
+  ctx.moveTo(center.x, center.y - markerRadius * 1.5);
+  ctx.lineTo(center.x, center.y + markerRadius * 1.5);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(162, 250, 255, 0.98)";
+  ctx.lineWidth = Math.max(1.5, 2 * field.plateScale);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, Math.max(2, 2.5 * field.plateScale), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 

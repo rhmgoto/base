@@ -2924,8 +2924,15 @@ const battingTighteningState = JSON.parse(runInGame(
     activeBatter = { ...findById(batters, "judge"), power: 10, meet: 5 };
     const zonePoints = getGoodContactZonePoints();
     const plateTop = field.plateY - 12 * field.plateScale;
+    const catcherSideBase = field.plateY + 22 * field.plateScale;
     const topY = Math.min(...zonePoints.map((point) => point.y));
+    const bottomY = Math.max(...zonePoints.map((point) => point.y));
     const topWidth = Math.abs(zonePoints[1].x - zonePoints[0].x);
+    const zoneCenter = getPolygonCenter(zonePoints);
+    const markerRadius = getGoodContactZoneCenterMarkerRadius();
+    const centerRate = getGoodContactZoneDistanceRate(zoneCenter.x, zoneCenter.y, 0);
+    const markerEdgeRate = getGoodContactZoneDistanceRate(zoneCenter.x + markerRadius, zoneCenter.y, 0);
+    const outsideMarkerRate = getGoodContactZoneDistanceRate(zoneCenter.x + markerRadius + 4 * field.plateScale, zoneCenter.y, 0);
     const profile = buildBattedBallProfile({
       timeDiff: 80,
       quality: 0.58,
@@ -3004,6 +3011,12 @@ const battingTighteningState = JSON.parse(runInGame(
     }, { kind: "hit", label: hitLabels.single });
     return JSON.stringify({
       topExtension: plateTop - topY,
+      catcherExtension: bottomY - catcherSideBase,
+      zoneCenterOffsetX: zoneCenter.x - field.plateX,
+      zoneCenterOffsetY: zoneCenter.y - (field.plateY - 2 * field.plateScale / 3),
+      centerRate,
+      markerEdgeRate,
+      outsideMarkerRate,
       topWidth,
       effectivePower10: getEffectiveBatterPower({ power: 10 }),
       effectivePower1: getEffectiveBatterPower({ power: 1 }),
@@ -3038,6 +3051,10 @@ const battingTighteningState = JSON.parse(runInGame(
 
 assert(battingTighteningState.topExtension <= 20, "good-contact yellow zone should stay controlled after the extra pitcher-side extension");
 assert(battingTighteningState.topExtension >= 10, "good-contact yellow zone should extend farther toward the pitcher");
+assert(Math.abs(battingTighteningState.catcherExtension - battingTighteningState.topExtension) < 0.001, "good-contact yellow zone should extend equally toward the pitcher and catcher");
+assert(Math.abs(battingTighteningState.zoneCenterOffsetX) < 0.001 && Math.abs(battingTighteningState.zoneCenterOffsetY) < 0.001, "good-contact yellow zone center should stay fixed as meet changes its reach");
+assert(battingTighteningState.centerRate === 0 && battingTighteningState.markerEdgeRate === 0, "the full visible center marker should receive the best zone score");
+assert(battingTighteningState.outsideMarkerRate > 0, "zone score should begin falling outside the visible center marker");
 assert(battingTighteningState.topWidth > 60, "good-contact yellow zone should keep its horizontal reach");
 assert(Math.abs(battingTighteningState.effectivePower10 - 9) < 0.001, "effective batter power should be reduced by ten percent");
 assert(Math.abs(battingTighteningState.effectivePower1 - 0.9) < 0.001, "low effective batter power should also be reduced by ten percent");

@@ -108,6 +108,20 @@ const result = JSON.parse(runInGame(context, `(() => {
     const centerZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x, zoneCenter.y, 0);
     const markerEdgeZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x + centerMarkerRadius, zoneCenter.y, 0);
     const outsideMarkerZoneRate = getGoodContactZoneDistanceRate(zoneCenter.x + centerMarkerRadius + 4 * field.plateScale, zoneCenter.y, 0);
+    const zoneScoreChecks = [0, 20, 50, 80, 100, 130, 170, 190].map((rate) => ({
+      rate,
+      score: getZoneScoreFromDistanceRate(rate),
+      cap: getZoneBattingFeedbackCap(rate),
+      overall: getRawBattingFeedbackScore({
+        timingScore: 1,
+        sweetSpotScore: 1,
+        barrelScore: 1,
+        zoneScore: getZoneScoreFromDistanceRate(rate),
+        zoneDistanceRate: rate,
+        quality: 1,
+        profileScore: 1
+      })
+    }));
     const planChecks = [];
     for (let index = 0; index < 10000; index += 1) {
       const plan = chooseComputerPitchPlan();
@@ -164,6 +178,7 @@ const result = JSON.parse(runInGame(context, `(() => {
       centerZoneRate,
       markerEdgeZoneRate,
       outsideMarkerZoneRate,
+      zoneScoreChecks,
       byControl
     });
   } finally {
@@ -179,6 +194,12 @@ assert(result.lockedPlanCount === 0, "CPU should not lock targets outside the pl
 assert(result.fixedPitchTargetY === result.expectedPitchTargetY, "all pitches should use the single fixed vertical target");
 assert(result.centerZoneRate === 0 && result.markerEdgeZoneRate === 0, "the complete center marker should receive the best zone score");
 assert(result.outsideMarkerZoneRate > 0, "zone score should fall after contact leaves the center marker");
+assert(JSON.stringify(result.zoneScoreChecks.map((item) => item.score)) === JSON.stringify([1, 0.98, 0.85, 0.65, 0.5, 0.3, 0.1, 0]), "zone scores should follow the requested distance curve");
+assert(JSON.stringify(result.zoneScoreChecks.map((item) => item.cap)) === JSON.stringify([1, 1, 1, 1, 1, 0.7, 0.5, 0.3]), "zone caps should stay open inside the zone and tighten outside it");
+assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 100).overall - 0.84) < 0.0001, "the zone edge should use its weighted score without a zone cap");
+assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 130).overall - 0.7) < 0.0001, "slight outside contact should cap overall feedback at seventy");
+assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 170).overall - 0.5) < 0.0001, "outside contact should cap overall feedback at fifty");
+assert(Math.abs(result.zoneScoreChecks.find((item) => item.rate === 190).overall - 0.3) < 0.0001, "far outside contact should cap overall feedback at thirty");
 assert(result.byControl.every((item) => item.normalPitchCount > 30000), "each control rating needs enough normal pitches");
 assert(result.byControl.every((item) => item.maximumDeviation <= 69.001), "normal straight pitches must stay inside the shared spread limit");
 
