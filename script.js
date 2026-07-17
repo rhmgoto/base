@@ -197,7 +197,7 @@ const pitchers = [
   { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
   { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 6 },
   { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 11, leftBreak: 10, slowChange: 8, fastChange: 11, control: 9, stuff: 13, fielding: 8, stamina: 12, cost: 17 },
-  { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 14, fielding: 6, stamina: 2, cost: 4 },
+  { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 14, fielding: 6, stamina: 3, cost: 4 },
   { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
   { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 7, leftBreak: 4, slowChange: 5, fastChange: 9, control: 5, stuff: 9, fielding: 4, stamina: 7, cost: 8 },
   { id: "hanifee", name: "ハニフィー", throws: "R", fastKmh: 156, rightBreak: 2, leftBreak: 10, slowChange: 2, fastChange: 2, control: 5, stuff: 2, fielding: 5, stamina: 2, cost: 1 },
@@ -213,8 +213,8 @@ const pitchers = [
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 16, leftBreak: 14, slowChange: 13, fastChange: 12, control: 13, stuff: 12, fielding: 7, stamina: 11, cost: 19 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
   { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 9, fastChange: 9, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
-  { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 2, cost: 4 },
-  { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 2, cost: 4 },
+  { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
+  { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 2, cost: 1 },
   { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 }
@@ -975,6 +975,7 @@ const gamepadState = {
   previousButtons: { away: new Set(), home: new Set() },
   previousDirections: { away: new Set(), home: new Set() },
   virtualKeys: new Set(),
+  lastButton: { index: null, team: null, time: 0 },
   menuCursors: {
     away: { x: 0, y: 0, initialized: false, element: null },
     home: { x: 0, y: 0, initialized: false, element: null }
@@ -4713,6 +4714,8 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   });
   const previousButtons = gamepadState.previousButtons[team] || new Set();
   const justPressed = (index) => pressed.has(index) && !previousButtons.has(index);
+  const newPresses = [...pressed].filter((index) => !previousButtons.has(index));
+  if (newPresses.length) recordLastGamepadButton(team, newPresses[newPresses.length - 1]);
 
   if (gamePhase === "menu") {
     if (justPressed(gamepadButtons.A)) clickMenuGamepadCursor(team);
@@ -4763,6 +4766,14 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   }
 
   gamepadState.previousButtons[team] = pressed;
+}
+
+function recordLastGamepadButton(team, index) {
+  gamepadState.lastButton = {
+    index,
+    team,
+    time: performance.now()
+  };
 }
 
 function getGamepadThrowTarget(directions) {
@@ -12219,8 +12230,7 @@ function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
 
 function completeUnifiedCircleCatch(fielder, fieldingPoint, elapsedSeconds) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = !battedBall?.isGrounder
-    && elapsedSeconds <= (battedBall?.ballTime ?? elapsedSeconds) + 0.04;
+  const caughtInAir = isCaughtAirBattedBall(battedBall);
 
   defenseState.unifiedCircleCatchComplete = true;
   defenseState.throw = null;
@@ -12253,6 +12263,7 @@ function resolveUnifiedCircleMissAfterArrival(elapsedSeconds) {
   const outcome = defenseState.outcome;
   const battedBall = defenseState.battedBall;
   if (!outcome?.caught || !battedBall || battedBall.fenceOver || battedBall.wallHit) return false;
+  if (isCaughtAirBattedBall(battedBall) && outcome.kind === "out" && !outcome.needsThrow) return false;
   const expectedArrival = Math.max(battedBall.ballTime ?? 0, outcome.fieldingTime ?? 0);
   if (elapsedSeconds <= expectedArrival + 0.12) return false;
 
@@ -12321,7 +12332,7 @@ function getLiveCircleCatchRadius(fielder, battedBall) {
 
 function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = caughtInAirOverride ?? (!battedBall.isGrounder && elapsedSeconds <= (battedBall.ballTime ?? elapsedSeconds) + 0.08);
+  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBall(battedBall);
   const outcome = {
       kind: caughtInAir ? "out" : "force",
       label: `${fielder.role} 捕球処理`,
@@ -12366,6 +12377,10 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   );
   const metricText = getBattedBallMetricText(battedBall);
   message = metricText ? `${outcome.label} / ${metricText}` : outcome.label;
+}
+
+function isCaughtAirBattedBall(battedBall) {
+  return Boolean(battedBall && !battedBall.isGrounder);
 }
 
 function resolveLivePostLandingPickup(elapsedSeconds) {
@@ -12689,7 +12704,7 @@ function getManualDefenseMissGrace(battedBall) {
 function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOverride = null) {
   const battedBall = defenseState.battedBall;
   const fieldingPoint = fieldingPointOverride || { x: fielder.currentX ?? fielder.x, y: fielder.currentY ?? fielder.y };
-  const caughtInAir = !battedBall?.isGrounder && elapsedSeconds <= (battedBall?.ballTime ?? 0) + 0.08;
+  const caughtInAir = isCaughtAirBattedBall(battedBall);
   const label = caughtInAir ? `${fielder.role} 捕球` : `${fielder.role} 捕球処理`;
   defenseState.manualFieldingComplete = true;
   defenseState.target = fieldingPoint;
@@ -17572,7 +17587,33 @@ function drawHud() {
   ctx.fillText(`S ${Math.min(count.strikes, 2)}  B ${Math.min(count.balls, 3)}  O ${Math.min(count.outs, 2)}`, 38, 120);
   drawBaseRunnerIndicator(306, 78);
   drawBaseRunnerNames(38, 148);
+  drawLastGamepadButton();
   if (gamePhase === "defense") drawDefenseHud();
+}
+
+function drawLastGamepadButton() {
+  const last = gamepadState.lastButton;
+  if (!Number.isFinite(last?.index) || !last.time) return;
+  const age = performance.now() - last.time;
+  if (age > 4200) return;
+  const alpha = age > 3200 ? clamp(1 - (age - 3200) / 1000, 0, 1) : 1;
+  const x = canvas.width - 142;
+  const y = 18;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(18, 32, 42, 0.88)";
+  roundRect(x, y, 124, 42, 8);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(174, 231, 255, 0.72)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#aee7ff";
+  ctx.font = "bold 12px sans-serif";
+  ctx.fillText(last.team === "home" ? "2P" : "1P", x + 12, y + 17);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 22px monospace";
+  ctx.fillText(`BTN ${last.index}`, x + 44, y + 29);
+  ctx.restore();
 }
 
 function drawPitchSpeedDisplay() {
