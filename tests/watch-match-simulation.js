@@ -122,6 +122,7 @@ const simulationCode = `
     hitLabels.centerReturnGrounder,
     hitLabels.single,
     hitLabels.cleanHit,
+    hitLabels.outfieldLiner,
     hitLabels.lineLiner,
     hitLabels.lineDrop,
     hitLabels.fenceLiner,
@@ -141,17 +142,18 @@ const simulationCode = `
   const resultKeys = ["out", "single", "double", "triple", "homer", "error", "foul", "foulOut", "other"];
   const byLabel = Object.fromEntries(battedLabels.map((label) => [
     label,
-    { total: 0, ...Object.fromEntries(resultKeys.map((key) => [key, 0])), runs: 0 }
+    { total: 0, ...Object.fromEntries(resultKeys.map((key) => [key, 0])), wallHit: 0, overFielderFly: 0, deepNonHomer: 0, runs: 0 }
   ]));
   const games = [];
   const noContact = { strikeout: 0, walk: 0, hbp: 0 };
+  const physicalResults = { wallHit: 0, fenceOver: 0, overFielderFly: 0, deepNonHomer: 0 };
   let currentContact = null;
   let resolvingFeedback = null;
   let currentGameIndex = -1;
 
   function ensureLabel(label) {
     if (!byLabel[label]) {
-      byLabel[label] = { total: 0, ...Object.fromEntries(resultKeys.map((key) => [key, 0])), runs: 0 };
+      byLabel[label] = { total: 0, ...Object.fromEntries(resultKeys.map((key) => [key, 0])), wallHit: 0, overFielderFly: 0, deepNonHomer: 0, runs: 0 };
     }
     return byLabel[label];
   }
@@ -221,9 +223,21 @@ const simulationCode = `
       resolvingFeedback.fallback
     );
     const entry = ensureLabel(event.label);
+    const battedBall = defenseState.battedBall;
+    const wasWallHit = Boolean(battedBall?.wallHit);
+    const wasFenceOver = Boolean(battedBall?.fenceOver);
+    const wasOverFielderFly = Boolean(battedBall?.battedProfile?.unifiedOverFielderFly);
+    const wasDeepNonHomer = Boolean(battedBall?.isDeep && !wasFenceOver);
     entry.total += 1;
     entry[finalResult] += 1;
+    entry.wallHit += Number(wasWallHit);
+    entry.overFielderFly += Number(wasOverFielderFly);
+    entry.deepNonHomer += Number(wasDeepNonHomer);
     entry.runs += Math.max(0, scores.away - scoreBefore.away) + Math.max(0, scores.home - scoreBefore.home);
+    physicalResults.wallHit += Number(wasWallHit);
+    physicalResults.fenceOver += Number(wasFenceOver);
+    physicalResults.overFielderFly += Number(wasOverFielderFly);
+    physicalResults.deepNonHomer += Number(wasDeepNonHomer);
     games[currentGameIndex].battedBalls += 1;
     games[currentGameIndex].results[finalResult] = (games[currentGameIndex].results[finalResult] || 0) + 1;
     currentContact = null;
@@ -336,6 +350,7 @@ const simulationCode = `
     teams: { away: "タイガース", home: "ドジャース" },
     games,
     byLabel,
+    physicalResults,
     noContact,
     totals
   };

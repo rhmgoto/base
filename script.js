@@ -1047,6 +1047,7 @@ const audioSettings = {
 const hitLabels = {
   single: "ヒット",
   cleanHit: "クリーンヒット",
+  outfieldLiner: "外野ライナー",
   gapGrounder: "内野間へのゴロ",
   double: "ツーベース",
   triple: "スリーベース",
@@ -5807,7 +5808,228 @@ function decideHitResultFromBattedProfile(contact) {
   }
 
   const feedbackScore = getContactFeedbackScore(contact);
-  return applyFinalHitResultBalance(decideZoneBandHitResult(contact, profile, feedbackScore, roll), profile, contact);
+  return decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll);
+}
+
+function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = Math.random()) {
+  const zoneBand = contact.zoneBand ?? getContactZoneBand(contact);
+  const zoneRate = getFeedbackZoneRate(contact);
+  const zoneScore = clamp(contact.zoneScore ?? profile.zoneScore ?? 0, 0, 1);
+  const timingScore = clamp(contact.timingScore ?? profile.timingScore ?? 0, 0, 1);
+  const sweetSpotScore = clamp(contact.sweetSpotScore ?? profile.sweetSpotScore ?? 0, 0, 1);
+  const rawQuality = clamp(
+    feedbackScore * 0.58
+      + zoneScore * 0.2
+      + timingScore * 0.12
+      + sweetSpotScore * 0.1,
+    0,
+    1
+  );
+  const zoneQualityScale = zoneBand === "center"
+    ? 1.12
+    : zoneBand === "middle"
+      ? 1
+      : zoneBand === "edge"
+        ? 0.82
+        : zoneBand === "slightOutside"
+          ? 0.62
+          : zoneBand === "outside"
+            ? 0.42
+            : 0.24;
+  const quality = clamp(0.16 + rawQuality * zoneQualityScale + randomBetween(-0.09, 0.09), 0, 1);
+  const unifiedProfile = {
+    ...profile,
+    feedbackScore: quality,
+    unifiedBattedBall: true,
+    unifiedQuality: quality,
+    zoneBand,
+    zoneDistanceRate: zoneRate,
+    preserveUnifiedDirection: true
+  };
+
+  const outsideFoulChance = zoneBand === "slightOutside"
+    ? 0.3
+    : zoneBand === "outside"
+      ? 0.44
+      : zoneBand === "farOutside"
+        ? 0.58
+        : zoneBand === "edge"
+          ? 0.12
+          : 0.03;
+  if (roll < outsideFoulChance) {
+    return {
+      label: hitLabels.foul,
+      kind: "foul",
+      power: clamp(profile.power ?? 0.36, 0.14, 0.62),
+      direction: profile.direction,
+      battedProfile: unifiedProfile
+    };
+  }
+
+  const launchAngle = profile.launchAngle ?? 10;
+  const trajectoryRoll = Math.random();
+  let trajectory = launchAngle < 8 ? "grounder" : launchAngle < 18 ? "liner" : "fly";
+  if (quality < 0.38 && trajectoryRoll < 0.28) trajectory = "popup";
+  else if (quality < 0.5 && trajectoryRoll < 0.46) trajectory = "fly";
+  else if (quality < 0.72 && trajectoryRoll < 0.25) trajectory = "fly";
+  else if (trajectory === "grounder" && trajectoryRoll > 0.86) trajectory = "liner";
+  else if (trajectory === "liner" && trajectoryRoll > 0.82) trajectory = "fly";
+  else if (trajectory === "fly" && trajectoryRoll < 0.1) trajectory = "liner";
+
+  if (zoneBand === "farOutside" && Math.random() < 0.54) trajectory = Math.random() < 0.52 ? "popup" : "grounder";
+  else if (zoneBand === "outside" && Math.random() < 0.34) trajectory = Math.random() < 0.45 ? "popup" : "grounder";
+
+  if (trajectory === "popup") return makeUnifiedPopupResult(unifiedProfile, quality);
+  if (trajectory === "grounder") return makeUnifiedGrounderResult(unifiedProfile, quality);
+  if (trajectory === "liner") return makeUnifiedLinerResult(unifiedProfile, quality);
+  return makeUnifiedFlyResult(unifiedProfile, quality);
+}
+
+function makeUnifiedResultProfile(profile, trajectory, distanceRatio) {
+  return {
+    ...profile,
+    unifiedTrajectory: trajectory,
+    unifiedDistanceRatio: distanceRatio,
+    preserveUnifiedDirection: true
+  };
+}
+
+function makeUnifiedPopupResult(profile, quality) {
+  const resultProfile = {
+    ...makeUnifiedResultProfile(profile, "fly", randomBetween(0.1, 0.22)),
+    unifiedFlightTimeScale: 1.9
+  };
+  return makePopupFlyResultFromProfile({
+    ...resultProfile,
+    power: clamp(0.26 + quality * 0.22, 0.26, 0.5)
+  });
+}
+
+function makeUnifiedGrounderResult(profile, quality) {
+  const directionX = Math.abs(profile.direction?.x ?? 0);
+  if (quality < 0.3) {
+    const resultProfile = makeUnifiedResultProfile(profile, "grounder", randomBetween(0.1, 0.2));
+    return makeGrounderOutResultFromProfile(resultProfile, randomBetween(0.22, 0.4), {
+      classification: "weak",
+      keepProfileDirection: true,
+      power: randomBetween(0.22, 0.4)
+    });
+  }
+  if (quality < 0.5) {
+    const resultProfile = makeUnifiedResultProfile(profile, "grounder", randomBetween(0.18, 0.32));
+    return makeGrounderOutResultFromProfile(resultProfile, randomBetween(0.42, 0.64), {
+      classification: "routine",
+      keepProfileDirection: true,
+      power: randomBetween(0.42, 0.64)
+    });
+  }
+  if (quality < 0.72) {
+    const resultProfile = makeUnifiedResultProfile(profile, "grounder", randomBetween(0.28, 0.48));
+    if (directionX < 0.12 && Math.random() < 0.28) return makeCenterReturnGrounderResultFromProfile(resultProfile);
+    if (directionX > 0.58 && Math.random() < 0.24) return makeLineEdgeGrounderResultFromProfile(resultProfile);
+    if (Math.random() < 0.46) return makeGapGrounderResult(resultProfile);
+    return makeGrounderOutResultFromProfile(resultProfile, randomBetween(0.66, 0.84), {
+      classification: "hard",
+      keepProfileDirection: true,
+      power: randomBetween(0.66, 0.84)
+    });
+  }
+  const resultProfile = makeUnifiedResultProfile(profile, "grounder", randomBetween(0.4, 0.62));
+  if (directionX < 0.14 && Math.random() < 0.3) return makeCenterReturnGrounderResultFromProfile(resultProfile);
+  if (directionX > 0.5 && Math.random() < 0.3) return makeLineEdgeGrounderResultFromProfile(resultProfile);
+  if (Math.random() < 0.5) return makeGapGrounderResult(resultProfile);
+  return makeGrounderOutResultFromProfile(resultProfile, randomBetween(0.86, 1.06), {
+    classification: "scorching",
+    keepProfileDirection: true,
+    power: randomBetween(0.86, 1.06)
+  });
+}
+
+function makeUnifiedLinerResult(profile, quality) {
+  const directionX = Math.abs(profile.direction?.x ?? 0);
+  if (quality < 0.28) {
+    return Math.random() < 0.58
+      ? makeUnifiedPopupResult(profile, quality)
+      : makeUnifiedGrounderResult(profile, quality);
+  }
+  if (quality < 0.5) {
+    const resultProfile = makeUnifiedResultProfile(profile, "liner", randomBetween(0.3, 0.52));
+    return Math.random() < 0.48
+      ? makeFrontDropResultFromProfile(resultProfile)
+      : makeLineDropResultFromProfile(resultProfile);
+  }
+  if (quality < 0.72) {
+    const resultProfile = makeUnifiedResultProfile(profile, "liner", randomBetween(0.42, 0.7));
+    if (directionX < 0.12 && Math.random() < 0.3) return makeCenterReturnLinerResultFromProfile(resultProfile);
+    if (directionX > 0.58 && Math.random() < 0.28) return makeLineLinerResultFromProfile(resultProfile);
+    return makeHardOutfieldBounceHitResultFromProfile(resultProfile);
+  }
+  const resultProfile = makeUnifiedResultProfile(profile, "liner", randomBetween(0.6, 0.94));
+  if (directionX < 0.14 && Math.random() < 0.22) return makeCenterReturnLinerResultFromProfile(resultProfile);
+  if (directionX > 0.5 && Math.random() < 0.42) return makeLineEdgeResultFromProfile(resultProfile);
+  return Math.random() < 0.58
+    ? makeLineLinerResultFromProfile(resultProfile)
+    : makeFenceLinerResultFromProfile(resultProfile);
+}
+
+function makeUnifiedFlyResult(profile, quality) {
+  if (quality < 0.34) {
+    return Math.random() < 0.38
+      ? makeUnifiedPopupResult(profile, quality)
+      : makeUnifiedRoutineFlyResult(profile, randomBetween(0.24, 0.48));
+  }
+  if (quality < 0.58) {
+    const resultProfile = makeUnifiedResultProfile(profile, "fly", randomBetween(0.38, 0.68));
+    return Math.random() < 0.72
+      ? makeUnifiedRoutineFlyResult(resultProfile, resultProfile.unifiedDistanceRatio)
+      : makeChaseFlyResultFromProfile(resultProfile);
+  }
+  if (quality < 0.78) {
+    const resultProfile = makeUnifiedResultProfile(profile, "fly", randomBetween(0.64, 0.92));
+    if (Math.random() < 0.68) {
+      return makeChaseFlyResultFromProfile({
+        ...resultProfile,
+        unifiedFlightTimeScale: randomBetween(0.78, 0.94),
+        unifiedOverFielderFly: true
+      });
+    }
+    return makeToweringFlyResultFromProfile({
+      ...resultProfile,
+      unifiedDistanceRatio: randomBetween(0.78, 1),
+      unifiedFlightTimeScale: randomBetween(0.52, 0.74),
+      unifiedOverFielderFly: true
+    });
+  }
+  const powerDrive = clamp(getPowerDriveScore(), 0, 1);
+  const homeRunLean = clamp((quality - 0.78) / 0.22 * (0.55 + powerDrive * 0.45), 0, 1);
+  const longBallRoll = Math.random();
+  if (longBallRoll < 0.26) {
+    return makeFenceEdgeFlyResultFromProfile({
+      ...makeUnifiedResultProfile(profile, "fly", randomBetween(1.04, 1.12)),
+      unifiedForceWallHit: true,
+      unifiedFlightTimeScale: randomBetween(0.9, 1.04)
+    });
+  }
+  if (longBallRoll < 0.58) {
+    return makeChaseFlyResultFromProfile({
+      ...makeUnifiedResultProfile(profile, "fly", randomBetween(0.74, 0.98)),
+      unifiedFlightTimeScale: randomBetween(0.72, 0.88),
+      unifiedOverFielderFly: true
+    });
+  }
+  const distanceRatio = randomBetween(0.84, 1.04 + homeRunLean * 0.2);
+  const resultProfile = makeUnifiedResultProfile(profile, "fly", distanceRatio);
+  return homeRunLean > 0.62 && Math.random() < homeRunLean * 0.5
+    ? makeDeepDriveResultFromProfile(resultProfile)
+    : makeFenceEdgeFlyResultFromProfile(resultProfile);
+}
+
+function makeUnifiedRoutineFlyResult(profile, distanceRatio) {
+  return makeRoutineFlyResultFromProfile({
+    ...profile,
+    unifiedDistanceRatio: distanceRatio,
+    unifiedFlightTimeScale: 1.34
+  });
 }
 
 function applyFinalHitResultBalance(result, profile, contact = null) {
@@ -7069,7 +7291,7 @@ function makeHardOutfieldBounceHitResultFromProfile(profile) {
   }
   return {
     ...makeGapLinerResult(bounceProfile),
-    label: hitLabels.cleanHit,
+    label: bounceProfile.unifiedBattedBall ? hitLabels.outfieldLiner : hitLabels.cleanHit,
     hardOutfieldBounce: true,
     gapLiner: true,
     power: clamp((profile.power ?? 0.72) + 0.36 + solidScoreBoost * 0.12, 1.14, 1.32),
@@ -7171,6 +7393,8 @@ function makeGrounderOutResultFromProfile(profile, power = profile?.power, optio
 function getGrounderOutPower(profile, power = profile?.power, directionChoice = {}, options = {}) {
   if (Number.isFinite(options.power)) return options.power;
   const basePower = power ?? profile?.power ?? 0.5;
+  if (options.classification === "weak") return clamp(basePower, 0.2, 0.42);
+  if (options.classification === "routine") return clamp(basePower, 0.4, 0.66);
   const quality = clamp(profile?.quality ?? 0.45, 0, 1);
   const exitVelocity = clamp(profile?.exitVelocity ?? basePower, 0, 1.75);
   const timingMiss = clamp(Math.abs(profile?.timingPull ?? 0), 0, 1);
@@ -7527,7 +7751,7 @@ function getGapLinerDirection(profileOrPower) {
 
 function makeGapLinerResult(profileOrPower) {
   const power = getProfileResultPower(profileOrPower);
-  return { label: hitLabels.single, kind: "hit", power: clamp(power + randomBetween(0.02, 0.08), 0.84, 0.92), scoreType: "single", gapLiner: true, direction: getGapLinerDirection(profileOrPower), battedProfile: getProfileResultSource(profileOrPower) };
+  return { label: hitLabels.cleanHit, kind: "hit", power: clamp(power + randomBetween(0.02, 0.08), 0.84, 0.92), scoreType: "single", gapLiner: true, direction: getGapLinerDirection(profileOrPower), battedProfile: getProfileResultSource(profileOrPower) };
 }
 
 function makeFrontDropResult(profileOrPower) {
@@ -10103,7 +10327,12 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     && profileExitVelocity >= 0.9
     && profileCarry >= 0.86;
   const isHardOutfieldBounce = isHardOutfieldBounceProfile;
-  const rawDistance = isBunt && isPopupFly
+  const unifiedDistanceRatio = Number.isFinite(battedProfile?.unifiedDistanceRatio)
+    ? clamp(battedProfile.unifiedDistanceRatio, 0.06, 1.2)
+    : null;
+  const rawDistance = unifiedDistanceRatio !== null
+    ? fenceDistance * unifiedDistanceRatio
+    : isBunt && isPopupFly
     ? randomBetween(120, 260)
     : isBunt
     ? (randomBetween(72, 170) + (1 - clamp(battedProfile?.buntQuality ?? 0.4, 0, 1)) * 70) * getBuntRollDistanceScale(battedProfile?.buntQuality ?? 0.4)
@@ -10163,7 +10392,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (!isGrounder && !isBunt) {
     distance *= getCurrentStadium().airCarryScale ?? 1;
   }
-  if (isGrounder && !isBunt && !isLineEdgeGrounder && !isCenterReturnGrounder) {
+  if (isGrounder && !isBunt && !isLineEdgeGrounder && !isCenterReturnGrounder && !battedProfile?.preserveUnifiedDirection) {
     direction = getRandomGrounderDirection64(battedProfile);
   }
   if (!isBunt && trajectory === "fly" && !isPopupFly && !isFrontDrop) {
@@ -10179,6 +10408,10 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const fairDeepFlight = !isGrounder && isFairDirection(direction);
   const fenceIntersection = isFairDirection(direction) ? getFenceIntersectionFromPoint(origin, direction) : null;
   const fenceTravelDistance = fenceIntersection?.travelDistance ?? fenceDistance;
+  const forceUnifiedWallHit = Boolean(battedProfile?.unifiedForceWallHit && fairDeepFlight && fenceIntersection);
+  if (forceUnifiedWallHit) {
+    distance = Math.max(distance, fenceTravelDistance + 18);
+  }
   let landingDistance = isLineLiner
     ? isHardOutfieldBounce
       ? distance * randomBetween(0.72, 0.84)
@@ -10302,6 +10535,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isFenceLiner
     ? randomBetween(116, 206) + Math.max(0, power - 1.18) * 340
     : getBattedBallMaxHeight(trajectory, power, possibleHomerFlightDistance) * (isRoutineFly || isChaseFly || isDeepDrive ? bigOutfieldFlyHeightScale : 1);
+  if (forceUnifiedWallHit) {
+    possibleHomerHeight = Math.min(possibleHomerHeight, defenseField.fenceHeight * 0.88);
+  }
   if (!isFenceLiner && !isLiner) {
     const homerQuality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
     const nearWallLift = clamp((132 - getBattedBallDistanceMeters(possibleHomerFlightDistance)) / 24, 0, 1);
@@ -10346,6 +10582,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (scoreDrivenHomerPush && fairDeepFlight && fenceIntersection && contactScore >= 0.6 && power >= 1.36 && distance > fenceTravelDistance - 180) {
     fenceOver = true;
   }
+  if (forceUnifiedWallHit && domeRule?.kind !== "groundRuleDouble") {
+    fenceOver = false;
+  }
   const reducedPowerHitterHomer = shouldReducePowerHitterHomeRunToWallHit({
     fenceOver,
     isFenceEdgeFly,
@@ -10369,6 +10608,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   let groundRuleDouble = domeRule?.kind === "groundRuleDouble";
   if (groundRuleDouble) fenceOver = false;
   let wallHit = !groundRuleDouble && !fenceOver && fairDeepFlight && fenceIntersection && (distance >= fenceTravelDistance || flyWallHit || possibleWallHit);
+  if (forceUnifiedWallHit && !groundRuleDouble) {
+    wallHit = true;
+  }
   const flightDistance = fenceOver ? possibleHomerFlightDistance : wallHit ? fenceTravelDistance : groundRuleDouble ? Math.min(distance, fenceTravelDistance + 70) : landingDistance;
   const contactSpeedLift = getSolidContactSpeedLift(contactScore, profileExitVelocity);
   if (fenceOver) {
@@ -10426,7 +10668,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       }, 42)
     : null;
   const lowGravityTimeScale = !isGrounder && !isBunt ? (getCurrentStadium().lowGravityTimeScale ?? 1) : 1;
-  const ballTime = (baseBallTime / (ballSpeedMultiplier * battedBallPaceMultiplier) + flightDistance / baseBallSpeed) * lowGravityTimeScale;
+  const ballTime = (baseBallTime / (ballSpeedMultiplier * battedBallPaceMultiplier) + flightDistance / baseBallSpeed)
+    * lowGravityTimeScale
+    * (battedProfile?.unifiedFlightTimeScale ?? 1);
   const flightDistanceMeters = getBattedBallDistanceMeters(flightDistance, {
     direction,
     fenceTravelDistance
