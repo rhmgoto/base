@@ -5840,6 +5840,7 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
   const unifiedProfile = {
     ...profile,
     feedbackScore: quality,
+    displayOverallScore: feedbackScore,
     unifiedBattedBall: true,
     unifiedQuality: quality,
     zoneBand,
@@ -5875,6 +5876,16 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
   else if (trajectory === "grounder" && trajectoryRoll > 0.86) trajectory = "liner";
   else if (trajectory === "liner" && trajectoryRoll > 0.82) trajectory = "fly";
   else if (trajectory === "fly" && trajectoryRoll < 0.1) trajectory = "liner";
+
+  if (quality >= 0.72 && (zoneBand === "center" || zoneBand === "middle") && trajectory !== "fly") {
+    const powerDrive = clamp(getPowerDriveScore(), 0, 1);
+    const liftChance = clamp(
+      0.24 + ((quality - 0.72) / 0.28) * 0.5 + powerDrive * 0.14,
+      0.24,
+      0.86
+    );
+    if (Math.random() < liftChance) trajectory = "fly";
+  }
 
   if (zoneBand === "farOutside" && Math.random() < 0.54) trajectory = Math.random() < 0.52 ? "popup" : "grounder";
   else if (zoneBand === "outside" && Math.random() < 0.34) trajectory = Math.random() < 0.45 ? "popup" : "grounder";
@@ -5984,7 +5995,7 @@ function makeUnifiedFlyResult(profile, quality) {
       ? makeUnifiedRoutineFlyResult(resultProfile, resultProfile.unifiedDistanceRatio)
       : makeChaseFlyResultFromProfile(resultProfile);
   }
-  if (quality < 0.78) {
+  if (quality < 0.72) {
     const resultProfile = makeUnifiedResultProfile(profile, "fly", randomBetween(0.64, 0.92));
     if (Math.random() < 0.68) {
       return makeChaseFlyResultFromProfile({
@@ -6001,27 +6012,34 @@ function makeUnifiedFlyResult(profile, quality) {
     });
   }
   const powerDrive = clamp(getPowerDriveScore(), 0, 1);
-  const homeRunLean = clamp((quality - 0.78) / 0.22 * (0.55 + powerDrive * 0.45), 0, 1);
+  const displayedOverall = clamp(profile.displayOverallScore ?? quality, 0, 1);
+  const homeRunGrade = clamp(Math.max(quality, displayedOverall * 0.96), 0, 1);
+  const homeRunCandidateChance = clamp(
+    0.24 + ((homeRunGrade - 0.72) / 0.28) * 0.58 + powerDrive * 0.12,
+    0.24,
+    0.88
+  );
   const longBallRoll = Math.random();
-  if (longBallRoll < 0.26) {
+  if (longBallRoll < homeRunCandidateChance) {
+    return makeDeepDriveResultFromProfile({
+      ...makeUnifiedResultProfile(profile, "fly", randomBetween(1.1, 1.24)),
+      unifiedHomerCandidate: true,
+      unifiedFlightTimeScale: randomBetween(0.94, 1.06)
+    });
+  }
+  const remainingRoll = (longBallRoll - homeRunCandidateChance) / Math.max(0.001, 1 - homeRunCandidateChance);
+  if (remainingRoll < 0.42) {
     return makeFenceEdgeFlyResultFromProfile({
       ...makeUnifiedResultProfile(profile, "fly", randomBetween(1.04, 1.12)),
       unifiedForceWallHit: true,
       unifiedFlightTimeScale: randomBetween(0.9, 1.04)
     });
   }
-  if (longBallRoll < 0.58) {
-    return makeChaseFlyResultFromProfile({
-      ...makeUnifiedResultProfile(profile, "fly", randomBetween(0.74, 0.98)),
-      unifiedFlightTimeScale: randomBetween(0.72, 0.88),
-      unifiedOverFielderFly: true
-    });
-  }
-  const distanceRatio = randomBetween(0.84, 1.04 + homeRunLean * 0.2);
-  const resultProfile = makeUnifiedResultProfile(profile, "fly", distanceRatio);
-  return homeRunLean > 0.62 && Math.random() < homeRunLean * 0.5
-    ? makeDeepDriveResultFromProfile(resultProfile)
-    : makeFenceEdgeFlyResultFromProfile(resultProfile);
+  return makeChaseFlyResultFromProfile({
+    ...makeUnifiedResultProfile(profile, "fly", randomBetween(0.76, 1)),
+    unifiedFlightTimeScale: randomBetween(0.72, 0.88),
+    unifiedOverFielderFly: true
+  });
 }
 
 function makeUnifiedRoutineFlyResult(profile, distanceRatio) {
@@ -10383,7 +10401,13 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? fenceDistance * 0.12 + Math.max(0, profileExitVelocity - 1.0) * 180 + Math.max(0, profileCarry - 0.95) * 180
     : 0;
   const boostedRawDistance = rawDistance + battingPracticeHomerDistanceBonus;
-  let distance = shouldShortenBigOutfieldFly({ isChaseFly, isFenceEdgeFly, isDeepDrive, isToweringFly })
+  let distance = shouldShortenBigOutfieldFly({
+    isChaseFly,
+    isFenceEdgeFly,
+    isDeepDrive,
+    isToweringFly,
+    unifiedHomerCandidate: Boolean(battedProfile?.unifiedHomerCandidate)
+  })
     ? boostedRawDistance * (isBattingPracticeHomerCandidate ? 1.04 : bigOutfieldFlyDistanceScale)
     : boostedRawDistance;
   const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (isStandardGrounderLabel(label) || power < 0.38));
@@ -10595,7 +10619,9 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     contactScore,
     profileExitVelocity,
     profileCarry,
-    power
+    power,
+    unifiedHomerCandidate: Boolean(battedProfile?.unifiedHomerCandidate),
+    displayOverallScore: battedProfile?.displayOverallScore
   });
   if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && !centerZoneHomerPush && !scoreDrivenHomerPush && domeRule?.kind !== "homer") fenceOver = false;
   const flyWallHit = trajectory === "fly"
@@ -10760,6 +10786,7 @@ function getHomeRunQuality({ contactScore = 0.5, profileExitVelocity = 1, power 
 
 function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
   if (!traits.fenceOver) return false;
+  if (traits.unifiedHomerCandidate && (traits.displayOverallScore ?? traits.contactScore ?? 0) >= 0.72) return false;
   const batterPower = clamp(activeBatter?.power ?? 5, 1, 10);
   if (batterPower < 8) return false;
   if (traits.isFenceLiner) return false;
@@ -10769,9 +10796,9 @@ function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
     power: traits.power ?? 1.2
   });
   const eliteProtection = clamp((quality - 0.86) / 0.14, 0, 1);
-  const powerHitterBoost = clamp((batterPower - 8) / 2, 0, 1) * 0.06;
+  const powerHitterProtection = clamp((batterPower - 8) / 2, 0, 1) * 0.12;
   const adjustedReductionRate = powerHitterHomeRunReductionRate / homeRunFrequencyMultiplier;
-  const conversionChance = clamp(adjustedReductionRate + powerHitterBoost - eliteProtection * 0.2, 0.08, 0.38);
+  const conversionChance = clamp(adjustedReductionRate - powerHitterProtection - eliteProtection * 0.2, 0.02, 0.32);
   return Math.random() < conversionChance;
 }
 
@@ -10878,6 +10905,7 @@ function getBattedBallMetricText(battedBall) {
 }
 
 function shouldShortenBigOutfieldFly(traits) {
+  if (traits?.unifiedHomerCandidate) return false;
   return Boolean(traits?.isChaseFly || traits?.isFenceEdgeFly || traits?.isDeepDrive || traits?.isToweringFly);
 }
 
@@ -15508,7 +15536,6 @@ function drawDefenseView() {
 
   drawDefenseTarget();
   drawHomeRunFireworks();
-  drawFieldingErrorEffect();
   drawGrounderBounceMarks();
   drawPostLandingBounceMarker();
   drawLandingImpactMarker();
@@ -15519,6 +15546,8 @@ function drawDefenseView() {
   drawBatterRunner();
   drawBallTrail();
   drawBall();
+  drawDefenseCatchEffect();
+  drawFieldingErrorEffect();
   ctx.restore();
 }
 
@@ -15803,32 +15832,159 @@ function drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds) {
   ctx.restore();
 }
 
+function drawDefenseCatchEffect() {
+  const outcome = defenseState.outcome;
+  if (!defenseState.active || !outcome?.caught || outcome.fieldingError) return;
+  const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
+  const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
+  const age = elapsedSeconds - fieldingTime;
+  const noBounceCatch = isNoBounceDefenseCatch(outcome, defenseState.battedBall);
+  const duration = noBounceCatch ? 1.05 : 0.58;
+  if (age < 0 || age > duration) return;
+  const point = outcome.fieldingPoint || defenseState.target;
+  if (!point) return;
+  const progress = clamp(age / duration, 0, 1);
+  const alpha = 1 - progress;
+  if (!noBounceCatch) {
+    drawSimpleDefensePickupEffect(point, progress, alpha);
+    return;
+  }
+  const pulse = 1 + Math.sin(age * 24) * 0.08;
+  const innerRadius = (18 + progress * 22) * pulse;
+  const outerRadius = (36 + progress * 68) * pulse;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = `rgba(174, 231, 255, ${0.34 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, innerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 242, 168, ${0.98 * alpha})`;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, outerRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  for (let i = 0; i < 12; i += 1) {
+    const angle = (Math.PI * 2 * i) / 12 + progress * 0.35;
+    const rayStart = outerRadius + 8;
+    const rayEnd = rayStart + 24 + progress * 34;
+    drawLine(
+      point.x + Math.cos(angle) * rayStart,
+      point.y + Math.sin(angle) * rayStart,
+      point.x + Math.cos(angle) * rayEnd,
+      point.y + Math.sin(angle) * rayEnd
+    );
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = `rgba(20, 52, 72, ${0.86 * alpha})`;
+  ctx.lineWidth = 5;
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
+  ctx.font = "bold 24px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.strokeText("キャッチ!", point.x, point.y - 68 - progress * 24);
+  ctx.fillText("キャッチ!", point.x, point.y - 68 - progress * 24);
+  ctx.restore();
+}
+
+function isNoBounceDefenseCatch(outcome, battedBall) {
+  if (!outcome?.caught || !battedBall || battedBall.isGrounder || outcome.postLandingPickup) return false;
+  if (/バウンド|ゴロ処理|捕球処理/.test(outcome.label || "")) return false;
+  const fieldingTime = outcome.fieldingTime ?? Number.POSITIVE_INFINITY;
+  const firstLandingTime = battedBall.ballTime ?? 0;
+  return fieldingTime <= firstLandingTime + 0.08;
+}
+
+function drawSimpleDefensePickupEffect(point, progress, alpha) {
+  const radius = 14 + progress * 24;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(174, 231, 255, ${0.72 * alpha})`;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.26 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, 9 + progress * 8, 0, Math.PI * 2);
+  ctx.fill();
+  for (let i = 0; i < 4; i += 1) {
+    const angle = (Math.PI * 2 * i) / 4 + Math.PI / 4;
+    const inner = radius + 4;
+    const outer = inner + 9 + progress * 8;
+    drawLine(
+      point.x + Math.cos(angle) * inner,
+      point.y + Math.sin(angle) * inner,
+      point.x + Math.cos(angle) * outer,
+      point.y + Math.sin(angle) * outer
+    );
+  }
+  ctx.restore();
+}
+
 function drawFieldingErrorEffect() {
   const outcome = defenseState.outcome;
   if (!defenseState.active || !outcome?.fieldingError) return;
   const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   const age = elapsedSeconds - fieldingTime;
-  if (age < 0 || age > 0.85) return;
+  const duration = 1.3;
+  if (age < 0 || age > duration) return;
   const point = outcome.errorPoint || outcome.fieldingPoint || defenseState.target;
-  const alpha = 1 - age / 0.85;
+  if (!point) return;
+  const progress = clamp(age / duration, 0, 1);
+  const alpha = 1 - progress;
+  const shakeX = Math.sin(age * 48) * 4 * alpha;
+  const shakeY = Math.cos(age * 39) * 3 * alpha;
+  const x = point.x + shakeX;
+  const y = point.y + shakeY;
   ctx.save();
-  ctx.strokeStyle = `rgba(255, 111, 97, ${0.85 * alpha})`;
-  ctx.fillStyle = `rgba(255, 242, 168, ${0.28 * alpha})`;
-  ctx.lineWidth = 5;
+  ctx.lineCap = "round";
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(255, 70, 78, ${0.98 * alpha})`;
+  ctx.fillStyle = `rgba(255, 111, 97, ${0.42 * alpha})`;
+  ctx.lineWidth = 7;
   ctx.beginPath();
-  ctx.arc(point.x, point.y, 18 + age * 48, 0, Math.PI * 2);
+  ctx.arc(x, y, 22 + progress * 72, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.75 * alpha})`;
+
+  ctx.strokeStyle = `rgba(255, 242, 168, ${0.92 * alpha})`;
+  ctx.lineWidth = 5;
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (Math.PI * 2 * i) / 10 - progress * 0.28;
+    const inner = 32 + progress * 34;
+    const outer = inner + 30 + (i % 2) * 18;
+    drawLine(
+      x + Math.cos(angle) * inner,
+      y + Math.sin(angle) * inner,
+      x + Math.cos(angle) * outer,
+      y + Math.sin(angle) * outer
+    );
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = `rgba(72, 12, 22, ${0.92 * alpha})`;
+  ctx.lineWidth = 7;
+  drawLine(x - 30, y - 24, x + 30, y + 24);
+  drawLine(x + 30, y - 24, x - 30, y + 24);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.96 * alpha})`;
   ctx.lineWidth = 3;
-  drawLine(point.x - 26, point.y - 18, point.x + 26, point.y + 18);
-  drawLine(point.x + 26, point.y - 18, point.x - 26, point.y + 18);
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * alpha})`;
-  ctx.font = "bold 20px sans-serif";
+  drawLine(x - 30, y - 24, x + 30, y + 24);
+  drawLine(x + 30, y - 24, x - 30, y + 24);
+
+  ctx.strokeStyle = `rgba(72, 12, 22, ${0.92 * alpha})`;
+  ctx.lineWidth = 6;
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
+  ctx.font = "bold 26px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("エラー", point.x, point.y - 42 - age * 18);
+  ctx.strokeText("エラー!", x, y - 76 - progress * 26);
+  ctx.fillText("エラー!", x, y - 76 - progress * 26);
   ctx.restore();
 }
 

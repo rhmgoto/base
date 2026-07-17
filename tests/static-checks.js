@@ -72,6 +72,32 @@ assertIncludesAll(
   "script.js bunt aim leniency"
 );
 
+assertIncludesAll(
+  script,
+  [
+    "function drawDefenseCatchEffect()",
+    "outcome?.caught || outcome.fieldingError",
+    'ctx.strokeText("キャッチ!"',
+    "function isNoBounceDefenseCatch",
+    "battedBall.isGrounder || outcome.postLandingPickup",
+    "function drawSimpleDefensePickupEffect",
+    "function drawFieldingErrorEffect()",
+    "outcome?.fieldingError",
+    'ctx.strokeText("エラー!"'
+  ],
+  "script.js defense result effects"
+);
+
+const defenseDrawSection = script.slice(
+  script.indexOf("function drawDefenseView()"),
+  script.indexOf("function drawHomeRunFireworks()")
+);
+assert(
+  defenseDrawSection.indexOf("drawDefenseFielders();") < defenseDrawSection.indexOf("drawDefenseCatchEffect();")
+    && defenseDrawSection.indexOf("drawBall();") < defenseDrawSection.indexOf("drawFieldingErrorEffect();"),
+  "defense catch and error effects should render over fielders and the ball"
+);
+
 ["normal", "slow", "fast", "special"].forEach((pitchType) => {
   assert(
     script.includes(`gamePhase === "playing" && isPlayerPitching()`) && script.includes(`startPitch("${pitchType}")`),
