@@ -66,8 +66,9 @@ assertIncludesAll(
     "function getBuntAimForContact",
     "now - swingState.buntAimMemoryTime <= buntAimMemoryDuration",
     "const gamepadX = Math.abs(axisX) >= 0.22 ? axisX : 0",
-    "const aimedSide = Math.abs(buntAimX) >= 0.22 ? Math.sign(buntAimX) : 0",
-    "const aimedFoulRelief = aimedSide ? 0.08 + aimControlScore * 0.12 : 0"
+    "const aimedSide = Math.abs(buntAimX) > 0 ? Math.sign(buntAimX) : 0",
+    "const aimControlScore = hasAim ? 1 : 0",
+    "const noAimPitcherFrontBoost = hasAim ? 0 : 0.22"
   ],
   "script.js bunt aim leniency"
 );
@@ -86,6 +87,35 @@ assertIncludesAll(
     'ctx.strokeText("エラー!"'
   ],
   "script.js defense result effects"
+);
+
+assertIncludesAll(
+  script,
+  [
+    "stuff: -64",
+    "id: \"homeRunVision\"",
+    "name: \"ホームランヴィジョンフィールド\"",
+    "suppressFoulGroundStands: true",
+    "hasReliefCar: true",
+    "function getHomeRunVisionAdvice",
+    "const homeRunVisionAdvicePatterns = buildHomeRunVisionAdvicePatterns()",
+    "patterns.length !== 256",
+    "return patterns",
+    "function drawHomeRunVisionBeyondOutfield",
+    "ホームランヴィジョン",
+    "無観客・スイング解析中",
+    "function drawReliefCarEntrance",
+    "isHomeRunVisionField() ? Math.max(6400, duration) : duration",
+    "function getHomeRunVisionScreenFocusPoint",
+    "const visionWeight = clamp"
+  ],
+  "script.js home run vision field"
+);
+
+assertIncludesAll(
+  html,
+  ["<option value=\"homeRunVision\">ホームランヴィジョンフィールド</option>"],
+  "index.html home run vision field option"
 );
 
 const defenseDrawSection = script.slice(

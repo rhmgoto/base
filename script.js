@@ -407,7 +407,7 @@ const defaultPitchers = pitchers.map((player) => ({ ...player }));
 const originalMenuBatterIds = { away: "original-away-batter", home: "original-home-batter" };
 const originalMenuBatters = Object.fromEntries(teamIds.map((team) => [team, createDefaultOriginalMenuBatter(team)]));
 const practiceOnlyPitchers = [
-  { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: -18, fielding: 5, stamina: 99, cost: 0, practiceOnly: true }
+  { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: -64, fielding: 5, stamina: 99, cost: 0, practiceOnly: true }
 ];
 let playerEditorState = { kind: "batter", playerId: batters[0]?.id ?? "", isNew: false };
 let chooserSortState = { team: "", role: "", kind: "", key: "" };
@@ -461,6 +461,23 @@ const stadiumPresets = {
     hasOcean: false,
     hasMountains: false,
     hasDome: false,
+    airCarryScale: 1
+  },
+  homeRunVision: {
+    id: "homeRunVision",
+    name: "ホームランヴィジョンフィールド",
+    surface: "visionGrass",
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
+    fenceHeight: baseDefenseField.fenceHeight,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: true,
+    suppressFoulGroundStands: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasHomeRunVision: true,
+    hasReliefCar: true,
     airCarryScale: 1
   },
   aozora: {
@@ -563,6 +580,10 @@ let currentStadiumId = "fireworks";
 
 function getCurrentStadium() {
   return stadiumPresets[currentStadiumId] || stadiumPresets.fireworks;
+}
+
+function isHomeRunVisionField() {
+  return getCurrentStadium().hasHomeRunVision === true;
 }
 
 function getStadiumFenceDistance(stadium) {
@@ -972,6 +993,7 @@ let stealState = createStealState();
 let hitEffect = { active: false, startTime: 0, text: "", color: "#fff2a8" };
 let battingFeedback = { active: false, startTime: 0, lines: [] };
 let hbpPose = { active: false, startTime: 0, duration: 1800 };
+let reliefCarEffect = { active: false, startTime: 0, duration: 2600, pitcherName: "", team: "away" };
 const keysDown = new Set();
 const pitchAdjustmentKeys = ["1", "3", "4", "6"];
 let pitchControlLockoutKeys = new Set();
@@ -2154,11 +2176,27 @@ function changePitcher(team, pitcherId) {
   if (fieldingTeam() === team) {
     setMatchup();
     resetBall();
-    message = `${teamLabel(team)} 投手交代: ${activePitcher.name}`;
+    if (isHomeRunVisionField()) {
+      startReliefCarEntrance(team, activePitcher);
+      message = `${teamLabel(team)} 投手交代: ${activePitcher.name}、リリーフカーで登場`;
+    } else {
+      message = `${teamLabel(team)} 投手交代: ${activePitcher.name}`;
+    }
   }
   updateSidebarAbilityPanels();
   renderPitcherChangeControls();
   return true;
+}
+
+function startReliefCarEntrance(team, pitcherInfo = activePitcher) {
+  if (!getCurrentStadium().hasReliefCar) return;
+  reliefCarEffect = {
+    active: true,
+    startTime: performance.now(),
+    duration: 2600,
+    pitcherName: pitcherInfo?.name || "",
+    team
+  };
 }
 
 function findSelectedById(list, id) {
@@ -3235,7 +3273,7 @@ function isHomeRunDerbyLastRegulationBall(team = battingTeam) {
     && (homeRunDerbyState.balls?.[team] || 0) === HOME_RUN_DERBY_REGULATION_BALLS - 1;
 }
 
-function handleHomeRunDerbyPitchResult(isHomer, metricText = "") {
+function handleHomeRunDerbyPitchResult(isHomer, metricText = "", battedBall = null) {
   if (!isHomeRunDerbyMode() || !homeRunDerbyState.active) return false;
   const team = battingTeam;
   const points = isHomer ? (isHomeRunDerbyLastRegulationBall(team) ? 2 : 1) : 0;
@@ -3246,12 +3284,123 @@ function handleHomeRunDerbyPitchResult(isHomer, metricText = "") {
     ? `ホームラン +${points}`
     : "ホームランならず";
   const detailText = metricText ? ` / ${metricText}` : "";
-  message = `${resultText}${detailText} / A ${scores.away} - B ${scores.home}`;
+  const adviceText = !isHomer && isHomeRunVisionField() ? getHomeRunVisionAdvice(battedBall) : "";
+  message = `${resultText}${detailText}${adviceText ? ` / ${adviceText}` : ""} / A ${scores.away} - B ${scores.home}`;
   showEffect(resultText, isHomer ? "#ff6f61" : "#aee7ff");
   advanceHomeRunDerbyTurn();
   resetPracticePlateAppearance();
   if (gamePhase === "playing" && !isInputLocked()) scheduleNextPitch(isHomer ? 1100 : 800);
   return true;
+}
+
+const homeRunVisionAdvicePatterns = buildHomeRunVisionAdvicePatterns();
+
+function buildHomeRunVisionAdvicePatterns() {
+  const distancePatterns = [
+    { band: "near", text: "あと少しで届く打球です。最後のひと伸びを作るため、芯の少し下を強く押し込みましょう" },
+    { band: "short", text: "フェンスまで距離が残っています。ゾーン中央を待って、打球の初速をもう一段上げたいです" },
+    { band: "deep", text: "外野深くまでは運べています。角度と速度のどちらかを少し整えるとホームラン圏に入ります" },
+    { band: "foul", text: "飛距離よりも方向が惜しい打球です。振り出しを急がず、フェアゾーンへ押し返しましょう" }
+  ];
+  const anglePatterns = [
+    { band: "low", text: "角度が低めです。ボールの少し下を叩いて、ライナーからフライ寄りに上げましょう" },
+    { band: "ideal", text: "角度はかなり良いです。この形なら、あとは芯の強さを足すだけです" },
+    { band: "high", text: "角度が高く、途中で失速しています。もう少し前へ押し込むスイングが合います" },
+    { band: "pop", text: "上がりすぎています。ミートポイントを少し前にして、こすらず強く捉えましょう" }
+  ];
+  const speedPatterns = [
+    { band: "soft", text: "打球速度が不足しています。タイミングを合わせて、強振の力を最後まで伝えましょう" },
+    { band: "medium", text: "打球速度は悪くありません。芯に近づけるほど、同じ角度でも大きく伸びます" },
+    { band: "hard", text: "打球速度は十分です。方向と角度が整えば、次はスタンドまで届きます" },
+    { band: "elite", text: "打球速度はホームラン級です。フェアゾーン中央へ乗せる意識を優先しましょう" }
+  ];
+  const contactPatterns = [
+    { band: "center", text: "芯に近い内容です。今の狙いを続けつつ、球の下半分を逃さないようにしましょう" },
+    { band: "edge", text: "芯の端に当たっています。バットの中心へ半個分だけ近づける意識が有効です" },
+    { band: "timing", text: "タイミングのずれが出ています。早すぎる時は待ち、遅い時は始動を少し早めましょう" },
+    { band: "miss", text: "ミートが浅い打球です。まずはゾーン中央を選び、無理な球を追わないことが近道です" }
+  ];
+  const patterns = [];
+  distancePatterns.forEach((distance) => {
+    anglePatterns.forEach((angle) => {
+      speedPatterns.forEach((speed) => {
+        contactPatterns.forEach((contact) => {
+          patterns.push({
+            distance: distance.band,
+            angle: angle.band,
+            speed: speed.band,
+            contact: contact.band,
+            text: `アドバイス: ${distance.text}。${angle.text}。${speed.text}。${contact.text}`
+          });
+        });
+      });
+    });
+  });
+  if (patterns.length !== 256) throw new Error("Home Run Vision advice patterns must contain 256 entries");
+  return patterns;
+}
+
+function getHomeRunVisionAdvice(battedBall = null) {
+  if (!battedBall) return homeRunVisionAdvicePatterns[0].text;
+  const profile = battedBall.battedProfile || {};
+  const fenceDistance = getFenceDistance(battedBall.target || {
+    x: field.plateX,
+    y: field.plateY + 42 - defenseField.fenceDistance
+  });
+  const flightDistance = battedBall.flightDistance ?? battedBall.landingDistance ?? fenceDistance;
+  const remainingMeters = Math.max(0, Math.round(getBattedBallDistanceMeters(Math.max(0, fenceDistance - flightDistance), {
+    direction: battedBall.direction,
+    fenceTravelDistance: fenceDistance
+  })));
+  const angle = Math.round(battedBall.launchAngleDegrees ?? 0);
+  const speed = Math.round(battedBall.exitSpeedKmh ?? 0);
+  const feedbackScore = clamp(profile.feedbackScore ?? profile.readableQuality ?? profile.quality ?? 0.45, 0, 1);
+  const timingPull = Math.abs(profile.timingPull ?? 0);
+  const distanceBand = battedBall.isFoulBall
+    ? "foul"
+    : remainingMeters <= 8
+      ? "near"
+      : remainingMeters <= 22
+        ? "deep"
+        : "short";
+  const angleBand = battedBall.isGrounder || angle < 14
+    ? "low"
+    : angle > 50
+      ? "pop"
+      : angle > 42
+        ? "high"
+        : "ideal";
+  const speedBand = speed >= 165
+    ? "elite"
+    : speed >= 150
+      ? "hard"
+      : speed >= 135
+        ? "medium"
+        : "soft";
+  const contactBand = feedbackScore >= 0.76
+    ? "center"
+    : timingPull > 0.62
+      ? "timing"
+      : feedbackScore >= 0.48
+        ? "edge"
+        : "miss";
+  const best = homeRunVisionAdvicePatterns
+    .map((pattern, index) => ({
+      pattern,
+      index,
+      score:
+        (pattern.distance === distanceBand ? 8 : 0)
+        + (pattern.angle === angleBand ? 6 : 0)
+        + (pattern.speed === speedBand ? 5 : 0)
+        + (pattern.contact === contactBand ? 5 : 0)
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.pattern;
+  return best?.text || homeRunVisionAdvicePatterns[0].text;
+}
+
+function appendHomeRunVisionAdviceToMessage(battedBall = null) {
+  if (!isHomeRunVisionField() || !battedBall || battedBall.fenceOver || message.includes("アドバイス:")) return;
+  message += ` / ${getHomeRunVisionAdvice(battedBall)}`;
 }
 
 function advanceHomeRunDerbyTurn() {
@@ -5398,12 +5547,13 @@ function buildBattingFeedbackLines(contact, result = {}) {
   const practicalSweetSpotScore = getPracticalSweetSpotScore(contact);
   const zoneText = getFeedbackZoneText(contact);
   const balancedScore = isBunt
-    ? getBuntFeedbackScore({ sweetSpotScore, zoneScore })
+    ? getBuntFeedbackScore({ zoneScore })
     : getBattingFeedbackBalancedScore(getBattingFeedbackScoreInput(contact, result.battedProfile));
   if (isBunt) {
+    const buntAimText = (contact.buntAimMagnitude ?? result.battedProfile?.buntAimControl ?? 0) > 0 ? "あり" : "なし";
     return [
       getBattingFeedbackResultText(result),
-      `バント評価: ゾーン到達率 ${Math.round(getFeedbackZoneRate(contact))}% / スイートスポット ${Math.round(sweetSpotScore * 100)}%`,
+      `バント評価: ゾーン到達率 ${Math.round(getFeedbackZoneRate(contact))}% / 方向入力 ${buntAimText}`,
       zoneText,
       `総合: ${Math.round(balancedScore * 100)}%`
     ];
@@ -5469,9 +5619,8 @@ function getBattingFeedbackScoreInput(contact = {}, profile = null) {
 }
 
 function getBuntFeedbackScore(scores = {}) {
-  const sweetSpot = clamp(scores.sweetSpotScore ?? 0, 0, 1);
   const zone = clamp(scores.zoneScore ?? 0, 0, 1);
-  return clamp(zone * 0.58 + sweetSpot * 0.42, 0, 1);
+  return zone;
 }
 
 function getBattedBallProfileScore(profile = null) {
@@ -5695,14 +5844,15 @@ function buildContactProfile(bestHit) {
   // 判定バットを太くした分、快打評価では中心線からの距離を少し戻す。
   const effectiveBatDistance = distanceToBat / batThicknessMultiplier;
   const barrelScore = Math.max(0, 1 - effectiveBatDistance / ((78 + batterMeet * 4) * 1.05));
-  const sweetSpotScore = getContactSweetSpotScore(bestHit);
+  const sweetSpotScore = isBuntStanceActive() ? 1 : getContactSweetSpotScore(bestHit);
   const plateDistance = distanceToGoodContactZone(bestHit.x, bestHit.y, ball.radius);
   const zoneDistanceRate = getGoodContactZoneDistanceRate(bestHit.x, bestHit.y, ball.radius);
   const zoneMissUnits = getGoodContactZoneMissUnits(plateDistance, ball.radius);
   const zoneMissStage = getGoodContactZoneMissStage(plateDistance);
   const zoneMissPenalty = getGoodContactZoneMissPenalty(zoneMissUnits);
+  const contactSweetSpotForRange = isBuntStanceActive() ? 1 : sweetSpotScore;
   const contactRange = baseContactRange
-    * getInsideMishitContactMultiplier(bestHit, sweetSpotScore, outsideStrikeZone)
+    * getInsideMishitContactMultiplier(bestHit, contactSweetSpotForRange, outsideStrikeZone)
     * getGoodContactZoneMissContactMultiplier(zoneMissUnits);
   const zoneReach = (68 + batterMeet * 12) * battingGoodContactZoneScale;
   const zoneScore = getZoneScoreFromDistanceRate(zoneDistanceRate);
@@ -7115,13 +7265,11 @@ function buildBattedBallProfile(contact) {
   });
   if (getCurrentSwingType() === "bunt") {
     const buntMeetSkill = clamp((meet - 3) / 9, 0, 1);
-    const aimMagnitude = clamp(buntAimMagnitude, 0, 1);
-    const hasAim = aimMagnitude >= 0.18;
-    const aimedSide = Math.abs(buntAimX) >= 0.22 ? Math.sign(buntAimX) : 0;
-    const aimControlScore = hasAim ? Math.max(aimMagnitude, Math.abs(buntAimX) * 0.92) : 0;
-    const noAimPenalty = hasAim ? 0 : 0.24;
+    const hasAim = Math.abs(buntAimX) > 0 || Math.abs(buntAimY) > 0;
+    const aimedSide = Math.abs(buntAimX) > 0 ? Math.sign(buntAimX) : 0;
+    const aimControlScore = hasAim ? 1 : 0;
+    const noAimPenalty = hasAim ? 0 : 0.3;
     const buntCoreScore = getBuntFeedbackScore({
-      sweetSpotScore,
       zoneScore: clamp(zoneScore ?? (inGoodContactZone ? 1 : 0), 0, 1)
     });
     const buntQuality = clamp(buntCoreScore + buntMeetSkill * 0.1 + aimControlScore * 0.12 - noAimPenalty, 0, 1);
@@ -7134,7 +7282,7 @@ function buildBattedBallProfile(contact) {
       : clamp(
           (buntTuning.popupFeedback - buntContactScore) / buntTuning.popupFeedback
             + Math.max(0, buntTuning.solidFeedback - buntContactScore) * 0.55
-            + Math.max(0, buntTuning.goodSweetSpot - sweetSpotScore) * 0.18,
+            + (hasAim ? 0 : 0.12),
           0,
           1
         );
@@ -7145,21 +7293,22 @@ function buildBattedBallProfile(contact) {
       : solidBuntContact
       ? clamp(buntTuning.solidLineChance + (buntContactScore - buntTuning.solidFeedback) * 0.24, 0.18, 0.26)
       : clamp(
-          buntTuning.badLineBase + buntContactScore * 0.2 + sweetSpotScore * 0.08,
+          buntTuning.badLineBase + buntContactScore * 0.2 + buntMeetSkill * 0.05,
           buntTuning.badLineMin,
           Math.min(0.28, buntTuning.badLineMax)
         );
-    const aimedLineBoost = aimedSide ? 0.08 + aimControlScore * 0.1 : 0;
+    const aimedLineBoost = aimedSide ? 0.12 : 0;
     const lineChance = clamp(baseLineChance + aimedLineBoost, buntTuning.badLineMin, buntTuning.goodLineChance);
     const pitcherFrontChance = goodBunt
       ? greatBunt ? clamp(0.04 - (buntContactScore - buntTuning.greatFeedback) * 0.3, 0.01, 0.04) : 0.12
       : solidBuntContact
       ? clamp(buntTuning.solidPitcherFrontChance + (buntContactScore - buntTuning.solidFeedback) * 0.42, 0.68, 0.76)
       : clamp(0.32 + buntContactScore * 0.5, 0.32, 0.52);
+    const noAimPitcherFrontBoost = hasAim ? 0 : 0.22;
     const roll = Math.random();
     const side = aimedSide || (Math.random() < 0.5 ? -1 : 1);
-    const aimAssist = aimedSide ? (0.12 + buntMeetSkill * 0.08) * aimControlScore : 0;
-    const aimedFoulRelief = aimedSide ? 0.08 + aimControlScore * 0.12 : 0;
+    const aimAssist = aimedSide ? 0.16 + buntMeetSkill * 0.08 : 0;
+    const aimedFoulRelief = aimedSide ? 0.14 : 0;
     const buntFoulChance = clamp(
       buntTuning.foulBase
         + (1 - buntQuality) * buntTuning.foulQualityScale
@@ -7167,17 +7316,16 @@ function buildBattedBallProfile(contact) {
         - aimedFoulRelief,
       buntTuning.foulMin,
       Math.min(0.82, buntTuning.foulMax + 0.12)
-    ) + (hasAim ? 0 : 0.04);
+    ) + (hasAim ? 0 : 0.06);
     const buntIsFoul = Math.random() < buntFoulChance;
     const pitcherBuntPopupChance = clamp(
-      buntTuning.popupBase + 0.08 + badBuntScore * (buntTuning.popupBadContactScale + 0.22) + (hasAim ? 0 : 0.04),
+      buntTuning.popupBase + 0.08 + badBuntScore * (buntTuning.popupBadContactScale + 0.22) + (hasAim ? 0 : 0.16),
       buntTuning.popupMin,
       Math.min(0.82, buntTuning.popupMax + 0.18)
     );
     const popupProtection = solidBuntContact
       ? clamp(
-          ((buntContactScore - buntTuning.solidFeedback) / 0.2)
-            + ((sweetSpotScore - buntTuning.solidContactSweetSpot) / 0.42) * 0.25,
+          (buntContactScore - buntTuning.solidFeedback) / 0.2,
           0,
           1
         )
@@ -7206,18 +7354,18 @@ function buildBattedBallProfile(contact) {
       ? goodBunt
         ? normalize({ x: side * randomBetween(0.95 + aimAssist, 1.25 + aimAssist), y: -randomBetween(0.42, 0.66) })
         : normalize({ x: side * randomBetween(0.72 + aimAssist * 0.7, 1.02 + aimAssist * 0.7), y: -randomBetween(0.58, 0.82) })
-      : roll < lineChance + pitcherFrontChance
+      : roll < lineChance + clamp(pitcherFrontChance + noAimPitcherFrontBoost, 0, 0.9)
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92 + aimAssist, 1.18 + aimAssist), y: -randomBetween(0.38, 0.68) });
-    const noAimPowerBoost = hasAim ? 0 : 0.08;
-    const deadenBonus = aimControlScore * 0.045 + (hasAim && buntAimY > 0.4 ? 0.025 : 0);
+    const noAimPowerBoost = hasAim ? 0 : 0.1;
+    const deadenBonus = (hasAim ? 0.045 : 0) + (hasAim && buntAimY > 0.4 ? 0.025 : 0);
     const buntPower = clamp(0.05 + buntQuality * 0.07 + noAimPowerBoost - deadenBonus, 0.045, 0.23);
     const badBuntLift = goodBunt ? 0 : clamp((0.62 - buntQuality) / 0.62, 0, 1) * randomBetween(0, 16);
     return {
       exitVelocity: pitcherBuntPopup ? clamp(0.1 + buntQuality * 0.08, 0.1, 0.22) : clamp(0.08 + buntQuality * 0.1 + noAimPowerBoost - deadenBonus, 0.07, 0.28),
-      launchAngle: pitcherBuntPopup ? randomBetween(30, 58) : clamp(-6 + sweetSpotScore * 5 + badBuntLift, -10, goodBunt ? 3 : 18),
+      launchAngle: pitcherBuntPopup ? randomBetween(30, 58) : clamp(-4 + buntContactScore * 2 + badBuntLift, -10, goodBunt ? 3 : 18),
       direction: buntDirection,
-      spin: clamp(0.28 + (1 - sweetSpotScore) * 0.38, 0.18, 0.82),
+      spin: clamp(0.26 + badBuntScore * 0.3 + (hasAim ? 0 : 0.08), 0.18, 0.82),
       carry: pitcherBuntPopup ? clamp(0.08 + badBuntScore * 0.08, 0.08, 0.18) : clamp(0.02 + buntQuality * 0.035, 0.02, 0.065),
       feedbackScore: buntContactScore,
       gapScore: 0,
@@ -9020,7 +9168,7 @@ function getDefensiveLineup(team) {
 }
 
 function getDefenseDuration(battedBall, outcome, runner, throwState, fieldingTarget = null) {
-  if (battedBall.fenceOver) return Math.max(6200, ((battedBall.ballTime ?? 0.7) + 5.4) * 1000);
+  if (battedBall.fenceOver) return Math.max(isHomeRunVisionField() ? 6400 : 6200, ((battedBall.ballTime ?? 0.7) + 5.4) * 1000);
   const runnerSeconds = runner ? runner.arrivalTime : 0;
   const throwSeconds = throwState
     ? Number.isFinite(throwState.endTime)
@@ -9031,7 +9179,8 @@ function getDefenseDuration(battedBall, outcome, runner, throwState, fieldingTar
   const rollSeconds = (!outcome.caught || outcome.needsThrow) && fieldingTarget
     ? battedBall.ballTime + getDefenseRollDuration(battedBall, battedBall.target, fieldingTarget) + 0.45
     : 0;
-  return clamp(Math.max(fieldingSeconds, runnerSeconds, throwSeconds, rollSeconds) * 1000, 1900, 12500);
+  const duration = clamp(Math.max(fieldingSeconds, runnerSeconds, throwSeconds, rollSeconds) * 1000, 1900, 12500);
+  return isHomeRunVisionField() ? Math.max(6400, duration) : duration;
 }
 
 function alignFieldingTimeWithBallArrival(battedBall, outcome, fieldingTarget, fielder = null) {
@@ -12274,6 +12423,14 @@ function updateDefensePlay(now) {
     resolveManualDefenseFielding(elapsedSeconds);
   } else {
     defenseState.fielders = defenseState.fielders.map((fielder) => {
+      const heldAtCatchPoint = getCompletedInfieldCatchHoldPoint(fielder, elapsedSeconds);
+      if (heldAtCatchPoint) {
+        return {
+          ...fielder,
+          currentX: heldAtCatchPoint.x,
+          currentY: heldAtCatchPoint.y
+        };
+      }
       const chaseTarget = getDefenseFielderMovementTarget(fielder, elapsedSeconds);
       if (!chaseTarget) return fielder;
       if (shouldUseIncrementalPostLandingChase(elapsedSeconds, chaseTarget)) {
@@ -12324,6 +12481,16 @@ function updateDefensePlay(now) {
   if (progress >= 1 && !defenseState.resolved && isBatterRunnerSettledForResolution()) {
     finishDefensePlay();
   }
+}
+
+function getCompletedInfieldCatchHoldPoint(fielder, elapsedSeconds) {
+  if (!fielder || fielder.role !== defenseState.chosenFielder?.role) return null;
+  if (!isInfielderRole(fielder.role)) return null;
+  const outcome = defenseState.outcome;
+  if (!outcome?.caught || !outcome.fieldingPoint) return null;
+  const fieldingTime = outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 0;
+  if (elapsedSeconds + 0.001 < fieldingTime) return null;
+  return outcome.fieldingPoint;
 }
 
 function resolveLiveInfielderContactCatch(elapsedSeconds) {
@@ -12387,7 +12554,7 @@ function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
 
 function completeUnifiedCircleCatch(fielder, fieldingPoint, elapsedSeconds) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = isCaughtAirBattedBall(battedBall);
+  const caughtInAir = isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
 
   defenseState.unifiedCircleCatchComplete = true;
   defenseState.throw = null;
@@ -12489,7 +12656,7 @@ function getLiveCircleCatchRadius(fielder, battedBall) {
 
 function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBall(battedBall);
+  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
   const outcome = {
       kind: caughtInAir ? "out" : "force",
       label: `${fielder.role} 捕球処理`,
@@ -12538,6 +12705,12 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
 
 function isCaughtAirBattedBall(battedBall) {
   return Boolean(battedBall && !battedBall.isGrounder);
+}
+
+function isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds) {
+  if (!isCaughtAirBattedBall(battedBall)) return false;
+  const firstLandingTime = Math.max(0, battedBall.ballTime ?? 0);
+  return elapsedSeconds <= firstLandingTime + 0.08;
 }
 
 function resolveLivePostLandingPickup(elapsedSeconds) {
@@ -13426,7 +13599,7 @@ function finishDefensePlay() {
   gamePhase = "playing";
   ball.active = false;
   if (defenseState.foulPlay) {
-    if (handleHomeRunDerbyPitchResult(false, metricText)) return;
+    if (handleHomeRunDerbyPitchResult(false, metricText, defenseState.battedBall)) return;
     if (outcome?.caught) {
       count.outs += 1;
       recordLastOutBatter(battingTeam, activeBatter);
@@ -13447,6 +13620,7 @@ function finishDefensePlay() {
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
       showEffect("ファウル", "#fff2a8");
     }
+    appendHomeRunVisionAdviceToMessage(defenseState.battedBall);
     if (gamePhase === "playing" && !isInputLocked()) scheduleNextPitch(900);
     return;
   }
@@ -13454,7 +13628,7 @@ function finishDefensePlay() {
 
   if (isHomeRunDerbyMode()) {
     const isHomer = outcome?.scoreType === "homer" || defenseState.battedBall?.fenceOver;
-    handleHomeRunDerbyPitchResult(isHomer, metricText);
+    handleHomeRunDerbyPitchResult(isHomer, metricText, defenseState.battedBall);
     return;
   }
 
@@ -13536,6 +13710,7 @@ function finishDefensePlay() {
     showEffect(effectText, scoreType === "homer" ? "#ff6f61" : "#fff2a8");
   }
 
+  appendHomeRunVisionAdviceToMessage(defenseState.battedBall);
   if (!resetPracticePlateAppearance()) {
     advanceBattingOrder();
     setMatchup();
@@ -14242,14 +14417,15 @@ function getBuntBatSegment() {
 
 function getRawBuntBatSegment() {
   const side = activeBatterSide === "R" ? 1 : -1;
-  const handleX = batter.x + side * 30;
-  const handleY = batter.y - 44 * field.plateScale;
-  const length = 150 * batLengthMultiplier * getMeetBatLengthScale();
+  // Bunt uses the visible black bat in the swing sprite as the contact guide.
+  const handleX = batter.x + side * 48;
+  const handleY = batter.y - 68;
+  const length = 108;
   return {
     x1: handleX,
     y1: handleY,
-    x2: handleX - side * length,
-    y2: handleY + 5
+    x2: handleX + side * length,
+    y2: handleY - 8
   };
 }
 
@@ -14340,6 +14516,7 @@ function draw() {
   drawPlateAndZone();
   drawGoodContactZone();
   drawPitcher();
+  drawReliefCarEntrance();
   drawBatter();
   drawStealPlay();
   drawHbpHitBox();
@@ -14548,6 +14725,10 @@ function drawStadiumFoulGroundDetails(homeY = field.plateY + 42) {
     drawLine(bench.x - 70, bench.y + 18, bench.x - 70, bench.y + 34);
     drawLine(bench.x + 70, bench.y + 18, bench.x + 70, bench.y + 34);
   });
+  if (getCurrentStadium().suppressFoulGroundStands) {
+    ctx.restore();
+    return;
+  }
   [
     { x: field.plateX - 850, y: homeY - 380 },
     { x: field.plateX + 850, y: homeY - 380 }
@@ -15168,6 +15349,51 @@ function drawAmericanRoyalBattingBackdrop() {
   ctx.restore();
 }
 
+function drawHomeRunVisionBeyondOutfield() {
+  if (!getCurrentStadium().hasHomeRunVision) return;
+  const focus = getHomeRunVisionScreenFocusPoint();
+  const centerX = focus.x;
+  const screenY = focus.y;
+  ctx.save();
+  ctx.fillStyle = "rgba(22, 33, 42, 0.8)";
+  roundRect(centerX - 390, screenY - 118, 780, 182, 18);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 242, 168, 0.82)";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  const glow = ctx.createLinearGradient(centerX - 340, screenY - 78, centerX + 340, screenY + 28);
+  glow.addColorStop(0, "rgba(64,184,216,0.94)");
+  glow.addColorStop(0.5, "rgba(255,242,168,0.98)");
+  glow.addColorStop(1, "rgba(255,111,97,0.92)");
+  ctx.fillStyle = glow;
+  roundRect(centerX - 338, screenY - 76, 676, 102, 12);
+  ctx.fill();
+  ctx.fillStyle = "rgba(20, 28, 40, 0.86)";
+  ctx.font = "bold 34px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("ホームランヴィジョン", centerX, screenY - 26);
+  ctx.font = "bold 18px sans-serif";
+  ctx.fillText("無観客・スイング解析中", centerX, screenY + 12);
+  ctx.strokeStyle = "rgba(35, 48, 71, 0.58)";
+  ctx.lineWidth = 12;
+  drawLine(centerX - 265, screenY + 66, centerX - 265, screenY + 178);
+  drawLine(centerX + 265, screenY + 66, centerX + 265, screenY + 178);
+  ctx.strokeStyle = "rgba(255,255,255,0.24)";
+  ctx.lineWidth = 2;
+  for (let x = centerX - 320; x <= centerX + 320; x += 80) {
+    drawLine(x, screenY - 68, x, screenY + 18);
+  }
+  ctx.restore();
+}
+
+function getHomeRunVisionScreenFocusPoint() {
+  return {
+    x: field.plateX,
+    y: field.plateY + 42 - defenseField.fenceDistance - 190
+  };
+}
+
 function drawAmericanRoyalBeyondOutfield() {
   if (!getCurrentStadium().royalEnclosed) return;
   const center = getFenceCenter();
@@ -15712,6 +15938,7 @@ function drawDefenseView() {
   drawNextDomeBeyondOutfield();
   drawRiversideBeyondOutfield();
   drawSpaceStadiumBeyondOutfield();
+  drawHomeRunVisionBeyondOutfield();
   drawAozoraRuralBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
@@ -16495,13 +16722,23 @@ function getDefenseCameraOffset() {
   if (!defenseState.active) return { x: 0, y: 0 };
   if (defenseState.battedBall?.fenceOver) return getHomeRunCameraOffset();
   const chosen = defenseState.fielders.find((fielder) => fielder.role === defenseState.chosenFielder.role);
-  const focusX = chosen ? ball.x * 0.68 + chosen.currentX * 0.32 : ball.x;
-  const focusY = chosen ? ball.y * 0.68 + chosen.currentY * 0.32 : ball.y;
+  let focusX = chosen ? ball.x * 0.68 + chosen.currentX * 0.32 : ball.x;
+  let focusY = chosen ? ball.y * 0.68 + chosen.currentY * 0.32 : ball.y;
   const homeY = field.plateY + 42;
-  const minX = field.plateX - defenseField.fenceDistance - 160;
-  const maxX = field.plateX + defenseField.fenceDistance + 160;
-  const minY = homeY - defenseField.fenceDistance - 180;
+  let minX = field.plateX - defenseField.fenceDistance - 160;
+  let maxX = field.plateX + defenseField.fenceDistance + 160;
+  let minY = homeY - defenseField.fenceDistance - 180;
   const maxY = homeY + 120;
+  if (isHomeRunVisionField()) {
+    const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
+    const vision = getHomeRunVisionScreenFocusPoint();
+    const visionWeight = clamp((elapsedSeconds - Math.max(0.8, defenseState.battedBall?.ballTime ?? 0.8)) / 1.05, 0, 1);
+    focusX = focusX * (1 - visionWeight) + vision.x * visionWeight;
+    focusY = focusY * (1 - visionWeight) + vision.y * visionWeight;
+    minX = Math.min(minX, vision.x - 560);
+    maxX = Math.max(maxX, vision.x + 560);
+    minY = Math.min(minY, vision.y - 210);
+  }
   const cameraX = clamp(canvas.width / 2 - focusX, canvas.width - maxX, -minX);
   const cameraY = clamp(canvas.height / 2 - focusY, canvas.height - maxY, -minY);
   return { x: cameraX, y: cameraY };
@@ -16559,6 +16796,10 @@ function getHomeRunStandFocusPoint() {
     x: field.plateX,
     y: getFenceCenter().y - defenseField.fenceDistance - 260
   };
+  if (isHomeRunVisionField()) {
+    const vision = getHomeRunVisionScreenFocusPoint();
+    return { x: vision.x, y: vision.y - 12 };
+  }
   if (getCurrentStadium().hasOcean && defenseState.battedBall?.fenceOver) {
     const water = getHomeRunWaterLandingPoint(defenseState.battedBall);
     return { x: water.x, y: water.y - 62 };
@@ -17335,6 +17576,74 @@ function drawPitcher() {
   drawPlayer(pitcher.x, pitcher.y, 1, "#286ed6", true);
 }
 
+function drawReliefCarEntrance() {
+  if (!reliefCarEffect.active || !getCurrentStadium().hasReliefCar) return;
+  const age = performance.now() - reliefCarEffect.startTime;
+  const progress = clamp(age / reliefCarEffect.duration, 0, 1);
+  if (progress >= 1) {
+    reliefCarEffect.active = false;
+    return;
+  }
+
+  const fromLeft = reliefCarEffect.team === "away";
+  const startX = fromLeft ? field.plateX - 820 : field.plateX + 820;
+  const endX = pitcher.x + (fromLeft ? -54 : 54);
+  const startY = field.plateY - 105;
+  const endY = pitcher.y + 58;
+  const ease = 1 - Math.pow(1 - progress, 2.8);
+  const x = startX + (endX - startX) * ease;
+  const y = startY + (endY - startY) * ease;
+  const facing = fromLeft ? 1 : -1;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(facing, 1);
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0, 31, 96, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f8f3d8";
+  roundRect(-82, -28, 164, 54, 12);
+  ctx.fill();
+  ctx.strokeStyle = "#233047";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#42b8d8";
+  roundRect(-34, -52, 78, 36, 12);
+  ctx.fill();
+  ctx.fillStyle = "#e8f8ff";
+  roundRect(-20, -45, 34, 18, 6);
+  ctx.fill();
+  ctx.fillStyle = "#ffcf70";
+  ctx.beginPath();
+  ctx.arc(86, -4, 8, 0, Math.PI * 2);
+  ctx.fill();
+  [-48, 48].forEach((wheelX) => {
+    ctx.fillStyle = "#233047";
+    ctx.beginPath();
+    ctx.arc(wheelX, 28, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d7e5ef";
+    ctx.beginPath();
+    ctx.arc(wheelX, 28, 6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+
+  if (reliefCarEffect.pitcherName) {
+    ctx.save();
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(20, 28, 40, 0.82)";
+    roundRect(x - 96, y - 92, 192, 30, 8);
+    ctx.fill();
+    ctx.fillStyle = "#fff2a8";
+    ctx.fillText(`${reliefCarEffect.pitcherName} 登場`, x, y - 77);
+    ctx.restore();
+  }
+}
+
 function drawPitcherSprite(team) {
   const spriteSet = pitcherSpriteSets[team];
   const frames = spriteSet.frames;
@@ -17490,31 +17799,19 @@ function drawBall() {
 function drawSpecialPitchGlow(x, y, radius = ball.radius) {
   const time = performance.now();
   const pulse = 0.5 + Math.sin(time / 82) * 0.5;
-  const outerRadius = radius + 18 + pulse * 7;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  const glow = ctx.createRadialGradient(x, y, radius * 0.2, x, y, outerRadius);
-  if (glow?.addColorStop) {
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.72)");
-    glow.addColorStop(0.28, "rgba(255, 207, 112, 0.58)");
-    glow.addColorStop(0.62, "rgba(255, 111, 97, 0.24)");
-    glow.addColorStop(1, "rgba(255, 207, 112, 0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(x, y, outerRadius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = `rgba(255, 242, 168, ${0.62 + pulse * 0.24})`;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(x, y, radius + 8 + pulse * 3, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 111, 97, 0.42)";
-  ctx.lineWidth = 5;
-  drawLine(x - 26, y + 5, x - 7, y + 1);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.54)";
+  ctx.strokeStyle = `rgba(255, 230, 120, ${0.52 + pulse * 0.18})`;
   ctx.lineWidth = 2;
-  drawLine(x - 18, y - 4, x - 5, y - 2);
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 207, 112, 0.42)";
+  ctx.lineWidth = 2;
+  drawLine(x - 18, y + 4, x - 7, y + 1);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
+  ctx.lineWidth = 1.4;
+  drawLine(x - 13, y - 3, x - 5, y - 2);
   ctx.restore();
 }
 
@@ -18850,11 +19147,3 @@ updateAudioToggleButtons();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
-
-
-
-
-
-
-
-
