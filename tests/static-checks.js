@@ -104,7 +104,12 @@ assertIncludesAll(
     "function drawHomeRunVisionBeyondOutfield",
     "ホームランヴィジョン",
     "無観客・スイング解析中",
+    "function drawHomeRunVisionAdviceText",
+    "function wrapJapaneseTextForCanvas",
+    "homeRunVisionDisplay.advice",
     "function drawReliefCarEntrance",
+    "duration: 3600",
+    "const silver = ctx.createLinearGradient",
     "isHomeRunVisionField() ? Math.max(6400, duration) : duration",
     "function getHomeRunVisionScreenFocusPoint",
     "const visionWeight = clamp"
@@ -114,8 +119,36 @@ assertIncludesAll(
 
 assertIncludesAll(
   html,
-  ["<option value=\"homeRunVision\">ホームランヴィジョンフィールド</option>"],
+  [
+    "<option value=\"homeRunVision\">ホームランヴィジョンフィールド</option>",
+    "<option value=\"shiokaze\">潮風球場</option>",
+    "id=\"spectatorModeButton\""
+  ],
   "index.html home run vision field option"
+);
+
+assertIncludesAll(
+  script,
+  [
+    "id: \"shiokaze\"",
+    "name: \"潮風球場\"",
+    "surface: \"seaBreezeGrass\"",
+    "hasSeaBreeze: true",
+    "seaBreezeParkMeters: { width: 1024, depth: 256 }",
+    "function applySeaBreezeToBattedBallDirection",
+    "function drawShiokazeParkBeyondOutfield",
+    "function startSpectatorMode",
+    "function drawSpectatorMode",
+    "function drawShiokazeAreaFeatures",
+    "function drawShiokazeShelters",
+    "function getShiokazeBallparkEntrancePoint",
+    "潮風公園",
+    "東海岸エリア",
+    "魚釣りエリア",
+    "const stickX = Math.abs(gamepad?.axes?.[0] ?? 0) >= 0.2",
+    "spectatorModeButton?.addEventListener"
+  ],
+  "script.js shiokaze stadium"
 );
 
 const defenseDrawSection = script.slice(

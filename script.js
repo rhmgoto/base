@@ -16,6 +16,7 @@ const startButton = byId("startButton");
 const practiceStartButton = byId("practiceStartButton");
 const pitchingPracticeStartButton = byId("pitchingPracticeStartButton");
 const homeRunDerbyStartButton = byId("homeRunDerbyStartButton");
+const spectatorModeButton = byId("spectatorModeButton");
 const soundToggleButton = byId("soundToggleButton");
 const bgmToggleButton = byId("bgmToggleButton");
 const menuSoundToggleButton = byId("menuSoundToggleButton");
@@ -508,6 +509,24 @@ const stadiumPresets = {
     hasDome: false,
     airCarryScale: 1
   },
+  shiokaze: {
+    id: "shiokaze",
+    name: "潮風球場",
+    surface: "seaBreezeGrass",
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
+    fenceHeight: baseDefenseField.fenceHeight * 0.82,
+    grassRadiusScale: 1.04,
+    hasFoulGroundDetails: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasSeaBreeze: true,
+    spectatorPark: true,
+    seaBreezeParkMeters: { width: 1024, depth: 256 },
+    windSideForce: 0.075,
+    airCarryScale: 1
+  },
   riverside: {
     id: "riverside",
     name: "リバーサイドパーク",
@@ -584,6 +603,10 @@ function getCurrentStadium() {
 
 function isHomeRunVisionField() {
   return getCurrentStadium().hasHomeRunVision === true;
+}
+
+function isShiokazeStadium() {
+  return getCurrentStadium().hasSeaBreeze === true;
 }
 
 function getStadiumFenceDistance(stadium) {
@@ -993,7 +1016,9 @@ let stealState = createStealState();
 let hitEffect = { active: false, startTime: 0, text: "", color: "#fff2a8" };
 let battingFeedback = { active: false, startTime: 0, lines: [] };
 let hbpPose = { active: false, startTime: 0, duration: 1800 };
-let reliefCarEffect = { active: false, startTime: 0, duration: 2600, pitcherName: "", team: "away" };
+let reliefCarEffect = { active: false, startTime: 0, duration: 3600, pitcherName: "", team: "away" };
+let homeRunVisionDisplay = { advice: "", startTime: 0 };
+let spectatorState = { x: field.plateX, y: field.plateY - 1450, speed: 8.5 };
 const keysDown = new Set();
 const pitchAdjustmentKeys = ["1", "3", "4", "6"];
 let pitchControlLockoutKeys = new Set();
@@ -2193,7 +2218,7 @@ function startReliefCarEntrance(team, pitcherInfo = activePitcher) {
   reliefCarEffect = {
     active: true,
     startTime: performance.now(),
-    duration: 2600,
+    duration: 3600,
     pitcherName: pitcherInfo?.name || "",
     team
   };
@@ -3284,7 +3309,7 @@ function handleHomeRunDerbyPitchResult(isHomer, metricText = "", battedBall = nu
     ? `ホームラン +${points}`
     : "ホームランならず";
   const detailText = metricText ? ` / ${metricText}` : "";
-  const adviceText = !isHomer && isHomeRunVisionField() ? getHomeRunVisionAdvice(battedBall) : "";
+  const adviceText = isHomeRunVisionField() ? setHomeRunVisionAdviceDisplay(battedBall, isHomer) : "";
   message = `${resultText}${detailText}${adviceText ? ` / ${adviceText}` : ""} / A ${scores.away} - B ${scores.home}`;
   showEffect(resultText, isHomer ? "#ff6f61" : "#aee7ff");
   advanceHomeRunDerbyTurn();
@@ -3398,9 +3423,43 @@ function getHomeRunVisionAdvice(battedBall = null) {
   return best?.text || homeRunVisionAdvicePatterns[0].text;
 }
 
+function getSeaBreezeDirectionSeed(profile = null) {
+  const raw = Math.sin(
+    (performance.now() * 0.00037)
+    + ((profile?.timingPull ?? 0) * 2.1)
+    + ((profile?.exitVelocity ?? 1) * 1.7)
+  );
+  return raw >= 0 ? 1 : -1;
+}
+
+function applySeaBreezeToBattedBallDirection(direction, power = 0.8, profile = null, traits = {}) {
+  if (!isShiokazeStadium() || !direction || traits.isBunt) return direction;
+  const stadium = getCurrentStadium();
+  const seed = getSeaBreezeDirectionSeed(profile);
+  const lift = traits.isPopupFly ? 0.45 : 1;
+  const carryFactor = clamp((power - 0.42) / 1.28, 0.25, 1);
+  const sideForce = (stadium.windSideForce ?? 0.06) * lift * carryFactor * seed;
+  return normalize({
+    x: direction.x + sideForce,
+    y: direction.y
+  });
+}
+
 function appendHomeRunVisionAdviceToMessage(battedBall = null) {
   if (!isHomeRunVisionField() || !battedBall || battedBall.fenceOver || message.includes("アドバイス:")) return;
-  message += ` / ${getHomeRunVisionAdvice(battedBall)}`;
+  const advice = setHomeRunVisionAdviceDisplay(battedBall, false);
+  message += ` / ${advice}`;
+}
+
+function setHomeRunVisionAdviceDisplay(battedBall = null, isHomer = false) {
+  const advice = isHomer
+    ? "アドバイス: 文句なしのホームランです。今の打球角度と打球速度を再現できれば、次もスタンドまで届きます。"
+    : getHomeRunVisionAdvice(battedBall);
+  homeRunVisionDisplay = {
+    advice,
+    startTime: performance.now()
+  };
+  return advice;
 }
 
 function advanceHomeRunDerbyTurn() {
@@ -5267,6 +5326,10 @@ function update(delta) {
   const now = performance.now();
   pollGamepadInput();
   updateCurrentBgm();
+  if (gamePhase === "spectator") {
+    updateSpectatorMode(delta);
+    return;
+  }
   if (gamePhase === "defense") {
     updateDefensePlay(now);
     if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
@@ -10636,6 +10699,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (isLineLiner) {
     direction = getLineLinerDirection({ ...(battedProfile || {}), direction });
   }
+  direction = applySeaBreezeToBattedBallDirection(direction, power, battedProfile, { isBunt, isPopupFly });
   const fenceDistance = defenseField.fenceDistance;
   const contactScore = clamp(battedProfile?.feedbackScore ?? battedProfile?.quality ?? 0.5, 0, 1);
   const profileExitVelocity = clamp(battedProfile?.exitVelocity ?? power, 0.08, 1.85);
@@ -11182,6 +11246,12 @@ function getMeasuredExitSpeedKmh({ flightDistanceMeters = null, ballTime = null,
 function getBattedBallDistanceMeters(distance, options = {}) {
   const metersPerFieldUnit = getMetersPerBattedBallFieldUnit(options);
   return Math.round(Math.max(0, distance) * metersPerFieldUnit);
+}
+
+function getFieldUnitsFromMeters(meters) {
+  const stadium = getCurrentStadium();
+  const centerMeters = Number.isFinite(stadium.centerFenceMeters) ? stadium.centerFenceMeters : realFieldMetrics.centerFieldFenceMeters;
+  return Math.max(0, meters) * (defenseField.fenceDistance / centerMeters);
 }
 
 function getBattedBallLaunchAngleDegrees({ trajectory = "liner", isGrounder = false, isLineEdgeGrounder = false, maxHeightMeters = null, flightDistanceMeters = null, profileLaunchAngle = null } = {}) {
@@ -14505,6 +14575,11 @@ function showEffect(text, color) {
 }
 
 function draw() {
+  if (gamePhase === "spectator") {
+    drawSpectatorMode();
+    drawHud();
+    return;
+  }
   if (gamePhase === "defense") {
     drawDefenseView();
     drawHud();
@@ -14706,10 +14781,16 @@ function drawNextDomeRoofHighlights(cx, cy, scale = 1) {
 function drawStadiumFoulGroundDetails(homeY = field.plateY + 42) {
   if (!getCurrentStadium().hasFoulGroundDetails) return;
   ctx.save();
-  const benches = [
-    { x: field.plateX - 710, y: homeY - 230 },
-    { x: field.plateX + 710, y: homeY - 230 }
-  ];
+  const stadium = getCurrentStadium();
+  const benches = stadium.hasSeaBreeze
+    ? [
+        { x: field.plateX - 540, y: homeY - 145 },
+        { x: field.plateX + 540, y: homeY - 145 }
+      ]
+    : [
+        { x: field.plateX - 710, y: homeY - 230 },
+        { x: field.plateX + 710, y: homeY - 230 }
+      ];
   benches.forEach((bench) => {
     ctx.fillStyle = "rgba(80, 48, 28, 0.38)";
     roundRect(bench.x - 104, bench.y - 30, 208, 56, 8);
@@ -14726,6 +14807,10 @@ function drawStadiumFoulGroundDetails(homeY = field.plateY + 42) {
     drawLine(bench.x + 70, bench.y + 18, bench.x + 70, bench.y + 34);
   });
   if (getCurrentStadium().suppressFoulGroundStands) {
+    ctx.restore();
+    return;
+  }
+  if (stadium.hasSeaBreeze) {
     ctx.restore();
     return;
   }
@@ -15354,35 +15439,40 @@ function drawHomeRunVisionBeyondOutfield() {
   const focus = getHomeRunVisionScreenFocusPoint();
   const centerX = focus.x;
   const screenY = focus.y;
+  const screenWidth = 1120;
+  const screenHeight = 360;
+  const panelWidth = 1010;
+  const panelHeight = 248;
   ctx.save();
   ctx.fillStyle = "rgba(22, 33, 42, 0.8)";
-  roundRect(centerX - 390, screenY - 118, 780, 182, 18);
+  roundRect(centerX - screenWidth / 2, screenY - screenHeight / 2, screenWidth, screenHeight, 22);
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 242, 168, 0.82)";
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 10;
   ctx.stroke();
-  const glow = ctx.createLinearGradient(centerX - 340, screenY - 78, centerX + 340, screenY + 28);
+  const glow = ctx.createLinearGradient(centerX - panelWidth / 2, screenY - 118, centerX + panelWidth / 2, screenY + 112);
   glow.addColorStop(0, "rgba(64,184,216,0.94)");
   glow.addColorStop(0.5, "rgba(255,242,168,0.98)");
   glow.addColorStop(1, "rgba(255,111,97,0.92)");
   ctx.fillStyle = glow;
-  roundRect(centerX - 338, screenY - 76, 676, 102, 12);
+  roundRect(centerX - panelWidth / 2, screenY - 122, panelWidth, panelHeight, 14);
   ctx.fill();
   ctx.fillStyle = "rgba(20, 28, 40, 0.86)";
-  ctx.font = "bold 34px sans-serif";
+  ctx.font = "bold 42px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("ホームランヴィジョン", centerX, screenY - 26);
-  ctx.font = "bold 18px sans-serif";
-  ctx.fillText("無観客・スイング解析中", centerX, screenY + 12);
+  ctx.fillText("ホームランヴィジョン", centerX, screenY - 88);
+  ctx.font = "bold 22px sans-serif";
+  ctx.fillText("無観客・スイング解析中", centerX, screenY - 48);
+  drawHomeRunVisionAdviceText(centerX - 460, screenY - 10, 920, homeRunVisionDisplay.advice || "打球結果のあと、ここにアドバイスを表示します。");
   ctx.strokeStyle = "rgba(35, 48, 71, 0.58)";
   ctx.lineWidth = 12;
-  drawLine(centerX - 265, screenY + 66, centerX - 265, screenY + 178);
-  drawLine(centerX + 265, screenY + 66, centerX + 265, screenY + 178);
+  drawLine(centerX - 370, screenY + screenHeight / 2, centerX - 370, screenY + screenHeight / 2 + 150);
+  drawLine(centerX + 370, screenY + screenHeight / 2, centerX + 370, screenY + screenHeight / 2 + 150);
   ctx.strokeStyle = "rgba(255,255,255,0.24)";
   ctx.lineWidth = 2;
-  for (let x = centerX - 320; x <= centerX + 320; x += 80) {
-    drawLine(x, screenY - 68, x, screenY + 18);
+  for (let x = centerX - 480; x <= centerX + 480; x += 80) {
+    drawLine(x, screenY - 112, x, screenY + 112);
   }
   ctx.restore();
 }
@@ -15390,8 +15480,46 @@ function drawHomeRunVisionBeyondOutfield() {
 function getHomeRunVisionScreenFocusPoint() {
   return {
     x: field.plateX,
-    y: field.plateY + 42 - defenseField.fenceDistance - 190
+    y: field.plateY + 42 - defenseField.fenceDistance - 250
   };
+}
+
+function drawHomeRunVisionAdviceText(x, y, maxWidth, text) {
+  ctx.save();
+  ctx.fillStyle = "rgba(20, 28, 40, 0.9)";
+  ctx.font = "bold 25px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  const cleanText = String(text || "").replace(/^アドバイス:\s*/, "");
+  const lines = wrapJapaneseTextForCanvas(cleanText, maxWidth, 4);
+  lines.forEach((line, index) => {
+    ctx.fillText(index === 0 ? `アドバイス: ${line}` : line, x, y + index * 34);
+  });
+  ctx.restore();
+}
+
+function wrapJapaneseTextForCanvas(text, maxWidth, maxLines = 4) {
+  const chars = [...String(text || "")];
+  const lines = [];
+  let line = "";
+  chars.forEach((char) => {
+    const next = line + char;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = char;
+      return;
+    }
+    line = next;
+  });
+  if (line) lines.push(line);
+  if (lines.length <= maxLines) return lines;
+  const trimmed = lines.slice(0, maxLines);
+  let last = trimmed[maxLines - 1];
+  while (ctx.measureText(`${last}…`).width > maxWidth && last.length > 0) {
+    last = last.slice(0, -1);
+  }
+  trimmed[maxLines - 1] = `${last}…`;
+  return trimmed;
 }
 
 function drawAmericanRoyalBeyondOutfield() {
@@ -15556,6 +15684,480 @@ function drawAozoraLargeTree(x, y, scale = 1) {
     ctx.arc(leaf.x, leaf.y, leaf.r, 0, Math.PI * 2);
     ctx.fill();
   });
+  ctx.restore();
+}
+
+function drawShiokazeParkBeyondOutfield() {
+  if (!isShiokazeStadium()) return;
+  const center = getFenceCenter();
+  const parkWidth = getShiokazeParkWidthUnits();
+  const parkDepth = getShiokazeParkDepthUnits();
+  const left = field.plateX - parkWidth / 2;
+  const top = center.y - defenseField.fenceDistance - parkDepth * 0.92;
+  ctx.save();
+  drawShiokazeParkScene(left, top, parkWidth, parkDepth, 1);
+  drawShiokazeOutfieldSeats(center.x, center.y, defenseField.fenceDistance + 120);
+  ctx.restore();
+}
+
+function getShiokazeParkWidthUnits() {
+  return getFieldUnitsFromMeters(getCurrentStadium().seaBreezeParkMeters?.width ?? 1024);
+}
+
+function getShiokazeParkDepthUnits() {
+  return getFieldUnitsFromMeters(getCurrentStadium().seaBreezeParkMeters?.depth ?? 256);
+}
+
+function drawShiokazeParkScene(left, top, width, height, detailScale = 1) {
+  const waterY = top + height * 0.18;
+  const grass = ctx.createLinearGradient(left, top, left, top + height);
+  grass.addColorStop(0, "#9bdd63");
+  grass.addColorStop(0.48, "#7fce5a");
+  grass.addColorStop(1, "#63b94f");
+  ctx.fillStyle = grass;
+  ctx.fillRect(left, top, width, height);
+  drawShiokazeGrassTexture(left, top, width, height, detailScale);
+
+  ctx.fillStyle = "#65bdda";
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  for (let i = 0; i <= 32; i += 1) {
+    const t = i / 32;
+    const x = left + width * t;
+    const y = waterY + Math.sin(t * Math.PI * 5.5) * 34 + Math.sin(t * Math.PI * 11) * 13;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(left + width, top - height * 0.35);
+  ctx.lineTo(left, top - height * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(245,255,255,0.62)";
+  ctx.lineWidth = 5 * detailScale;
+  for (let i = 0; i < 5; i += 1) {
+    const waveY = waterY - 68 - i * 42;
+    drawLine(left + 80 + i * 140, waveY, left + width - 120, waveY + Math.sin(i) * 18);
+  }
+
+  ctx.strokeStyle = "#d8c18a";
+  ctx.lineWidth = 28 * detailScale;
+  ctx.beginPath();
+  for (let i = 0; i <= 30; i += 1) {
+    const t = i / 30;
+    const x = left + width * t;
+    const y = waterY + 72 + Math.sin(t * Math.PI * 4) * 22;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  drawShiokazeTetrapods(left, waterY, width, detailScale);
+  drawShiokazeParkDetails(left, top, width, height, detailScale);
+  drawShiokazeAreaFeatures(left, top, width, height, detailScale);
+  drawShiokazeShelters(left, top, width, height, detailScale);
+}
+
+function drawShiokazeTetrapods(left, waterY, width, detailScale = 1) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(100, 112, 118, 0.72)";
+  ctx.lineWidth = 5 * detailScale;
+  for (let i = 0; i < 18; i += 1) {
+    if (i % 4 === 2) continue;
+    const x = left + 90 + i * (width - 180) / 17;
+    const y = waterY + 18 + Math.sin(i * 1.7) * 22;
+    drawLine(x - 14, y, x + 14, y);
+    drawLine(x, y - 14, x, y + 14);
+    drawLine(x - 10, y + 10, x + 10, y - 10);
+  }
+  ctx.restore();
+}
+
+function drawShiokazeParkDetails(left, top, width, height, detailScale = 1) {
+  const flowers = ["#fff5a6", "#ff9abd", "#e8f7ff", "#c9a6ff"];
+  for (let i = 0; i < 90; i += 1) {
+    const x = left + ((i * 73) % Math.max(1, width - 140)) + 70;
+    const y = top + height * 0.36 + ((i * 47) % Math.max(1, height * 0.48));
+    ctx.fillStyle = flowers[i % flowers.length];
+    ctx.beginPath();
+    ctx.arc(x, y, (i % 3 === 0 ? 3.2 : 2.2) * detailScale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 22; i += 1) {
+    const x = left + 120 + ((i * 211) % Math.max(1, width - 240));
+    const y = top + height * (0.34 + ((i * 37) % 52) / 100);
+    drawShiokazeTree(x, y, (0.75 + (i % 4) * 0.12) * detailScale);
+  }
+  for (let i = 0; i < 12; i += 1) {
+    const x = left + 160 + i * (width - 320) / 11;
+    const y = top + height * 0.48 + Math.sin(i * 1.1) * 54;
+    drawShiokazeBench(x, y, detailScale);
+    drawShiokazeLamp(x + 58, y - 30, detailScale);
+  }
+}
+
+function drawShiokazeGrassTexture(left, top, width, height, detailScale = 1) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = Math.max(1, 1.2 * detailScale);
+  for (let i = 0; i < 90; i += 1) {
+    const x = left + ((i * 97) % Math.max(1, width));
+    const y = top + ((i * 53) % Math.max(1, height));
+    drawLine(x, y, x + 22 + (i % 5) * 6, y - 7 + (i % 3) * 4);
+  }
+  ctx.strokeStyle = "rgba(34,112,53,0.16)";
+  for (let i = 0; i < 70; i += 1) {
+    const x = left + ((i * 131) % Math.max(1, width));
+    const y = top + ((i * 71) % Math.max(1, height));
+    drawLine(x, y, x + 18, y + 5);
+  }
+  ctx.restore();
+}
+
+function getShiokazeAreas(left, top, width, height) {
+  const names = ["東海岸エリア", "遊歩道エリア", "球場エリア", "魚釣りエリア", "潮風エリア"];
+  return names.map((name, index) => ({
+    name,
+    index,
+    left: left + (width * index) / 5,
+    right: left + (width * (index + 1)) / 5,
+    centerX: left + width * (index + 0.5) / 5,
+    top,
+    bottom: top + height
+  }));
+}
+
+function drawShiokazeAreaFeatures(left, top, width, height, detailScale = 1) {
+  const areas = getShiokazeAreas(left, top, width, height);
+  const waterY = top + height * 0.18;
+  drawShiokazeParkSign(left + width * 0.5, top + height * 0.31, "潮風公園", 1.25 * detailScale);
+  areas.forEach((area) => {
+    drawShiokazeParkSign(area.centerX, top + height * 0.42, area.name, 0.82 * detailScale);
+    drawShiokazeDirectionalSign(area.centerX - width * 0.055, top + height * 0.58, area.index, detailScale);
+  });
+  drawShiokazeCoastRocks(areas[0].left, waterY + 52, width / 5, detailScale);
+  drawShiokazePromenadeShade(areas[1].left, top + height * 0.52, width / 5, detailScale);
+  drawShiokazeBallparkGate(areas[2].centerX, top + height * 0.64, detailScale);
+  drawShiokazeFishingPiers(areas[3].left, waterY + 40, width / 5, detailScale);
+  drawShiokazeWindFlags(areas[4].left, top + height * 0.44, width / 5, detailScale);
+}
+
+function drawShiokazeParkSign(x, y, text, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#7a5632";
+  roundRect(-82, -32, 164, 48, 7);
+  ctx.fill();
+  ctx.fillStyle = "#f8f3d8";
+  roundRect(-72, -24, 144, 28, 4);
+  ctx.fill();
+  ctx.fillStyle = "#23422c";
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, -10);
+  ctx.strokeStyle = "#5d4635";
+  ctx.lineWidth = 4;
+  drawLine(-44, 16, -44, 46);
+  drawLine(44, 16, 44, 46);
+  ctx.restore();
+}
+
+function drawShiokazeDirectionalSign(x, y, areaIndex, scale = 1) {
+  const labels = ["←東海岸", "遊歩道→", "球場入口", "釣り場→", "潮風広場→"];
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#ffffff";
+  roundRect(-54, -20, 108, 30, 4);
+  ctx.fill();
+  ctx.strokeStyle = "#3f5c48";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#2d4c39";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(labels[areaIndex] || "案内", 0, -2);
+  ctx.strokeStyle = "#5d4635";
+  ctx.lineWidth = 3;
+  drawLine(0, 10, 0, 38);
+  ctx.restore();
+}
+
+function drawShiokazeShelters(left, top, width, height, detailScale = 1) {
+  for (let i = 0; i < 16; i += 1) {
+    const area = i % 5;
+    const row = Math.floor(i / 5);
+    const x = left + width * (area + 0.18 + ((i * 17) % 48) / 100) / 5;
+    const y = top + height * (0.5 + row * 0.12 + ((i * 13) % 18) / 100);
+    drawShiokazeShelter(x, y, i + 1, 0.8 * detailScale);
+  }
+}
+
+function drawShiokazeShelter(x, y, number, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#f7fbff";
+  roundRect(-24, -18, 48, 36, 3);
+  ctx.fill();
+  ctx.strokeStyle = "#9aa7b2";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#334155";
+  ctx.font = "7px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(number), 0, 0);
+  ctx.restore();
+}
+
+function drawShiokazeCoastRocks(left, y, width, detailScale = 1) {
+  ctx.save();
+  ctx.fillStyle = "rgba(114, 124, 128, 0.7)";
+  for (let i = 0; i < 12; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(left + 35 + i * width / 12, y + Math.sin(i) * 20, 16 * detailScale, 9 * detailScale, i * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShiokazePromenadeShade(left, y, width, detailScale = 1) {
+  for (let i = 0; i < 7; i += 1) {
+    drawShiokazeTree(left + 35 + i * width / 7, y + Math.sin(i * 1.2) * 26, 0.95 * detailScale);
+  }
+}
+
+function drawShiokazeBallparkGate(x, y, detailScale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(detailScale, detailScale);
+  ctx.strokeStyle = "#34513a";
+  ctx.lineWidth = 8;
+  drawLine(-72, 36, -72, -32);
+  drawLine(72, 36, 72, -32);
+  drawLine(-82, -32, 82, -32);
+  ctx.fillStyle = "#f8f3d8";
+  roundRect(-68, -64, 136, 28, 5);
+  ctx.fill();
+  ctx.fillStyle = "#24432e";
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("潮風球場入口", 0, -46);
+  ctx.restore();
+}
+
+function drawShiokazeFishingPiers(left, y, width, detailScale = 1) {
+  ctx.save();
+  ctx.strokeStyle = "#8b6b45";
+  ctx.lineWidth = 8 * detailScale;
+  for (let i = 0; i < 3; i += 1) {
+    const x = left + width * (0.22 + i * 0.24);
+    drawLine(x, y + 36, x + 70, y - 64);
+    ctx.strokeStyle = "#3b5561";
+    ctx.lineWidth = 2 * detailScale;
+    drawLine(x + 70, y - 64, x + 84, y - 38);
+    ctx.strokeStyle = "#8b6b45";
+    ctx.lineWidth = 8 * detailScale;
+  }
+  ctx.restore();
+}
+
+function drawShiokazeWindFlags(left, y, width, detailScale = 1) {
+  ctx.save();
+  for (let i = 0; i < 8; i += 1) {
+    const x = left + 34 + i * width / 8;
+    ctx.strokeStyle = "#405061";
+    ctx.lineWidth = 4 * detailScale;
+    drawLine(x, y + 64, x, y);
+    ctx.fillStyle = i % 2 ? "#7ec8e3" : "#fff2a8";
+    ctx.beginPath();
+    ctx.moveTo(x, y + 4);
+    ctx.quadraticCurveTo(x + 38, y + 8 + Math.sin(i) * 8, x + 58, y + 22);
+    ctx.lineTo(x, y + 30);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShiokazeOutfieldSeats(cx, cy, radius) {
+  ctx.save();
+  for (let row = 0; row < 4; row += 1) {
+    ctx.strokeStyle = row % 2 === 0 ? "rgba(255, 237, 153, 0.82)" : "rgba(114, 181, 210, 0.78)";
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + row * 32, degreesToRadians(205), degreesToRadians(335));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(80, 105, 82, 0.48)";
+  ctx.lineWidth = 5;
+  for (let angle = 210; angle <= 330; angle += 15) {
+    const rad = degreesToRadians(angle);
+    drawLine(
+      cx + Math.cos(rad) * (radius - 20),
+      cy + Math.sin(rad) * (radius - 20),
+      cx + Math.cos(rad) * (radius + 132),
+      cy + Math.sin(rad) * (radius + 132)
+    );
+  }
+  ctx.restore();
+}
+
+function drawShiokazeTree(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#8a6339";
+  roundRect(-7, 0, 14, 48, 6);
+  ctx.fill();
+  ["#7fbd4b", "#8dcc56", "#a2d967"].forEach((color, index) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc((index - 1) * 17, -8 - index * 6, 29 - index * 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawShiokazeBench(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#9a6a3e";
+  roundRect(-34, -8, 68, 10, 4);
+  ctx.fill();
+  roundRect(-30, 7, 60, 8, 4);
+  ctx.fill();
+  ctx.strokeStyle = "#5d4635";
+  ctx.lineWidth = 3;
+  drawLine(-24, 15, -24, 27);
+  drawLine(24, 15, 24, 27);
+  ctx.restore();
+}
+
+function drawShiokazeLamp(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = "#405061";
+  ctx.lineWidth = 4;
+  drawLine(0, 0, 0, 58);
+  ctx.fillStyle = "rgba(255, 242, 168, 0.72)";
+  ctx.beginPath();
+  ctx.arc(0, -4, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function startSpectatorMode() {
+  if (!isShiokazeStadium()) applyStadiumPreset("shiokaze");
+  gamePhase = "spectator";
+  shell?.classList.remove("menu-open");
+  menu.classList.add("hidden");
+  const entrance = getShiokazeBallparkEntrancePoint();
+  spectatorState.x = entrance.x;
+  spectatorState.y = entrance.y;
+  message = "スペクテイターモード: 左スティック/矢印キー/WASDで潮風公園を散歩、Rでメニュー";
+}
+
+function updateSpectatorMode(delta) {
+  const frameScale = clamp(delta / (1000 / 60), 0.4, 2.2);
+  const gamepad = getConnectedGamepads()[0] || null;
+  const stickX = Math.abs(gamepad?.axes?.[0] ?? 0) >= 0.2 ? gamepad.axes[0] : 0;
+  const stickY = Math.abs(gamepad?.axes?.[1] ?? 0) >= 0.2 ? gamepad.axes[1] : 0;
+  const left = keysDown.has("ArrowLeft") || keysDown.has("a") || keysDown.has("A");
+  const right = keysDown.has("ArrowRight") || keysDown.has("d") || keysDown.has("D");
+  const up = keysDown.has("ArrowUp") || keysDown.has("w") || keysDown.has("W");
+  const down = keysDown.has("ArrowDown") || keysDown.has("s") || keysDown.has("S");
+  const keyboardX = left === right ? 0 : left ? -1 : 1;
+  const keyboardY = up === down ? 0 : up ? -1 : 1;
+  const dx = stickX || keyboardX;
+  const dy = stickY || keyboardY;
+  const mag = Math.hypot(dx, dy) || 1;
+  spectatorState.x += (dx / mag) * spectatorState.speed * frameScale;
+  spectatorState.y += (dy / mag) * spectatorState.speed * frameScale;
+  const bounds = getShiokazeSpectatorBounds();
+  spectatorState.x = clamp(spectatorState.x, bounds.left, bounds.right);
+  spectatorState.y = clamp(spectatorState.y, bounds.top, bounds.bottom);
+}
+
+function getShiokazeBallparkEntrancePoint() {
+  return {
+    x: field.plateX,
+    y: field.plateY + 42 - defenseField.fenceDistance * 0.18 + 190
+  };
+}
+
+function getShiokazeSpectatorBounds() {
+  const width = getShiokazeParkWidthUnits();
+  const depth = getShiokazeParkDepthUnits();
+  return {
+    left: field.plateX - width / 2 + 80,
+    right: field.plateX + width / 2 - 80,
+    top: field.plateY + 42 - defenseField.fenceDistance - depth * 1.18,
+    bottom: field.plateY + 42 - defenseField.fenceDistance + depth * 0.18
+  };
+}
+
+function drawSpectatorMode() {
+  applyStadiumPreset(currentStadiumId);
+  const width = getShiokazeParkWidthUnits();
+  const depth = getShiokazeParkDepthUnits();
+  const left = field.plateX - width / 2;
+  const top = field.plateY + 42 - defenseField.fenceDistance - depth * 1.02;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(canvas.width / 2 - spectatorState.x, canvas.height / 2 - spectatorState.y);
+  drawShiokazeParkScene(left, top, width, depth, 1.25);
+  drawShiokazeSpectatorBallpark(field.plateX, field.plateY + 42 - defenseField.fenceDistance * 0.18);
+  drawSpectatorWalker(spectatorState.x, spectatorState.y);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = "rgba(20, 28, 40, 0.72)";
+  roundRect(28, 28, 470, 76, 10);
+  ctx.fill();
+  ctx.fillStyle = "#fff2a8";
+  ctx.font = "bold 18px sans-serif";
+  ctx.fillText("スペクテイターモード", 48, 54);
+  ctx.font = "15px sans-serif";
+  ctx.fillText("矢印キー/WASDで散歩、Rでメニューへ戻る", 48, 82);
+  ctx.restore();
+}
+
+function drawShiokazeSpectatorBallpark(cx, cy) {
+  ctx.save();
+  ctx.fillStyle = "rgba(94, 185, 78, 0.62)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 420, Math.PI, Math.PI * 2);
+  ctx.fill();
+  drawShiokazeGrassTexture(cx - 430, cy - 430, 860, 430, 0.7);
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 430, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  drawShiokazeOutfieldSeats(cx, cy, 475);
+  drawShiokazeBench(cx - 210, cy + 120, 1.3);
+  drawShiokazeBench(cx + 210, cy + 120, 1.3);
+  ctx.restore();
+}
+
+function drawSpectatorWalker(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#f4d0a6";
+  ctx.beginPath();
+  ctx.arc(0, -18, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#2e73d2";
+  roundRect(-9, -8, 18, 26, 7);
+  ctx.fill();
+  ctx.strokeStyle = "#233047";
+  ctx.lineWidth = 4;
+  drawLine(-5, 18, -12, 36);
+  drawLine(5, 18, 12, 36);
   ctx.restore();
 }
 
@@ -15882,7 +16484,7 @@ function drawField() {
   drawNextDomeRoofScreen();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.centerX, 70, 836) : "#d89548";
+  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.centerX, 70, 836) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
   ctx.lineTo(24, 836);
@@ -15891,6 +16493,8 @@ function drawField() {
   ctx.fill();
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 232, 170, 0.16)"
+    : stadium.surface === "seaBreezeGrass"
+      ? "#82cf5c"
     : stadium.surface === "spaceGlow"
       ? getSpaceOutfieldFill(field.centerX, 754, 405)
     : stadium.surface === "royalGrass"
@@ -15914,7 +16518,7 @@ function drawField() {
     drawLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY);
     drawLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY);
   }
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? "rgba(28, 34, 42, 0.92)" : "#c8793b";
+  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#73bd51" : stadium.surface === "spaceGlow" ? "rgba(28, 34, 42, 0.92)" : "#c8793b";
   ctx.beginPath();
   ctx.ellipse(pitcher.x, pitcher.y + 18, 68, 30, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -15939,11 +16543,12 @@ function drawDefenseView() {
   drawRiversideBeyondOutfield();
   drawSpaceStadiumBeyondOutfield();
   drawHomeRunVisionBeyondOutfield();
+  drawShiokazeParkBeyondOutfield();
   drawAozoraRuralBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
 
-  ctx.fillStyle = stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
+  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.plateX, field.plateY + 42);
   ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
@@ -15953,6 +16558,8 @@ function drawDefenseView() {
 
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 235, 174, 0.14)"
+    : stadium.surface === "seaBreezeGrass"
+      ? "#82cf5c"
     : stadium.surface === "spaceGlow"
       ? getSpaceOutfieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
     : stadium.surface === "royalGrass"
@@ -17602,17 +18209,32 @@ function drawReliefCarEntrance() {
   ctx.beginPath();
   ctx.ellipse(0, 31, 96, 18, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#f8f3d8";
+  const silver = ctx.createLinearGradient(-82, -36, 82, 26);
+  silver.addColorStop(0, "#f8fbff");
+  silver.addColorStop(0.38, "#b7c2cb");
+  silver.addColorStop(0.72, "#eef3f7");
+  silver.addColorStop(1, "#8c98a3");
+  ctx.fillStyle = silver;
   roundRect(-82, -28, 164, 54, 12);
   ctx.fill();
   ctx.strokeStyle = "#233047";
   ctx.lineWidth = 4;
   ctx.stroke();
-  ctx.fillStyle = "#42b8d8";
-  roundRect(-34, -52, 78, 36, 12);
+  ctx.fillStyle = "rgba(90, 179, 213, 0.62)";
+  roundRect(-48, -54, 96, 39, 12);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.72)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#f4d0a6";
+  ctx.beginPath();
+  ctx.arc(-13, -35, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = reliefCarEffect.team === "away" ? "#2e73d2" : "#d94f42";
+  roundRect(-29, -25, 32, 28, 8);
   ctx.fill();
   ctx.fillStyle = "#e8f8ff";
-  roundRect(-20, -45, 34, 18, 6);
+  roundRect(10, -45, 26, 18, 6);
   ctx.fill();
   ctx.fillStyle = "#ffcf70";
   ctx.beginPath();
@@ -18812,6 +19434,7 @@ window.addEventListener("keydown", (event) => {
   keysDown.add(event.code);
   keysDown.add(event.key);
   if (!event.repeat && event.code === "Space" && gamePhase === "playing" && isPlayerBatting()) swingBat();
+  if (!event.repeat && (event.key === "v" || event.key === "V") && isShiokazeStadium() && gamePhase !== "spectator") startSpectatorMode();
   if (!event.repeat && event.code === "ArrowUp" && gamePhase === "defense") handleBatterRunnerBaseCommand("second");
   if (!event.repeat && event.code === "ArrowLeft" && gamePhase === "defense") handleBatterRunnerBaseCommand("third");
   if (!event.repeat && event.code === "ArrowDown" && gamePhase === "defense") handleBatterRunnerBaseCommand("home");
@@ -18996,6 +19619,11 @@ pitchingPracticeStartButton?.addEventListener("click", () => {
 });
 homeRunDerbyStartButton?.addEventListener("click", () => {
   startGame("homerDerby");
+});
+spectatorModeButton?.addEventListener("click", () => {
+  applyStadiumPreset("shiokaze");
+  if (stadiumSelect) stadiumSelect.value = "shiokaze";
+  startSpectatorMode();
 });
 practiceBatterSelect?.addEventListener("change", () => {
   practiceBatterId = practiceBatterSelect.value;
