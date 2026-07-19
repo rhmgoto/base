@@ -16,7 +16,6 @@ const startButton = byId("startButton");
 const practiceStartButton = byId("practiceStartButton");
 const pitchingPracticeStartButton = byId("pitchingPracticeStartButton");
 const homeRunDerbyStartButton = byId("homeRunDerbyStartButton");
-const spectatorModeButton = byId("spectatorModeButton");
 const soundToggleButton = byId("soundToggleButton");
 const bgmToggleButton = byId("bgmToggleButton");
 const menuSoundToggleButton = byId("menuSoundToggleButton");
@@ -193,7 +192,7 @@ const catchers = [
 ];
 
 const pitchers = [
-  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 8, fastChange: 8, control: 6, stuff: 8, fielding: 7, stamina: 8, cost: 9 },
+  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 8, fastChange: 8, control: 6, stuff: 8, fielding: 7, stamina: 6, cost: 9 },
   { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 7, control: 8, stuff: 7, fielding: 6, stamina: 7, cost: 8 },
   { id: "saiki", name: "サイキ", throws: "R", fastKmh: 155, rightBreak: 5, leftBreak: 2, slowChange: 10, fastChange: 6, control: 6, stuff: 6, fielding: 5, stamina: 7, cost: 6 },
   { id: "kershaw", name: "カーショウ", throws: "L", fastKmh: 148, rightBreak: 4, leftBreak: 10, slowChange: 6, fastChange: 4, control: 8, stuff: 5, fielding: 4, stamina: 5, cost: 6 },
@@ -210,19 +209,21 @@ const pitchers = [
   { id: "sasaki", name: "ササキ", throws: "R", fastKmh: 165, rightBreak: 5, leftBreak: 2, slowChange: 6, fastChange: 4, control: 4, stuff: 7, fielding: 4, stamina: 5, cost: 6 },
   { id: "matsui", name: "マツイ", throws: "L", fastKmh: 150, rightBreak: 2, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 5, fielding: 5, stamina: 2, cost: 3 },
   { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 2, cost: 3 },
-  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 6, leftBreak: 3, slowChange: 5, fastChange: 5, control: 1, stuff: 6, fielding: 3, stamina: 6, cost: 5 },
-  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 5, leftBreak: 8, slowChange: 8, fastChange: 4, control: 5, stuff: 7, fielding: 5, stamina: 7, cost: 8 },
+  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 6, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 5 },
+  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 5, control: 6, stuff: 7, fielding: 5, stamina: 7, cost: 8 },
   { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 16, leftBreak: 15, slowChange: 15, fastChange: 16, control: 15, stuff: 21, fielding: 12, stamina: 16, cost: 30 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 20, leftBreak: 18, slowChange: 17, fastChange: 16, control: 17, stuff: 20, fielding: 11, stamina: 15, cost: 30 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 9, fastChange: 9, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 8, fastChange: 9, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 2, cost: 1 },
-  { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 }
+  { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 },
+  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 2, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
+  { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 }
 ];
 
 const pitchTypes = {
@@ -481,6 +482,38 @@ const stadiumPresets = {
     hasReliefCar: true,
     airCarryScale: 1
   },
+  mStadium: {
+    id: "mStadium",
+    name: "Mスタジアムです。",
+    surface: "obsidian",
+    centerFenceMeters: 118,
+    lineFenceMeters: 118,
+    fenceHeight: baseDefenseField.fenceHeight,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: true,
+    suppressFoulGroundStands: true,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasMStadium: true,
+    airCarryScale: 1
+  },
+  xStadium: {
+    id: "xStadium",
+    name: "Xスタジアム",
+    surface: "grass",
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
+    fenceHeight: baseDefenseField.fenceHeight,
+    grassRadiusScale: 1,
+    hasFoulGroundDetails: false,
+    hasOcean: false,
+    hasMountains: false,
+    hasDome: false,
+    hasXStadium: true,
+    fireworkScale: 1,
+    airCarryScale: 1
+  },
   aozora: {
     id: "aozora",
     name: "青空グラウンド",
@@ -522,7 +555,6 @@ const stadiumPresets = {
     hasMountains: false,
     hasDome: false,
     hasSeaBreeze: true,
-    spectatorPark: true,
     seaBreezeParkMeters: { width: 1024, depth: 256 },
     windSideForce: 0.075,
     airCarryScale: 1
@@ -1018,7 +1050,7 @@ let battingFeedback = { active: false, startTime: 0, lines: [] };
 let hbpPose = { active: false, startTime: 0, duration: 1800 };
 let reliefCarEffect = { active: false, startTime: 0, duration: 3600, pitcherName: "", team: "away" };
 let homeRunVisionDisplay = { advice: "", startTime: 0 };
-let spectatorState = { x: field.plateX, y: field.plateY - 1450, speed: 8.5 };
+let xStadiumPrompt = { active: false, offeredDefenseStartTime: null, goRect: null, dontRect: null };
 const keysDown = new Set();
 const pitchAdjustmentKeys = ["1", "3", "4", "6"];
 let pitchControlLockoutKeys = new Set();
@@ -1875,6 +1907,7 @@ function createDefenseState() {
 
 function resetDefenseState() {
   defenseState = createDefenseState();
+  xStadiumPrompt = { active: false, offeredDefenseStartTime: null, goRect: null, dontRect: null };
 }
 
 function readMenu() {
@@ -5326,10 +5359,6 @@ function update(delta) {
   const now = performance.now();
   pollGamepadInput();
   updateCurrentBgm();
-  if (gamePhase === "spectator") {
-    updateSpectatorMode(delta);
-    return;
-  }
   if (gamePhase === "defense") {
     updateDefensePlay(now);
     if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
@@ -5914,20 +5943,27 @@ function buildContactProfile(bestHit) {
   const zoneMissStage = getGoodContactZoneMissStage(plateDistance);
   const zoneMissPenalty = getGoodContactZoneMissPenalty(zoneMissUnits);
   const contactSweetSpotForRange = isBuntStanceActive() ? 1 : sweetSpotScore;
-  const contactRange = baseContactRange
+  const naturalContactRange = baseContactRange
     * getInsideMishitContactMultiplier(bestHit, contactSweetSpotForRange, outsideStrikeZone)
     * getGoodContactZoneMissContactMultiplier(zoneMissUnits);
+  const contactRescueExtension = ball.radius * 2;
+  const contactRange = naturalContactRange + contactRescueExtension;
+  const contactRescueUse = nearPlate
+    ? clamp((distanceToBat - naturalContactRange) / Math.max(1, contactRescueExtension), 0, 1)
+    : 0;
   const zoneReach = (68 + batterMeet * 12) * battingGoodContactZoneScale;
   const zoneScore = getZoneScoreFromDistanceRate(zoneDistanceRate);
   const zoneBand = getContactZoneBand({ inGoodContactZone, plateDistance, zoneScore, zoneDistanceRate });
   const zoneCenterBonus = inGoodContactZone ? Math.pow(zoneScore, 5.2) * 0.62 : 0;
   const zoneEdgePenalty = inGoodContactZone ? (Math.pow(1 - zoneScore, 0.72) * 0.82 + clamp((0.48 - zoneScore) / 0.48, 0, 1) * 0.18) * 1.5 : 0;
-  const chasePenalty = inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 1.35, 0, 1.35) : clamp(zoneMissPenalty, 0, 1.45);
+  const rescueChasePenalty = contactRescueUse * (outsideStrikeZone || !inGoodContactZone ? 0.74 : 0.42);
+  const chasePenalty = (inGoodContactZone ? clamp(Math.pow(1 - zoneScore, 0.74) * 1.35, 0, 1.35) : clamp(zoneMissPenalty, 0, 1.45)) + rescueChasePenalty;
   const stuffPenalty = getPitcherStuffPressure(activePitcher);
-  const outsideReachUse = outsideStrikeZone && outsideContactPoint
+  const naturalOutsideReachUse = outsideStrikeZone && outsideContactPoint
     ? clamp((distanceToBat - preExtensionContactRange * 0.86) / Math.max(1, baseContactRange - preExtensionContactRange * 0.86), 0, 1)
     : 0;
-  const edgePenalty = (inGoodContactZone ? zoneEdgePenalty : 0.58) + outsideReachUse * 0.46 + zoneMissPenalty * 0.86;
+  const outsideReachUse = clamp(Math.max(naturalOutsideReachUse, contactRescueUse * 1.18), 0, 1.35);
+  const edgePenalty = (inGoodContactZone ? zoneEdgePenalty : 0.58) + outsideReachUse * 0.46 + zoneMissPenalty * 0.86 + contactRescueUse * 0.32;
   const yellowZoneBoost = getYellowZoneContactBoost(inGoodContactZone, outsideStrikeZone, zoneScore);
   const lowMeetPressure = clamp((10 - batterMeet) / 7, 0, 1);
   const sweetSpotMiss = 1 - sweetSpotScore;
@@ -5955,6 +5991,7 @@ function buildContactProfile(bestHit) {
     zoneMissStage,
     outsideStrikeZone,
     outsideReachUse,
+    contactRescueUse,
     inGoodContactZone,
     yellowZoneBoost,
     quality,
@@ -7138,6 +7175,8 @@ function buildBattedBallProfile(contact) {
     zoneDistanceRate,
     plateDistance,
     zoneMissUnits = 0,
+    outsideReachUse = 0,
+    contactRescueUse = 0,
     outsideStrikeZone,
     sweetSpotScore,
     inGoodContactZone,
@@ -7153,7 +7192,8 @@ function buildBattedBallProfile(contact) {
   const stuffPressure = getPitcherStuffPressure(activePitcher);
   const lowStuffProfileBoost = getLowPitcherStuffProfileBoost(activePitcher);
   const goodZoneMissDrag = getGoodContactZoneMissPenalty(zoneMissUnits);
-  const chasePenalty = inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.74) * 0.72 : (1 - zoneScore) * 1.08 + goodZoneMissDrag + 0.62;
+  const rescueContactDrag = clamp(Math.max(contactRescueUse, outsideReachUse * 0.45), 0, 1.2);
+  const chasePenalty = (inGoodContactZone ? Math.pow(1 - clamp(zoneScore, 0, 1), 0.74) * 0.72 : (1 - zoneScore) * 1.08 + goodZoneMissDrag + 0.62) + rescueContactDrag * 0.58;
   const timingPenaltyScale = inGoodContactZone ? 0.45 : yellowZoneBoost > 0 ? 0.68 : 1;
   const timingPenalty = (abs > 260 ? 0.18 : abs > 150 ? 0.08 : 0) * timingPenaltyScale;
   const powerBoost = (power - 5) * 0.035;
@@ -7169,7 +7209,7 @@ function buildBattedBallProfile(contact) {
   const sweetSpotCenterBoost = clamp((sweetSpotScore - 0.82) / 0.18, 0, 1) * 0.1;
   const lowPowerMastery = getLowPowerGoodContactMastery({ power, quality, timingScore, sweetSpotScore, barrelScore, zoneScore, inGoodContactZone });
   const profileEase = quality * (goodContactEaseScale - 1) * clamp((timingScore + barrelScore + sweetSpotScore) / 2.2, 0, 1);
-  const readableQualityCore = quality + profileEase + powerBoost + meetBoost + pitchQualityBoost + practicePitcherContactBoost + sweetSpotCenterBoost + lowPowerMastery * 0.12 - zoneEdgeDrag;
+  const readableQualityCore = quality + profileEase + powerBoost + meetBoost + pitchQualityBoost + practicePitcherContactBoost + sweetSpotCenterBoost + lowPowerMastery * 0.12 - zoneEdgeDrag - rescueContactDrag * 0.34;
   const readableQuality = clamp(readableQualityCore * handednessContactMultiplier - stuffPressure - chasePenalty - timingPenalty, 0, 1);
   const lowMeetPressure = clamp((10 - meet) / 7, 0, 1);
   const sweetSpotMiss = 1 - sweetSpotScore;
@@ -7180,7 +7220,7 @@ function buildBattedBallProfile(contact) {
   const yellowDriveScore = yellowZoneBoost > 0
     ? yellowZoneBoost * clamp((quality - 0.42) / 0.36, 0, 1) * clamp((sweetSpotScore - 0.52) / 0.34, 0, 1)
     : 0;
-  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.42 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.28 + goodZoneMissDrag * 0.86;
+  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.42 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.28 + goodZoneMissDrag * 0.86 + rescueContactDrag * 0.72;
   const centerDriveScore = inGoodContactZone
     ? clamp((zoneScore - 0.74) / 0.26, 0, 1) * clamp((quality - 0.1) / 0.38, 0, 1) * clamp((sweetSpotScore - 0.1) / 0.54, 0, 1)
     : 0;
@@ -8595,6 +8635,7 @@ function createHomeRunFireworks(battedBall) {
   const boatCatch = getHomeRunBoatCatch(battedBall);
   const oceanBoats = getHomeRunOceanWaitingBoats(battedBall, boatCatch);
   const rockets = createSpaceHomeRunRockets(battedBall, homerRuns, duration);
+  const mStadiumRocket = createMStadiumHomeRunRocket(battedBall, homerRuns);
   const trains = createAozoraHomeRunTrains(battedBall, duration);
   const bursts = Array.from({ length: burstCount }, (_, burstIndex) => {
     const standDistance = defenseField.fenceDistance + randomBetween(70, homerRuns >= 4 ? 430 : 260);
@@ -8624,12 +8665,16 @@ function createHomeRunFireworks(battedBall) {
   });
   const burstDuration = bursts.reduce((max, burst) => Math.max(max, burst.delay + 1.08), 0);
   const rocketDuration = rockets.reduce((max, rocket) => Math.max(max, rocket.delay + rocket.duration + 0.7), 0);
+  const mStadiumRocketDuration = mStadiumRocket
+    ? mStadiumRocket.delay + mStadiumRocket.duration + mStadiumRocket.endingDuration
+    : 0;
   const trainDuration = trains.reduce((max, train) => Math.max(max, train.delay + train.duration + 0.4), 0);
   return {
     startDelay: Math.max(0.15, battedBall.ballTime ?? 0.7),
-    duration: Math.max(boatCatch ? 5.8 : duration, burstDuration, rocketDuration, trainDuration),
+    duration: Math.max(boatCatch ? 5.8 : duration, burstDuration, rocketDuration, mStadiumRocketDuration, trainDuration),
     bursts,
     rockets,
+    mStadiumRocket,
     trains,
     oceanBoats,
     boatCatch
@@ -8709,6 +8754,66 @@ function createSpaceHomeRunRockets(battedBall, homerRuns, duration) {
     wobble: randomBetween(34, 54),
     size: homerRuns >= 4 ? 1.28 : homerRuns >= 2 ? 1.14 : 1
   }];
+}
+
+function createMStadiumHomeRunRocket(battedBall, homerRuns) {
+  const stadium = getCurrentStadium();
+  if (!(stadium.hasMStadium || stadium.hasXStadium) || !battedBall?.fenceOver) return null;
+  const center = getFenceCenter();
+  const launchX = clamp(
+    battedBall.target?.x ?? field.plateX,
+    field.plateX - defenseField.fenceDistance * 0.36,
+    field.plateX + defenseField.fenceDistance * 0.36
+  );
+  const launchY = center.y - defenseField.fenceDistance - 92;
+  const flightHeight = homerRuns >= 4 ? 760 : homerRuns >= 2 ? 700 : 640;
+  return {
+    start: { x: launchX, y: launchY },
+    end: { x: launchX + randomBetween(-28, 28), y: launchY - flightHeight },
+    delay: 0.18,
+    duration: stadium.hasXStadium ? 64 : homerRuns >= 4 ? 4.25 : 3.65,
+    endingDuration: 3.45,
+    smokeSeed: Math.floor(randomBetween(0, 1000)),
+    cosmicJourney: stadium.hasXStadium === true,
+    lines: stadium.hasXStadium ? getXStadiumHomeRunJourneyLines(homerRuns) : getMStadiumHomeRunEndingLines(homerRuns)
+  };
+}
+
+function getMStadiumHomeRunEndingLines(homerRuns = 1) {
+  if (homerRuns >= 4) {
+    return [
+      "黒曜石の空へ、満塁弾が打ち上がりました。",
+      "Mスタジアムの夜は、この一振りを忘れません。",
+      "すべての走者が帰り、物語は最高高度へ。"
+    ];
+  }
+  if (homerRuns >= 2) {
+    return [
+      "白いロケットが、ホームランの軌道を追って昇ります。",
+      "黒曜石のフィールドに、勝負を変える光が残りました。",
+      "Mスタジアムは、この打球を歓声として記録します。"
+    ];
+  }
+  return [
+    "打球はフェンスを越え、ロケットは夜空へ向かいます。",
+    "黒曜石のフィールドに、ひとすじの白い炎が伸びました。",
+    "Mスタジアムです。ここからまた、新しい勝負が始まります。"
+  ];
+}
+
+function getXStadiumHomeRunJourneyLines(homerRuns = 1) {
+  if (homerRuns >= 4) {
+    return [
+      "Xスタジアム発、満塁ホームラン宇宙便。",
+      "64秒の旅路が、すべての走者の帰還を祝います。",
+      "Mスタジアムから続く試合は、さらに遠い空へ。"
+    ];
+  }
+  return [
+    "Xスタジアム発、ホームラン宇宙便。",
+    "64秒間、白いロケットが打球の余韻を運びます。",
+    "試合は続きます。舞台だけが、星の近くへ進みました。"
+  ];
 }
 
 function getHomeRunBoatCatch(battedBall) {
@@ -13659,8 +13764,47 @@ function isObviousFoulFlyOut(battedBall) {
   );
 }
 
+function shouldOfferXStadiumPromptBeforeDefenseFinish(outcome) {
+  return Boolean(
+    getCurrentStadium().hasMStadium
+      && !isAnyPracticeMode()
+      && !xStadiumPrompt.active
+      && xStadiumPrompt.offeredDefenseStartTime !== defenseState.startTime
+      && (outcome?.scoreType === "homer" || outcome?.kind === "homer" || defenseState.battedBall?.fenceOver)
+  );
+}
+
+function showXStadiumPrompt() {
+  xStadiumPrompt = {
+    active: true,
+    offeredDefenseStartTime: defenseState.startTime,
+    goRect: null,
+    dontRect: null
+  };
+  gamePhase = "xStadiumPrompt";
+  message = "XスタジアムにGOしますか？";
+}
+
+function handleXStadiumPromptChoice(goToXStadium) {
+  if (!xStadiumPrompt.active) return false;
+  xStadiumPrompt.active = false;
+  if (goToXStadium) {
+    applyStadiumPreset("xStadium");
+    message = "XスタジアムへGO！試合はMスタジアムの続きです";
+  } else {
+    message = "Mスタジアムで試合を続けます";
+  }
+  gamePhase = "defense";
+  finishDefensePlay();
+  return true;
+}
+
 function finishDefensePlay() {
   const outcome = defenseState.outcome;
+  if (shouldOfferXStadiumPromptBeforeDefenseFinish(outcome)) {
+    showXStadiumPrompt();
+    return;
+  }
   const defendingPitcher = activePitcher;
   const metricText = getBattedBallMetricText(defenseState.battedBall);
   refreshDefenseThrowSafety();
@@ -14575,9 +14719,10 @@ function showEffect(text, color) {
 }
 
 function draw() {
-  if (gamePhase === "spectator") {
-    drawSpectatorMode();
+  if (gamePhase === "xStadiumPrompt") {
+    drawDefenseView();
     drawHud();
+    drawXStadiumPrompt();
     return;
   }
   if (gamePhase === "defense") {
@@ -14605,7 +14750,101 @@ function draw() {
   drawHitEffect();
 }
 
+function drawXStadiumPrompt() {
+  const width = 640;
+  const height = 236;
+  const x = (canvas.width - width) / 2;
+  const y = canvas.height * 0.5 - height / 2;
+  const goRect = { x: x + 92, y: y + 156, width: 190, height: 54 };
+  const dontRect = { x: x + width - 282, y: y + 156, width: 190, height: 54 };
+  xStadiumPrompt.goRect = goRect;
+  xStadiumPrompt.dontRect = dontRect;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(5, 5, 12, 0.72)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const panel = ctx.createLinearGradient(x, y, x, y + height);
+  if (panel?.addColorStop) {
+    panel.addColorStop(0, "rgba(29, 25, 44, 0.96)");
+    panel.addColorStop(0.55, "rgba(11, 10, 18, 0.96)");
+    panel.addColorStop(1, "rgba(35, 30, 54, 0.96)");
+    ctx.fillStyle = panel;
+  } else {
+    ctx.fillStyle = "rgba(20, 18, 32, 0.96)";
+  }
+  roundRect(x, y, width, height, 14);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(232, 226, 255, 0.62)";
+  ctx.lineWidth = 3;
+  roundRect(x + 2, y + 2, width - 4, height - 4, 12);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#f4f0ff";
+  ctx.font = "bold 32px sans-serif";
+  ctx.fillText("XスタジアムにGOしますか？", x + width / 2, y + 54);
+  ctx.font = "18px sans-serif";
+  ctx.fillStyle = "#d9d4f4";
+  ctx.fillText("試合状況はそのまま、球場だけが切り替わります。", x + width / 2, y + 96);
+  ctx.fillText("Xスタではホームラン後に64秒間の宇宙への旅が始まります。", x + width / 2, y + 124);
+
+  drawXStadiumPromptButton(goRect, "GO", "#72f2a4", "#102418");
+  drawXStadiumPromptButton(dontRect, "Don’t", "#f4c0c0", "#281616");
+  ctx.restore();
+}
+
+function drawXStadiumPromptButton(rect, label, fill, textColor) {
+  ctx.save();
+  ctx.fillStyle = fill;
+  roundRect(rect.x, rect.y, rect.width, rect.height, 9);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.68)";
+  ctx.lineWidth = 2;
+  roundRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2, 8);
+  ctx.stroke();
+  ctx.fillStyle = textColor;
+  ctx.font = "bold 25px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.width / 2, rect.y + rect.height / 2);
+  ctx.restore();
+}
+
 function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
+  if (stadium.surface === "obsidian") {
+    const base = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    if (base?.addColorStop) {
+      base.addColorStop(0, "#050509");
+      base.addColorStop(0.42, "#14121e");
+      base.addColorStop(0.72, "#08070d");
+      base.addColorStop(1, "#1c1727");
+      ctx.fillStyle = base;
+    } else {
+      ctx.fillStyle = "#0c0a12";
+    }
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    for (let y = -40; y < canvas.height + 80; y += 46) {
+      for (let x = -40; x < canvas.width + 80; x += 46) {
+        const shade = ((x / 46 + y / 46) % 3 + 3) % 3;
+        ctx.fillStyle = shade === 0 ? "rgba(41, 36, 58, 0.22)" : shade === 1 ? "rgba(7, 7, 12, 0.28)" : "rgba(73, 52, 94, 0.12)";
+        ctx.fillRect(x, y, 46, 46);
+        ctx.strokeStyle = "rgba(132, 104, 170, 0.08)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, 45, 45);
+      }
+    }
+    for (let i = 0; i < 260; i += 1) {
+      const x = (i * 97 + (i % 11) * 17) % canvas.width;
+      const y = (i * 53 + (i % 7) * 29) % canvas.height;
+      ctx.strokeStyle = i % 4 === 0 ? "rgba(177, 130, 220, 0.18)" : "rgba(18, 16, 27, 0.32)";
+      ctx.lineWidth = 1 + (i % 3) * 0.35;
+      drawLine(x - 10, y + 4, x + 12, y - 5);
+    }
+    ctx.restore();
+    return;
+  }
   if (stadium.surface === "dirt") {
     const dirt = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     if (dirt?.addColorStop) {
@@ -15322,6 +15561,50 @@ function getSpaceOutfieldFill(centerX, homeY, radius) {
     return fill;
   }
   return "rgba(9, 14, 22, 0.96)";
+}
+
+function getObsidianFieldFill(centerX, topY, bottomY) {
+  const fill = ctx.createLinearGradient(centerX, topY, centerX, bottomY);
+  if (fill?.addColorStop) {
+    fill.addColorStop(0, "#090811");
+    fill.addColorStop(0.36, "#191428");
+    fill.addColorStop(0.68, "#050509");
+    fill.addColorStop(1, "#221a32");
+    return fill;
+  }
+  return "#100d19";
+}
+
+function drawMStadiumBeyondOutfield() {
+  if (!getCurrentStadium().hasMStadium) return;
+  const center = getFenceCenter();
+  const innerRadius = defenseField.fenceDistance + 34;
+  const outerRadius = innerRadius + 270;
+  ctx.save();
+  if (traceRiversideOutfieldAnnulus(innerRadius, outerRadius, 182, 358, 18)) {
+    const seats = ctx.createRadialGradient(center.x, center.y, innerRadius, center.x, center.y, outerRadius);
+    if (seats?.addColorStop) {
+      seats.addColorStop(0, "rgba(38, 34, 52, 0.96)");
+      seats.addColorStop(0.55, "rgba(74, 61, 92, 0.94)");
+      seats.addColorStop(1, "rgba(26, 24, 35, 0.96)");
+      ctx.fillStyle = seats;
+    } else {
+      ctx.fillStyle = "rgba(52, 45, 67, 0.95)";
+    }
+    ctx.fill();
+  }
+  for (let radius = innerRadius + 26; radius < outerRadius; radius += 42) {
+    ctx.strokeStyle = radius % 84 === 0 ? "rgba(185, 160, 215, 0.42)" : "rgba(125, 106, 154, 0.36)";
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, Math.PI + 0.08, Math.PI * 2 - 0.08);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#ece8ff";
+  ctx.font = "bold 30px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Mスタジアムです。", center.x, center.y - outerRadius + 72);
+  ctx.restore();
 }
 
 function drawSpaceStadiumBeyondOutfield() {
@@ -16051,116 +16334,6 @@ function drawShiokazeLamp(x, y, scale = 1) {
   ctx.restore();
 }
 
-function startSpectatorMode() {
-  if (!isShiokazeStadium()) applyStadiumPreset("shiokaze");
-  gamePhase = "spectator";
-  shell?.classList.remove("menu-open");
-  menu.classList.add("hidden");
-  const entrance = getShiokazeBallparkEntrancePoint();
-  spectatorState.x = entrance.x;
-  spectatorState.y = entrance.y;
-  message = "スペクテイターモード: 左スティック/矢印キー/WASDで潮風公園を散歩、Rでメニュー";
-}
-
-function updateSpectatorMode(delta) {
-  const frameScale = clamp(delta / (1000 / 60), 0.4, 2.2);
-  const gamepad = getConnectedGamepads()[0] || null;
-  const stickX = Math.abs(gamepad?.axes?.[0] ?? 0) >= 0.2 ? gamepad.axes[0] : 0;
-  const stickY = Math.abs(gamepad?.axes?.[1] ?? 0) >= 0.2 ? gamepad.axes[1] : 0;
-  const left = keysDown.has("ArrowLeft") || keysDown.has("a") || keysDown.has("A");
-  const right = keysDown.has("ArrowRight") || keysDown.has("d") || keysDown.has("D");
-  const up = keysDown.has("ArrowUp") || keysDown.has("w") || keysDown.has("W");
-  const down = keysDown.has("ArrowDown") || keysDown.has("s") || keysDown.has("S");
-  const keyboardX = left === right ? 0 : left ? -1 : 1;
-  const keyboardY = up === down ? 0 : up ? -1 : 1;
-  const dx = stickX || keyboardX;
-  const dy = stickY || keyboardY;
-  const mag = Math.hypot(dx, dy) || 1;
-  spectatorState.x += (dx / mag) * spectatorState.speed * frameScale;
-  spectatorState.y += (dy / mag) * spectatorState.speed * frameScale;
-  const bounds = getShiokazeSpectatorBounds();
-  spectatorState.x = clamp(spectatorState.x, bounds.left, bounds.right);
-  spectatorState.y = clamp(spectatorState.y, bounds.top, bounds.bottom);
-}
-
-function getShiokazeBallparkEntrancePoint() {
-  return {
-    x: field.plateX,
-    y: field.plateY + 42 - defenseField.fenceDistance * 0.18 + 190
-  };
-}
-
-function getShiokazeSpectatorBounds() {
-  const width = getShiokazeParkWidthUnits();
-  const depth = getShiokazeParkDepthUnits();
-  return {
-    left: field.plateX - width / 2 + 80,
-    right: field.plateX + width / 2 - 80,
-    top: field.plateY + 42 - defenseField.fenceDistance - depth * 1.18,
-    bottom: field.plateY + 42 - defenseField.fenceDistance + depth * 0.18
-  };
-}
-
-function drawSpectatorMode() {
-  applyStadiumPreset(currentStadiumId);
-  const width = getShiokazeParkWidthUnits();
-  const depth = getShiokazeParkDepthUnits();
-  const left = field.plateX - width / 2;
-  const top = field.plateY + 42 - defenseField.fenceDistance - depth * 1.02;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.translate(canvas.width / 2 - spectatorState.x, canvas.height / 2 - spectatorState.y);
-  drawShiokazeParkScene(left, top, width, depth, 1.25);
-  drawShiokazeSpectatorBallpark(field.plateX, field.plateY + 42 - defenseField.fenceDistance * 0.18);
-  drawSpectatorWalker(spectatorState.x, spectatorState.y);
-  ctx.restore();
-  ctx.save();
-  ctx.fillStyle = "rgba(20, 28, 40, 0.72)";
-  roundRect(28, 28, 470, 76, 10);
-  ctx.fill();
-  ctx.fillStyle = "#fff2a8";
-  ctx.font = "bold 18px sans-serif";
-  ctx.fillText("スペクテイターモード", 48, 54);
-  ctx.font = "15px sans-serif";
-  ctx.fillText("矢印キー/WASDで散歩、Rでメニューへ戻る", 48, 82);
-  ctx.restore();
-}
-
-function drawShiokazeSpectatorBallpark(cx, cy) {
-  ctx.save();
-  ctx.fillStyle = "rgba(94, 185, 78, 0.62)";
-  ctx.beginPath();
-  ctx.arc(cx, cy, 420, Math.PI, Math.PI * 2);
-  ctx.fill();
-  drawShiokazeGrassTexture(cx - 430, cy - 430, 860, 430, 0.7);
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 430, Math.PI, Math.PI * 2);
-  ctx.stroke();
-  drawShiokazeOutfieldSeats(cx, cy, 475);
-  drawShiokazeBench(cx - 210, cy + 120, 1.3);
-  drawShiokazeBench(cx + 210, cy + 120, 1.3);
-  ctx.restore();
-}
-
-function drawSpectatorWalker(x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = "#f4d0a6";
-  ctx.beginPath();
-  ctx.arc(0, -18, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#2e73d2";
-  roundRect(-9, -8, 18, 26, 7);
-  ctx.fill();
-  ctx.strokeStyle = "#233047";
-  ctx.lineWidth = 4;
-  drawLine(-5, 18, -12, 36);
-  drawLine(5, 18, 12, 36);
-  ctx.restore();
-}
-
 function drawRiversideBeyondOutfield() {
   if (!getCurrentStadium().hasRiver) return;
   const center = getFenceCenter();
@@ -16484,7 +16657,7 @@ function drawField() {
   drawNextDomeRoofScreen();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
-  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.centerX, 70, 836) : "#d89548";
+  ctx.fillStyle = stadium.surface === "obsidian" ? getObsidianFieldFill(field.centerX, 70, 836) : stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.centerX, 70, 836) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.centerX, 70);
   ctx.lineTo(24, 836);
@@ -16493,6 +16666,8 @@ function drawField() {
   ctx.fill();
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 232, 170, 0.16)"
+    : stadium.surface === "obsidian"
+      ? getObsidianFieldFill(field.centerX, 754, 405)
     : stadium.surface === "seaBreezeGrass"
       ? "#82cf5c"
     : stadium.surface === "spaceGlow"
@@ -16518,7 +16693,7 @@ function drawField() {
     drawLine(field.plateX - plateHalfTop, plateTopY, field.plateX - plateHalfTop - lineDx, lineEndY);
     drawLine(field.plateX + plateHalfTop, plateTopY, field.plateX + plateHalfTop + lineDx, lineEndY);
   }
-  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#73bd51" : stadium.surface === "spaceGlow" ? "rgba(28, 34, 42, 0.92)" : "#c8793b";
+  ctx.fillStyle = stadium.surface === "obsidian" ? "rgba(10, 9, 16, 0.94)" : stadium.surface === "seaBreezeGrass" ? "#73bd51" : stadium.surface === "spaceGlow" ? "rgba(28, 34, 42, 0.92)" : "#c8793b";
   ctx.beginPath();
   ctx.ellipse(pitcher.x, pitcher.y + 18, 68, 30, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -16543,12 +16718,13 @@ function drawDefenseView() {
   drawRiversideBeyondOutfield();
   drawSpaceStadiumBeyondOutfield();
   drawHomeRunVisionBeyondOutfield();
+  drawMStadiumBeyondOutfield();
   drawShiokazeParkBeyondOutfield();
   drawAozoraRuralBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
 
-  ctx.fillStyle = stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
+  ctx.fillStyle = stadium.surface === "obsidian" ? getObsidianFieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
   ctx.beginPath();
   ctx.moveTo(field.plateX, field.plateY + 42);
   ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
@@ -16558,6 +16734,8 @@ function drawDefenseView() {
 
   ctx.fillStyle = stadium.surface === "dirt"
     ? "rgba(255, 235, 174, 0.14)"
+    : stadium.surface === "obsidian"
+      ? getObsidianFieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
     : stadium.surface === "seaBreezeGrass"
       ? "#82cf5c"
     : stadium.surface === "spaceGlow"
@@ -16643,6 +16821,7 @@ function drawHomeRunFireworks() {
     ctx.fill();
   });
   drawSpaceHomeRunRockets(fireworks, elapsedSeconds);
+  drawMStadiumHomeRunRocket(fireworks, elapsedSeconds);
   drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds);
   drawAozoraHomeRunTrains(fireworks, elapsedSeconds);
   ctx.restore();
@@ -16839,6 +17018,164 @@ function drawSpaceCartoonRocket(x, y, angle, alpha = 1, scale = 1) {
   ctx.strokeStyle = "rgba(255, 242, 168, 0.64)";
   ctx.lineWidth = 8;
   drawLine(-116, 0, -174, 0);
+  ctx.restore();
+}
+
+function drawMStadiumHomeRunRocket(fireworks, elapsedSeconds) {
+  const rocket = fireworks?.mStadiumRocket;
+  if (!rocket) return;
+  const age = elapsedSeconds - rocket.delay;
+  if (age < 0 || age > rocket.duration + rocket.endingDuration) return;
+  drawMStadiumLaunchPad(rocket.start.x, rocket.start.y, clamp(1 - age / 4.2, 0, 1));
+  if (age <= rocket.duration + 0.25) {
+    const progress = clamp(age / rocket.duration, 0, 1);
+    const ease = 1 - Math.pow(1 - progress, 2.1);
+    const drift = Math.sin(progress * Math.PI * 2.2 + rocket.smokeSeed) * (1 - progress) * 9;
+    const x = rocket.start.x + (rocket.end.x - rocket.start.x) * ease + drift;
+    const y = rocket.start.y + (rocket.end.y - rocket.start.y) * ease;
+    const alpha = age > rocket.duration ? 1 - clamp((age - rocket.duration) / 0.25, 0, 1) : 1;
+    drawMStadiumRocketPlume(x, y, rocket.start.y, progress, alpha);
+    drawMStadiumPhotoRocket(x, y, alpha, 1 + progress * 0.12);
+  }
+  const endingAge = age - rocket.duration;
+  if (endingAge >= 0) drawMStadiumHomeRunEnding(rocket, endingAge);
+}
+
+function drawMStadiumLaunchPad(x, y, alpha = 1) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.strokeStyle = "rgba(22, 22, 28, 0.88)";
+  ctx.lineWidth = 6;
+  drawLine(x - 88, y + 12, x + 88, y + 12);
+  drawLine(x - 58, y + 12, x - 28, y - 94);
+  drawLine(x + 58, y + 12, x + 28, y - 94);
+  drawLine(x - 28, y - 94, x + 28, y - 94);
+  ctx.strokeStyle = "rgba(188, 180, 205, 0.34)";
+  ctx.lineWidth = 3;
+  drawLine(x - 44, y - 34, x + 44, y - 34);
+  drawLine(x - 36, y - 64, x + 36, y - 64);
+  ctx.restore();
+}
+
+function drawMStadiumRocketPlume(x, y, groundY, progress, alpha = 1) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const flameLength = 92 + progress * 72;
+  const flame = ctx.createLinearGradient(x, y + 34, x, y + flameLength);
+  if (flame?.addColorStop) {
+    flame.addColorStop(0, `rgba(255, 255, 248, ${0.96 * alpha})`);
+    flame.addColorStop(0.32, `rgba(255, 220, 97, ${0.9 * alpha})`);
+    flame.addColorStop(0.72, `rgba(255, 123, 48, ${0.72 * alpha})`);
+    flame.addColorStop(1, `rgba(255, 87, 35, ${0.05 * alpha})`);
+    ctx.fillStyle = flame;
+  } else {
+    ctx.fillStyle = `rgba(255, 202, 84, ${0.86 * alpha})`;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x - 20, y + 36);
+  ctx.quadraticCurveTo(x - 34, y + flameLength * 0.48, x - 10, y + flameLength);
+  ctx.lineTo(x + 10, y + flameLength);
+  ctx.quadraticCurveTo(x + 34, y + flameLength * 0.48, x + 20, y + 36);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+  for (let i = 0; i < 18; i += 1) {
+    const spread = 34 + progress * 120 + (i % 5) * 12;
+    const sx = x + Math.cos(i * 1.7) * spread * (0.34 + (i % 4) * 0.12);
+    const sy = groundY + 18 + Math.sin(i * 1.15) * 18 + (i % 3) * 8;
+    const radius = 24 + progress * 42 + (i % 6) * 5;
+    ctx.fillStyle = `rgba(238, 236, 229, ${0.34 * alpha * (1 - progress * 0.28)})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMStadiumPhotoRocket(x, y, alpha = 1, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.globalAlpha *= alpha;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.fillStyle = "#f1f0eb";
+  ctx.strokeStyle = "rgba(28, 30, 36, 0.78)";
+  ctx.lineWidth = 3.5;
+  roundRect(-12, -116, 24, 144, 9);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#d9dde2";
+  ctx.beginPath();
+  ctx.moveTo(-11, -112);
+  ctx.quadraticCurveTo(0, -148, 11, -112);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#14151b";
+  roundRect(-13, -46, 26, 42, 3);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+  roundRect(-9, -88, 18, 28, 4);
+  ctx.fill();
+
+  ctx.fillStyle = "#e8e4da";
+  ctx.beginPath();
+  ctx.moveTo(-12, 18);
+  ctx.lineTo(-30, 46);
+  ctx.lineTo(-14, 44);
+  ctx.lineTo(-4, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(12, 18);
+  ctx.lineTo(30, 46);
+  ctx.lineTo(14, 44);
+  ctx.lineTo(4, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = `rgba(255, 245, 170, ${0.7 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 42, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMStadiumHomeRunEnding(rocket, endingAge) {
+  const duration = rocket.endingDuration ?? 3.4;
+  const progress = clamp(endingAge / duration, 0, 1);
+  const fadeIn = clamp(endingAge / 0.55, 0, 1);
+  const fadeOut = 1 - clamp((endingAge - duration + 0.7) / 0.7, 0, 1);
+  const alpha = Math.min(fadeIn, fadeOut);
+  if (alpha <= 0) return;
+  const camera = getDefenseCameraOffset();
+  const screenCenterX = canvas.width / 2 - camera.x;
+  const screenBaseY = canvas.height * 0.76 - camera.y;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.fillStyle = "rgba(5, 5, 10, 0.58)";
+  roundRect(screenCenterX - 410, screenBaseY - 136, 820, 188, 12);
+  ctx.fill();
+  ctx.fillStyle = "#f3f0ff";
+  ctx.strokeStyle = "rgba(18, 16, 28, 0.88)";
+  ctx.lineWidth = 4;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const yOffset = 42 - progress * 74;
+  (rocket.lines || []).forEach((line, index) => {
+    const y = screenBaseY - 66 + index * 45 + yOffset;
+    ctx.font = index === 0 ? "bold 28px sans-serif" : "bold 23px sans-serif";
+    ctx.strokeText(line, screenCenterX, y);
+    ctx.fillText(line, screenCenterX, y);
+  });
   ctx.restore();
 }
 
@@ -17390,6 +17727,13 @@ function getHomeRunStandFocusPoint() {
     return {
       x: (rocket.start.x + rocket.end.x) / 2,
       y: Math.min(rocket.start.y, rocket.end.y) - 70
+    };
+  }
+  if (fireworks?.mStadiumRocket) {
+    const rocket = fireworks.mStadiumRocket;
+    return {
+      x: (rocket.start.x + rocket.end.x) / 2,
+      y: rocket.start.y - 360
     };
   }
   if (fireworks?.trains?.length) {
@@ -19364,6 +19708,16 @@ function getCanvasPoint(event) {
   };
 }
 
+function isPointInRect(point, rect) {
+  return Boolean(
+    point && rect
+      && point.x >= rect.x
+      && point.x <= rect.x + rect.width
+      && point.y >= rect.y
+      && point.y <= rect.y + rect.height
+  );
+}
+
 function gameLoop(time) {
   const delta = Math.min(40, time - lastFrameTime);
   lastFrameTime = time;
@@ -19434,7 +19788,6 @@ window.addEventListener("keydown", (event) => {
   keysDown.add(event.code);
   keysDown.add(event.key);
   if (!event.repeat && event.code === "Space" && gamePhase === "playing" && isPlayerBatting()) swingBat();
-  if (!event.repeat && (event.key === "v" || event.key === "V") && isShiokazeStadium() && gamePhase !== "spectator") startSpectatorMode();
   if (!event.repeat && event.code === "ArrowUp" && gamePhase === "defense") handleBatterRunnerBaseCommand("second");
   if (!event.repeat && event.code === "ArrowLeft" && gamePhase === "defense") handleBatterRunnerBaseCommand("third");
   if (!event.repeat && event.code === "ArrowDown" && gamePhase === "defense") handleBatterRunnerBaseCommand("home");
@@ -19516,6 +19869,13 @@ canvas.addEventListener("mouseleave", () => {
 
 canvas.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
+  if (gamePhase === "xStadiumPrompt") {
+    event.preventDefault();
+    const point = getCanvasPoint(event);
+    if (isPointInRect(point, xStadiumPrompt.goRect)) handleXStadiumPromptChoice(true);
+    else if (isPointInRect(point, xStadiumPrompt.dontRect)) handleXStadiumPromptChoice(false);
+    return;
+  }
   if (gamePhase !== "playing" || !isPlayerBatting()) return;
   event.preventDefault();
   updateMouseAim(event);
@@ -19619,11 +19979,6 @@ pitchingPracticeStartButton?.addEventListener("click", () => {
 });
 homeRunDerbyStartButton?.addEventListener("click", () => {
   startGame("homerDerby");
-});
-spectatorModeButton?.addEventListener("click", () => {
-  applyStadiumPreset("shiokaze");
-  if (stadiumSelect) stadiumSelect.value = "shiokaze";
-  startSpectatorMode();
 });
 practiceBatterSelect?.addEventListener("change", () => {
   practiceBatterId = practiceBatterSelect.value;

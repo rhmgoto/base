@@ -219,6 +219,7 @@ function assertHtmlShell() {
     'value="fireworks"',
     'value="aozora"',
     'value="hyperOcean"',
+    'value="mStadium"',
     'value="riverside"',
     'value="americanRoyal"',
     'value="nextDome"',
@@ -2959,6 +2960,16 @@ const battingTighteningState = JSON.parse(runInGame(
       y: field.plateY,
       batContact: { t: 0.98 }
     });
+    const outsidePlateDistance = distanceToGoodContactZone(field.plateX + field.strikeZoneWidth, field.plateY, ball.radius);
+    const outsideMissUnits = getGoodContactZoneMissUnits(outsidePlateDistance, ball.radius);
+    const naturalOutsideRange = (((ball.radius + 22) + ball.radius * 2) * batThicknessMultiplier * meetZoneWidthScale)
+      * getGoodContactZoneMissContactMultiplier(outsideMissUnits);
+    const rescuedOutsideContact = buildContactProfile({
+      distanceToBat: naturalOutsideRange + ball.radius,
+      x: field.plateX + field.strikeZoneWidth,
+      y: field.plateY,
+      batContact: { t: 0.98 }
+    });
     const outsideCleanerContact = buildContactProfile({
       distanceToBat: scaledOutsideRange - 2,
       x: field.plateX + field.strikeZoneWidth,
@@ -3040,6 +3051,10 @@ const battingTighteningState = JSON.parse(runInGame(
       outsideReachContact: outsideReachContact.isContact,
       outsideReachUse: outsideReachContact.outsideReachUse,
       outsideReachQuality: outsideReachContact.quality,
+      rescuedOutsideContact: rescuedOutsideContact.isContact,
+      rescuedOutsideReachUse: rescuedOutsideContact.outsideReachUse,
+      rescuedOutsideContactRescueUse: rescuedOutsideContact.contactRescueUse,
+      rescuedOutsideQuality: rescuedOutsideContact.quality,
       outsideCleanerQuality: outsideCleanerContact.quality,
       goodFoulNudgedFair: isFairDirection(nudgedGoodDirection),
       weakFoulStillFoul: !isFairDirection(nudgedWeakDirection),
@@ -3076,6 +3091,10 @@ assert(battingTighteningState.keptKind === "hit", "non-yellow hits should remain
 assert(battingTighteningState.outsideReachContact === true, "outside pitches should be reachable about one extra ball width off the plate");
 assert(battingTighteningState.outsideReachUse > 0, "extended outside reach should be tracked as tip contact");
 assert(battingTighteningState.outsideReachQuality <= 0.28, "outside tip contact should usually become a foul or weak out-quality ball");
+assert(battingTighteningState.rescuedOutsideContact === true, "contact-only rescue should add about two ball radii outside the natural bat range");
+assert(battingTighteningState.rescuedOutsideContactRescueUse > 0.4, "rescued contact should be tracked separately from natural contact");
+assert(battingTighteningState.rescuedOutsideReachUse >= battingTighteningState.rescuedOutsideContactRescueUse, "rescued contact should also count as reaching for the pitch");
+assert(battingTighteningState.rescuedOutsideQuality <= battingTighteningState.outsideCleanerQuality, "rescued contact should not improve hit quality over cleaner outside contact");
 assert(battingTighteningState.goodFoulNudgedFair === true, "good 50-plus contact should be nudged back toward fair territory when it only barely leaks foul");
 assert(battingTighteningState.weakFoulStillFoul === true, "weak or badly mistimed contact should still be allowed to stay foul");
 assert(battingTighteningState.earlyFeedback.includes("早い"), "batting feedback should show early timing");

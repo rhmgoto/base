@@ -62,6 +62,12 @@ assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria
 assertIncludesAll(
   script,
   [
+    "const contactRescueExtension = ball.radius * 2",
+    "const contactRange = naturalContactRange + contactRescueExtension",
+    "contactRescueUse",
+    "const rescueChasePenalty = contactRescueUse",
+    "const outsideReachUse = clamp(Math.max(naturalOutsideReachUse, contactRescueUse * 1.18)",
+    "const rescueContactDrag = clamp(Math.max(contactRescueUse, outsideReachUse * 0.45)",
     "const buntAimMemoryDuration = 650",
     "function getBuntAimForContact",
     "now - swingState.buntAimMemoryTime <= buntAimMemoryDuration",
@@ -121,10 +127,53 @@ assertIncludesAll(
   html,
   [
     "<option value=\"homeRunVision\">ホームランヴィジョンフィールド</option>",
-    "<option value=\"shiokaze\">潮風球場</option>",
-    "id=\"spectatorModeButton\""
+    "<option value=\"mStadium\">Mスタジアム</option>",
+    "<option value=\"shiokaze\">潮風球場</option>"
   ],
   "index.html home run vision field option"
+);
+
+assert(!html.includes("spectatorModeButton"), "index.html should no longer expose spectator mode");
+assert(!html.includes("value=\"xStadium\""), "X Stadium should stay hidden from the normal stadium selector");
+assert(!script.includes("startSpectatorMode"), "script.js should no longer include spectator mode startup");
+assert(!script.includes('gamePhase === "spectator"'), "script.js should no longer route through spectator mode");
+
+assertIncludesAll(
+  script,
+  [
+    "id: \"mStadium\"",
+    "name: \"Mスタジアムです。\"",
+    "surface: \"obsidian\"",
+    "centerFenceMeters: 118",
+    "lineFenceMeters: 118",
+    "hasMStadium: true",
+    "function getObsidianFieldFill",
+    "function drawMStadiumBeyondOutfield",
+    "drawMStadiumBeyondOutfield();",
+    "function createMStadiumHomeRunRocket",
+    "function drawMStadiumHomeRunRocket",
+    "function drawMStadiumPhotoRocket",
+    "function drawMStadiumHomeRunEnding",
+    "Mスタジアムです。ここからまた、新しい勝負が始まります。",
+    "drawMStadiumHomeRunRocket(fireworks, elapsedSeconds);"
+  ],
+  "script.js M stadium"
+);
+
+assertIncludesAll(
+  script,
+  [
+    "id: \"xStadium\"",
+    "name: \"Xスタジアム\"",
+    "hasXStadium: true",
+    "gamePhase = \"xStadiumPrompt\"",
+    "XスタジアムにGOしますか？",
+    "applyStadiumPreset(\"xStadium\")",
+    "duration: stadium.hasXStadium ? 64",
+    "64秒間、白いロケットが打球の余韻を運びます。",
+    "試合状況はそのまま、球場だけが切り替わります。"
+  ],
+  "script.js X stadium hidden transition"
 );
 
 assertIncludesAll(
@@ -137,16 +186,11 @@ assertIncludesAll(
     "seaBreezeParkMeters: { width: 1024, depth: 256 }",
     "function applySeaBreezeToBattedBallDirection",
     "function drawShiokazeParkBeyondOutfield",
-    "function startSpectatorMode",
-    "function drawSpectatorMode",
     "function drawShiokazeAreaFeatures",
     "function drawShiokazeShelters",
-    "function getShiokazeBallparkEntrancePoint",
     "潮風公園",
     "東海岸エリア",
-    "魚釣りエリア",
-    "const stickX = Math.abs(gamepad?.axes?.[0] ?? 0) >= 0.2",
-    "spectatorModeButton?.addEventListener"
+    "魚釣りエリア"
   ],
   "script.js shiokaze stadium"
 );
