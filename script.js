@@ -68,6 +68,9 @@ const awayBatterCName = byId("awayBatterCName");
 const awayBatterRName = byId("awayBatterRName");
 const awayBatterCAName = byId("awayBatterCAName");
 const awayBatterDHName = byId("awayBatterDHName");
+const awayBench1Name = byId("awayBench1Name");
+const awayBench2Name = byId("awayBench2Name");
+const awayBench3Name = byId("awayBench3Name");
 const homeBatterSSName = byId("homeBatterSSName");
 const homeBatter2BName = byId("homeBatter2BName");
 const homeBatterLName = byId("homeBatterLName");
@@ -75,6 +78,9 @@ const homeBatterCName = byId("homeBatterCName");
 const homeBatterRName = byId("homeBatterRName");
 const homeBatterCAName = byId("homeBatterCAName");
 const homeBatterDHName = byId("homeBatterDHName");
+const homeBench1Name = byId("homeBench1Name");
+const homeBench2Name = byId("homeBench2Name");
+const homeBench3Name = byId("homeBench3Name");
 const awayPitcherName = byId("awayPitcherName");
 const awayPitcher2Name = byId("awayPitcher2Name");
 const awayPitcher3Name = byId("awayPitcher3Name");
@@ -92,6 +98,9 @@ const awayBatterCStats = byId("awayBatterCStats");
 const awayBatterRStats = byId("awayBatterRStats");
 const awayBatterCAStats = byId("awayBatterCAStats");
 const awayBatterDHStats = byId("awayBatterDHStats");
+const awayBench1Stats = byId("awayBench1Stats");
+const awayBench2Stats = byId("awayBench2Stats");
+const awayBench3Stats = byId("awayBench3Stats");
 const homeBatterSSStats = byId("homeBatterSSStats");
 const homeBatter2BStats = byId("homeBatter2BStats");
 const homeBatterLStats = byId("homeBatterLStats");
@@ -99,6 +108,9 @@ const homeBatterCStats = byId("homeBatterCStats");
 const homeBatterRStats = byId("homeBatterRStats");
 const homeBatterCAStats = byId("homeBatterCAStats");
 const homeBatterDHStats = byId("homeBatterDHStats");
+const homeBench1Stats = byId("homeBench1Stats");
+const homeBench2Stats = byId("homeBench2Stats");
+const homeBench3Stats = byId("homeBench3Stats");
 const awayPitcherStats = byId("awayPitcherStats");
 const awayPitcher2Stats = byId("awayPitcher2Stats");
 const awayPitcher3Stats = byId("awayPitcher3Stats");
@@ -158,39 +170,41 @@ const batters = [
   { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 5, arm: 7, cost: 5 },
   { id: "trout", name: "トラウト", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 3, outfieldDefense: 6, arm: 5, cost: 6 },
   { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 8, run: 5, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 9 },
-  { id: "ruth", name: "ルース", bats: "R", power: 30, meet: 20, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 28 },
+  { id: "ruth", name: "ルース", bats: "R", power: 42, meet: 20, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
   { id: "kimhyesong", name: "キムヘソン", bats: "L", power: 4, meet: 4, run: 5, infieldDefense: 5, outfieldDefense: 5, arm: 5, cost: 3 },
   { id: "betts", name: "ベッツ", bats: "R", power: 5, meet: 6, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 5 },
   { id: "okamoto", name: "オカモト", bats: "R", power: 5, meet: 5, run: 6, infieldDefense: 6, outfieldDefense: 5, arm: 7, cost: 5 },
   { id: "murakami", name: "ムラカミ", bats: "L", power: 7, meet: 4, run: 3, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 5 },
-  { id: "nagashima", name: "ナガシマ", bats: "R", power: 26, meet: 18, run: 8, infieldDefense: 12, outfieldDefense: 2, arm: 15, cost: 25 },
+  { id: "nagashima", name: "ナガシマ", bats: "R", power: 33, meet: 18, run: 8, infieldDefense: 15, outfieldDefense: 2, arm: 14, cost: 25 },
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 8, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
   { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 8, cost: 8 },
   { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
   { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
   { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
-  { id: "bonds", name: "ボンズ", bats: "L", power: 27, meet: 19, run: 8, infieldDefense: 3, outfieldDefense: 15, arm: 10, cost: 28 },
+  { id: "bonds", name: "ボンズ", bats: "L", power: 41, meet: 19, run: 8, infieldDefense: 3, outfieldDefense: 18, arm: 10, cost: 28 },
   { id: "outman", name: "アウトマン", bats: "L", power: 6, meet: 2, run: 5, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 4 },
   { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 2 },
   { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
-  { id: "sadaharu", name: "サダハル", bats: "L", power: 31, meet: 16, run: 5, infieldDefense: 8, outfieldDefense: 2, arm: 12, cost: 25 },
+  { id: "sadaharu", name: "サダハル", bats: "L", power: 43, meet: 16, run: 5, infieldDefense: 14, outfieldDefense: 2, arm: 10, cost: 25 },
   { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
   { id: "tucker", name: "タッカー", bats: "L", power: 6, meet: 5, run: 7, infieldDefense: 2, outfieldDefense: 6, arm: 7, cost: 5 },
   { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 5 },
   { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 },
   { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
-  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 }
+  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
+  { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 26, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
+  { id: "henderson", name: "ヘンダーソン", bats: "R", power: 25, meet: 20, run: 16, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 }
 ];
 
 const catchers = [
   { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 7, cost: 6 },
   { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 5, cost: 5 },
-  { id: "nomura", name: "ノムラ", bats: "R", power: 22, meet: 16, run: 5, arm: 14, cost: 25 },
+  { id: "nomura", name: "ノムラ", bats: "R", power: 34, meet: 16, run: 5, arm: 21, cost: 27 },
   { id: "kaicannon", name: "カイキャノン", bats: "R", power: 2, meet: 3, run: 4, arm: 9, cost: 4 },
   { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 7, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 6, cost: 3 },
-  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 24, meet: 17, run: 5, arm: 16, cost: 27 },
+  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 36, meet: 17, run: 5, arm: 24, cost: 29 },
   { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 4, cost: 4 }
 ];
 
@@ -203,7 +217,7 @@ const pitchers = [
   { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 5 },
   { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
   { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 6 },
-  { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 15, leftBreak: 14, slowChange: 12, fastChange: 15, control: 13, stuff: 20, fielding: 12, stamina: 16, cost: 28 },
+  { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 27, leftBreak: 26, slowChange: 24, fastChange: 27, control: 25, stuff: 32, fielding: 24, stamina: 21, cost: 30 },
   { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 14, fielding: 6, stamina: 3, cost: 4 },
   { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
   { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 7, leftBreak: 4, slowChange: 5, fastChange: 9, control: 5, stuff: 9, fielding: 4, stamina: 7, cost: 8 },
@@ -216,8 +230,8 @@ const pitchers = [
   { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 5, control: 6, stuff: 7, fielding: 5, stamina: 7, cost: 8 },
   { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
-  { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 16, leftBreak: 15, slowChange: 15, fastChange: 16, control: 15, stuff: 21, fielding: 12, stamina: 16, cost: 30 },
-  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 20, leftBreak: 18, slowChange: 17, fastChange: 16, control: 17, stuff: 20, fielding: 11, stamina: 15, cost: 30 },
+  { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 28, leftBreak: 27, slowChange: 27, fastChange: 28, control: 27, stuff: 33, fielding: 24, stamina: 21, cost: 32 },
+  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 32, leftBreak: 30, slowChange: 29, fastChange: 28, control: 29, stuff: 32, fielding: 23, stamina: 20, cost: 32 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
   { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 8, fastChange: 9, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
@@ -226,7 +240,9 @@ const pitchers = [
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 2, cost: 1 },
   { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 },
   { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 2, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
-  { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 }
+  { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
+  { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 28, leftBreak: 23, slowChange: 32, fastChange: 24, control: 30, stuff: 31, fielding: 23, stamina: 21, cost: 30 },
+  { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 27, control: 27, stuff: 33, fielding: 23, stamina: 20, cost: 29 }
 ];
 
 const pitchTypes = {
@@ -375,6 +391,8 @@ const catcherRole = "CA";
 const dhRole = "DH";
 const defensiveBatterRoles = [...infielderRoles, ...outfielderRoles, catcherRole];
 const batterRoles = [...defensiveBatterRoles, dhRole];
+const benchRoles = ["bench1", "bench2", "bench3"];
+const benchCostLimit = 10;
 const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
@@ -385,15 +403,15 @@ const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
   tigers: {
     label: "タイガース",
-    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "hanifee", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", lineupOrder: [...awayRegularLineupOrder] }
+    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "hanifee", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", bench1: "", bench2: "", bench3: "", lineupOrder: [...awayRegularLineupOrder] }
   },
   dodgers: {
     label: "ドジャース",
-    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "rojas", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", lineupOrder: [...homeRegularLineupOrder] }
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "rojas", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", bench1: "", bench2: "", bench3: "", lineupOrder: [...homeRegularLineupOrder] }
   },
   dendos: {
     label: "デンドーズ",
-    selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "maddux", pitcher4: "hikari", pitcher5: "magari", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", lineupOrder: [...batterRoles] }
+    selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "clemens", pitcher4: "johnson", pitcher5: "maddux", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", bench1: "rose", bench2: "henderson", bench3: "", lineupOrder: [...batterRoles] }
   }
 };
 const defaultTeamPresetBySide = { away: "dodgers", home: "dodgers" };
@@ -1078,7 +1096,26 @@ const gamepadButtons = {
   Y: 0,
   LB: 4,
   RB: 5,
-  INTENTIONAL_WALK: 9
+  INTENTIONAL_WALK: 9,
+  PAUSE: 12
+};
+
+let pauseMenuState = {
+  active: false,
+  team: "away",
+  mode: "main",
+  selectedIndex: 0,
+  selectedRole: null,
+  selectedBase: null,
+  message: ""
+};
+
+let switchBatterChoice = {
+  active: false,
+  team: "away",
+  batterId: "",
+  selectedSide: "L",
+  axisHeld: false
 };
 
 function createStealState() {
@@ -1764,6 +1801,10 @@ function createSelectedTeams(selection) {
 function createSelectedTeam(selection) {
   const selectedPitchers = pitcherRoles.map((role) => createMatchPitcher(findById(pitchers, selection[role])));
   const lineupOrder = getSelectionLineupOrder(selection);
+  const selectedBench = benchRoles.map((role) => ({
+    role,
+    player: selection?.[role] ? findSelectedById(getPlayerListForRole(role), selection[role]) : null
+  }));
   return {
     pitchers: selectedPitchers,
     activePitcherId: selectedPitchers[0].id,
@@ -1771,7 +1812,9 @@ function createSelectedTeam(selection) {
     batters: lineupOrder.map((role) => ({
       role,
       player: findById(getPlayerListForRole(role), selection[role])
-    }))
+    })),
+    bench: selectedBench,
+    usedBenchIds: []
   };
 }
 
@@ -2274,6 +2317,65 @@ function changePitcher(team, pitcherId) {
   return true;
 }
 
+function getAvailableBenchEntries(team) {
+  const teamState = selected?.[team];
+  if (!teamState?.bench?.length) return [];
+  const used = new Set(teamState.usedBenchIds || []);
+  return teamState.bench.filter((entry) => entry?.player && !used.has(entry.player.id));
+}
+
+function markBenchUsed(team, playerId) {
+  const teamState = selected?.[team];
+  if (!teamState || !playerId) return;
+  if (!Array.isArray(teamState.usedBenchIds)) teamState.usedBenchIds = [];
+  if (!teamState.usedBenchIds.includes(playerId)) teamState.usedBenchIds.push(playerId);
+}
+
+function findLineupEntryByPlayerId(team, playerId) {
+  return selected?.[team]?.batters?.find((entry) => entry?.player?.id === playerId) || null;
+}
+
+function substituteLineupPlayer(team, lineupEntry, benchPlayer, reason = "sub") {
+  if (!lineupEntry || !benchPlayer) return false;
+  lineupEntry.player = { ...benchPlayer };
+  markBenchUsed(team, benchPlayer.id);
+  if (team === battingTeam || team === fieldingTeam()) setMatchup();
+  updateSidebarAbilityPanels();
+  return true;
+}
+
+function substituteCurrentBatter(team, benchPlayer) {
+  if (team !== battingTeam || !benchPlayer) return false;
+  const lineup = selected?.[team]?.batters;
+  if (!lineup?.length) return false;
+  const index = battingOrderIndex[team] % lineup.length;
+  const ok = substituteLineupPlayer(team, lineup[index], benchPlayer, "pinchHit");
+  if (ok) message = `${teamLabel(team)} PH: ${benchPlayer.name}`;
+  return ok;
+}
+
+function substituteRunner(team, baseName, benchPlayer) {
+  if (team !== battingTeam || !baseNames.includes(baseName) || !benchPlayer || !bases?.[baseName]) return false;
+  const oldRunner = bases[baseName];
+  const lineupEntry = findLineupEntryByPlayerId(team, oldRunner.id);
+  if (!lineupEntry) return false;
+  const nextRunner = makeBaseRunner(benchPlayer);
+  nextRunner.responsiblePitcherId = oldRunner.responsiblePitcherId;
+  nextRunner.responsibleTeam = oldRunner.responsibleTeam;
+  bases[baseName] = nextRunner;
+  const ok = substituteLineupPlayer(team, lineupEntry, benchPlayer, "pinchRun");
+  if (ok) message = `${teamLabel(team)} PR: ${benchPlayer.name}`;
+  return ok;
+}
+
+function substituteDefender(team, role, benchPlayer) {
+  if (team !== fieldingTeam() || !defensiveBatterRoles.includes(role) || !benchPlayer) return false;
+  const lineupEntry = selected?.[team]?.batters?.find((entry) => entry.role === role);
+  const ok = substituteLineupPlayer(team, lineupEntry, benchPlayer, "defense");
+  if (ok) message = `${teamLabel(team)} DEF: ${getMenuRoleLabel(role)} ${benchPlayer.name}`;
+  return ok;
+}
+
 function startReliefCarEntrance(team, pitcherInfo = activePitcher) {
   if (!getCurrentStadium().hasReliefCar) return;
   reliefCarEffect = {
@@ -2306,6 +2408,7 @@ function getAllHitters() {
 }
 
 function getPlayerListForRole(role) {
+  if (benchRoles.includes(role)) return getAllHitters();
   if (isDhRole(role)) return getAllHitters();
   return isCatcherRole(role) ? catchers : [...batters, ...Object.values(originalMenuBatters)];
 }
@@ -2319,6 +2422,7 @@ function getPlayerListForKind(kind) {
 
 function getChooserKindForRole(role) {
   if (pitcherRoles.includes(role)) return "pitcher";
+  if (benchRoles.includes(role)) return "hitter";
   if (isDhRole(role)) return "hitter";
   return isCatcherRole(role) ? "catcher" : "batter";
 }
@@ -2335,6 +2439,10 @@ function getMenuPitcherTeamCost(team, selection = menuSelection[team]) {
   return pitcherRoles.reduce((total, role) => total + getMenuPlayerCost(pitchers, selection[role]), 0);
 }
 
+function getMenuBenchTeamCost(team, selection = menuSelection[team]) {
+  return benchRoles.reduce((total, role) => total + getMenuPlayerCost(getPlayerListForRole(role), selection?.[role]), 0);
+}
+
 function getMenuTeamCost(team, selection = menuSelection[team]) {
   return getMenuFielderTeamCost(team, selection) + getMenuPitcherTeamCost(team, selection) - getMenuSamePlayerCostExemption(selection);
 }
@@ -2346,6 +2454,15 @@ function getMenuTeamCostWithCandidate(team, role, kind, playerId) {
     [role]: playerId
   };
   return getMenuTeamCost(team, selection);
+}
+
+function getMenuBenchCostWithCandidate(team, role, playerId) {
+  const selection = {
+    ...menuSelection[team],
+    [lineupOrderKey]: getMenuLineupOrder(team),
+    [role]: playerId
+  };
+  return getMenuBenchTeamCost(team, selection);
 }
 
 function isMenuTeamComplete(team) {
@@ -2362,7 +2479,7 @@ function hasMenuPitcherCatcherConflict(team, selection = menuSelection[team]) {
 function hasMenuSamePlayerConflict(team, selection = menuSelection[team]) {
   if (!selection) return false;
   return hasDuplicateSelectionInRoles(selection, pitcherRoles)
-    || hasDuplicateSelectionInRoles(selection, batterRoles);
+    || hasDuplicateSelectionInRoles(selection, [...batterRoles, ...benchRoles]);
 }
 
 function hasDuplicateSelectionInRoles(selection, roles) {
@@ -2391,16 +2508,22 @@ function getMenuSamePlayerCostExemption(selection = null) {
 function updateMenuPointStatus() {
   const awayCost = getMenuTeamCost("away");
   const homeCost = getMenuTeamCost("home");
+  const awayBenchCost = getMenuBenchTeamCost("away");
+  const homeBenchCost = getMenuBenchTeamCost("home");
   const skipAwayLimit = !doesMenuPointLimitApply("away");
   const skipHomeLimit = !doesMenuPointLimitApply("home");
+  const skipAwayBenchLimit = !doesMenuPointLimitApply("away");
+  const skipHomeBenchLimit = !doesMenuPointLimitApply("home");
   const awayOver = doesMenuPointLimitApply("away") && awayCost > teamPointLimit;
   const homeOver = doesMenuPointLimitApply("home") && homeCost > teamPointLimit;
+  const awayBenchOver = !skipAwayBenchLimit && awayBenchCost > benchCostLimit;
+  const homeBenchOver = !skipHomeBenchLimit && homeBenchCost > benchCostLimit;
   const isIncomplete = !isMenuTeamComplete("away") || !isMenuTeamComplete("home");
-  const isOver = awayOver || homeOver;
+  const isOver = awayOver || homeOver || awayBenchOver || homeBenchOver;
   renderPointStatus(awayPitcherPointStatus, skipAwayLimit ? "合計P 制限なし" : "合計P", awayCost, skipAwayLimit ? null : teamPointLimit, awayOver);
-  hidePointStatus(awayFielderPointStatus);
+  renderPointStatus(awayFielderPointStatus, skipAwayBenchLimit ? "Bench 制限なし" : "Bench", awayBenchCost, skipAwayBenchLimit ? null : benchCostLimit, awayBenchOver);
   renderPointStatus(homePitcherPointStatus, skipHomeLimit ? "合計P 制限なし" : "合計P", homeCost, skipHomeLimit ? null : teamPointLimit, homeOver);
-  hidePointStatus(homeFielderPointStatus);
+  renderPointStatus(homeFielderPointStatus, skipHomeBenchLimit ? "Bench 制限なし" : "Bench", homeBenchCost, skipHomeBenchLimit ? null : benchCostLimit, homeBenchOver);
   startButton.disabled = isOver || isIncomplete;
 }
 
@@ -2418,6 +2541,9 @@ function hidePointStatus(element) {
 }
 
 function getMenuRoleLabel(role) {
+  if (role === "bench1") return "\u63a7\u3048\u91ce\u624b1";
+  if (role === "bench2") return "\u63a7\u3048\u91ce\u624b2";
+  if (role === "bench3") return "\u63a7\u3048\u91ce\u624b3";
   if (role === "pitcher") return "先発投手";
   if (role === "pitcher2") return "控え投手1";
   if (role === "pitcher3") return "控え投手2";
@@ -2434,6 +2560,9 @@ function getMenuRoleLabel(role) {
 
 function getLineupCardId(team, role) {
   const side = team === "away" ? "away" : "home";
+  if (role === "bench1") return `${side}Bench1Card`;
+  if (role === "bench2") return `${side}Bench2Card`;
+  if (role === "bench3") return `${side}Bench3Card`;
   if (role === "pitcher") return `${side}PitcherCard`;
   if (role === "pitcher2") return `${side}Pitcher2Card`;
   if (role === "pitcher3") return `${side}Pitcher3Card`;
@@ -2490,11 +2619,13 @@ function updateLineupCardShell(team, role) {
   const card = getLineupCard(team, role);
   if (!card) return;
   const isBatter = batterRoles.includes(role);
+  const isBench = benchRoles.includes(role);
   const isPitcher = pitcherRoles.includes(role);
   batterRoles.forEach((batterRole) => card.classList.remove(`field-role-${batterRole}`));
+  benchRoles.forEach((benchRole) => card.classList.remove(`bench-role-${benchRole}`));
   pitcherRoles.forEach((pitcherRole) => card.classList.remove(`pitcher-role-${pitcherRole}`));
   card.classList.toggle("lineup-slot", isBatter);
-  card.classList.toggle("field-symbol", isBatter);
+  card.classList.toggle("field-symbol", isBatter || isBench);
   card.classList.toggle("pitcher-list-item", isPitcher);
   card.classList.toggle("lineup-order-pending", activeLineupOrderPicker?.team === team && activeLineupOrderPicker?.role === role);
   card.classList.toggle("lineup-slot-dragging", false);
@@ -2507,6 +2638,7 @@ function updateLineupCardShell(team, role) {
     card.style.order = "";
     card.setAttribute("aria-label", `${teamLabel(team)} ${slotNumber}番 ${getMenuRoleLabel(role)}`);
   } else {
+    if (isBench) card.classList.add(`bench-role-${role}`);
     if (isPitcher) card.classList.add(`pitcher-role-${role}`);
     card.draggable = false;
     card.style ||= {};
@@ -2747,6 +2879,16 @@ function renderChooserOption(player, team, role, kind) {
   `;
 }
 
+function renderEmptyBenchChooserOption(team, role, kind) {
+  const selectedClass = menuSelection[team]?.[role] ? "" : " selected";
+  return `
+    <button class="chooser-option${selectedClass}" type="button" data-team="${escapeHtml(team)}" data-role="${escapeHtml(role)}" data-player-id="" data-kind="${escapeHtml(kind)}">
+      <strong class="chooser-player-title"><span>\u7a7a\u6b04</span><em>0P</em></strong>
+      <div class="chooser-card-stats compact-stats">\u3053\u306e\u63a7\u3048\u67a0\u306f\u4f7f\u7528\u3057\u306a\u3044</div>
+    </button>
+  `;
+}
+
 function getChooserElements(team) {
   return team === "home"
     ? {
@@ -2786,6 +2928,7 @@ function renderPlayerChooserOptions(team = chooserSortState.team) {
   if (!elements.options || !team || !role || !kind) return;
   const list = getChooserPlayerList(kind);
   elements.options.innerHTML = [
+    benchRoles.includes(role) ? renderEmptyBenchChooserOption(team, role, kind) : "",
     renderOriginalBatterCreator(team, role, kind),
     ...list.map((player) => renderChooserOption(player, team, role, kind))
   ].join("");
@@ -2838,10 +2981,12 @@ function sortPlayerChooserBy(key, options = {}) {
 
 function isMenuPlayerUnavailable(team, role, kind, playerId) {
   const selection = menuSelection[team];
+  if (!playerId && benchRoles.includes(role)) return false;
   if (playerId === selection[role]) return false;
   if (kind !== "pitcher" && kind !== "batter" && kind !== "catcher" && kind !== "hitter") return false;
-  const duplicateRoles = kind === "pitcher" ? pitcherRoles : batterRoles;
+  const duplicateRoles = kind === "pitcher" ? pitcherRoles : [...batterRoles, ...benchRoles];
   if (duplicateRoles.some((otherRole) => otherRole !== role && selection[otherRole] === playerId)) return true;
+  if (benchRoles.includes(role)) return doesMenuPointLimitApply(team) && getMenuBenchCostWithCandidate(team, role, playerId) > benchCostLimit;
   return doesMenuPointLimitApply(team) && getMenuTeamCostWithCandidate(team, role, kind, playerId) > teamPointLimit;
 }
 
@@ -2887,7 +3032,10 @@ const menuPanelElements = {
     C: { name: awayBatterCName, stats: awayBatterCStats },
     R: { name: awayBatterRName, stats: awayBatterRStats },
     CA: { name: awayBatterCAName, stats: awayBatterCAStats },
-    DH: { name: awayBatterDHName, stats: awayBatterDHStats }
+    DH: { name: awayBatterDHName, stats: awayBatterDHStats },
+    bench1: { name: awayBench1Name, stats: awayBench1Stats },
+    bench2: { name: awayBench2Name, stats: awayBench2Stats },
+    bench3: { name: awayBench3Name, stats: awayBench3Stats }
   },
   home: {
     pitcher: { name: homePitcherName, stats: homePitcherStats },
@@ -2901,7 +3049,10 @@ const menuPanelElements = {
     C: { name: homeBatterCName, stats: homeBatterCStats },
     R: { name: homeBatterRName, stats: homeBatterRStats },
     CA: { name: homeBatterCAName, stats: homeBatterCAStats },
-    DH: { name: homeBatterDHName, stats: homeBatterDHStats }
+    DH: { name: homeBatterDHName, stats: homeBatterDHStats },
+    bench1: { name: homeBench1Name, stats: homeBench1Stats },
+    bench2: { name: homeBench2Name, stats: homeBench2Stats },
+    bench3: { name: homeBench3Name, stats: homeBench3Stats }
   }
 };
 
@@ -2913,6 +3064,14 @@ function renderMenuPlayerPanel(team, role) {
     const card = getLineupCard(team, role);
     const picker = card?.querySelector?.(".position-picker");
     if (picker) picker.textContent = getPitcherRoleShortLabel(role);
+    return;
+  }
+  if (benchRoles.includes(role)) {
+    updateLineupCardShell(team, role);
+    renderMenuBenchSlot(findSelectedById(getPlayerListForRole(role), menuSelection[team][role]), panel.name, panel.stats);
+    const card = getLineupCard(team, role);
+    const picker = card?.querySelector?.(".position-picker");
+    if (picker) picker.textContent = getMenuRoleLabel(role);
     return;
   }
   updateLineupCardShell(team, role);
@@ -2938,6 +3097,16 @@ function renderMenuPitcherSlot(player, nameElement, statsElement) {
   `;
 }
 
+function renderMenuBenchSlot(player, nameElement, statsElement) {
+  nameElement.textContent = player?.name ?? "Not selected";
+  statsElement.innerHTML = `
+    <div class="menu-simple-cost">
+      <span>Bench</span>
+      <strong>${player?.cost ?? 0}pt</strong>
+    </div>
+  `;
+}
+
 function renderMenuFielderSymbol(team, role, player, nameElement, statsElement) {
   nameElement.textContent = player?.name ?? "未選択";
   statsElement.innerHTML = `
@@ -2951,7 +3120,7 @@ function renderMenuFielderSymbol(team, role, player, nameElement, statsElement) 
 
 function resetMenuTeam(team) {
   if (!menuSelection[team]) return;
-  [...pitcherRoles, ...batterRoles].forEach((role) => {
+  [...pitcherRoles, ...batterRoles, ...benchRoles].forEach((role) => {
     menuSelection[team][role] = "";
   });
   menuSelection[team][lineupOrderKey] = [...batterRoles];
@@ -2985,6 +3154,7 @@ function updateMenuAbilityPanels() {
   teamIds.forEach((team) => {
     pitcherRoles.forEach((role) => renderMenuPlayerPanel(team, role));
     batterRoles.forEach((role) => renderMenuPlayerPanel(team, role));
+    benchRoles.forEach((role) => renderMenuPlayerPanel(team, role));
   });
   updateMenuPointStatus();
   updateSidebarAbilityPanels();
@@ -3185,7 +3355,7 @@ function startGame(modeOverride = null) {
     updateMenuPointStatus();
     return;
   }
-  if (!isAnyPracticeMode() && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit))) {
+  if (!isAnyPracticeMode() && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit) || (doesMenuPointLimitApply("away") && getMenuBenchTeamCost("away") > benchCostLimit) || (doesMenuPointLimitApply("home") && getMenuBenchTeamCost("home") > benchCostLimit))) {
     message = `獲得ポイントは各チーム合計${teamPointLimit}以内`;
     updateMenuPointStatus();
     return;
@@ -3262,6 +3432,7 @@ function setMatchup() {
     ensurePitcherGameRecord(fieldingTeam(), activePitcher);
   }
   activeBatterSide = resolveBatterSide(activeBatter, activePitcher);
+  setupSwitchBatterChoice();
   const box = getBatterMoveBox();
   batter.x = getInitialBatterX(box);
   batter.y = 738;
@@ -3640,7 +3811,7 @@ function isInputLocked(now = performance.now()) {
 }
 
 function shouldAutoScheduleComputerPitch() {
-  return gamePhase === "playing" && isComputerControlledGameMode() && !isPlayerPitching();
+  return gamePhase === "playing" && !isSwitchBatterChoicePending() && isComputerControlledGameMode() && !isPlayerPitching();
 }
 
 function scheduleNextComputerPitchAfterJudgment(delay = computerJudgmentNextPitchDelay) {
@@ -3651,6 +3822,11 @@ function scheduleNextComputerPitchAfterJudgment(delay = computerJudgmentNextPitc
 }
 
 function scheduleNextPitch(delay = 900) {
+  if (isSwitchBatterChoicePending()) {
+    computerPitchPlan = null;
+    autoPitchTimer = Number.POSITIVE_INFINITY;
+    return;
+  }
   if (isComputerControlledGameMode() && !isPlayerPitching()) {
     maybeAutoChangeCpuPitcher(fieldingTeam());
     computerPitchPlan = chooseComputerPitchPlan();
@@ -3769,6 +3945,7 @@ function declareIntentionalWalk() {
 }
 
 function startPitch(typeKey, options = {}) {
+  if (isSwitchBatterChoicePending()) return;
   if (gamePhase !== "playing" || isInputLocked() || isPitching || pendingPitch || ball.active || (stealState.active && !stealState.resolved)) return;
   const pitch = pitchTypes[typeKey];
   if (!pitch) {
@@ -5165,6 +5342,191 @@ function hasPitchStartGamepadButtonPressed(gamepad) {
     || isGamepadButtonDown(gamepad, gamepadButtons.X);
 }
 
+function setupSwitchBatterChoice() {
+  if (activeBatter?.bats !== "S" || !isPlayerBatting()) {
+    switchBatterChoice.active = false;
+    return;
+  }
+  const selectedSide = activePitcher?.throws === "R" ? "L" : "R";
+  activeBatterSide = selectedSide;
+  switchBatterChoice = {
+    active: true,
+    team: battingTeam,
+    batterId: activeBatter.id,
+    selectedSide,
+    axisHeld: false
+  };
+}
+
+function isSwitchBatterChoicePending() {
+  return Boolean(switchBatterChoice.active && activeBatter?.id === switchBatterChoice.batterId && battingTeam === switchBatterChoice.team);
+}
+
+function setSwitchBatterChoiceSide(side) {
+  if (!isSwitchBatterChoicePending()) return;
+  if (side !== "R" && side !== "L") return;
+  switchBatterChoice.selectedSide = side;
+  activeBatterSide = side;
+  const box = getBatterMoveBox();
+  batter.x = getInitialBatterX(box);
+  batter.y = 738;
+  updateSidebarAbilityPanels();
+}
+
+function confirmSwitchBatterChoice() {
+  if (!isSwitchBatterChoicePending()) return false;
+  activeBatterSide = switchBatterChoice.selectedSide;
+  switchBatterChoice.active = false;
+  message = `${activeBatter.name} ${handLabel(activeBatterSide)}打席`;
+  if (shouldAutoScheduleComputerPitch() && !isPitching && !pendingPitch && !ball.active) scheduleNextPitch(500);
+  return true;
+}
+
+function canOpenPauseMenu() {
+  if (isAnyPracticeMode()) return false;
+  if (gamePhase !== "playing") return false;
+  if (isPitching || pendingPitch || ball.active || stealState.active) return false;
+  return true;
+}
+
+function openPauseMenu(team) {
+  if (!canOpenPauseMenu()) return false;
+  pauseMenuState = { active: true, team, mode: "main", selectedIndex: 0, selectedRole: null, selectedBase: null, message: "" };
+  return true;
+}
+
+function closePauseMenu() {
+  pauseMenuState.active = false;
+  pauseMenuState.mode = "main";
+  pauseMenuState.selectedIndex = 0;
+  pauseMenuState.selectedRole = null;
+  pauseMenuState.selectedBase = null;
+}
+
+function getPauseMainOptions(team) {
+  if (team === fieldingTeam()) {
+    return [
+      { label: "\u6295\u624b\u4ea4\u4ee3", action: "pitcher" },
+      { label: "\u5b88\u5099\u9078\u624b\u4ea4\u4ee3", action: "defenseRole" },
+      { label: "\u9589\u3058\u308b", action: "close" }
+    ];
+  }
+  if (team === battingTeam) {
+    return [
+      { label: "\u4ee3\u6253", action: "pinchHit" },
+      { label: "\u4ee3\u8d70", action: "runnerBase" },
+      { label: "\u9589\u3058\u308b", action: "close" }
+    ];
+  }
+  return [{ label: "\u9589\u3058\u308b", action: "close" }];
+}
+
+function getPauseOptions() {
+  const team = pauseMenuState.team;
+  if (pauseMenuState.mode === "main") return getPauseMainOptions(team);
+  if (pauseMenuState.mode === "pitcher") {
+    return selected?.[team]?.pitchers
+      ?.filter((pitcherInfo) => canUsePitcher(team, pitcherInfo.id))
+      .map((pitcherInfo) => ({ label: `${pitcherInfo.name} ${getPitcherGameStaminaText(pitcherInfo)}`, action: "usePitcher", pitcherId: pitcherInfo.id })) || [];
+  }
+  if (pauseMenuState.mode === "defenseRole") {
+    return defensiveBatterRoles.map((role) => {
+      const entry = selected?.[team]?.batters?.find((item) => item.role === role);
+      return { label: `${getMenuRoleLabel(role)} ${entry?.player?.name || ""}`, action: "selectDefenseRole", role };
+    });
+  }
+  if (pauseMenuState.mode === "defenseBench" || pauseMenuState.mode === "pinchHitBench" || pauseMenuState.mode === "runnerBench") {
+    return getAvailableBenchEntries(team).map((entry) => ({
+      label: `${entry.player.name} ${entry.player.cost ?? 0}P`,
+      action: "useBench",
+      benchId: entry.player.id
+    }));
+  }
+  if (pauseMenuState.mode === "runnerBase") {
+    return baseNames
+      .filter((baseName) => bases?.[baseName])
+      .map((baseName) => ({ label: `${baseName} ${bases[baseName].name}`, action: "selectRunnerBase", baseName }));
+  }
+  return [];
+}
+
+function handlePauseSelection(option) {
+  if (!option) return;
+  const team = pauseMenuState.team;
+  if (option.action === "close") {
+    closePauseMenu();
+    return;
+  }
+  if (option.action === "pitcher" || option.action === "defenseRole" || option.action === "pinchHit") {
+    pauseMenuState.mode = option.action === "pinchHit" ? "pinchHitBench" : option.action;
+    pauseMenuState.selectedIndex = 0;
+    return;
+  }
+  if (option.action === "runnerBase") {
+    pauseMenuState.mode = "runnerBase";
+    pauseMenuState.selectedIndex = 0;
+    return;
+  }
+  if (option.action === "usePitcher") {
+    changePitcher(team, option.pitcherId);
+    closePauseMenu();
+    return;
+  }
+  if (option.action === "selectDefenseRole") {
+    pauseMenuState.selectedRole = option.role;
+    pauseMenuState.mode = "defenseBench";
+    pauseMenuState.selectedIndex = 0;
+    return;
+  }
+  if (option.action === "selectRunnerBase") {
+    pauseMenuState.selectedBase = option.baseName;
+    pauseMenuState.mode = "runnerBench";
+    pauseMenuState.selectedIndex = 0;
+    return;
+  }
+  if (option.action === "useBench") {
+    const benchPlayer = getAvailableBenchEntries(team).find((entry) => entry.player.id === option.benchId)?.player;
+    if (pauseMenuState.mode === "pinchHitBench") substituteCurrentBatter(team, benchPlayer);
+    if (pauseMenuState.mode === "runnerBench") substituteRunner(team, pauseMenuState.selectedBase, benchPlayer);
+    if (pauseMenuState.mode === "defenseBench") substituteDefender(team, pauseMenuState.selectedRole, benchPlayer);
+    closePauseMenu();
+  }
+}
+
+function handlePauseMenuGamepad(gamepad, justPressed) {
+  const options = getPauseOptions();
+  const axisY = gamepad.axes?.[1] ?? 0;
+  if (justPressed(gamepadButtons.B) || justPressed(gamepadButtons.PAUSE)) {
+    if (pauseMenuState.mode === "main") closePauseMenu();
+    else {
+      pauseMenuState.mode = "main";
+      pauseMenuState.selectedIndex = 0;
+    }
+    return;
+  }
+  if (Math.abs(axisY) > 0.55 && !pauseMenuState.axisHeld) {
+    pauseMenuState.selectedIndex = clamp(pauseMenuState.selectedIndex + (axisY > 0 ? 1 : -1), 0, Math.max(0, options.length - 1));
+    pauseMenuState.axisHeld = true;
+  } else if (Math.abs(axisY) <= 0.3) {
+    pauseMenuState.axisHeld = false;
+  }
+  if (justPressed(gamepadButtons.A)) handlePauseSelection(options[pauseMenuState.selectedIndex]);
+}
+
+function handleSwitchBatterChoiceGamepad(gamepad, team, justPressed) {
+  if (!isSwitchBatterChoicePending() || team !== battingTeam) return false;
+  const axisX = gamepad.axes?.[0] ?? 0;
+  if (Math.abs(axisX) > 0.55 && !switchBatterChoice.axisHeld) {
+    setSwitchBatterChoiceSide(axisX < 0 ? "L" : "R");
+    switchBatterChoice.axisHeld = true;
+  } else if (Math.abs(axisX) <= 0.3) {
+    switchBatterChoice.axisHeld = false;
+  }
+  if (justPressed(gamepadButtons.A)) confirmSwitchBatterChoice();
+  if (justPressed(gamepadButtons.B)) setSwitchBatterChoiceSide(switchBatterChoice.selectedSide === "R" ? "L" : "R");
+  return true;
+}
+
 function handleGamepadButtonPresses(gamepad, team, options = {}) {
   const pressed = new Set();
   (gamepad.buttons || []).forEach((button, index) => {
@@ -5175,9 +5537,29 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   const newPresses = [...pressed].filter((index) => !previousButtons.has(index));
   if (newPresses.length) recordLastGamepadButton(team, newPresses[newPresses.length - 1]);
 
+  if (handleSwitchBatterChoiceGamepad(gamepad, team, justPressed)) {
+    gamepadState.previousButtons[team] = pressed;
+    return;
+  }
+  if (isSwitchBatterChoicePending()) {
+    gamepadState.previousButtons[team] = pressed;
+    return;
+  }
+
+  if (pauseMenuState.active) {
+    if (pauseMenuState.team === team) handlePauseMenuGamepad(gamepad, justPressed);
+    gamepadState.previousButtons[team] = pressed;
+    return;
+  }
+
   if (gamePhase === "menu") {
     if (justPressed(gamepadButtons.A)) clickMenuGamepadCursor(team);
     if (justPressed(gamepadButtons.B)) closeMenuGamepadOverlay(team);
+    gamepadState.previousButtons[team] = pressed;
+    return;
+  }
+
+  if (justPressed(gamepadButtons.PAUSE) && openPauseMenu(team)) {
     gamepadState.previousButtons[team] = pressed;
     return;
   }
@@ -5437,6 +5819,7 @@ function update(delta) {
   const now = performance.now();
   pollGamepadInput();
   updateCurrentBgm();
+  if (pauseMenuState.active) return;
   if (gamePhase === "defense") {
     updateDefensePlay(now);
     if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
@@ -14846,6 +15229,8 @@ function draw() {
     drawDefenseView();
     drawHud();
     drawXStadiumPrompt();
+    if (pauseMenuState.active) drawPauseMenu();
+    if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
     return;
   }
   if (gamePhase === "defense") {
@@ -14853,6 +15238,8 @@ function draw() {
     drawHud();
     drawBattingFeedback();
     drawHitEffect();
+    if (pauseMenuState.active) drawPauseMenu();
+    if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
     return;
   }
   drawField();
@@ -14871,6 +15258,89 @@ function draw() {
   drawPitcherGameRecordsBoard();
   drawBattingFeedback();
   drawHitEffect();
+  if (pauseMenuState.active) drawPauseMenu();
+  if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
+}
+
+function drawSwitchBatterChoice() {
+  const width = 500;
+  const height = 190;
+  const x = (canvas.width - width) / 2;
+  const y = 132;
+  ctx.save();
+  ctx.fillStyle = "rgba(9, 18, 30, 0.64)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(248, 250, 252, 0.97)";
+  ctx.strokeStyle = "#1f2937";
+  ctx.lineWidth = 3;
+  roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#111827";
+  ctx.font = "700 25px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`${activeBatter?.name || ""} 打席選択`, x + width / 2, y + 44);
+  ctx.font = "14px sans-serif";
+  ctx.fillStyle = "#4b5563";
+  ctx.fillText("左スティック左右で選択  /  ボタン1で決定", x + width / 2, y + 70);
+  drawSwitchChoiceButton(x + 58, y + 100, 170, 54, "左打席", switchBatterChoice.selectedSide === "L");
+  drawSwitchChoiceButton(x + width - 228, y + 100, 170, 54, "右打席", switchBatterChoice.selectedSide === "R");
+  ctx.restore();
+}
+
+function drawSwitchChoiceButton(x, y, width, height, label, selected) {
+  ctx.fillStyle = selected ? "#2563eb" : "#e5e7eb";
+  ctx.strokeStyle = selected ? "#1d4ed8" : "#9ca3af";
+  ctx.lineWidth = 2;
+  roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = selected ? "#ffffff" : "#111827";
+  ctx.font = selected ? "700 22px sans-serif" : "20px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(label, x + width / 2, y + 35);
+}
+
+function drawPauseMenu() {
+  const options = getPauseOptions();
+  const width = 520;
+  const rowHeight = 42;
+  const height = 120 + Math.max(1, options.length) * rowHeight;
+  const x = (canvas.width - width) / 2;
+  const y = (canvas.height - height) / 2;
+  ctx.save();
+  ctx.fillStyle = "rgba(9, 18, 30, 0.78)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(248, 250, 252, 0.96)";
+  ctx.strokeStyle = "#1f2937";
+  ctx.lineWidth = 3;
+  roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#111827";
+  ctx.font = "700 26px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(`${teamLabel(pauseMenuState.team)} Pause`, x + 28, y + 42);
+  ctx.font = "14px sans-serif";
+  ctx.fillStyle = "#4b5563";
+  ctx.fillText("Left stick: select   Button1: OK   Button2/12: back", x + 28, y + 66);
+  if (!options.length) {
+    ctx.fillStyle = "#991b1b";
+    ctx.font = "18px sans-serif";
+    ctx.fillText("No available players", x + 28, y + 108);
+    ctx.restore();
+    return;
+  }
+  options.forEach((option, index) => {
+    const rowY = y + 92 + index * rowHeight;
+    const selectedRow = index === pauseMenuState.selectedIndex;
+    ctx.fillStyle = selectedRow ? "#2563eb" : "#e5e7eb";
+    ctx.fillRect(x + 24, rowY, width - 48, rowHeight - 8);
+    ctx.fillStyle = selectedRow ? "#ffffff" : "#111827";
+    ctx.font = selectedRow ? "700 19px sans-serif" : "18px sans-serif";
+    ctx.fillText(option.label, x + 42, rowY + 26);
+  });
+  ctx.restore();
 }
 
 function drawXStadiumPrompt() {
@@ -19910,6 +20380,12 @@ window.addEventListener("keydown", (event) => {
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
   keysDown.add(event.code);
   keysDown.add(event.key);
+  if (isSwitchBatterChoicePending()) {
+    if (!event.repeat && event.code === "ArrowLeft") setSwitchBatterChoiceSide("L");
+    if (!event.repeat && event.code === "ArrowRight") setSwitchBatterChoiceSide("R");
+    if (!event.repeat && event.code === "Enter") confirmSwitchBatterChoice();
+    return;
+  }
   if (!event.repeat && event.code === "Space" && gamePhase === "playing" && isPlayerBatting()) swingBat();
   if (!event.repeat && event.code === "ArrowUp" && gamePhase === "defense") handleBatterRunnerBaseCommand("second");
   if (!event.repeat && event.code === "ArrowLeft" && gamePhase === "defense") handleBatterRunnerBaseCommand("third");

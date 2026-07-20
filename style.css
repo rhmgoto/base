@@ -700,6 +700,29 @@ canvas {
   top: 92%;
 }
 
+.bench-role-bench1,
+.bench-role-bench2,
+.bench-role-bench3 {
+  width: clamp(112px, 17%, 142px);
+  min-height: 54px;
+  z-index: 2;
+}
+
+.bench-role-bench1 {
+  left: 86%;
+  top: 60%;
+}
+
+.bench-role-bench2 {
+  left: 86%;
+  top: 70%;
+}
+
+.bench-role-bench3 {
+  left: 86%;
+  top: 80%;
+}
+
 .menu-player-card:focus-within {
   border-color: #ffe374;
   box-shadow: 0 0 0 3px rgba(255, 227, 116, 0.35);
