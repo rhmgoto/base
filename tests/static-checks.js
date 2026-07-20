@@ -62,6 +62,20 @@ assert(!/aria-label="[^"]*>\s*$/m.test(html), "index.html contains a broken aria
 assertIncludesAll(
   script,
   [
+    "function getComputerOutsideEscapeTakeAdjustment",
+    "cpuPlateSideNudge: 13",
+    "function updateComputerBatterPosition",
+    "function shouldMoveComputerBatter",
+    "batterMoveTuning.cpuPitchSideMoveScale",
+    "batterMoveTuning.cpuSlowPitchMoveBonus",
+    "else if (gamePhase === \"playing\") updateComputerBatterPosition(delta)",
+    "const outsideSign = activeBatterSide === \"R\" ? 1 : -1",
+    "const awayEscapeScore = clamp(escapeAmount / 34, 0, 1)",
+    "const slowPitchScore = clamp(",
+    "const meetReadSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1)",
+    "const adjustedStrikeConfidence = clamp(strikeConfidence - outsideEscapeTake.confidencePenalty, 0, 1)",
+    "outsideEscapeTake.chaseMultiplier",
+    "outsideEscapeTake.swingMultiplier",
     "const contactRescueExtension = ball.radius * 2",
     "const contactRange = naturalContactRange + contactRescueExtension",
     "contactRescueUse",
@@ -211,5 +225,18 @@ assert(
     `pitch key for ${pitchType} should only be active during playing phase`
   );
 });
+
+assertIncludesAll(
+  script,
+  [
+    "cpuAutoChangeThreshold: 40",
+    "function maybeAutoChangeCpuPitcher",
+    "function getNextUnusedPitcher",
+    "if (gameMode === \"watch\") return true",
+    "if (gameMode === \"single\") return team !== playerTeam",
+    "maybeAutoChangeCpuPitcher(fieldingTeam());"
+  ],
+  "CPU pitcher auto change below 40 stamina"
+);
 
 console.log("Static checks passed");

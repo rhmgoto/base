@@ -136,7 +136,10 @@ const batterMoveTuning = {
   moundSideShrink: (42 * field.plateScale) / 3,
   horizontalRangeScale: 0.5,
   plateSideNudge: 10,
-  cpuPlateSideNudge: 9,
+  cpuPlateSideNudge: 13,
+  cpuPitchSideMoveScale: 0.34,
+  cpuSlowPitchMoveBonus: 0.24,
+  cpuPitchSideMoveSpeed: 3.8,
   plateSideExtraReach: 18,
   shoeLimitOffsetY: -12,
   keyboardMoveSpeed: 5.2
@@ -250,6 +253,7 @@ const pitcherAbilityTuning = {
 };
 const staminaTuning = {
   pointsPerRating: 18.2,
+  cpuAutoChangeThreshold: 40,
   pitchCostMultiplier: 0.55,
   horizontalVariationCostRate: 0.1,
   verticalVariationCostRate: 0.2,
@@ -2225,6 +2229,30 @@ function canUsePitcher(team, pitcherId) {
     && !teamState.usedPitcherIds.includes(pitcherId);
 }
 
+function isCpuPitcherTeam(team) {
+  if (isAnyPracticeMode()) return false;
+  if (gameMode === "watch") return true;
+  if (gameMode === "single") return team !== playerTeam;
+  return false;
+}
+
+function getNextUnusedPitcher(team) {
+  const teamState = selected?.[team];
+  if (!teamState?.pitchers?.length) return null;
+  return teamState.pitchers.find((pitcherInfo) => canUsePitcher(team, pitcherInfo.id)) || null;
+}
+
+function maybeAutoChangeCpuPitcher(team = fieldingTeam()) {
+  if (gamePhase !== "playing" || !isCpuPitcherTeam(team)) return false;
+  if (isPitching || pendingPitch || ball.active || (stealState.active && !stealState.resolved)) return false;
+  const currentPitcher = getTeamActivePitcher(team);
+  const currentStamina = currentPitcher?.currentStamina ?? getPitcherMaxStamina(currentPitcher);
+  if (!Number.isFinite(currentStamina) || currentStamina >= staminaTuning.cpuAutoChangeThreshold) return false;
+  const nextPitcher = getNextUnusedPitcher(team);
+  if (!nextPitcher) return false;
+  return changePitcher(team, nextPitcher.id);
+}
+
 function changePitcher(team, pitcherId) {
   if (!canUsePitcher(team, pitcherId)) return false;
   finalizePitcherAppearance(team, getTeamActivePitcher(team));
@@ -3624,6 +3652,7 @@ function scheduleNextComputerPitchAfterJudgment(delay = computerJudgmentNextPitc
 
 function scheduleNextPitch(delay = 900) {
   if (isComputerControlledGameMode() && !isPlayerPitching()) {
+    maybeAutoChangeCpuPitcher(fieldingTeam());
     computerPitchPlan = chooseComputerPitchPlan();
     autoPitchTimer = Math.max(performance.now(), inputLockedUntil) + delay;
     return;
@@ -4800,22 +4829,62 @@ function getComputerSwingStrikeConfidence() {
   return clamp(projectedStrike * 0.78 + lateCurrentRead * 0.22, 0, 1);
 }
 
+function getComputerOutsideEscapeTakeAdjustment(strikeConfidence) {
+  const projected = getProjectedPitchPlatePosition();
+  const outsideSign = activeBatterSide === "R" ? 1 : -1;
+  const currentOutside = (ball.x - field.plateX) * outsideSign;
+  const projectedOutside = (projected.x - field.plateX) * outsideSign;
+  const escapeAmount = projectedOutside - currentOutside;
+  const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
+  const currentDistance = distanceToHomePlate(ball.x, ball.y, ball.radius);
+  const nearZone = clamp(1 - Math.min(projectedDistance, currentDistance) / 92, 0, 1);
+  const outsideEdge = field.strikeZoneWidth * 0.42;
+  const outsideScore = clamp((projectedOutside - outsideEdge) / 78, 0, 1);
+  const awayEscapeScore = clamp(escapeAmount / 34, 0, 1);
+  const ballZoneScore = clamp(projectedDistance / 70, 0, 1);
+  const slowPitchScore = clamp(
+    Math.max(
+      currentPitchType === "slow" ? 1 : 0,
+      Number.isFinite(currentPitchSpeedKmh) ? (148 - currentPitchSpeedKmh) / 34 : 0
+    ),
+    0,
+    1
+  );
+  const meetReadSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
+  const readAccuracy = 0.46 + meetReadSkill * 0.54;
+  const takeStrength = nearZone
+    * slowPitchScore
+    * awayEscapeScore
+    * outsideScore
+    * (0.48 + ballZoneScore * 0.72)
+    * readAccuracy;
+  return {
+    takeStrength: clamp(takeStrength, 0, 0.88),
+    chaseMultiplier: clamp(1 - takeStrength * (1 + ballZoneScore * 0.45), 0.06, 1),
+    swingMultiplier: clamp(1 - takeStrength * (0.85 + ballZoneScore * 0.7), 0.04, 1),
+    confidencePenalty: takeStrength * (0.25 + ballZoneScore * 0.35),
+    ballZoneScore
+  };
+}
+
 function computerSwingBat() {
   if (isPitchingPracticeMode() && pitchingPracticeBatterType !== "B") return;
   if ((gameMode !== "single" && gameMode !== "watch" && !isPitchingPracticeMode() && !isHomeRunDerbyMode()) || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
   const progress = getPitchProgress();
   if (progress < 0.72 || progress > 1.08) return;
   const strikeConfidence = getComputerSwingStrikeConfidence();
+  const outsideEscapeTake = getComputerOutsideEscapeTakeAdjustment(strikeConfidence);
+  const adjustedStrikeConfidence = clamp(strikeConfidence - outsideEscapeTake.confidencePenalty, 0, 1);
   const timingWindow = Math.max(0, 1 - Math.abs(progress - 0.92) / 0.26);
   if (isHomeRunDerbyMode()) {
-    if (strikeConfidence < 0.18 && Math.random() > 0.18) return;
-    const derbySwingChance = timingWindow * clamp(0.42 + strikeConfidence * 0.7 + activeBatter.meet * 0.025, 0.18, 0.96);
+    if (adjustedStrikeConfidence < 0.18 && Math.random() > 0.18 * outsideEscapeTake.chaseMultiplier) return;
+    const derbySwingChance = timingWindow * clamp(0.42 + adjustedStrikeConfidence * 0.7 + activeBatter.meet * 0.025, 0.18, 0.96) * outsideEscapeTake.swingMultiplier;
     if (Math.random() < derbySwingChance) startSwing(performance.now(), "strong");
     return;
   }
   const chaseChance = timingWindow * clamp((activeBatter.meet - 6) / 220, 0.002, 0.02);
-  if (strikeConfidence < 0.36 && Math.random() >= chaseChance) return;
-  const swingChance = 0.006 + timingWindow * (0.04 + strikeConfidence * 0.31 + activeBatter.meet * 0.004);
+  if (adjustedStrikeConfidence < 0.36 && Math.random() >= chaseChance * outsideEscapeTake.chaseMultiplier) return;
+  const swingChance = (0.006 + timingWindow * (0.04 + adjustedStrikeConfidence * 0.31 + activeBatter.meet * 0.004)) * outsideEscapeTake.swingMultiplier;
   if (Math.random() < swingChance) startSwing(performance.now(), chooseComputerSwingType());
 }
 
@@ -5365,6 +5434,7 @@ function update(delta) {
     return;
   }
   if (gamePhase === "playing" && isPlayerBatting()) updateBatter(delta);
+  else if (gamePhase === "playing") updateComputerBatterPosition(delta);
   updateBuntStance(now);
   if (shouldAutoScheduleComputerPitch() && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && !stealState.active && !Number.isFinite(autoPitchTimer)) {
     scheduleNextComputerPitchAfterJudgment();
@@ -5422,6 +5492,50 @@ function updateBatter(delta = 1000 / 60) {
   }
   batter.x = clamp(batter.x, box.left, box.right);
   batter.y = clamp(batter.y, box.top, box.bottom);
+}
+
+function updateComputerBatterPosition(delta = 1000 / 60) {
+  if (!shouldMoveComputerBatter()) return;
+  const box = getBatterMoveBox();
+  const projected = getProjectedPitchPlatePosition();
+  const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
+  const zoneRead = clamp(1 - projectedDistance / 132, 0, 1);
+  if (zoneRead <= 0) return;
+  const outsideSign = activeBatterSide === "R" ? 1 : -1;
+  const pitchSide = (projected.x - field.plateX) * outsideSign;
+  const slowPitchScore = clamp(
+    Math.max(
+      currentPitchType === "slow" ? 1 : 0,
+      Number.isFinite(currentPitchSpeedKmh) ? (148 - currentPitchSpeedKmh) / 34 : 0
+    ),
+    0,
+    1
+  );
+  const meetRead = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
+  const moveScale = batterMoveTuning.cpuPitchSideMoveScale
+    + slowPitchScore * batterMoveTuning.cpuSlowPitchMoveBonus;
+  const maxMove = 22 + slowPitchScore * 18 + meetRead * 8;
+  const initialX = getInitialBatterX(box);
+  const targetX = clamp(
+    initialX + clamp(pitchSide * moveScale * zoneRead, -maxMove, maxMove) * outsideSign,
+    box.left,
+    box.right
+  );
+  const frameScale = delta / (1000 / 60);
+  const speed = batterMoveTuning.cpuPitchSideMoveSpeed * (1 + slowPitchScore * 0.9 + meetRead * 0.35);
+  const dx = targetX - batter.x;
+  batter.x += clamp(dx, -speed * frameScale, speed * frameScale);
+  batter.x = clamp(batter.x, box.left, box.right);
+  batter.y = clamp(batter.y, box.top, box.bottom);
+}
+
+function shouldMoveComputerBatter() {
+  return (gameMode === "single" || gameMode === "watch" || isPitchingPracticeMode() || isHomeRunDerbyMode())
+    && !isPlayerBatting()
+    && isPitching
+    && ball.inPitch
+    && !ball.crossedPlate
+    && !swingState.didSwingThisPitch;
 }
 
 function getBatterKeyboardMove() {
