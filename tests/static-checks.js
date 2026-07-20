@@ -234,9 +234,13 @@ assertIncludesAll(
     "function getNextUnusedPitcher",
     "if (gameMode === \"watch\") return true",
     "if (gameMode === \"single\") return team !== playerTeam",
-    "maybeAutoChangeCpuPitcher(fieldingTeam());"
+    "maybeAutoChangeCpuPitcher(fieldingTeam());",
+    "function getCpuInsidePitchTargetX",
+    "const safeDistance = (Number.isFinite(ball.radius) ? ball.radius : pitchRadius) * 3",
+    "insideEdgeX - course.direction * safeDistance",
+    "plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));"
   ],
-  "CPU pitcher auto change below 40 stamina"
+  "CPU pitcher auto change and inside target safety"
 );
 
 console.log("Static checks passed");

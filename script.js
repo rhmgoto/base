@@ -3998,6 +3998,13 @@ function getSharedPitchCourseAim(course, pitchRadius = 8, typeKey = "normal", pi
   };
 }
 
+function getCpuInsidePitchTargetX(targetX, course, pitchRadius = ball.radius) {
+  if (!course?.direction || course.direction !== getDangerousBendDirectionForBatter()) return targetX;
+  const insideEdgeX = getHomePlateEdgeXAtY(field.plateY, course.direction);
+  const safeDistance = (Number.isFinite(ball.radius) ? ball.radius : pitchRadius) * 3;
+  return insideEdgeX - course.direction * safeDistance;
+}
+
 function getPitchCourseBaseSpread(course, typeKey, pitch) {
   if (!course?.direction) return pitch.targetSpread;
   if (!isEdgeCommandPitch(typeKey)) return 8;
@@ -4599,6 +4606,7 @@ function applySharedComputerPitchAim(plan) {
     pitchTypes[plan.type]
   );
   plan.targetX = sharedAim.targetX;
+  plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));
   plan.targetY = sharedAim.targetY;
   plan.targetSpread = sharedAim.targetSpread;
   plan.lockTarget = false;
@@ -4613,6 +4621,7 @@ function constrainComputerPitchPlanToPlayerReach(plan) {
   if (plan.course?.direction) {
     const sharedAim = getSharedPitchCourseAim(plan.course, getPitchRadius(plan.type), plan.type, pitchTypes[plan.type]);
     plan.targetX = sharedAim.targetX;
+    plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));
     plan.targetSpread = sharedAim.targetSpread;
     plan.lockTarget = false;
   }
