@@ -194,7 +194,7 @@ const batters = [
   { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
   { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 26, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
-  { id: "henderson", name: "ヘンダーソン", bats: "R", power: 25, meet: 20, run: 16, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 }
+  { id: "henderson", name: "ヘンダーソン", bats: "R", power: 14, meet: 22, run: 18, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 }
 ];
 
 const catchers = [
@@ -226,20 +226,20 @@ const pitchers = [
   { id: "sasaki", name: "ササキ", throws: "R", fastKmh: 165, rightBreak: 5, leftBreak: 2, slowChange: 6, fastChange: 4, control: 4, stuff: 7, fielding: 4, stamina: 5, cost: 6 },
   { id: "matsui", name: "マツイ", throws: "L", fastKmh: 150, rightBreak: 2, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 5, fielding: 5, stamina: 2, cost: 3 },
   { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 2, cost: 3 },
-  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 6, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 5 },
-  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 5, control: 6, stuff: 7, fielding: 5, stamina: 7, cost: 8 },
+  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 7, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 5 },
+  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 8 },
   { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 28, leftBreak: 27, slowChange: 27, fastChange: 28, control: 27, stuff: 33, fielding: 24, stamina: 21, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 32, leftBreak: 30, slowChange: 29, fastChange: 28, control: 29, stuff: 32, fielding: 23, stamina: 20, cost: 32 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 8, fastChange: 9, control: 6, stuff: 9, fielding: 6, stamina: 7, cost: 6 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 8, fastChange: 8, control: 5, stuff: 9, fielding: 5, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 2, cost: 1 },
   { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 },
-  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 2, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
+  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 3, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
   { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
   { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 28, leftBreak: 23, slowChange: 32, fastChange: 24, control: 30, stuff: 31, fielding: 23, stamina: 21, cost: 30 },
   { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 27, control: 27, stuff: 33, fielding: 23, stamina: 20, cost: 29 }
@@ -1329,6 +1329,10 @@ function sanitizeNumber(value, min, max, fallback) {
   return Math.round(clamp(number, min, max));
 }
 
+const rosterAbilityMax = 99;
+const rosterAbilityMin = 0;
+const rosterStuffMin = -99;
+
 function sanitizeRosterPlayer(player, kind, fallback = {}) {
   const name = String(player?.name || fallback.name || "新規選手").trim().slice(0, 18) || "新規選手";
   const id = String(player?.id || fallback.id || normalizePlayerId(name, kind)).trim();
@@ -1339,14 +1343,14 @@ function sanitizeRosterPlayer(player, kind, fallback = {}) {
       name,
       throws: ["R", "L"].includes(player?.throws) ? player.throws : fallback.throws ?? "R",
       fastKmh: sanitizeNumber(player?.fastKmh, 80, 230, fallback.fastKmh ?? 150),
-      rightBreak: sanitizeNumber(player?.rightBreak, 1, 10, fallback.rightBreak ?? 5),
-      leftBreak: sanitizeNumber(player?.leftBreak, 1, 10, fallback.leftBreak ?? 5),
-      slowChange: sanitizeNumber(player?.slowChange, 1, 10, fallback.slowChange ?? 5),
-      fastChange: sanitizeNumber(player?.fastChange, 1, 10, fallback.fastChange ?? 5),
-      control: sanitizeNumber(player?.control, 1, 10, fallback.control ?? 5),
-      stuff: sanitizeNumber(player?.stuff, 1, 10, fallback.stuff ?? 5),
-      fielding: sanitizeNumber(player?.fielding, 1, 10, fallback.fielding ?? 5),
-      stamina: sanitizeNumber(player?.stamina, 1, 10, fallback.stamina ?? 6),
+      rightBreak: sanitizeNumber(player?.rightBreak, rosterAbilityMin, rosterAbilityMax, fallback.rightBreak ?? 5),
+      leftBreak: sanitizeNumber(player?.leftBreak, rosterAbilityMin, rosterAbilityMax, fallback.leftBreak ?? 5),
+      slowChange: sanitizeNumber(player?.slowChange, rosterAbilityMin, rosterAbilityMax, fallback.slowChange ?? 5),
+      fastChange: sanitizeNumber(player?.fastChange, rosterAbilityMin, rosterAbilityMax, fallback.fastChange ?? 5),
+      control: sanitizeNumber(player?.control, rosterAbilityMin, rosterAbilityMax, fallback.control ?? 5),
+      stuff: sanitizeNumber(player?.stuff, rosterStuffMin, rosterAbilityMax, fallback.stuff ?? 5),
+      fielding: sanitizeNumber(player?.fielding, rosterAbilityMin, rosterAbilityMax, fallback.fielding ?? 5),
+      stamina: sanitizeNumber(player?.stamina, rosterAbilityMin, rosterAbilityMax, fallback.stamina ?? 6),
       cost
     };
   }
@@ -1355,10 +1359,10 @@ function sanitizeRosterPlayer(player, kind, fallback = {}) {
       id,
       name,
       bats: ["R", "L", "S"].includes(player?.bats) ? player.bats : fallback.bats ?? "R",
-      power: sanitizeNumber(player?.power, 1, 10, fallback.power ?? 5),
-      meet: sanitizeNumber(player?.meet, 1, 10, fallback.meet ?? 5),
-      run: sanitizeNumber(player?.run, 1, 10, fallback.run ?? 5),
-      arm: sanitizeNumber(player?.arm, 1, 10, fallback.arm ?? 5),
+      power: sanitizeNumber(player?.power, rosterAbilityMin, rosterAbilityMax, fallback.power ?? 5),
+      meet: sanitizeNumber(player?.meet, rosterAbilityMin, rosterAbilityMax, fallback.meet ?? 5),
+      run: sanitizeNumber(player?.run, rosterAbilityMin, rosterAbilityMax, fallback.run ?? 5),
+      arm: sanitizeNumber(player?.arm, rosterAbilityMin, rosterAbilityMax, fallback.arm ?? 5),
       cost
     };
   }
@@ -1366,12 +1370,12 @@ function sanitizeRosterPlayer(player, kind, fallback = {}) {
     id,
     name,
     bats: ["R", "L", "S"].includes(player?.bats) ? player.bats : fallback.bats ?? "R",
-    power: sanitizeNumber(player?.power, 1, 10, fallback.power ?? 5),
-    meet: sanitizeNumber(player?.meet, 1, 10, fallback.meet ?? 5),
-    run: sanitizeNumber(player?.run, 1, 10, fallback.run ?? 5),
-    infieldDefense: sanitizeNumber(player?.infieldDefense, 1, 10, fallback.infieldDefense ?? fallback.fielding ?? 5),
-    outfieldDefense: sanitizeNumber(player?.outfieldDefense, 1, 10, fallback.outfieldDefense ?? fallback.fielding ?? 5),
-    arm: sanitizeNumber(player?.arm, 1, 10, fallback.arm ?? 5),
+    power: sanitizeNumber(player?.power, rosterAbilityMin, rosterAbilityMax, fallback.power ?? 5),
+    meet: sanitizeNumber(player?.meet, rosterAbilityMin, rosterAbilityMax, fallback.meet ?? 5),
+    run: sanitizeNumber(player?.run, rosterAbilityMin, rosterAbilityMax, fallback.run ?? 5),
+    infieldDefense: sanitizeNumber(player?.infieldDefense, rosterAbilityMin, rosterAbilityMax, fallback.infieldDefense ?? fallback.fielding ?? 5),
+    outfieldDefense: sanitizeNumber(player?.outfieldDefense, rosterAbilityMin, rosterAbilityMax, fallback.outfieldDefense ?? fallback.fielding ?? 5),
+    arm: sanitizeNumber(player?.arm, rosterAbilityMin, rosterAbilityMax, fallback.arm ?? 5),
     cost
   };
 }
@@ -1655,7 +1659,7 @@ function renderPlayerEditorList() {
   `).join("");
 }
 
-function editorNumberInput(field, label, value, min = 1, max = 10) {
+function editorNumberInput(field, label, value, min = 1, max = rosterAbilityMax) {
   return `
     <label>
       ${label}
@@ -4366,8 +4370,8 @@ function getPreferredComputerBendDirection(player = activePitcher, fallbackDirec
 }
 
 function getPreferredComputerSpeedChangeDirection(player = activePitcher, fallbackDirection = -1, roll = Math.random()) {
-  const slowSkill = clamp(player?.slowChange ?? 5, 0, 20);
-  const fastSkill = clamp(player?.fastChange ?? 5, 0, 20);
+  const slowSkill = Math.max(0, Number(player?.slowChange ?? 5));
+  const fastSkill = Math.max(0, Number(player?.fastChange ?? 5));
   if (Math.abs(fastSkill - slowSkill) < 1) return fallbackDirection;
   const preferredDirection = fastSkill > slowSkill ? 1 : -1;
   const advantage = Math.abs(fastSkill - slowSkill);
@@ -6031,7 +6035,7 @@ function applyPitchSpeedChange(direction, frameScale = 1) {
     return;
   }
   const rating = (direction < 0 ? activePitcher.slowChange : activePitcher.fastChange) * (ball.pitchAbilityMultiplier ?? 1) * pitcherAbilityTuning.globalMultiplier;
-  const ratingEffect = Math.pow(clamp(rating, 1, 15) / 10, 2);
+  const ratingEffect = Math.pow(Math.max(1, rating) / 10, 2);
   const staminaMultiplier = getStaminaChangeMultiplier(activePitcher, staminaTuning.speedChangeExhaustedMultiplier);
   const changeAmount = maxPitchSpeedChangeAmount * ratingEffect * staminaMultiplier * frameScale;
   const nextScale = clamp(ball.speedScale + direction * changeAmount, 1 - pitchSpeedChangeLimit, 1 + pitchSpeedChangeLimit);
@@ -8992,7 +8996,7 @@ function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, out
   const startBase = baseIndexByName[baseName];
   if (startBase < 1 || startBase > 3) return 0;
   if (!nextBase || nextBase <= startBase) return 0;
-  const run = clamp(runnerInfo.run ?? 5, 1, 10);
+  const run = getOpenEndedAbilityRating(runnerInfo.run ?? 5);
   const normalLead = 26 + run * 7.2;
   const isHitAndRunRunner = hitAndRunState?.active
     && hitAndRunState.startBase === baseName
@@ -9043,8 +9047,13 @@ function getEffectiveRunRating(runRating) {
   return getRedistributedMovementRating(runRating);
 }
 
+function getOpenEndedAbilityRating(rating, fallback = 5) {
+  const value = Number(rating ?? fallback);
+  return Number.isFinite(value) ? Math.max(1, value) : Math.max(1, fallback);
+}
+
 function getBaseCompressedMovementRating(rating) {
-  const value = clamp(rating ?? 5, 1, 10);
+  const value = getOpenEndedAbilityRating(rating);
   const highRunCompression = 0.775;
   return 1 + (value - 1) * highRunCompression;
 }
@@ -9055,7 +9064,7 @@ function boostLowActualAbilityRating(currentRating, maxRating) {
 }
 
 function getRedistributedMovementRating(rating) {
-  const value = clamp(rating ?? 5, 1, 10);
+  const value = getOpenEndedAbilityRating(rating);
   const oldRatingThree = getBaseCompressedMovementRating(3);
   const oldRatingTen = getBaseCompressedMovementRating(10);
   const boosted = boostLowActualAbilityRating(oldRatingThree, oldRatingTen);
@@ -9063,7 +9072,7 @@ function getRedistributedMovementRating(rating) {
 }
 
 function getRedistributedFieldingMovementRating(rating) {
-  const value = clamp(rating ?? 5, 1, 10);
+  const value = getOpenEndedAbilityRating(rating);
   const oldRatingFloor = getBaseCompressedMovementRating(3.6);
   const oldRatingTen = getBaseCompressedMovementRating(10);
   const boosted = boostLowActualAbilityRating(oldRatingFloor, oldRatingTen);
@@ -9085,7 +9094,7 @@ function shouldRunnerScoreFromFirstOnDouble(runner, battedBall, outcome) {
 function getAggressiveRunnerScore(runner, battedBall, outcome) {
   const fieldingPoint = outcome?.fieldingPoint || battedBall.wallReboundTarget || battedBall.target || defenseField.bases.second;
   const depthRatio = clamp(getFenceDistance(fieldingPoint) / defenseField.fenceDistance, 0, 1);
-  const run = clamp(runner.run ?? 5, 1, 10);
+  const run = getOpenEndedAbilityRating(runner.run ?? 5);
   const runnerBoost = (run - 5) * 0.085;
   const slowRunnerPenalty = clamp((5 - run) / 4, 0, 1) * 0.18;
   const ballTimeBoost = clamp((battedBall.ballTime ?? 0.8) / 3.5, 0, 0.34);
@@ -10610,8 +10619,8 @@ function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBal
 }
 
 function getAutoThrowSetSeconds(fielder) {
-  const fielding = clamp(fielder?.fielding ?? fielder?.speed ?? 5, 1, 10);
-  return clamp(0.7 - ((fielding - 1) / 9) * 0.5, 0.2, 0.7);
+  const fielding = getOpenEndedAbilityRating(fielder?.fielding ?? fielder?.speed ?? 5);
+  return clamp(0.7 - ((fielding - 1) / 9) * 0.5, 0.08, 0.7);
 }
 
 function isDefenseThrowSafeAtBase(targetBase, throwArrivalTime, batterRunner = null, baseRunners = null, outcome = defenseState.outcome) {
@@ -10843,19 +10852,20 @@ function getActiveForceTargets() {
 }
 
 function getThrowProfile(fielder, distance, options = {}) {
-  const arm = clamp(fielder?.arm ?? 5, 1, 10);
+  const arm = getOpenEndedAbilityRating(fielder?.arm ?? 5);
+  const legacyArm = clamp(arm, 1, 10);
   const longThrowFactor = clamp((distance - 420) / 1180, 0, 1);
   const longOutfieldHomeThrow = isLongOutfieldHomeThrow(fielder, distance, options);
   const baseSpeed = getArmThrowSpeed(arm);
   const outfieldArmSpeedScale = longOutfieldHomeThrow
-    ? 1 - ((arm - 1) / 9) * 0.2
+    ? 1 - ((legacyArm - 1) / 9) * 0.2
     : 1;
-  const longThrowPenalty = 0.76 - arm * 0.045 + (longOutfieldHomeThrow ? ((arm - 1) / 9) * 0.14 : 0);
+  const longThrowPenalty = Math.max(0.08, 0.76 - arm * 0.045 + (longOutfieldHomeThrow ? ((legacyArm - 1) / 9) * 0.14 : 0));
   const speedMultiplier = clamp(1 - longThrowFactor * longThrowPenalty, longOutfieldHomeThrow ? 0.28 : 0.22, 1);
   const throwSpeed = baseSpeed * outfieldArmSpeedScale * speedMultiplier;
-  const minimumTime = 0.78
+  const minimumTime = Math.max(0.42, 0.78
     + longThrowFactor * (1.35 - arm * 0.055)
-    + (longOutfieldHomeThrow ? longThrowFactor * 0.16 : 0);
+    + (longOutfieldHomeThrow ? longThrowFactor * 0.16 : 0));
   const needsBounce = distance >= 900 && (longOutfieldHomeThrow ? arm <= 8 : arm < 8);
   const bounceDrag = needsBounce
     ? clamp(
@@ -10868,7 +10878,7 @@ function getThrowProfile(fielder, distance, options = {}) {
     ? clamp((9 - arm) * 0.12 + longThrowFactor * 0.28, 0.24, 1.12)
     : 0;
   const throwTime = Math.max(distance / throwSpeed, minimumTime + bounceTimePenalty) * (1 + bounceDrag);
-  const arcHeight = 38 + longThrowFactor * (210 - arm * 7 + (longOutfieldHomeThrow ? 28 : 0));
+  const arcHeight = Math.max(28, 38 + longThrowFactor * (210 - arm * 7 + (longOutfieldHomeThrow ? 28 : 0)));
   const bounce = needsBounce
     ? {
         enabled: true,
@@ -10923,7 +10933,7 @@ function getThrowBouncePoint(throwState) {
 }
 
 function getArmThrowSpeed(armRating) {
-  const value = clamp(armRating ?? 5, 1, 10);
+  const value = getOpenEndedAbilityRating(armRating);
   const minThrowSpeed = 800;
   const maxThrowSpeed = 1100;
   return minThrowSpeed + ((value - 1) / 9) * (maxThrowSpeed - minThrowSpeed);
@@ -12106,8 +12116,8 @@ function isInfielderLineDropRouteBall(fielder, battedBall) {
   if (progress < 0.1 || progress > 0.9) return false;
   if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 18)) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const routeRadius = 82 + fielding * 16 + speed * 9;
   return distance <= routeRadius;
 }
@@ -12119,8 +12129,8 @@ function isInfielderNearGrounderRoute(fielder, battedBall) {
   const progress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (progress < 0.08 || progress > 0.94) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const power = battedBall.power ?? 0.8;
   const ballTime = battedBall.ballTime ?? 0.7;
   const softRollBonus = power <= 0.9 || ballTime >= 0.62 ? 96 : 28;
@@ -12137,8 +12147,8 @@ function isInfielderAwareOfRouteBall(fielder, battedBall) {
   const progress = getBattedBallRouteProgressForPoint(point, battedBall);
   if (progress < 0.12 || progress > 0.82) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 6)) return false;
   const awarenessRadius = 96 + fielding * 18 + speed * 10 + (battedBall.isGrounder ? 80 : 28) + (isHardGrounder(battedBall) ? 120 : 0);
   return distance <= awarenessRadius;
@@ -12146,7 +12156,7 @@ function isInfielderAwareOfRouteBall(fielder, battedBall) {
 
 function isInfielderPlayableRouteHeight(fielder, battedBall, point, bonus = 0) {
   if (!battedBall || battedBall.isGrounder) return true;
-  const fielding = clamp(fielder?.fielding ?? fielder?.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   const ballHeight = getBattedBallRouteHeightAtPoint(point, battedBall);
   const playableHeight = 58 + fielding * 5 + bonus;
   return ballHeight <= playableHeight;
@@ -12173,7 +12183,7 @@ function isInfielderReactionRouteBall(fielder, battedBall) {
   if (!isInfielderPlayableRouteHeight(fielder, battedBall, point)) return false;
   if (getInfielderRouteBodyCatch(fielder, battedBall, point).caught) return true;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   const routeRadius = defenseRangeTuning.closeHardBallRadius + fielding * 13 + (isTemporaryInfielderRole(fielder.role) ? 88 : 36);
   const linerRouteScale = battedBall.isLiner && isTemporaryInfielderRole(fielder.role) ? 0.736 : 1;
   const gapGrounderRouteScale = battedBall.grounderGap && isTemporaryInfielderRole(fielder.role)
@@ -12210,7 +12220,7 @@ function isInfielderAttemptRouteBall(fielder, battedBall) {
   if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 10)) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
   const lateralMove = Math.abs(point.x - fielder.x);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   const hardGrounder = isHardGrounder(battedBall);
   const attemptRadius = defenseRangeTuning.closeHardBallRadius
     + fielding * (hardGrounder ? 30 : 18)
@@ -12440,17 +12450,25 @@ function getFielderSpeed(fielder) {
   return getFieldingMoveSpeed(fielder?.speed ?? fielder?.fielding ?? 5);
 }
 
+function getFielderFieldingRating(fielder) {
+  return getOpenEndedAbilityRating(fielder?.fielding ?? fielder?.speed ?? 5);
+}
+
+function getFielderSpeedRating(fielder) {
+  return getOpenEndedAbilityRating(fielder?.speed ?? fielder?.fielding ?? 5);
+}
+
 function getFieldingMoveSpeed(fieldingRating) {
   return (abilitySpeedBaseRating + getRedistributedFieldingMovementRating(fieldingRating)) * fielderSpeedUnit * defenseFielderMoveSpeedScale;
 }
 
 function getFielderReactionDelay(fielder) {
   if (fielder?.quickBuntReaction) return 0.04;
-  const fielding = clamp(fielder?.fielding ?? fielder?.speed ?? 5, 1, 10);
+  const fielding = getOpenEndedAbilityRating(fielder?.fielding ?? fielder?.speed ?? 5);
   const delay = fielding <= fielderReactionDelayTuning.midpointFielding
     ? fielderReactionDelayTuning.slowest - (fielding - 1) * ((fielderReactionDelayTuning.slowest - fielderReactionDelayTuning.midpointDelay) / 4)
     : fielderReactionDelayTuning.midpointDelay - (fielding - fielderReactionDelayTuning.midpointFielding) * ((fielderReactionDelayTuning.midpointDelay - fielderReactionDelayTuning.fastest) / 5);
-  return clamp(delay, fielderReactionDelayTuning.fastest, fielderReactionDelayTuning.slowest);
+  return clamp(delay, 0.08, fielderReactionDelayTuning.slowest);
 }
 
 function isPitcherHandledGrounder(battedBall) {
@@ -12481,7 +12499,7 @@ function getDifficultHardBallCatch(fielder, battedBall, fielderTime, ballTime, r
   if (battedBall.isHardOutfieldBounce && isTemporaryInfielderRole(fielder.role)) return { caught: false, chance: 0 };
   if ((battedBall.power ?? 0) < 0.56 && !battedBall.isLiner) return { caught: false, chance: 0 };
   const lateBy = fielderTime - ballTime;
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   if (battedBall.grounderGap && isTemporaryInfielderRole(fielder.role) && fielding < 5) return { caught: false, chance: 0 };
   const window = defenseRangeTuning.difficultCatchTimeWindow + fielding * 0.022;
   if (lateBy < -0.04 || lateBy > window) return { caught: false, chance: 0 };
@@ -12502,7 +12520,7 @@ function getCloseHardBallCatch(fielder, battedBall, fieldingPoint, roll = Math.r
   if (battedBall.isHardOutfieldBounce && isTemporaryInfielderRole(fielder.role) && !isHardGrounderInfieldPlayable(battedBall)) return { caught: false, chance: 0, distance: Infinity };
   if ((battedBall.power ?? 0) < 0.56 && !battedBall.isLiner) return { caught: false, chance: 0, distance: Infinity };
   const distance = Math.hypot((fieldingPoint?.x ?? battedBall.target.x) - fielder.x, (fieldingPoint?.y ?? battedBall.target.y) - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   if (battedBall.grounderGap && isTemporaryInfielderRole(fielder.role) && fielding < 5) return { caught: false, chance: 0, distance };
   const hardGrounderFrontBonus = isHardGrounder(battedBall) && isTemporaryInfielderRole(fielder.role) ? 52 : 0;
   const radius = (defenseRangeTuning.closeHardBallRadius + fielding * 4 + hardGrounderFrontBonus) * (battedBall.isGrounder ? 1.35 : 1);
@@ -12531,7 +12549,7 @@ function getHardShotFieldingError(fielder, battedBall, relation, roll = Math.ran
   if (!fielder || !battedBall || (!battedBall.isGrounder && !battedBall.isLiner)) return { error: false, chance: 0 };
   if ((battedBall.power ?? 0) < 0.78) return { error: false, chance: 0 };
   if (battedBall.isSoftDrop || battedBall.wallHit || battedBall.fenceOver) return { error: false, chance: 0 };
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   const sideGap = relation?.sideGap ?? Infinity;
   if (sideGap > (battedBall.isLiner ? 74 : 88)) return { error: false, chance: 0 };
   const powerPressure = clamp(((battedBall.power ?? 0.78) - 0.78) / 0.55, 0, 1);
@@ -12563,8 +12581,8 @@ function getInfieldPopupFlyCatch(fielder, battedBall, fieldingPoint = null) {
   }
   const target = fieldingPoint || battedBall.target;
   if (!target) return { caught: false, fieldingTime: Infinity, routeGap: Infinity };
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const routeGap = Math.hypot((fielder.x ?? 0) - target.x, (fielder.y ?? 0) - target.y);
   const infieldRange = 82 + fielding * 14 + speed * 8 + (fielder.role === "P" ? 34 : 22);
   if (routeGap > infieldRange) {
@@ -12600,8 +12618,8 @@ function getGuaranteedSlowInfieldGrounderPickup(fielder, battedBall, fieldingPoi
   if (!fielder || !fieldingPoint || !isInfielderRole(fielder.role) || !isSlowInfieldBounceGrounder(battedBall)) {
     return { caught: false, fieldingTime: Infinity, ballArrival: Infinity, fielderTime: Infinity };
   }
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const routeGap = Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
   const routeProgress = getBattedBallRouteProgressForPoint(fieldingPoint, battedBall);
   if (routeProgress < 0.1 || routeProgress > 0.97) {
@@ -12643,8 +12661,8 @@ function getInfielderFrontGrounderPickup(fielder, battedBall, fieldingPoint, rel
   if (routeProgress < 0.1 || routeProgress > 0.97) {
     return { caught: false, fieldingTime: Infinity, ballArrival: Infinity, fielderTime: Infinity, routeGap: Infinity };
   }
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   if (fielding < 4) {
     return { caught: false, fieldingTime: Infinity, ballArrival: Infinity, fielderTime: Infinity, routeGap: Infinity };
   }
@@ -12676,8 +12694,8 @@ function getGuaranteedSlowInfieldDropPlay(fielder, battedBall, fieldingPoint) {
   if (!fielder || !fieldingPoint || !isInfielderRole(fielder.role) || !isSlowInfieldDropBall(battedBall)) {
     return { handled: false, fieldingTime: Infinity, fielderTime: Infinity };
   }
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const distance = Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
   const reachableDistance = 126 + fielding * 20 + speed * 16 + (fielder.role === "P" ? 42 : 0);
   if (distance > reachableDistance) {
@@ -12725,8 +12743,8 @@ function resolveMiddleInfieldBouncePickup(fielder, battedBall, outcome, runner) 
   }
   const routeProgress = getBattedBallRouteProgressForPoint(fieldingPoint, battedBall);
   if (routeProgress < 0.1 || routeProgress > 0.96) return null;
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const routeGap = Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
   const reactionDelay = getFielderReactionDelay(fielder);
   const fielderTime = reactionDelay * 0.82 + Math.max(0, routeGap - (88 + fielding * 13)) / getFielderSpeed(fielder);
@@ -12766,8 +12784,8 @@ function getInfielderRouteBodyCatch(fielder, battedBall, fieldingPoint) {
   if (routeProgress < 0.12 || routeProgress > 0.94) return { caught: false, routeGap: Infinity, timeGrace: 0 };
   if (!isInfielderPlayableRouteHeight(fielder, battedBall, point, 4)) return { caught: false, routeGap: Infinity, timeGrace: 0 };
   const routeGap = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const hardGrounderBodyBoost = isHardGrounder(battedBall) ? 92 : 0;
   const grounderWidth = (74 + fielding * 8 + speed * 5 + (battedBall.grounderGap ? 34 : 18) + hardGrounderBodyBoost) * 1.58;
   const linerWidth = (34 + fielding * 4 + speed * 1.5) * 0.8;
@@ -12845,14 +12863,14 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
   return makeStrictCircleMissOutcome(fielder, battedBall, fieldingPoint, fielderTime, fieldingPointBallTime);
   const grounderPenalty = battedBall.isGrounder
     ? isTemporaryInfielderRole(fielder.role)
-      ? 0.2 + (battedBall.grounderGap ? clamp(0.24 - clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10) * 0.018, 0.04, 0.2) : 0)
+      ? 0.2 + (battedBall.grounderGap ? clamp(0.24 - getFielderFieldingRating(fielder) * 0.018, 0.04, 0.2) : 0)
       : 0.55
       : battedBall.isLiner
         ? isTemporaryInfielderRole(fielder.role) ? 0.18 : 0.08
       : 0;
   const canField = fielderTime <= fieldingPointBallTime - grounderPenalty + defenseRangeTuning.nearMissCatchGrace;
   const relation = getBattedBallFielderRelation(fielder, { ...battedBall, target: fieldingPoint });
-  const fielderFielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielderFielding = getFielderFieldingRating(fielder);
   const routeBodyCatch = getInfielderRouteBodyCatch(fielder, battedBall, fieldingPoint);
   const frontGrounderPickup = getInfielderFrontGrounderPickup(fielder, battedBall, fieldingPoint, relation);
   const guaranteedSlowPickup = getGuaranteedSlowInfieldGrounderPickup(fielder, battedBall, fieldingPoint);
@@ -13052,8 +13070,8 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
 function isCatchableOutfieldFly(battedBall, fielder, fielderTime, ballTime) {
   if (!battedBall || !fielder || fielder.role === "P") return false;
   if (battedBall.isGrounder || battedBall.isLiner || battedBall.isSoftDrop || battedBall.wallHit || battedBall.fenceOver) return false;
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
-  const speed = clamp(fielder.speed ?? fielding, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
+  const speed = getFielderSpeedRating(fielder);
   const routineBonus = battedBall.isRoutineFly ? 0.08 + fielding * 0.006 : 0;
   const chaseBonus = battedBall.isChaseFly ? 0.045 + fielding * 0.004 : 0;
   const grace = 0.16 + speed * 0.012 + fielding * 0.01 + routineBonus + chaseBonus;
@@ -13497,7 +13515,7 @@ function updateManualDefenseFielders(deltaSeconds) {
       y: assist.y + move.y * move.magnitude * 0.85
     });
     if (!combined.magnitude) return { ...fielder, currentX, currentY };
-    const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+    const fielding = getFielderFieldingRating(fielder);
     const speed = getFielderSpeed(fielder) * (0.72 + fielding * 0.035) * combined.magnitude;
     const current = clampFielderOutsideRiversideRiver(clampPointInsideFence({
       x: currentX + combined.x * speed * deltaSeconds,
@@ -13667,16 +13685,16 @@ function initializeFielderCatchRanges(fielders) {
 
 function getFielderRangeFieldingRating(fielder) {
   const rosterRating = getCurrentDefenseRatingForRole(fielder?.role);
-  if (Number.isFinite(rosterRating)) return clamp(rosterRating, 1, 10);
+  if (Number.isFinite(rosterRating)) return getOpenEndedAbilityRating(rosterRating);
   const direct = Number.isFinite(fielder?.fielding)
     ? fielder.fielding
     : Number.isFinite(fielder?.speed)
       ? fielder.speed
       : null;
-  if (direct !== null) return clamp(direct, 1, 10);
+  if (direct !== null) return getOpenEndedAbilityRating(direct);
   const roleMatch = defenseState?.fielders?.find((entry) => entry.role === fielder?.role);
-  if (Number.isFinite(roleMatch?.fielding)) return clamp(roleMatch.fielding, 1, 10);
-  if (Number.isFinite(roleMatch?.speed)) return clamp(roleMatch.speed, 1, 10);
+  if (Number.isFinite(roleMatch?.fielding)) return getOpenEndedAbilityRating(roleMatch.fielding);
+  if (Number.isFinite(roleMatch?.speed)) return getOpenEndedAbilityRating(roleMatch.speed);
   return 5;
 }
 
@@ -13845,7 +13863,7 @@ function shouldInfielderAttemptRollingRoute(fielder, battedBall, fieldingTarget)
   const progress = getBattedBallRouteProgressForPoint(point, rollingBall);
   if (progress < 0.1 || progress > 0.97) return false;
   const distance = Math.hypot(point.x - fielder.x, point.y - fielder.y);
-  const fielding = clamp(fielder.fielding ?? fielder.speed ?? 5, 1, 10);
+  const fielding = getFielderFieldingRating(fielder);
   const radius = defenseRangeTuning.closeHardBallRadius
     + fielding * 20
     + 184
@@ -20729,3 +20747,4 @@ updateAudioToggleButtons();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
+
