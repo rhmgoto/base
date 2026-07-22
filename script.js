@@ -194,7 +194,7 @@ const batters = [
   { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
   { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 26, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
-  { id: "henderson", name: "ヘンダーソン", bats: "R", power: 14, meet: 22, run: 18, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 }
+  { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 22, run: 20, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 }
 ];
 
 const catchers = [
