@@ -233,7 +233,7 @@ const pitchers = [
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 28, leftBreak: 27, slowChange: 27, fastChange: 28, control: 27, stuff: 33, fielding: 24, stamina: 21, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 32, leftBreak: 30, slowChange: 29, fastChange: 28, control: 29, stuff: 32, fielding: 23, stamina: 20, cost: 32 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 3, slowChange: 8, fastChange: 8, control: 5, stuff: 9, fielding: 5, stamina: 7, cost: 6 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 9, fastChange: 9, control: 5, stuff: 9, fielding: 5, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
