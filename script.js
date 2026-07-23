@@ -1083,6 +1083,8 @@ const gamepadState = {
   teamIndexes: { away: null, home: null },
   previousButtons: { away: new Set(), home: new Set() },
   previousDirections: { away: new Set(), home: new Set() },
+  lastDirectionPress: { away: { time: 0, directions: new Set() }, home: { time: 0, directions: new Set() } },
+  lastThrowButtonPress: { away: 0, home: 0 },
   virtualKeys: new Set(),
   lastButton: { index: null, team: null, time: 0 },
   menuCursors: {
@@ -5541,6 +5543,8 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   });
   const previousButtons = gamepadState.previousButtons[team] || new Set();
   const justPressed = (index) => pressed.has(index) && !previousButtons.has(index);
+  const directions = getGamepadDirections(gamepad);
+  updateDefenseThrowDirectionTiming(team, directions);
   const newPresses = [...pressed].filter((index) => !previousButtons.has(index));
   if (newPresses.length) recordLastGamepadButton(team, newPresses[newPresses.length - 1]);
 
@@ -5579,7 +5583,6 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
       swingBat("weak");
     }
     if (justPressed(gamepadButtons.Y)) {
-      const directions = getGamepadDirections(gamepad);
       if (directions.size > 0) {
         tryStartSteal(getGamepadThrowTarget(directions));
       }
@@ -5603,12 +5606,17 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
     if (justPressed(gamepadButtons.X)) startPitch("special");
   }
   if (gamePhase === "defense" && team === fieldingTeam()) {
-    if (justPressed(gamepadButtons.A)) handleDefenseThrowCommand(getGamepadThrowTarget(getGamepadDirections(gamepad)));
-    if (justPressed(gamepadButtons.X)) handleDefenseThrowCommand(getGamepadThrowTarget(getGamepadDirections(gamepad)));
+    const throwTarget = getGamepadThrowTarget(directions);
+    if (justPressed(gamepadButtons.B)) {
+      gamepadState.lastThrowButtonPress[team] = performance.now();
+      handleDefenseThrowCommand(throwTarget, getDefenseThrowTimingOptions(team));
+    }
+    if (justPressed(gamepadButtons.A)) handleDefenseThrowCommand(throwTarget);
+    if (justPressed(gamepadButtons.X)) handleDefenseThrowCommand(throwTarget);
   }
   if (gamePhase === "defense" && team === battingTeam) {
-    if (justPressed(gamepadButtons.A)) handleBatterRunnerBaseCommand(getGamepadThrowTarget(getGamepadDirections(gamepad)), "advance");
-    if (justPressed(gamepadButtons.B)) handleBatterRunnerBaseCommand(getGamepadThrowTarget(getGamepadDirections(gamepad)), "return");
+    if (justPressed(gamepadButtons.A)) handleBatterRunnerBaseCommand(getGamepadThrowTarget(directions), "advance");
+    if (justPressed(gamepadButtons.B)) handleBatterRunnerBaseCommand(getGamepadThrowTarget(directions), "return");
     if (justPressed(gamepadButtons.X)) handleAllRunnerBaseCommand("advance");
     if (justPressed(gamepadButtons.Y)) handleAllRunnerBaseCommand("return");
   }
@@ -5621,6 +5629,32 @@ function recordLastGamepadButton(team, index) {
     index,
     team,
     time: performance.now()
+  };
+}
+
+function updateDefenseThrowDirectionTiming(team, directions) {
+  const previous = gamepadState.previousDirections[team] || new Set();
+  const hasNewDirection = directions.size > 0
+    && (previous.size === 0 || [...directions].some((direction) => !previous.has(direction)));
+  if (!hasNewDirection) return;
+  gamepadState.lastDirectionPress[team] = {
+    time: performance.now(),
+    directions: new Set(directions)
+  };
+}
+
+function getDefenseThrowTimingOptions(team) {
+  const now = performance.now();
+  const directionTime = gamepadState.lastDirectionPress[team]?.time || 0;
+  const buttonTime = gamepadState.lastThrowButtonPress[team] || now;
+  const diff = Math.abs(buttonTime - directionTime);
+  const timingSuccess = directionTime > 0 && diff <= 180;
+  const quick = timingSuccess;
+  return {
+    throwTimingSuccess: timingSuccess,
+    throwTimeMultiplier: timingSuccess ? 1 : 1.25,
+    throwArcMultiplier: timingSuccess ? 1 : 1.22,
+    throwTimingLabel: quick ? "クイック送球" : "送球"
   };
 }
 
@@ -10517,7 +10551,7 @@ function getThrowHeldBaseAtTime(throwState, elapsedSeconds) {
   return elapsedSeconds >= throwState.endTime ? throwState.targetBase : null;
 }
 
-function handleDefenseThrowCommand(targetBase) {
+function handleDefenseThrowCommand(targetBase, options = {}) {
   if (!canManualDefenseThrow(targetBase)) return;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   updateBatterRunner(elapsedSeconds);
@@ -10536,7 +10570,11 @@ function handleDefenseThrowCommand(targetBase) {
     immediate: true,
     startTime: commandStartTime,
     minStartTime: commandStartTime,
-    baseRunners: defenseState.baseRunners
+    baseRunners: defenseState.baseRunners,
+    throwTimeMultiplier: options.throwTimeMultiplier ?? 1,
+    throwArcMultiplier: options.throwArcMultiplier ?? 1,
+    throwTimingSuccess: Boolean(options.throwTimingSuccess),
+    throwTimingLabel: options.throwTimingSuccess ? "ナイス送球" : options.throwTimingLabel || ""
   });
   if (isForceThrowTargetBase(targetBase, defenseState.outcome, defenseState.battedBall)) {
     defenseState.outcome = {
@@ -10554,6 +10592,8 @@ function handleDefenseThrowCommand(targetBase) {
     defenseState.duration = elapsedSeconds * 1000 + 1200;
   }
   message = `${getBaseLabel(targetBase)}へ送球指示`;
+  if (options.throwTimingSuccess) message = `${getBaseLabel(targetBase)}へナイス送球`;
+  else if (options.throwTimingLabel) message = `${getBaseLabel(targetBase)}へ山なり送球`;
 }
 
 function canManualDefenseThrow(targetBase) {
@@ -10594,7 +10634,7 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
     : options.manualWait
       ? Number.POSITIVE_INFINITY
       : prepareStartTime + getAutoThrowSetSeconds(fielder);
-  const throwTime = throwProfile.throwTime;
+  const throwTime = throwProfile.throwTime * (options.throwTimeMultiplier ?? 1);
   const throwArrivalTime = fieldingTime + throwTime;
   const holdDeadline = Number.isFinite(throwArrivalTime)
     ? throwArrivalTime + defenseThrowResultHoldSeconds
@@ -10614,7 +10654,9 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
     holdDeadline,
     manualWait: Boolean(options.manualWait),
     throwTime,
-    arcHeight: throwProfile.arcHeight,
+    throwTimingLabel: options.throwTimingLabel || "",
+    throwTimingSuccess: Boolean(options.throwTimingSuccess),
+    arcHeight: throwProfile.arcHeight * (options.throwArcMultiplier ?? 1),
     bounce: throwProfile.bounce,
     baseLabel: getBaseLabel(targetBase),
     targetBase,
@@ -18849,6 +18891,19 @@ function drawThrowPath() {
   const arrowPoint = getThrowPointAtProgress(throwState, 0.72);
 
   ctx.save();
+  if (throwState.throwTimingSuccess && !isPreparing) {
+    const effectAge = Math.max(0, elapsedSeconds - throwState.startTime);
+    const alpha = clamp(1 - effectAge / 0.45, 0, 1) * 0.34;
+    if (alpha > 0) {
+      ctx.fillStyle = `rgba(174, 231, 255, ${alpha * 0.45})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(throwState.from.x, throwState.from.y, 18 + effectAge * 54, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
   ctx.strokeStyle = isPreparing ? "rgba(255, 242, 168, 0.44)" : throwState.safe ? "rgba(255, 227, 116, 0.9)" : "rgba(174, 231, 255, 0.95)";
   ctx.lineWidth = isPreparing ? 4 : 9;
   ctx.setLineDash(isPreparing ? [6, 12] : [18, 10]);
