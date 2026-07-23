@@ -1075,6 +1075,7 @@ let homeRunVisionDisplay = { advice: "", startTime: 0 };
 let xStadiumPrompt = { active: false, offeredDefenseStartTime: null, goRect: null, dontRect: null };
 const keysDown = new Set();
 const pitchAdjustmentKeys = ["1", "3", "4", "6"];
+const SAFE_TOLERANCE = 0.03;
 let pitchControlLockoutKeys = new Set();
 let mouseAim = { active: false, x: 0, y: 0 };
 let lastFrameTime = performance.now();
@@ -1946,6 +1947,8 @@ function createDefenseState() {
     resolved: false,
     outCallShown: false,
     completedForceOutBases: [],
+    judgmentLog: [],
+    outEvents: [],
     forceTargets: [],
     manualFielding: false,
     manualFieldingComplete: false,
@@ -8910,8 +8913,19 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const distance = getRunnerRouteDistance(ledRoute);
   return {
     ...runnerInfo,
+    runnerId: runnerInfo.id || runnerInfo.name || baseName,
     startBase: baseName,
+    originalBase: baseName,
+    currentBase: baseName,
     targetBase: nextBase >= 4 ? "home" : baseNameByIndex[nextBase],
+    forceBase: null,
+    forceObligation: false,
+    running: nextBase !== startBase,
+    returning: false,
+    leftBaseTime: routeStartTime,
+    reachedBaseTime: null,
+    returnedBaseTime: null,
+    isOut: false,
     tagUp,
     groundOutAdvance,
     scored: nextBase >= 4,
@@ -9444,6 +9458,13 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   }
   const baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingTarget, hitAndRunState);
   const forceTargets = createForceTargetsForPlay(battedBall, outcome);
+  const forceMapForPlay = new Map(forceTargets.map((target) => [target.startBase, target.targetBase]));
+  runner.forceBase = forceMapForPlay.get("batter") || null;
+  runner.forceObligation = Boolean(runner.forceBase);
+  baseRunners.forEach((baseRunner) => {
+    baseRunner.forceBase = forceMapForPlay.get(baseRunner.startBase) || null;
+    baseRunner.forceObligation = Boolean(baseRunner.forceBase);
+  });
   let throwState = manualFielding
     ? null
     : createThrowState(chosenFielder, fieldingTarget, outcome, runner, {
@@ -9896,14 +9917,26 @@ function createBatterRunner(batterInfo) {
   const route = [start, destination];
   const distance = getRunnerRouteDistance(route);
   return {
+    ...batterInfo,
+    runnerId: batterInfo?.id || batterInfo?.name || "batter",
     start,
     destination,
     route,
+    startBase: "batter",
+    originalBase: "home",
     currentBase: "home",
     returnBase: "home",
     routeStartTime: 0,
     routeDuration: distance / speed,
     targetBase: "first",
+    forceBase: "first",
+    forceObligation: true,
+    running: true,
+    returning: false,
+    leftBaseTime: 0,
+    reachedBaseTime: null,
+    returnedBaseTime: null,
+    isOut: false,
     baseLabel: "一塁",
     x: start.x,
     y: start.y,
@@ -10548,6 +10581,7 @@ function getRunnerRouteDistance(route) {
 function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}) {
   if (!outcome.needsThrow) return null;
   const targetBase = options.targetBase || runner?.targetBase || outcome.targetBase || "first";
+  const playType = isForceThrowTargetBase(targetBase, outcome, defenseState.battedBall) ? "force" : "tag";
   const destination = getDefenseBasePointByName(targetBase);
   const distance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
   const throwProfile = getThrowProfile(fielder, distance, {
@@ -10574,6 +10608,9 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
     prepareStartTime,
     startTime: fieldingTime,
     endTime: fieldingTime + throwTime,
+    playType,
+    baseTouchTime: playType === "force" ? fieldingTime + throwTime : null,
+    tagTime: playType === "tag" ? fieldingTime + throwTime : null,
     holdDeadline,
     manualWait: Boolean(options.manualWait),
     throwTime,
@@ -10678,15 +10715,110 @@ function updateHeldBallBaseFromThrow() {
 
 function isBatterRunnerOutAtThrowTarget(throwState, runner) {
   if (!throwState || !runner || !throwState.targetBase || runner.targetBase !== throwState.targetBase) return false;
-  if (!Number.isFinite(throwState.endTime) || !Number.isFinite(runner.arrivalTime)) return false;
   if (isBatterRunnerAlreadySafeAtThrowTarget(throwState, runner)) return false;
-  return throwState.endTime <= runner.arrivalTime + 0.001;
+  return judgeOutPlay(runner, throwState.targetBase, throwState).out;
 }
 
 function isBatterRunnerAlreadySafeAtThrowTarget(throwState, runner) {
   if (!throwState || !runner || !throwState.targetBase || runner.targetBase !== throwState.targetBase) return false;
   if (!Number.isFinite(throwState.startTime) || !Number.isFinite(runner.arrivalTime)) return false;
   return runner.arrived && runner.arrivalTime <= throwState.startTime;
+}
+
+function getRunnerKey(runner) {
+  if (!runner) return "";
+  return runner.runnerId || runner.id || runner.name || runner.startBase || "runner";
+}
+
+function recalculateForceStateForPlay(completedForceOutBases = defenseState.completedForceOutBases || []) {
+  const activeTargets = getForceTargetsForCurrentPlay()
+    .filter((target) => isForceTargetEntryActive(target, getForceTargetsForCurrentPlay(), completedForceOutBases));
+  return new Map(activeTargets.map((target) => [target.startBase, target.targetBase]));
+}
+
+function getRunnerForceBase(runner, forceMap = recalculateForceStateForPlay()) {
+  if (!runner) return null;
+  const startBase = runner.startBase || (runner === defenseState.runner ? "batter" : null);
+  return startBase ? forceMap.get(startBase) || null : null;
+}
+
+function hasForceObligationToBase(runner, targetBase, forceMap = recalculateForceStateForPlay()) {
+  return Boolean(targetBase && getRunnerForceBase(runner, forceMap) === targetBase);
+}
+
+function logDefenseJudgment(entry) {
+  defenseState.judgmentLog = defenseState.judgmentLog || [];
+  defenseState.judgmentLog.push({
+    time: Number.isFinite(entry.time) ? Number(entry.time.toFixed(3)) : null,
+    ...entry
+  });
+  if (defenseState.judgmentLog.length > 40) defenseState.judgmentLog.shift();
+}
+
+function recordDefenseOutEvent({ runner = null, base = null, outType = "unknown", time = null, reason = "" } = {}) {
+  defenseState.outEvents = defenseState.outEvents || [];
+  const event = {
+    runnerId: getRunnerKey(runner),
+    base,
+    outType,
+    time: Number.isFinite(time) ? Number(time.toFixed(3)) : null,
+    reason,
+    outNumber: count.outs + defenseState.outEvents.length + 1
+  };
+  defenseState.outEvents.push(event);
+  logDefenseJudgment({
+    result: `${String(outType).toUpperCase()}_OUT_RECORDED`,
+    runnerId: event.runnerId,
+    targetBase: base,
+    time,
+    reason
+  });
+  return event;
+}
+
+function judgeOutPlay(runner, targetBase, throwState, options = {}) {
+  if (!runner || !targetBase || !throwState || throwState.visualOnly) {
+    return { result: "NO_PLAY", out: false, reason: "Missing runner, base, or live throw" };
+  }
+  const ballSecureTime = throwState.endTime;
+  const runnerArrivalTime = runner.arrivalTime;
+  if (!Number.isFinite(ballSecureTime) || !Number.isFinite(runnerArrivalTime)) {
+    return { result: "SAFE", out: false, reason: "Missing timing data" };
+  }
+  const forceMap = recalculateForceStateForPlay(options.completedForceOutBases);
+  const forcedBase = getRunnerForceBase(runner, forceMap);
+  const forced = forcedBase === targetBase;
+  if (forced) {
+    const baseTouchTime = throwState.baseTouchTime ?? ballSecureTime;
+    const out = baseTouchTime + SAFE_TOLERANCE < runnerArrivalTime;
+    return {
+      result: out ? "FORCE_OUT" : "SAFE",
+      out,
+      outType: out ? "force" : null,
+      forcedBase,
+      reason: out
+        ? "Ball secured and forced base touched before runner arrived"
+        : "Forced runner reached base before or with the throw",
+      ballSecureTime,
+      baseTouchTime,
+      runnerArrivalTime
+    };
+  }
+  const tagTime = throwState.tagTime ?? ballSecureTime;
+  const tagAttempt = throwState.playType === "tag" && isRunnerHeadingToDefenseBase(runner, targetBase);
+  const out = tagAttempt && tagTime + SAFE_TOLERANCE < runnerArrivalTime;
+  return {
+    result: out ? "TAG_OUT" : "SAFE",
+    out,
+    outType: out ? "tag" : null,
+    forcedBase,
+    reason: out
+      ? "Runner was not forced; tag play beat runner to safe base"
+      : "Runner was not forced; base touch alone cannot record an out",
+    ballSecureTime,
+    tagTime,
+    runnerArrivalTime
+  };
 }
 
 function hasRunnerTargetingThrowBase(targetBase, batterRunner = null, baseRunners = null, outcome = defenseState.outcome) {
@@ -10713,9 +10845,8 @@ function isDefenseRunnerAlreadySafeAtThrowTarget(throwState, runner) {
 
 function isDefenseRunnerOutAtThrowTarget(throwState, runner) {
   if (!throwState || !runner || !throwState.targetBase || runner.targetBase !== throwState.targetBase) return false;
-  if (!Number.isFinite(throwState.endTime) || !Number.isFinite(runner.arrivalTime)) return false;
   if (isDefenseRunnerAlreadySafeAtThrowTarget(throwState, runner)) return false;
-  return throwState.endTime <= runner.arrivalTime + 0.001;
+  return judgeOutPlay(runner, throwState.targetBase, throwState).out;
 }
 
 function getDefenseThrowTargetRunnerArrival(targetBase, batterRunner = null, baseRunners = null, outcome = defenseState.outcome) {
@@ -10852,6 +10983,18 @@ function getForceTargetsForCurrentPlay() {
 
 function getActiveForceTargets() {
   return getForceTargetsForCurrentPlay().filter((entry) => isForceTargetActive(entry.targetBase));
+}
+
+function annotateRunnerForceStates(batterRunner = defenseState.runner, baseRunners = defenseState.baseRunners) {
+  const forceMap = recalculateForceStateForPlay();
+  const apply = (runner, startBase) => {
+    if (!runner || !startBase) return;
+    const forceBase = forceMap.get(startBase) || null;
+    runner.forceBase = forceBase;
+    runner.forceObligation = Boolean(forceBase);
+  };
+  apply(batterRunner, "batter");
+  (baseRunners || []).forEach((runner) => apply(runner, runner.startBase));
 }
 
 function getThrowProfile(fielder, distance, options = {}) {
@@ -13982,6 +14125,8 @@ function updateBatterRunner(elapsedSeconds) {
   runner.arrived = runnerProgress >= 1;
   if (runner.arrived) {
     runner.currentBase = runner.targetBase;
+    runner.reachedBaseTime = runner.arrivalTime;
+    runner.running = false;
     runner.returnBase = getPreviousBatterRunnerBase(runner.currentBase) || runner.returnBase;
   }
 }
@@ -14030,6 +14175,12 @@ function updateDefenseBaseRunners(elapsedSeconds) {
     runner.x = point.x;
     runner.y = point.y;
     runner.arrived = runnerProgress >= 1;
+    if (runner.arrived) {
+      runner.currentBase = runner.targetBase || runner.startBase;
+      runner.reachedBaseTime = runner.arrivalTime;
+      runner.running = false;
+      runner.returning = false;
+    }
   });
 }
 
@@ -14096,24 +14247,41 @@ function getForceOutBasesFromThrowState(throwState) {
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
   if (!forcedRunner || !Number.isFinite(forcedRunner.arrivalTime)) return [];
   if (isDefenseRunnerAlreadySafeAtThrowTarget(throwState, forcedRunner)) return [];
-  return throwState.endTime <= forcedRunner.arrivalTime + 0.001 ? [throwState.targetBase] : [];
+  const judgment = judgeOutPlay(forcedRunner, throwState.targetBase, throwState);
+  return judgment.result === "FORCE_OUT" ? [throwState.targetBase] : [];
 }
 
 function getThrowOutRunner(throwState) {
   if (throwState?.visualOnly) return null;
   if (!throwState?.targetBase || !Number.isFinite(throwState.endTime)) return null;
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
-  if (forcedRunner && isDefenseRunnerOutAtThrowTarget(throwState, forcedRunner)) return forcedRunner;
+  if (forcedRunner) {
+    const judgment = judgeOutPlay(forcedRunner, throwState.targetBase, throwState);
+    if (judgment.out) {
+      logDefenseJudgment({
+        ...judgment,
+        runnerId: getRunnerKey(forcedRunner),
+        targetBase: throwState.targetBase,
+        time: throwState.endTime
+      });
+      return forcedRunner;
+    }
+  }
   const targetRunners = getDefenseThrowTargetRunners(
     throwState.targetBase,
     defenseState.runner,
     defenseState.baseRunners,
     defenseState.outcome
   );
-  const outRunner = targetRunners.find((runner) => isDefenseRunnerOutAtThrowTarget(throwState, runner));
-  if (outRunner) return outRunner;
-  if (throwState.safe === false) {
-    return targetRunners.find((runner) => !isDefenseRunnerAlreadySafeAtThrowTarget(throwState, runner)) || null;
+  for (const runner of targetRunners) {
+    const judgment = judgeOutPlay(runner, throwState.targetBase, throwState);
+    logDefenseJudgment({
+      ...judgment,
+      runnerId: getRunnerKey(runner),
+      targetBase: throwState.targetBase,
+      time: throwState.endTime
+    });
+    if (judgment.out) return runner;
   }
   return null;
 }
@@ -14390,6 +14558,25 @@ function finishDefensePlay() {
       const isForceOut = forceOutBases.length > 0;
       if (isForceOut) recordCompletedForceOut(defenseState.throw);
       const outsToAdd = isForceOut ? clamp(forceOutBases.length, 1, 3 - count.outs) : 1;
+      if (isForceOut) {
+        forceOutBases.slice(0, outsToAdd).forEach((base) => {
+          recordDefenseOutEvent({
+            runner: getForcedRunnerForThrowTarget(base, defenseState.runner, defenseState.baseRunners),
+            base,
+            outType: "force",
+            time: defenseState.throw?.endTime,
+            reason: "Force play recorded at forced base"
+          });
+        });
+      } else {
+        recordDefenseOutEvent({
+          runner: throwOutRunner,
+          base: defenseState.throw?.targetBase,
+          outType: "tag",
+          time: defenseState.throw?.endTime,
+          reason: "Non-forced runner retired on tag play"
+        });
+      }
       count.outs += outsToAdd;
       recordLastOutFromDefense(forceOutBases, throwOutRunner);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, outsToAdd);
@@ -14420,6 +14607,13 @@ function finishDefensePlay() {
       showEffect(runs > 0 ? `セーフ +${runs}` : "セーフ", "#fff2a8");
     }
   } else if (outcome.kind === "out") {
+    recordDefenseOutEvent({
+      runner: defenseState.runner || activeBatter,
+      base: null,
+      outType: "fly",
+      time: outcome.fieldingTime ?? defenseState.battedBall?.ballTime,
+      reason: "Batter-runner out on legal catch"
+    });
     count.outs += 1;
     recordLastOutBatter(battingTeam, activeBatter);
     recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
@@ -14538,6 +14732,7 @@ function applyTagOutBaseState(outRunner, batterInfo) {
 }
 
 function applySafeDefenseThrowBaseState(batterInfo) {
+  if (count.outs >= 3) return 0;
   const nextBases = createEmptyBases();
   let runs = 0;
   (defenseState.baseRunners || []).forEach((runner) => {
@@ -14569,6 +14764,7 @@ function getForcedRunnerStartBaseForTarget(targetBase) {
 }
 
 function applyManualDefenseAdvancement(batterInfo) {
+  if (count.outs >= 3) return 0;
   let runs = 0;
   const nextBases = { ...bases };
   defenseState.baseRunners?.forEach((runner) => {
@@ -14639,6 +14835,7 @@ function applyDefenseOutAdvancements() {
     recordPitcherOuts(fieldingTeam(), getTeamActivePitcher(fieldingTeam()), outsToAdd);
     if (outsToAdd > 0) adjustPitcherStamina(getTeamActivePitcher(fieldingTeam()), staminaTuning.outRecovery);
     defenseState.tagUpOutsAdded = (defenseState.tagUpOutsAdded || 0) + outsToAdd;
+    if (count.outs >= 3) runs = 0;
   }
   addRunsToBattingTeam(runs);
   playScoringCheer(runs);
