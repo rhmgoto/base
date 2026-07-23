@@ -9389,7 +9389,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
     return;
   }
   const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
-  const manualFielding = isManualDefenseControl() && !shouldAutoFieldFlyInManualDefense(battedBall) && !battedBall.fenceOver && !battedBall.wallHit && !battedBall.groundRuleDouble;
+  const manualFielding = false;
   let chosenFielder = battedBall.isBunt ? chooseBuntDefenseFielder(fielders, battedBall) : chooseDefenseFielder(fielders, battedBall);
   const runner = createBatterRunner(activeBatter);
   let outcome = resolveDefenseOutcome(chosenFielder, battedBall, runner);
@@ -9461,7 +9461,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   if (!throwState) {
     throwState = createTagUpVisualThrowState(chosenFielder, fieldingTarget, outcome, battedBall, baseRunners);
   }
-  if (outcome.caught) throwState = null;
+  if (outcome.caught && !outcome.needsThrow) throwState = null;
 
   gamePhase = "defense";
   isPitching = false;
@@ -9862,7 +9862,8 @@ function getDefenseDuration(battedBall, outcome, runner, throwState, fieldingTar
   const rollSeconds = (!outcome.caught || outcome.needsThrow) && fieldingTarget
     ? battedBall.ballTime + getDefenseRollDuration(battedBall, battedBall.target, fieldingTarget) + 0.45
     : 0;
-  const duration = clamp(Math.max(fieldingSeconds, runnerSeconds, throwSeconds, rollSeconds) * 1000, 1900, 12500);
+  const maxDuration = throwState?.manualWait ? 16000 : 12500;
+  const duration = clamp(Math.max(fieldingSeconds, runnerSeconds, throwSeconds, rollSeconds) * 1000, 1900, maxDuration);
   return isHomeRunVisionField() ? Math.max(6400, duration) : duration;
 }
 
@@ -10563,7 +10564,9 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
   const throwArrivalTime = fieldingTime + throwTime;
   const holdDeadline = Number.isFinite(throwArrivalTime)
     ? throwArrivalTime + defenseThrowResultHoldSeconds
-    : prepareStartTime + defenseThrowResultHoldSeconds;
+    : options.manualWait
+      ? prepareStartTime + 15
+      : prepareStartTime + defenseThrowResultHoldSeconds;
   return {
     active: false,
     from: { ...fieldingTarget },
