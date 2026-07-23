@@ -112,6 +112,23 @@ assertIncludesAll(
 assertIncludesAll(
   script,
   [
+    "catchVisual: null",
+    "landingMissVisual: null",
+    "const distance = Math.hypot(current.x - ball.x, current.y - ball.y)",
+    "candidate.distance <= candidate.circleRadius + ballRadius",
+    "function startDefenseCatchVisual",
+    "function drawDefenseCatchBallTransition",
+    "function updateDefenseLandingMissVisual",
+    "function drawDefenseLandingMissEffect",
+    "defenseState.catchVisual?.caughtInAir",
+    "Math.max(fieldingTime, visualFinishTime)"
+  ],
+  "script.js visible catch-range result alignment"
+);
+
+assertIncludesAll(
+  script,
+  [
     "stuff: -64",
     "id: \"homeRunVision\"",
     "name: \"ホームランヴィジョンフィールド\"",
