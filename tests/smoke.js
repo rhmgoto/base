@@ -8139,6 +8139,172 @@ assert(defenseOutAdvancementState.failedBases.score === 0, "failed tag-up attemp
 assert(defenseOutAdvancementState.failedBases.outs === 3, "failed tag-up attempts should add an out and can complete the third out");
 assert(defenseOutAdvancementState.failedBases.tagUpOuts === 1, "failed tag-up outs should be tracked on the defense state");
 
+const manualRunningCpuDefenseState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    gameMode = "versus";
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "auto" };
+    gamePhase = "defense";
+    activeBatter = findById(batters, "suzuki");
+    activePitcher = getTeamActivePitcher("home");
+    count = { strikes: 0, balls: 0, outs: 0 };
+    scores = { away: 0, home: 0 };
+    bases = createEmptyBases();
+    const thirdRunnerInfo = makeBaseRunner(findById(batters, "ichiro"));
+    bases.third = thirdRunnerInfo;
+    const flyBall = {
+      origin: { x: field.plateX, y: field.plateY },
+      target: { x: field.centerX, y: field.plateY - 820 },
+      direction: normalize({ x: 0, y: -1 }),
+      trajectory: "fly",
+      isGrounder: false,
+      isLiner: false,
+      ballTime: 1.4,
+      landingDistance: 820,
+      fenceOver: false,
+      wallHit: false
+    };
+    const fielder = {
+      role: "C",
+      x: flyBall.target.x,
+      y: flyBall.target.y,
+      currentX: flyBall.target.x,
+      currentY: flyBall.target.y,
+      fielding: 7,
+      arm: 7
+    };
+    const batterRunner = createBatterRunner(activeBatter);
+    const tagRunner = {
+      ...thirdRunnerInfo,
+      startBase: "third",
+      currentBase: "third",
+      targetBase: "third",
+      manualTargetBase: null,
+      tagUp: true,
+      scored: false,
+      route: [{ ...defenseField.bases.third }],
+      routeStartTime: 0,
+      routeDuration: 0,
+      arrivalTime: 0,
+      arrived: true,
+      x: defenseField.bases.third.x,
+      y: defenseField.bases.third.y,
+      speed: getDefenseBaseRunnerSpeed(thirdRunnerInfo)
+    };
+    defenseState = {
+      ...createDefenseState(),
+      active: true,
+      resolved: false,
+      startTime: performance.now() - 1000,
+      runner: batterRunner,
+      baseRunners: [tagRunner],
+      chosenFielder: fielder,
+      target: flyBall.target,
+      landingTarget: flyBall.target,
+      battedBall: flyBall,
+      outcome: {
+        kind: "out",
+        label: hitLabels.routineFly,
+        caught: true,
+        needsThrow: false,
+        fieldingTime: 0.8
+      },
+      unifiedCircleCatchComplete: true,
+      throw: null,
+      duration: 5000
+    };
+    handleBatterRunnerBaseCommand("home", "advance");
+    const flyOutcomePreserved = defenseState.outcome.kind === "out"
+      && defenseState.outcome.caught
+      && defenseState.outcome.needsThrow === false;
+    const cpuThrowsHome = defenseState.throw?.targetBase === "home";
+    const tagRunnerAfterCommand = defenseState.baseRunners[0];
+    tagRunnerAfterCommand.arrivalTime = defenseState.throw.endTime - 0.2;
+    finishDefensePlay();
+    const safeTagResult = {
+      outs: count.outs,
+      runs: scores.away,
+      thirdEmpty: !bases.third
+    };
+
+    count = { strikes: 0, balls: 0, outs: 0 };
+    scores = { away: 0, home: 0 };
+    bases = createEmptyBases();
+    gamePhase = "defense";
+    const relayRunner = createBatterRunner(activeBatter);
+    relayRunner.x = defenseField.bases.first.x;
+    relayRunner.y = defenseField.bases.first.y;
+    relayRunner.currentBase = "first";
+    relayRunner.targetBase = "first";
+    relayRunner.arrived = true;
+    const relayBall = {
+      ...flyBall,
+      trajectory: "liner",
+      isLiner: true,
+      target: { x: field.centerX + 100, y: field.plateY - 720 }
+    };
+    const firstBasePoint = { ...defenseField.bases.first };
+    defenseState = {
+      ...createDefenseState(),
+      active: true,
+      resolved: false,
+      startTime: performance.now() - 1000,
+      runner: relayRunner,
+      baseRunners: [],
+      chosenFielder: fielder,
+      target: relayBall.target,
+      landingTarget: relayBall.target,
+      battedBall: relayBall,
+      outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 0.4 },
+      throw: {
+        active: true,
+        completed: false,
+        from: relayBall.target,
+        to: firstBasePoint,
+        targetBase: "first",
+        baseLabel: "一塁",
+        startTime: 0.8,
+        endTime: 1.6,
+        holdDeadline: 3.6,
+        throwTime: 0.8,
+        safe: true
+      },
+      duration: 5000
+    };
+    handleBatterRunnerBaseCommand("second", "advance");
+    const firstThrowKeptInFlight = defenseState.throw.targetBase === "first";
+    updateThrowState(1.7);
+    const relayThrowCreated = defenseState.throw.targetBase === "second"
+      && Number.isFinite(defenseState.throw.startTime)
+      && Math.abs(defenseState.throw.from.x - firstBasePoint.x) < 0.001
+      && Math.abs(defenseState.throw.from.y - firstBasePoint.y) < 0.001;
+    const relayThrowActual = {
+      targetBase: defenseState.throw?.targetBase,
+      startTime: defenseState.throw?.startTime,
+      from: defenseState.throw?.from,
+      runnerTarget: defenseState.runner?.targetBase,
+      runnerArrived: defenseState.runner?.arrived
+    };
+    return JSON.stringify({
+      flyOutcomePreserved,
+      cpuThrowsHome,
+      safeTagResult,
+      firstThrowKeptInFlight,
+      relayThrowCreated,
+      relayThrowActual
+    });
+  })()`
+));
+
+assert(manualRunningCpuDefenseState.flyOutcomePreserved === true, "manual tag-up commands must not overwrite the caught-fly out");
+assert(manualRunningCpuDefenseState.cpuThrowsHome === true, "CPU defense should throw home when the third-base runner tags up manually");
+assert(manualRunningCpuDefenseState.safeTagResult.outs === 1, "a safe manual tag-up must still record the caught-fly out");
+assert(manualRunningCpuDefenseState.safeTagResult.runs === 1, "a safe manual tag-up from third should score exactly one run");
+assert(manualRunningCpuDefenseState.safeTagResult.thirdEmpty === true, "a scoring tag-up runner should be removed from third base");
+assert(manualRunningCpuDefenseState.firstThrowKeptInFlight === true, "CPU defense should not redirect a throw that is already in flight");
+assert(manualRunningCpuDefenseState.relayThrowCreated === true, `CPU defense should relay to the next base when a runner keeps advancing (${JSON.stringify(manualRunningCpuDefenseState.relayThrowActual)})`);
+
 const deepOutfieldFielderState = JSON.parse(runInGame(
   context,
   `(() => {

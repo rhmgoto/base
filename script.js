@@ -9685,14 +9685,14 @@ function handleBatterRunnerBaseCommand(targetBase, mode = "advance") {
   const legalTargetBase = getSequentialBatterRunnerTargetBase(runner, targetBase, mode);
   if (!canBatterRunnerTargetBase(runner, legalTargetBase, mode)) {
     if (handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds)) {
-      retargetDefenseThrowToBatterRunner(elapsedSeconds);
+      retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds);
       refreshDefenseThrowSafety();
     }
     return;
   }
   setBatterRunnerManualDestination(runner, legalTargetBase, elapsedSeconds, mode);
   if (mode === "advance") advanceForcedBaseRunnersForBatterTarget(legalTargetBase, elapsedSeconds);
-  retargetDefenseThrowToBatterRunner(elapsedSeconds);
+  retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds);
   refreshDefenseThrowSafety();
   message = mode === "return" ? `${getBaseLabel(legalTargetBase)}へ帰塁指示` : `${getBaseLabel(legalTargetBase)}へ走塁指示`;
 }
@@ -9776,7 +9776,7 @@ function handleAllRunnerBaseCommand(mode = "advance") {
     returnAllBaseRunnersOneBase(elapsedSeconds);
     message = "全走者帰塁指示";
   }
-  retargetDefenseThrowToBatterRunner(elapsedSeconds);
+  retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds);
   refreshDefenseThrowSafety();
 }
 
@@ -9868,6 +9868,9 @@ function setDefenseBaseRunnerManualDestination(runner, nextBase, elapsedSeconds)
   runner.route = [{ x: runner.x, y: runner.y }, { ...getDefenseBasePoint(nextBase) }];
   runner.targetBase = targetBase;
   runner.manualTargetBase = targetBase;
+  if (defenseState.outcome?.kind === "out" && defenseState.outcome.caught) {
+    runner.tagUp = true;
+  }
   runner.scored = nextBase >= 4;
   runner.routeDuration = getRunnerRouteDistance(runner.route) / runner.speed;
   runner.arrivalTime = elapsedSeconds + runner.routeDuration;
@@ -13446,7 +13449,7 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
 
   if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) {
     if (!defenseState.unifiedCircleCatchComplete) return false;
-    const tagUpThrowHold = defenseState.throw?.visualOnly && Number.isFinite(defenseState.throw.holdDeadline)
+    const tagUpThrowHold = Number.isFinite(defenseState.throw?.holdDeadline)
       ? defenseState.throw.holdDeadline
       : outcome.fieldingTime + defenseThrowResultHoldSeconds;
     return elapsedSeconds >= tagUpThrowHold
@@ -13470,6 +13473,88 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   }
 
   return false;
+}
+
+function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
+  if (isManualThrowControl()) return false;
+  const caughtFly = defenseState.outcome?.kind === "out" && defenseState.outcome.caught;
+  const candidates = [
+    ...(defenseState.baseRunners || []),
+    ...(caughtFly ? [] : [defenseState.runner])
+  ]
+    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived)
+    .sort((a, b) => {
+      const baseDifference = getBatterRunnerTargetIndex(b.targetBase) - getBatterRunnerTargetIndex(a.targetBase);
+      if (baseDifference !== 0) return baseDifference;
+      return (a.arrivalTime ?? Number.POSITIVE_INFINITY) - (b.arrivalTime ?? Number.POSITIVE_INFINITY);
+    });
+  const threatenedRunner = candidates[0];
+  if (!threatenedRunner || !defenseState.chosenFielder || !defenseState.target) return false;
+
+  const previousThrow = defenseState.throw;
+  if (previousThrow && Number.isFinite(previousThrow.endTime) && elapsedSeconds < previousThrow.endTime) {
+    return previousThrow.targetBase === threatenedRunner.targetBase;
+  }
+  if (
+    previousThrow
+    && previousThrow.targetBase === threatenedRunner.targetBase
+    && Number.isFinite(previousThrow.endTime)
+  ) {
+    refreshDefenseThrowSafety();
+    previousThrow.holdDeadline = Math.max(
+      previousThrow.holdDeadline ?? elapsedSeconds,
+      (threatenedRunner.arrivalTime ?? elapsedSeconds) + defenseThrowResultHoldSeconds
+    );
+    return true;
+  }
+
+  const isRelay = Boolean(
+    previousThrow
+    && Number.isFinite(previousThrow.endTime)
+    && elapsedSeconds >= previousThrow.endTime
+  );
+  const from = isRelay ? previousThrow.to : defenseState.target;
+  const thrower = isRelay
+    ? { ...(defenseState.chosenFielder || {}), arm: 5, fielding: 5 }
+    : defenseState.chosenFielder;
+  const throwOutcome = {
+    ...(defenseState.outcome || {}),
+    caught: true,
+    needsThrow: true
+  };
+  const nextThrow = createThrowState(thrower, from, throwOutcome, threatenedRunner, {
+    targetBase: threatenedRunner.targetBase,
+    immediate: true,
+    startTime: Math.max(elapsedSeconds, throwOutcome.fieldingTime ?? 0),
+    minStartTime: Math.max(elapsedSeconds, throwOutcome.fieldingTime ?? 0),
+    baseRunners: defenseState.baseRunners
+  });
+  if (!nextThrow) return false;
+  if (caughtFly) {
+    nextThrow.visualOnly = true;
+  } else {
+    defenseState.outcome = {
+      ...defenseState.outcome,
+      kind: "force",
+      caught: true,
+      needsThrow: true
+    };
+  }
+  defenseState.throw = nextThrow;
+  defenseState.heldBallBase = null;
+  defenseState.heldBallSince = null;
+  defenseState.duration = Math.max(
+    defenseState.duration ?? 0,
+    getDefenseDuration(
+      defenseState.battedBall,
+      defenseState.outcome,
+      defenseState.runner,
+      defenseState.throw,
+      defenseState.target
+    ),
+    (nextThrow.holdDeadline + 0.4) * 1000
+  );
+  return true;
 }
 
 function getHomeRunPlayFinishTime(battedBall, fireworks) {
@@ -13598,6 +13683,7 @@ function updateThrowState(elapsedSeconds) {
     if (getForceOutBasesFromThrowState(throwState).length) {
       recordCompletedForceOut(throwState);
     }
+    retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds);
   }
 }
 
@@ -14226,7 +14312,7 @@ function applyDefenseOutAdvancements() {
 
 function isTagUpRunnerSafe(runner) {
   const throwState = defenseState.throw;
-  if (!runner?.tagUp || !throwState?.visualOnly || throwState.targetBase !== runner.targetBase) return true;
+  if (!runner?.tagUp || !throwState || throwState.targetBase !== runner.targetBase) return true;
   if (!Number.isFinite(runner.arrivalTime) || !Number.isFinite(throwState.endTime)) return true;
   return runner.arrivalTime <= throwState.endTime;
 }
