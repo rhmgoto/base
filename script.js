@@ -383,6 +383,16 @@ const homeRunPowerTuning = {
   superCarryBonusMetersPerPoint: 1.5,
   cancelledToWallRate: 0.8
 };
+const homeRunVarietyTuning = {
+  standardDeepDrivePaceMin: 0.88,
+  standardDeepDrivePaceMax: 1.24,
+  superDeepDrivePacePerPoint: 0.12,
+  maxDeepDrivePace: 2.2,
+  lowPowerLinerWallRate: 0.7,
+  highPowerLinerWallRate: 0.4,
+  lowPowerFlyWallRate: 0.28,
+  highPowerFlyWallRate: 0.1
+};
 const homerToStrongInfieldGrounderRate = 0.16;
 const batLengthMultiplier = 0.648 * 0.85 * 0.9;
 const batInnerTrimRatio = 0.65 * 1.1;
@@ -7929,7 +7939,10 @@ function makeDeepDriveResultFromProfile(profile) {
   }
   const driveFloor = 1.18 + getPowerDriveScore() * 0.32;
   const feedbackScore = clamp(profile.feedbackScore ?? profile.quality ?? 0.6, 0, 1);
-  const isSuperDrive = feedbackScore >= 0.8;
+  const batterPower = getHomeRunPowerProfile();
+  const isSuperDrive = batterPower.superPower > 0
+    ? feedbackScore >= 0.72
+    : batterPower.standardPower >= 8 && feedbackScore >= 0.86;
   const label = isSuperDrive ? superDeepDriveLabel : deepDriveLabel;
   const powerBoost = isSuperDrive ? 0.38 : 0;
   const distancePowerBoost =
@@ -7937,10 +7950,27 @@ function makeDeepDriveResultFromProfile(profile) {
     + clamp(((profile.carry ?? 0.9) - 0.9) / 0.68, 0, 1) * 0.34
     + clamp((feedbackScore - 0.64) / 0.36, 0, 1) * 0.24
     + getPowerDriveScore() * 0.12;
-  const direction = isSuperDrive
+  const deepDriveTrajectory = isSuperDrive || (profile.launchAngle ?? 18) >= 23
+    ? "fly"
+    : "liner";
+  const direction = deepDriveTrajectory === "fly"
     ? getFlyBallDirection(profile, 0.12)
     : getStrongLinerLaneDirection({ ...profile, launchAngle: Math.min(profile.launchAngle ?? 18, 22) }, 0.46);
-  return { label, kind: "hit", power: clamp(profile.power + profile.carry * 0.62 + powerBoost + distancePowerBoost, driveFloor, deepDriveTuning.maxPower), scoreType: "single", deepDrive: true, superDeepDrive: isSuperDrive, direction, battedProfile: { ...profile, feedbackScore } };
+  return {
+    label,
+    kind: "hit",
+    power: clamp(profile.power + profile.carry * 0.62 + powerBoost + distancePowerBoost, driveFloor, deepDriveTuning.maxPower),
+    scoreType: "single",
+    deepDrive: true,
+    superDeepDrive: isSuperDrive,
+    direction,
+    battedProfile: {
+      ...profile,
+      feedbackScore,
+      deepDriveTrajectory,
+      batterPowerRating: batterPower.rating
+    }
+  };
 }
 
 function shouldConvertHomerCandidateToStrongInfieldGrounder(profile, roll = Math.random()) {
@@ -10957,7 +10987,9 @@ function getFenceIntersectionFromPoint(origin, direction) {
 
 function buildBattedBall(power, direction, label, battedProfile = null) {
   const origin = { x: field.plateX, y: field.plateY - 10 };
-  const batterHomeRunPower = getHomeRunPowerProfile();
+  const batterHomeRunPower = getHomeRunPowerProfile(
+    battedProfile?.batterPowerRating ?? getSwingAdjustedBatterPowerRating(activeBatter)
+  );
   const isBunt = Boolean(battedProfile?.isBunt);
   const isPopupFly = label === hitLabels.popup;
   const isRoutineFly = label === hitLabels.routineFly || label === hitLabels.fly;
@@ -10974,6 +11006,8 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const isFenceEdgeFly = label === hitLabels.fenceEdgeFly;
   const isSuperDeepDrive = label === superDeepDriveLabel || (label === deepDriveLabel && power >= 2.45);
   const isDeepDrive = label === deepDriveLabel || isSuperDeepDrive;
+  const deepDriveTrajectory = battedProfile?.deepDriveTrajectory
+    ?? (isSuperDeepDrive ? "fly" : "liner");
   const isBattingPracticeHomerCandidate = Boolean(battedProfile?.battingPracticeHomerCandidate);
   const isCenterZoneHomerCandidate = Boolean(battedProfile?.centerZoneHomerCandidate);
   const isScoreDrivenLongBall = Boolean(battedProfile?.scoreDrivenLongBall);
@@ -11043,14 +11077,15 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const centerZoneHomerPush = isCenterZoneHomerCandidate
     && contactScore >= 0.66
     && (isDeepDrive || isFenceEdgeFly || isFenceLiner);
-  const battingPracticeHomerDistanceBonus = (isBattingPracticeHomerCandidate || centerZoneHomerPush || scoreDrivenHomerPush) && isDeepDrive
-    ? fenceDistance * (isBattingPracticeHomerCandidate ? 0.24 : centerZoneHomerPush ? 0.17 : 0.18) + Math.max(0, profileExitVelocity - 1.1) * 260 + Math.max(0, profileCarry - 1.05) * 260
-    : centerZoneHomerPush
-    ? fenceDistance * 0.14 + Math.max(0, profileExitVelocity - 1.02) * 220 + Math.max(0, profileCarry - 0.98) * 220
+  const naturalLongBallBonusMeters = centerZoneHomerPush
+    ? 2.5 + contactScore * 1.5
     : scoreDrivenHomerPush
-    ? fenceDistance * 0.12 + Math.max(0, profileExitVelocity - 1.0) * 180 + Math.max(0, profileCarry - 0.95) * 180
-    : 0;
-  const boostedRawDistance = rawDistance + battingPracticeHomerDistanceBonus;
+      ? 2 + contactScore
+      : 0;
+  const naturalLongBallDistanceBonus = naturalLongBallBonusMeters
+    * fenceDistance
+    / Math.max(1, getActualFenceDistanceMetersForDirection(direction));
+  const boostedRawDistance = rawDistance + naturalLongBallDistanceBonus;
   let distance = shouldShortenBigOutfieldFly({
     isChaseFly,
     isFenceEdgeFly,
@@ -11061,7 +11096,14 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? boostedRawDistance * (isBattingPracticeHomerCandidate ? 1.04 : bigOutfieldFlyDistanceScale)
     : boostedRawDistance;
   const isGrounder = isCenterReturnGrounder || isLineEdgeGrounder || (!isPopupFly && !isRoutineFly && !isFrontDrop && !isLineEdge && !isLineLiner && !isLineDrop && !isFenceLiner && !isCenterReturnLiner && !isChaseFly && !isFenceEdgeFly && (isStandardGrounderLabel(label) || power < 0.38));
-  const isLiner = isHardOutfieldBounce || isCenterReturnLiner || isLineEdge || isLineLiner || isLineDrop || isFenceLiner || (isDeepDrive && !isSuperDeepDrive) || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
+  const isLiner = isHardOutfieldBounce
+    || isCenterReturnLiner
+    || isLineEdge
+    || isLineLiner
+    || isLineDrop
+    || isFenceLiner
+    || (isDeepDrive && deepDriveTrajectory === "liner")
+    || (!isGrounder && !isPopupFly && !isRoutineFly && !isFrontDrop && !isChaseFly && !isFenceEdgeFly && power < 0.94);
   const trajectory = isGrounder ? "grounder" : isLiner ? "liner" : "fly";
   if (!isGrounder && !isBunt) {
     distance *= getCurrentStadium().airCarryScale ?? 1;
@@ -11180,20 +11222,17 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     * ballSpeedMultiplier
     * battedBallPaceMultiplier
     * (isHardBattedBall ? hardBattedBallSpeedScale : 1)
-    * (isLineEdgeGrounder ? 1.22 : isLineEdge ? 1.12 : isLineLiner ? 1.08 : isFenceLiner ? 1.05 : isDeepDrive ? 1.45 * deepDriveBallSpeedScale * (!isSuperDeepDrive ? 1.12 : 1) : isFrontDrop ? 0.7 : isFenceEdgeFly ? 0.66 : isToweringFly ? 0.68 : isChaseFly ? 0.78 : isSoftDrop ? 0.74 : isGrounder && power >= hardGrounderTuning.minPower ? hardGrounderTuning.initialSpeedScale : isHardOutfieldBounce ? 1.08 : isHardOutfieldHit ? 0.88 : 1);
+    * (isLineEdgeGrounder ? 1.22 : isLineEdge ? 1.12 : isLineLiner ? 1.08 : isFenceLiner ? 1.05 : isDeepDrive ? getDeepDriveBallPaceScale({
+      powerProfile: batterHomeRunPower,
+      contactScore,
+      isSuperDeepDrive
+    }) : isFrontDrop ? 0.7 : isFenceEdgeFly ? 0.66 : isToweringFly ? 0.68 : isChaseFly ? 0.78 : isSoftDrop ? 0.74 : isGrounder && power >= hardGrounderTuning.minPower ? hardGrounderTuning.initialSpeedScale : isHardOutfieldBounce ? 1.08 : isHardOutfieldHit ? 0.88 : 1);
   if (isBunt) {
     baseBallSpeed *= isPopupFly ? 0.72 : 0.26;
   }
-  const possibleWallHit = isDeepDrive
-    && !isBattingPracticeHomerCandidate
-    && !centerZoneHomerPush
-    && !scoreDrivenHomerPush
-    && power >= 1.34
-    && distance > defenseField.deepHitDistance
-    && Math.random() < 0.36;
   const homeRunQualityBoost = getHomeRunQuality({ contactScore, profileExitVelocity, power });
   const homeRunFrequencyDistanceBonus = !isBunt && fairDeepFlight && !isGrounder
-    ? (homeRunFrequencyMultiplier - 1) * 170 * clamp(homeRunQualityBoost + (isFenceLiner ? 0.12 : 0), 0.28, 1)
+    ? (homeRunFrequencyMultiplier - 1) * 80 * clamp(homeRunQualityBoost + (isFenceLiner ? 0.12 : 0), 0.28, 1)
     : 0;
   const homeRunTestDistance = distance + homeRunFrequencyDistanceBonus;
   const possibleHomerFlightDistance = getPossibleHomeRunFlightDistance(
@@ -11211,6 +11250,8 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       profileCarry,
       direction,
       unifiedHomerCandidate: Boolean(battedProfile?.unifiedHomerCandidate),
+      centerZoneHomerCandidate: isCenterZoneHomerCandidate,
+      scoreDrivenLongBall: isScoreDrivenLongBall,
       batterPowerRating: batterHomeRunPower.rating
     }
   );
@@ -11219,6 +11260,10 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? randomBetween(330, 450) * bigOutfieldFlyHeightScale
     : isToweringFly
     ? randomBetween(390, 540) * bigOutfieldFlyHeightScale
+    : isDeepDrive && isLiner
+    ? randomBetween(185, 245)
+      + batterHomeRunPower.standardDrive * 42
+      + batterHomeRunPower.superPower * 4
     : isFenceLiner
     ? randomBetween(116, 206) + Math.max(0, power - 1.18) * 340
     : getBattedBallMaxHeight(trajectory, power, possibleHomerFlightDistance) * (isRoutineFly || isChaseFly || isDeepDrive ? bigOutfieldFlyHeightScale : 1);
@@ -11237,6 +11282,29 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
         trajectory
       })
     : 0;
+  const possibleHomerMeters = getBattedBallDistanceMeters(possibleHomerFlightDistance, {
+    direction,
+    fenceTravelDistance
+  });
+  const fenceMeters = getBattedBallDistanceMeters(fenceTravelDistance, {
+    direction,
+    fenceTravelDistance
+  });
+  const clearanceMeters = possibleHomerMeters - fenceMeters;
+  const clearsFenceNaturally = possibleFenceOver
+    && heightAtFence >= defenseField.fenceHeight;
+  const possibleWallHit = clearsFenceNaturally
+    && Math.random() < getNaturalFenceWallHitChance({
+      powerProfile: batterHomeRunPower,
+      contactScore,
+      clearanceMeters,
+      isLiner: isLiner || isFenceLiner,
+      isDeepDrive,
+      isFenceLiner,
+      isFenceEdgeFly,
+      isToweringFly,
+      isChaseFly
+    });
   const domeRule = getNextDomeBattedBallRule({
     direction,
     trajectory,
@@ -11255,71 +11323,12 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     isDeepDrive,
     isFenceLiner
   });
-  let fenceOver = domeRule?.kind === "homer" || (!possibleWallHit && possibleFenceOver && getBattedBallHeightAtDistance(fenceTravelDistance, {
-    flightDistance: possibleHomerFlightDistance,
-    maxHeight: possibleHomerHeight,
-    trajectory
-  }) >= defenseField.fenceHeight);
-  if (!fenceOver && battedProfile?.unifiedHomerCandidate && possibleFenceOver) {
-    const candidateLiftChance = clamp(
-      0.55
-        + batterHomeRunPower.standardDrive * 0.33
-        + batterHomeRunPower.superPower * 0.02,
-      0.55,
-      0.99
-    );
-    if (Math.random() < candidateLiftChance) fenceOver = true;
-  }
-  if (isBattingPracticeHomerCandidate && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 180) {
-    fenceOver = true;
-  }
-  if (centerZoneHomerPush && fairDeepFlight && fenceIntersection && distance > fenceTravelDistance - 155) {
-    fenceOver = true;
-  }
-  if (scoreDrivenHomerPush && fairDeepFlight && fenceIntersection && contactScore >= 0.6 && power >= 1.36 && distance > fenceTravelDistance - 180) {
-    fenceOver = true;
-  }
-  let nearFenceZoneHomerPush = false;
-  const zoneBand = battedProfile?.zoneBand;
-  const nearFenceZoneHomerPushEligible = !fenceOver
-    && (zoneBand === "center" || zoneBand === "middle")
-    && fairDeepFlight
-    && fenceIntersection
-    && !isGrounder
-    && distance > fenceTravelDistance - 180
-    && possibleHomerFlightDistance > fenceTravelDistance - 120
-    && heightAtFence >= defenseField.fenceHeight * 0.62;
-  if (nearFenceZoneHomerPushEligible && Math.random() < 0.3) {
-    nearFenceZoneHomerPush = true;
-    fenceOver = true;
-  }
+  let fenceOver = domeRule?.kind === "homer"
+    || (clearsFenceNaturally && !possibleWallHit);
   if (forceUnifiedWallHit && domeRule?.kind !== "groundRuleDouble") {
     fenceOver = false;
   }
-  const reducedPowerHitterHomer = shouldReducePowerHitterHomeRunToWallHit({
-    fenceOver,
-    isFenceEdgeFly,
-    isToweringFly,
-    isChaseFly,
-    isDeepDrive,
-    isFenceLiner,
-    contactScore,
-    profileExitVelocity,
-    profileCarry,
-    power,
-    unifiedHomerCandidate: Boolean(battedProfile?.unifiedHomerCandidate),
-    displayOverallScore: battedProfile?.displayOverallScore
-  });
-  let cancelledHomerFallback = null;
-  if (reducedPowerHitterHomer && !battedProfile?.battingPracticeHomerCandidate && !centerZoneHomerPush && !scoreDrivenHomerPush && !nearFenceZoneHomerPush && domeRule?.kind !== "homer") {
-    fenceOver = false;
-    cancelledHomerFallback = Math.random() < homeRunPowerTuning.cancelledToWallRate ? "wall" : "warningTrack";
-    if (cancelledHomerFallback === "warningTrack") {
-      const shortfall = randomBetween(28, 82);
-      distance = Math.min(distance, fenceTravelDistance - shortfall);
-      landingDistance = Math.min(landingDistance, fenceTravelDistance - shortfall);
-    }
-  }
+  const cancelledHomerFallback = possibleWallHit ? "wall" : null;
   const flyWallHit = trajectory === "fly"
     ? distance >= fenceTravelDistance - (isFenceEdgeFly ? 38 : isDeepDrive ? 52 : 24)
     : isFenceLiner
@@ -11334,7 +11343,6 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     && fairDeepFlight
     && fenceIntersection
     && (cancelledHomerFallback === "wall" || distance >= fenceTravelDistance || flyWallHit || possibleWallHit);
-  if (cancelledHomerFallback === "warningTrack") wallHit = false;
   if (forceUnifiedWallHit && !groundRuleDouble) {
     wallHit = true;
   }
@@ -11347,7 +11355,8 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       power,
       flightDistance,
       fenceTravelDistance,
-      isLiner: isLiner || isFenceLiner
+      isLiner: isLiner || isFenceLiner,
+      powerProfile: batterHomeRunPower
     });
   } else if (isHardBattedBall || isHardOutfieldHit || isLineLiner || isLineEdge || isLineEdgeGrounder || isFenceLiner) {
     baseBallSpeed *= contactSpeedLift;
@@ -11485,31 +11494,78 @@ function getHomeRunQuality({ contactScore = 0.5, profileExitVelocity = 1, power 
   );
 }
 
-function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
-  if (!traits.fenceOver) return false;
-  if (traits.unifiedHomerCandidate && (traits.displayOverallScore ?? traits.contactScore ?? 0) >= 0.72) return false;
-  if (traits.isFenceLiner) return false;
-  const homeRunPower = getHomeRunPowerProfile();
-  const quality = getHomeRunQuality({
-    contactScore: traits.contactScore ?? 0.5,
-    profileExitVelocity: traits.profileExitVelocity ?? traits.power ?? 1.2,
-    power: traits.power ?? 1.2
-  });
-  const eliteProtection = clamp((quality - 0.78) / 0.22, 0, 1);
-  const adjustedReductionRate = powerHitterHomeRunReductionRate / homeRunFrequencyMultiplier;
-  const conversionChance = clamp(
-    adjustedReductionRate * 0.46
-      - homeRunPower.candidateBonus * 0.14
-      - homeRunPower.mishitRescue * 0.12
-      - eliteProtection * 0.1,
-    0.01,
-    0.18
+function getDeepDriveBallPaceScale({ powerProfile = null, contactScore = 0.5, isSuperDeepDrive = false } = {}) {
+  const resolvedPower = powerProfile || getHomeRunPowerProfile();
+  const standardPace = homeRunVarietyTuning.standardDeepDrivePaceMin
+    + resolvedPower.standardDrive
+      * (homeRunVarietyTuning.standardDeepDrivePaceMax - homeRunVarietyTuning.standardDeepDrivePaceMin);
+  const contactPace = clamp((contactScore - 0.58) / 0.42, 0, 1) * 0.08;
+  const superPace = resolvedPower.superPower
+    * homeRunVarietyTuning.superDeepDrivePacePerPoint;
+  return clamp(
+    standardPace + contactPace + superPace + (isSuperDeepDrive && resolvedPower.superPower > 0 ? 0.08 : 0),
+    homeRunVarietyTuning.standardDeepDrivePaceMin,
+    homeRunVarietyTuning.maxDeepDrivePace
   );
-  return Math.random() < conversionChance;
 }
 
-function getHomeRunBallSpeedScale({ contactScore = 0.5, profileExitVelocity = 1, power = 1.2, flightDistance = 0, fenceTravelDistance = defenseField.fenceDistance, isLiner = false } = {}) {
-  if (isLiner) return 0.96 + getHomeRunQuality({ contactScore, profileExitVelocity, power }) * 0.14;
+function getNaturalFenceWallHitChance({
+  powerProfile = null,
+  contactScore = 0.5,
+  clearanceMeters = 0,
+  isLiner = false,
+  isDeepDrive = false,
+  isFenceLiner = false,
+  isFenceEdgeFly = false,
+  isToweringFly = false,
+  isChaseFly = false
+} = {}) {
+  if (!isDeepDrive && !isFenceLiner && !isFenceEdgeFly && !isToweringFly && !isChaseFly) return 0;
+  const resolvedPower = powerProfile || getHomeRunPowerProfile();
+  const baseRate = isLiner
+    ? homeRunVarietyTuning.lowPowerLinerWallRate
+      + resolvedPower.standardDrive
+        * (homeRunVarietyTuning.highPowerLinerWallRate - homeRunVarietyTuning.lowPowerLinerWallRate)
+    : homeRunVarietyTuning.lowPowerFlyWallRate
+      + resolvedPower.standardDrive
+        * (homeRunVarietyTuning.highPowerFlyWallRate - homeRunVarietyTuning.lowPowerFlyWallRate);
+  const clearanceRelief = clamp(clearanceMeters / 28, 0, 1) * (isLiner ? 0.2 : 0.08);
+  const contactRelief = clamp((contactScore - 0.62) / 0.38, 0, 1) * (isLiner ? 0.08 : 0.04);
+  const superPowerRelief = clamp(resolvedPower.superPower * 0.035, 0, 0.32);
+  return clamp(
+    baseRate - clearanceRelief - contactRelief - superPowerRelief,
+    resolvedPower.superPower > 0 ? 0.01 : 0.06,
+    0.72
+  );
+}
+
+function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
+  if (!traits.fenceOver) return false;
+  return Math.random() < getNaturalFenceWallHitChance({
+    powerProfile: getHomeRunPowerProfile(traits.batterPowerRating),
+    contactScore: traits.contactScore,
+    clearanceMeters: traits.clearanceMeters,
+    isLiner: traits.isLiner,
+    isDeepDrive: traits.isDeepDrive,
+    isFenceLiner: traits.isFenceLiner,
+    isFenceEdgeFly: traits.isFenceEdgeFly,
+    isToweringFly: traits.isToweringFly,
+    isChaseFly: traits.isChaseFly
+  });
+}
+
+function getHomeRunBallSpeedScale({ contactScore = 0.5, profileExitVelocity = 1, power = 1.2, flightDistance = 0, fenceTravelDistance = defenseField.fenceDistance, isLiner = false, powerProfile = null } = {}) {
+  const resolvedPower = powerProfile || getHomeRunPowerProfile();
+  if (isLiner) {
+    return clamp(
+      0.84
+        + getHomeRunQuality({ contactScore, profileExitVelocity, power }) * 0.12
+        + resolvedPower.standardDrive * 0.1
+        + resolvedPower.superPower * 0.025,
+      0.84,
+      1.2
+    );
+  }
   const quality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
   const clearance = clamp((flightDistance - fenceTravelDistance) / 420, 0, 1);
   return clamp(0.72 + quality * 0.22 + clearance * 0.14, 0.72, 1.08);
@@ -11651,31 +11707,35 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
             ? -2 + quality * 3
             : 0;
   const scoreLimitedMaximumMeters = contactScore < 0.7
-    ? 130 + clamp((contactScore - 0.55) / 0.15, 0, 1) * 7 + exitQuality * 1.5 + carryQuality * 1.5
+    ? 136 + clamp((contactScore - 0.55) / 0.15, 0, 1) * 7 + exitQuality * 2 + carryQuality * 2
     : contactScore < 0.8
-      ? 140 + clamp((contactScore - 0.7) / 0.1, 0, 1) * 10 + exitQuality * 2.5 + carryQuality * 2.5
-      : 152 + clamp((contactScore - 0.8) / 0.2, 0, 1) * 18 + exitQuality * 4 + carryQuality * 4;
+      ? 145 + clamp((contactScore - 0.7) / 0.1, 0, 1) * 10 + exitQuality * 3 + carryQuality * 3
+      : 154 + clamp((contactScore - 0.8) / 0.2, 0, 1) * 18 + exitQuality * 4 + carryQuality * 4;
   const minimumOverFenceMeters = fenceMeters + (contactScore >= 0.8 ? 4 : 2);
   const absoluteMaximumMeters =
-    142
-    + batterHomeRunPower.standardPower * 3.8
-    + batterHomeRunPower.superPower * 1.6;
+    138
+    + batterHomeRunPower.standardDrive * 22
+    + batterHomeRunPower.superPower * 2;
   const maximumMeters = clamp(
     Math.max(minimumOverFenceMeters, scoreLimitedMaximumMeters + batterHomeRunPower.carryBonusMeters),
     0,
     absoluteMaximumMeters
   );
   const lowGravityCarryScale = getCurrentStadium().hasSpaceStadium ? (getCurrentStadium().airCarryScale ?? 1) : 1;
-  const candidateClearanceMeters = traits.unifiedHomerCandidate
-    ? 2
-      + batterHomeRunPower.standardDrive * 8
-      + batterHomeRunPower.superPower * 1.25
+  const candidateCarryMeters = traits.unifiedHomerCandidate
+    ? randomBetween(-14, 4)
+      + quality * 2
+      + batterHomeRunPower.standardDrive * 3
+      + batterHomeRunPower.superPower * 1.1
     : 0;
-  const candidateMinimumMeters = traits.unifiedHomerCandidate
-    ? fenceMeters + candidateClearanceMeters
-    : 0;
+  const centerCarryMeters = traits.centerZoneHomerCandidate ? 2.5 : 0;
+  const scoreCarryMeters = traits.scoreDrivenLongBall ? 2 : 0;
   const finalMeters = clamp(
-    Math.max(naturalMeters + styleBonus, candidateMinimumMeters),
+    naturalMeters
+      + styleBonus
+      + candidateCarryMeters
+      + centerCarryMeters
+      + scoreCarryMeters,
     0,
     maximumMeters
   ) * lowGravityCarryScale;

@@ -3941,11 +3941,11 @@ const homeRunDistanceVarietyState = JSON.parse(runInGame(
       }));
     }
     return JSON.stringify({
-      nearWall: homerMeters(260, { contactScore: 0.58, profileExitVelocity: 0.98, profileCarry: 0.96, power: 1.42 }),
-      solid: homerMeters(520, { contactScore: 0.72, profileExitVelocity: 1.1, profileCarry: 1.08, power: 1.65 }),
-      strong: homerMeters(620, { contactScore: 0.72, profileExitVelocity: 1.14, profileCarry: 1.1, power: 1.78 }),
-      veryStrong: homerMeters(700, { contactScore: 0.78, profileExitVelocity: 1.18, profileCarry: 1.16, power: 1.8 }),
-      elite: homerMeters(900, { contactScore: 0.92, profileExitVelocity: 1.42, profileCarry: 1.36, power: 2.15 }),
+      nearWall: homerMeters(260, { contactScore: 0.58, profileExitVelocity: 0.98, profileCarry: 0.96, power: 1.42, batterPowerRating: 5 }),
+      solid: homerMeters(520, { contactScore: 0.72, profileExitVelocity: 1.1, profileCarry: 1.08, power: 1.65, batterPowerRating: 6 }),
+      strong: homerMeters(620, { contactScore: 0.72, profileExitVelocity: 1.14, profileCarry: 1.1, power: 1.78, batterPowerRating: 7 }),
+      veryStrong: homerMeters(700, { contactScore: 0.78, profileExitVelocity: 1.18, profileCarry: 1.16, power: 1.8, batterPowerRating: 8 }),
+      elite: homerMeters(900, { contactScore: 0.92, profileExitVelocity: 1.42, profileCarry: 1.36, power: 2.15, batterPowerRating: 10 }),
       perfect: homerMeters(1400, { contactScore: 0.98, profileExitVelocity: 1.7, profileCarry: 1.75, power: 2.7, batterPowerRating: 10 })
     });
   })()`
@@ -3956,7 +3956,7 @@ assert(homeRunDistanceVarietyState.solid >= 136 && homeRunDistanceVarietyState.s
 assert(homeRunDistanceVarietyState.strong >= 140 && homeRunDistanceVarietyState.strong <= 154, "strong homers should reach the upper part of the ordinary home-run range");
 assert(homeRunDistanceVarietyState.veryStrong >= 144 && homeRunDistanceVarietyState.veryStrong <= 160, "very strong homers should be long without always hitting the cap");
 assert(homeRunDistanceVarietyState.elite > homeRunDistanceVarietyState.veryStrong, "elite homers should carry beyond ordinary strong homers");
-assert(homeRunDistanceVarietyState.perfect >= 165 && homeRunDistanceVarietyState.perfect <= 180, "near-perfect contact should be capped around 180m instead of becoming unrealistic");
+assert(homeRunDistanceVarietyState.perfect >= 156 && homeRunDistanceVarietyState.perfect <= 162, "normal power ratings should cap near-perfect contact around 160m");
 
 const stadiumFenceOutcomeState = JSON.parse(runInGame(
   context,
@@ -4877,32 +4877,32 @@ const variedBattedBallState = JSON.parse(runInGame(
     const marginalHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 80,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 1.48, contactScore: 0.54, profileExitVelocity: 0.94 }
+      { isDeepDrive: true, power: 1.48, contactScore: 0.54, profileExitVelocity: 0.94, batterPowerRating: 5 }
     );
     const solidHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 340,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 1.82, contactScore: 0.74, profileExitVelocity: 1.12 }
+      { isDeepDrive: true, power: 1.82, contactScore: 0.74, profileExitVelocity: 1.12, batterPowerRating: 8 }
     );
     const monsterHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 760,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 2.58, contactScore: 0.96, profileExitVelocity: 1.48 }
+      { isDeepDrive: true, power: 2.58, contactScore: 0.96, profileExitVelocity: 1.48, batterPowerRating: 10 }
     );
     const sameRawWeakHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 360,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 1.42, contactScore: 0.56, profileExitVelocity: 0.96, profileCarry: 0.98 }
+      { isDeepDrive: true, power: 1.42, contactScore: 0.56, profileExitVelocity: 0.96, profileCarry: 0.98, batterPowerRating: 5 }
     );
     const sameRawSolidHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 360,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 1.9, contactScore: 0.76, profileExitVelocity: 1.18, profileCarry: 1.24 }
+      { isDeepDrive: true, power: 1.9, contactScore: 0.76, profileExitVelocity: 1.18, profileCarry: 1.24, batterPowerRating: 8 }
     );
     const sameRawPerfectHomeRunDistance = getPossibleHomeRunFlightDistance(
       defenseField.fenceDistance + 360,
       defenseField.fenceDistance,
-      { isDeepDrive: true, power: 2.62, contactScore: 0.98, profileExitVelocity: 1.58, profileCarry: 1.68 }
+      { isDeepDrive: true, power: 2.62, contactScore: 0.98, profileExitVelocity: 1.58, profileCarry: 1.68, batterPowerRating: 10 }
     );
     const solidSeventySpeed = getDisplayExitSpeedKmh({
       power: 0.92,
@@ -5212,10 +5212,9 @@ assert(variedBattedBallState.fenceEdgeHomerOver || variedBattedBallState.fenceEd
 assert(variedBattedBallState.fenceEdgeHomerFlightOverFence >= -80, "stretched fence-edge fly distance should reach the fence area");
 assert(variedBattedBallState.barelyHomerOver === true, "the best fence-edge flies should be able to become barely-cleared home runs");
 assert(variedBattedBallState.barelyHomerFlightOverFence > 0, "barely-cleared fence-edge flies should carry just beyond the fence");
-assert(variedBattedBallState.deepDriveWallHit === true, "deep drives should be able to reach the wall");
-assert(variedBattedBallState.deepDriveWallOver === false, "wall-bound deep drives should stay in play");
-assert(variedBattedBallState.deepDriveBallTime < variedBattedBallState.oldDeepDriveBallTimeEstimate * 0.96, "strong deep drives should travel even faster than the previous boost");
-assert(variedBattedBallState.deepDriveExitSpeed >= 178, "strong deep drives should display a more powerful exit velocity");
+assert(variedBattedBallState.deepDriveWallHit === false && variedBattedBallState.deepDriveWallOver === false, "ordinary deep drives should be able to stay in the outfield instead of always reaching the stands");
+assert(variedBattedBallState.deepDriveBallTime > variedBattedBallState.oldDeepDriveBallTimeEstimate * 1.08, "normal-power deep drives should no longer flash to the stands at the former extreme speed");
+assert(variedBattedBallState.deepDriveExitSpeed <= 190, "normal deep-drive exit-speed display should stay below the superhuman range");
 assert(variedBattedBallState.deepDriveHomerOver === false, "strong but imperfect deep drives should now be able to stay in play");
 assert(variedBattedBallState.deepDriveHomerWallHit === true, "strong but imperfect deep drives can now threaten the wall instead of clearing it");
 assert(variedBattedBallState.perfectDeepDriveHomerOver === true, "perfect deep drives should still become home runs");
@@ -5226,7 +5225,7 @@ assert(variedBattedBallState.solidHomeRunOverFence < variedBattedBallState.monst
 assert(variedBattedBallState.marginalHomeRunMeters < variedBattedBallState.solidHomeRunMeters, "displayed home-run distances should vary with contact quality");
 assert(variedBattedBallState.solidHomeRunMeters < variedBattedBallState.monsterHomeRunMeters, "displayed monster shots should remain visibly longer");
 assert(variedBattedBallState.sameRawWeakHomeRunMeters < variedBattedBallState.sameRawSolidHomeRunMeters, "home-run distance should grow even when raw wall distance is the same but contact is better");
-assert(variedBattedBallState.sameRawSolidHomeRunMeters + 8 <= variedBattedBallState.sameRawPerfectHomeRunMeters, "perfect contact should add a visibly larger home-run distance ceiling");
+assert(variedBattedBallState.sameRawSolidHomeRunMeters + 5 <= variedBattedBallState.sameRawPerfectHomeRunMeters, "perfect contact should add a visibly larger home-run distance ceiling");
 assert(variedBattedBallState.marginalHomeRunMeters <= 135, "barely-cleared home runs should display near-wall to modest middle-distance values");
 assert(variedBattedBallState.monsterHomeRunMeters >= 145 && variedBattedBallState.monsterHomeRunMeters <= 180, "perfect contact should still display as an extra-large but realistic home run");
 assert(variedBattedBallState.solidSeventySpeed >= variedBattedBallState.lowerSolidSpeed + 12, "seventy-percent strong contact should get a more forceful exit-speed display");
@@ -5461,9 +5460,9 @@ const battedProfileState = JSON.parse(runInGame(
       inGoodContactZone: true
     });
     Math.random = () => 0.3;
-    const centerDriveWallBall = buildBattedBall(centerDriveResult.power, normalize({ x: 0.04, y: -1 }), centerDriveResult.label);
+    const centerDriveWallBall = buildBattedBall(centerDriveResult.power, normalize({ x: 0.04, y: -1 }), centerDriveResult.label, centerDriveResult.battedProfile);
     Math.random = () => 0.99;
-    const centerDriveHomerBall = buildBattedBall(centerDriveResult.power, normalize({ x: 0.04, y: -1 }), centerDriveResult.label);
+    const centerDriveHomerBall = buildBattedBall(centerDriveResult.power, normalize({ x: 0.04, y: -1 }), centerDriveResult.label, centerDriveResult.battedProfile);
     Math.random = () => 0.6;
     const offTimingCenterDriveResult = decideHitResultFromBattedProfile({
       timeDiff: 185,
@@ -6098,7 +6097,7 @@ assert(battedProfileState.mistakeFenceEdgeScore > battedProfileState.outsideFenc
 assert(battedProfileState.centerDriveKind === "hit", "middle-zone mistake contact should create a threatening drive");
 assert(battedProfileState.centerDriveFenceEdge || battedProfileState.centerDriveDeepDrive || battedProfileState.centerDriveFenceLiner, "middle-zone mistake contact should be able to lift toward the fence");
 assert(battedProfileState.centerDriveRoutineFly === false, "middle-zone mistake contact should not fall back to a routine fly first");
-assert(battedProfileState.centerDriveWallHit === true, "middle-zone mistake contact should be able to hit the fence");
+assert(battedProfileState.centerDriveWallHit === false, "middle-zone mistake contact should also be able to stay in play instead of being forced to the wall");
 assert(battedProfileState.centerDriveHomerOver === true, "middle-zone mistake contact should be able to clear the fence");
 assert(["hit", "out"].includes(battedProfileState.offTimingCenterDriveKind), "slightly off-timing middle-zone contact should resolve as a playable ball");
 assert(battedProfileState.forgivingCenterDriveKind === "hit", "forgiving middle-zone contact should still be a hit");
@@ -6199,7 +6198,7 @@ const powerSeparationState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(powerSeparationState.values[5].distanceMeters >= powerSeparationState.values[1].distanceMeters + 8, `power-5 hitters should clearly outdistance power-1 hitters (${JSON.stringify(powerSeparationState.values)})`);
+assert(powerSeparationState.values[5].distanceMeters >= powerSeparationState.values[1].distanceMeters + 6, `power-5 hitters should clearly outdistance power-1 hitters (${JSON.stringify(powerSeparationState.values)})`);
 assert(powerSeparationState.values[10].distanceMeters >= powerSeparationState.values[5].distanceMeters + 5, `power-10 hitters should keep a clearly higher deep-outfield ceiling (${JSON.stringify(powerSeparationState.values)})`);
 assert(powerSeparationState.powerHitterHomerConverted === true, "some power-hitter home-run candidates should be converted into fence doubles");
 assert(powerSeparationState.powerHitterHomerKept === false, "power-hitter home-run conversion should not remove every homer");

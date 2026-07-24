@@ -107,11 +107,20 @@ const result = vm.runInContext(`
     activeBatter = { ...findById(batters, "judge"), power: rating, meet: 6 };
     let candidates = 0;
     let homers = 0;
-    let walls = 0;
-    let warningTrack = 0;
+    let wallHits = 0;
+    let nearFenceInPlay = 0;
+    let linerHomers = 0;
+    let flyHomers = 0;
+    let barelyHomers = 0;
+    let ordinaryHomers = 0;
+    let longHomers = 0;
+    let monsterHomers = 0;
     let distanceTotal = 0;
+    let minimumDistance = Infinity;
     let maxDistance = 0;
+    let homeRunTimeTotal = 0;
     for (let index = 0; index < samples; index += 1) {
+      const launchAngles = [16, 20, 24, 28, 34];
       const profile = {
         quality: 0.62,
         feedbackScore: 0.62,
@@ -119,7 +128,7 @@ const result = vm.runInContext(`
         power: 1.28,
         exitVelocity: 1.02,
         carry: 1,
-        launchAngle: 28,
+        launchAngle: launchAngles[index % launchAngles.length],
         direction: normalize({ x: 0.08, y: -1 }),
         zoneBand: "middle",
         preserveUnifiedDirection: true
@@ -132,20 +141,51 @@ const result = vm.runInContext(`
       if (ball.fenceOver) {
         homers += 1;
         distanceTotal += ball.flightDistanceMeters;
+        minimumDistance = Math.min(minimumDistance, ball.flightDistanceMeters);
         maxDistance = Math.max(maxDistance, ball.flightDistanceMeters);
+        homeRunTimeTotal += ball.ballTime;
+        if (ball.isLiner) linerHomers += 1;
+        else flyHomers += 1;
+        const fenceTravelDistance = getFenceIntersectionFromPoint(ball.origin, ball.direction)?.travelDistance
+          ?? defenseField.fenceDistance;
+        const fenceMeters = getBattedBallDistanceMeters(fenceTravelDistance, {
+          direction: ball.direction,
+          fenceTravelDistance
+        });
+        const clearance = ball.flightDistanceMeters - fenceMeters;
+        if (clearance <= 18) barelyHomers += 1;
+        else if (ball.flightDistanceMeters <= 145) ordinaryHomers += 1;
+        else if (ball.flightDistanceMeters <= 160) longHomers += 1;
+        else monsterHomers += 1;
       }
-      if (ball.cancelledHomerFallback === "wall") walls += 1;
-      if (ball.cancelledHomerFallback === "warningTrack") warningTrack += 1;
+      if (ball.wallHit) wallHits += 1;
+      if (!ball.fenceOver && !ball.wallHit) {
+        const fenceTravelDistance = getFenceIntersectionFromPoint(ball.origin, ball.direction)?.travelDistance
+          ?? defenseField.fenceDistance;
+        const fenceMeters = getBattedBallDistanceMeters(fenceTravelDistance, {
+          direction: ball.direction,
+          fenceTravelDistance
+        });
+        if (ball.flightDistanceMeters >= fenceMeters - 5) nearFenceInPlay += 1;
+      }
     }
-    const fallbackTotal = walls + warningTrack;
     const powerProfile = getHomeRunPowerProfile();
     return {
       power: rating,
       candidateRate: Math.round(candidates / samples * 1000) / 10,
       homeRunRate: Math.round(homers / samples * 1000) / 10,
+      wallHitRate: Math.round(wallHits / samples * 1000) / 10,
+      nearFenceInPlayRate: Math.round(nearFenceInPlay / samples * 1000) / 10,
       averageHomeRunMeters: homers ? Math.round(distanceTotal / homers * 10) / 10 : 0,
+      minimumHomeRunMeters: homers ? Math.round(minimumDistance * 10) / 10 : 0,
       maxHomeRunMeters: Math.round(maxDistance * 10) / 10,
-      cancelledWallRate: fallbackTotal ? Math.round(walls / fallbackTotal * 1000) / 10 : 0,
+      averageHomeRunSeconds: homers ? Math.round(homeRunTimeTotal / homers * 100) / 100 : 0,
+      linerHomerRate: homers ? Math.round(linerHomers / homers * 1000) / 10 : 0,
+      flyHomerRate: homers ? Math.round(flyHomers / homers * 1000) / 10 : 0,
+      barelyHomerRate: homers ? Math.round(barelyHomers / homers * 1000) / 10 : 0,
+      ordinaryHomerRate: homers ? Math.round(ordinaryHomers / homers * 1000) / 10 : 0,
+      longHomerRate: homers ? Math.round(longHomers / homers * 1000) / 10 : 0,
+      monsterHomerRate: homers ? Math.round(monsterHomers / homers * 1000) / 10 : 0,
       candidateBonus: Math.round(powerProfile.candidateBonus * 1000) / 10,
       carryBonusMeters: Math.round(powerProfile.carryBonusMeters * 10) / 10
     };
@@ -176,9 +216,19 @@ if (!(powerTen.homeRunRate > powerEight.homeRunRate)) {
 if (!(powerForty.averageHomeRunMeters > powerTen.averageHomeRunMeters + 25)) {
   throw new Error("super-power hitters should have clearly exceptional home-run distance");
 }
-for (const power of [5, 8, 9, 10, 20, 40]) {
-  const entry = result.find((item) => item.power === power);
-  if (entry.cancelledWallRate < 65 || entry.cancelledWallRate > 95) {
-    throw new Error(`cancelled home runs should usually become wall hits at power ${power}`);
-  }
+const powerFive = result.find((entry) => entry.power === 5);
+if (!(powerFive.wallHitRate > 5 && powerFive.homeRunRate > 5)) {
+  throw new Error("ordinary power should produce both home runs and fence hits");
+}
+if (!(powerFive.minimumHomeRunMeters < powerFive.averageHomeRunMeters - 2)) {
+  throw new Error("power 5 should include weaker home runs instead of one fixed distance");
+}
+if (!(powerFive.barelyHomerRate > 5 && powerFive.linerHomerRate > 10 && powerFive.flyHomerRate > 20)) {
+  throw new Error("power 5 should produce barely-cleared, liner, and fly-ball home runs");
+}
+if (!(powerTen.maxHomeRunMeters <= 162)) {
+  throw new Error("normal power ratings should not produce superhuman home-run distance");
+}
+if (!(powerForty.monsterHomerRate > powerTen.monsterHomerRate + 25)) {
+  throw new Error("monster home runs should remain concentrated among super-power hitters");
 }

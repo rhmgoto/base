@@ -328,4 +328,19 @@ assertIncludesAll(
   "bunt popup reduction and pitcher-front grounder conversion"
 );
 
+assertIncludesAll(
+  script,
+  [
+    "const homeRunVarietyTuning",
+    "function getDeepDriveBallPaceScale",
+    "function getNaturalFenceWallHitChance",
+    "deepDriveTrajectory",
+    "const clearsFenceNaturally",
+    "const candidateCarryMeters",
+    "randomBetween(-14, 4)",
+    "batterPowerRating: batterPower.rating"
+  ],
+  "continuous home-run distance, trajectory, and wall-hit variety"
+);
+
 console.log("Static checks passed");
