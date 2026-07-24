@@ -426,7 +426,8 @@ const dhRole = "DH";
 const defensiveBatterRoles = [...infielderRoles, ...outfielderRoles, catcherRole];
 const batterRoles = [...defensiveBatterRoles, dhRole];
 const benchRoles = ["bench1", "bench2", "bench3"];
-const benchCostLimit = 10;
+const benchCostLimit = 15;
+const benchSinglePlayerCostLimit = benchCostLimit / 2;
 const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
@@ -1009,6 +1010,8 @@ let battingTeam = "away";
 let inning = 1;
 let half = "top";
 let scores = { away: 0, home: 0 };
+let inningScores = createInningScores();
+let batterGameRecords = createBatterGameRecords();
 let pitcherGameRecords = createPitcherGameRecords();
 let pitcherDecisionEvents = [];
 let selected = createSelectedTeams(defaultMenuSelection);
@@ -1842,7 +1845,7 @@ function createSelectedTeam(selection) {
   const lineupOrder = getSelectionLineupOrder(selection);
   const selectedBench = benchRoles.map((role) => ({
     role,
-    player: selection?.[role] ? findSelectedById(getPlayerListForRole(role), selection[role]) : null
+    player: selection?.[role] ? createBenchPlayerForMatch(findSelectedById(getPlayerListForRole(role), selection[role])) : null
   }));
   return {
     pitchers: selectedPitchers,
@@ -2063,6 +2066,100 @@ function getTeamActivePitcher(team) {
 
 function createPitcherGameRecords() {
   return { away: {}, home: {} };
+}
+
+function createInningScores() {
+  return { away: [], home: [] };
+}
+
+function createBatterGameRecords() {
+  return { away: {}, home: {} };
+}
+
+function getBatterRecordKey(player) {
+  return player?.id || player?.name || "unknown";
+}
+
+function ensureBatterGameRecord(team, player = activeBatter, role = getCurrentBatterRole(team)) {
+  if (isAnyPracticeMode() || !team || !player) return null;
+  const teamRecords = batterGameRecords[team] || (batterGameRecords[team] = {});
+  const key = getBatterRecordKey(player);
+  const lineup = selected?.[team]?.batters || [];
+  const lineupIndex = lineup.findIndex((entry) => entry?.player?.id === player.id);
+  const existingCount = Object.keys(teamRecords).length;
+  const record = teamRecords[key] || {
+    id: player.id,
+    name: player.name,
+    role: role || lineup[lineupIndex]?.role || "",
+    order: lineupIndex >= 0 ? lineupIndex : lineup.length + existingCount,
+    plateAppearances: 0,
+    atBats: 0,
+    runs: 0,
+    hits: 0,
+    rbi: 0,
+    doubles: 0,
+    triples: 0,
+    homeRuns: 0,
+    strikeouts: 0,
+    walks: 0,
+    hbp: 0,
+    errorsReached: 0
+  };
+  record.name = player.name;
+  if (role) record.role = role;
+  teamRecords[key] = record;
+  return record;
+}
+
+function initializeBatterGameRecords() {
+  batterGameRecords = createBatterGameRecords();
+  teamIds.forEach((team) => {
+    selected?.[team]?.batters?.forEach((entry) => ensureBatterGameRecord(team, entry.player, entry.role));
+  });
+}
+
+function recordBatterPlateAppearance(resultType, options = {}) {
+  if (isAnyPracticeMode()) return;
+  const record = ensureBatterGameRecord(battingTeam, activeBatter, getCurrentBatterRole(battingTeam));
+  if (!record) return;
+  const runsBattedIn = Math.max(0, options.rbi ?? options.runs ?? 0);
+  record.plateAppearances += 1;
+  record.rbi += runsBattedIn;
+  if (resultType === "walk") {
+    record.walks += 1;
+    return;
+  }
+  if (resultType === "hbp") {
+    record.hbp += 1;
+    return;
+  }
+  record.atBats += 1;
+  if (resultType === "strikeout") record.strikeouts += 1;
+  if (resultType === "error") record.errorsReached += 1;
+  if (scoringHitTypes.has(resultType)) {
+    record.hits += 1;
+    if (resultType === "double") record.doubles += 1;
+    if (resultType === "triple") record.triples += 1;
+    if (resultType === "homer") record.homeRuns += 1;
+  }
+}
+
+function recordBatterRunScored(team, runner) {
+  if (isAnyPracticeMode() || !team || !runner) return;
+  const record = ensureBatterGameRecord(team, runner, null);
+  if (record) record.runs += 1;
+}
+
+function recordLineScoreRuns(team, runs) {
+  if (isAnyPracticeMode() || !team || !runs || runs <= 0) return;
+  const index = Math.max(0, inning - 1);
+  if (!inningScores[team]) inningScores[team] = [];
+  inningScores[team][index] = (inningScores[team][index] || 0) + runs;
+}
+
+function recordScoringRunners(team, runners) {
+  if (isAnyPracticeMode() || !Array.isArray(runners)) return;
+  runners.forEach((runner) => recordBatterRunScored(team, runner));
 }
 
 function getScoreLead(team, scoreState = scores) {
@@ -2301,7 +2398,8 @@ function markPitcherHolds() {
 }
 
 function getTeamCatcher(team) {
-  return selected?.[team]?.batters?.find((entry) => entry.role === catcherRole)?.player || findById(catchers, menuSelection?.[team]?.[catcherRole]);
+  const player = selected?.[team]?.batters?.find((entry) => entry.role === catcherRole)?.player || findById(catchers, menuSelection?.[team]?.[catcherRole]);
+  return applyBenchDefenseRoleAdjustment(player, catcherRole);
 }
 
 function getTeamCatcherArm(team) {
@@ -2380,7 +2478,13 @@ function findLineupEntryByPlayerId(team, playerId) {
 
 function substituteLineupPlayer(team, lineupEntry, benchPlayer, reason = "sub") {
   if (!lineupEntry || !benchPlayer) return false;
-  lineupEntry.player = { ...benchPlayer };
+  lineupEntry.player = {
+    ...benchPlayer,
+    fromBench: true,
+    substitutionReason: reason,
+    benchSourceKind: benchPlayer.benchSourceKind || getBenchSourceKind(benchPlayer)
+  };
+  ensureBatterGameRecord(team, lineupEntry.player, lineupEntry.role);
   markBenchUsed(team, benchPlayer.id);
   if (team === battingTeam || team === fieldingTeam()) setMatchup();
   updateSidebarAbilityPanels();
@@ -2446,8 +2550,71 @@ function isCatcherLikePlayer(player) {
   return Boolean(player && !("infieldDefense" in player) && !("outfieldDefense" in player));
 }
 
+function isRodgersPlayer(player) {
+  return player?.id === "rodgers";
+}
+
+function getRodgersFielderProfile() {
+  return batters.find((player) => player.id === "rodgers") || null;
+}
+
+function getRodgersCatcherProfile() {
+  return catchers.find((player) => player.id === "rodgers") || null;
+}
+
+function resolveRodgersForRole(player, role = null) {
+  if (!isRodgersPlayer(player)) return player;
+  const fielder = getRodgersFielderProfile() || player;
+  const catcher = getRodgersCatcherProfile() || player;
+  return {
+    ...player,
+    power: fielder.power ?? catcher.power ?? player.power,
+    meet: fielder.meet ?? catcher.meet ?? player.meet,
+    run: fielder.run ?? catcher.run ?? player.run,
+    infieldDefense: fielder.infieldDefense ?? player.infieldDefense ?? player.fielding ?? 5,
+    outfieldDefense: fielder.outfieldDefense ?? player.outfieldDefense ?? player.fielding ?? 5,
+    arm: isCatcherRole(role) ? (catcher.arm ?? player.arm ?? 5) : (fielder.arm ?? player.arm ?? 5),
+    cost: fielder.cost ?? catcher.cost ?? player.cost
+  };
+}
+
+function getBenchSourceKind(player) {
+  return isCatcherLikePlayer(player) ? "catcher" : "fielder";
+}
+
+function createBenchPlayerForMatch(player) {
+  if (!player) return null;
+  const resolved = resolveRodgersForRole(player, null);
+  return {
+    ...resolved,
+    benchSourceKind: getBenchSourceKind(player)
+  };
+}
+
+function applyBenchDefenseRoleAdjustment(player, role) {
+  if (!player) return player;
+  const adjusted = { ...resolveRodgersForRole(player, role) };
+  if (isRodgersPlayer(adjusted) || !adjusted.fromBench) return adjusted;
+  if (adjusted.benchSourceKind === "catcher" && !isCatcherRole(role) && !isDhRole(role)) {
+    adjusted.arm = Math.max(1, (adjusted.arm ?? 5) - 1);
+    adjusted.infieldDefense = 2;
+    adjusted.outfieldDefense = 2;
+    adjusted.fielding = 2;
+  } else if (adjusted.benchSourceKind === "fielder" && isCatcherRole(role)) {
+    adjusted.arm = Math.max(1, (adjusted.arm ?? 5) - 4);
+  }
+  return adjusted;
+}
+
 function getAllHitters() {
-  return [...batters, ...Object.values(originalMenuBatters), ...catchers];
+  const hitters = [...batters, ...Object.values(originalMenuBatters), ...catchers];
+  const usedIds = new Set();
+  return hitters.filter((player) => {
+    if (!player?.id) return false;
+    if (usedIds.has(player.id)) return false;
+    usedIds.add(player.id);
+    return true;
+  });
 }
 
 function getPlayerListForRole(role) {
@@ -2508,6 +2675,17 @@ function getMenuBenchCostWithCandidate(team, role, playerId) {
   return getMenuBenchTeamCost(team, selection);
 }
 
+function isBenchSinglePlayerCostOverLimit(team, playerId) {
+  if (!doesMenuPointLimitApply(team) || !playerId) return false;
+  const cost = getMenuPlayerCost(getPlayerListForRole("bench1"), playerId);
+  return cost > benchSinglePlayerCostLimit;
+}
+
+function hasMenuBenchSinglePlayerCostOverLimit(team, selection = menuSelection[team]) {
+  if (!doesMenuPointLimitApply(team) || !selection) return false;
+  return benchRoles.some((role) => isBenchSinglePlayerCostOverLimit(team, selection[role]));
+}
+
 function isMenuTeamComplete(team) {
   const selection = menuSelection[team];
   return pitcherRoles.every((role) => findSelectedById(pitchers, selection[role]))
@@ -2561,12 +2739,14 @@ function updateMenuPointStatus() {
   const homeOver = doesMenuPointLimitApply("home") && homeCost > teamPointLimit;
   const awayBenchOver = !skipAwayBenchLimit && awayBenchCost > benchCostLimit;
   const homeBenchOver = !skipHomeBenchLimit && homeBenchCost > benchCostLimit;
+  const awayBenchSingleOver = hasMenuBenchSinglePlayerCostOverLimit("away");
+  const homeBenchSingleOver = hasMenuBenchSinglePlayerCostOverLimit("home");
   const isIncomplete = !isMenuTeamComplete("away") || !isMenuTeamComplete("home");
-  const isOver = awayOver || homeOver || awayBenchOver || homeBenchOver;
+  const isOver = awayOver || homeOver || awayBenchOver || homeBenchOver || awayBenchSingleOver || homeBenchSingleOver;
   renderPointStatus(awayPitcherPointStatus, skipAwayLimit ? "合計P 制限なし" : "合計P", awayCost, skipAwayLimit ? null : teamPointLimit, awayOver);
-  renderPointStatus(awayFielderPointStatus, skipAwayBenchLimit ? "Bench 制限なし" : "Bench", awayBenchCost, skipAwayBenchLimit ? null : benchCostLimit, awayBenchOver);
+  renderPointStatus(awayFielderPointStatus, skipAwayBenchLimit ? "Bench 制限なし" : "Bench", awayBenchCost, skipAwayBenchLimit ? null : benchCostLimit, awayBenchOver || awayBenchSingleOver);
   renderPointStatus(homePitcherPointStatus, skipHomeLimit ? "合計P 制限なし" : "合計P", homeCost, skipHomeLimit ? null : teamPointLimit, homeOver);
-  renderPointStatus(homeFielderPointStatus, skipHomeBenchLimit ? "Bench 制限なし" : "Bench", homeBenchCost, skipHomeBenchLimit ? null : benchCostLimit, homeBenchOver);
+  renderPointStatus(homeFielderPointStatus, skipHomeBenchLimit ? "Bench 制限なし" : "Bench", homeBenchCost, skipHomeBenchLimit ? null : benchCostLimit, homeBenchOver || homeBenchSingleOver);
   startButton.disabled = isOver || isIncomplete;
 }
 
@@ -2690,6 +2870,7 @@ function updateLineupCardShell(team, role) {
 }
 
 function getBatterDefenseRating(player, role = null) {
+  player = applyBenchDefenseRoleAdjustment(player, role);
   if (role && infielderRoles.includes(role)) return player.infieldDefense ?? player.fielding ?? 5;
   if (role && outfielderRoles.includes(role)) return player.outfieldDefense ?? player.fielding ?? 5;
   if (role && isCatcherRole(role)) return player.arm ?? player.fielding ?? 5;
@@ -3029,7 +3210,10 @@ function isMenuPlayerUnavailable(team, role, kind, playerId) {
   if (kind !== "pitcher" && kind !== "batter" && kind !== "catcher" && kind !== "hitter") return false;
   const duplicateRoles = kind === "pitcher" ? pitcherRoles : [...batterRoles, ...benchRoles];
   if (duplicateRoles.some((otherRole) => otherRole !== role && selection[otherRole] === playerId)) return true;
-  if (benchRoles.includes(role)) return doesMenuPointLimitApply(team) && getMenuBenchCostWithCandidate(team, role, playerId) > benchCostLimit;
+  if (benchRoles.includes(role)) {
+    return doesMenuPointLimitApply(team)
+      && (isBenchSinglePlayerCostOverLimit(team, playerId) || getMenuBenchCostWithCandidate(team, role, playerId) > benchCostLimit);
+  }
   return doesMenuPointLimitApply(team) && getMenuTeamCostWithCandidate(team, role, kind, playerId) > teamPointLimit;
 }
 
@@ -3398,7 +3582,7 @@ function startGame(modeOverride = null) {
     updateMenuPointStatus();
     return;
   }
-  if (!isAnyPracticeMode() && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit) || (doesMenuPointLimitApply("away") && getMenuBenchTeamCost("away") > benchCostLimit) || (doesMenuPointLimitApply("home") && getMenuBenchTeamCost("home") > benchCostLimit))) {
+  if (!isAnyPracticeMode() && ((doesMenuPointLimitApply("away") && getMenuTeamCost("away") > teamPointLimit) || (doesMenuPointLimitApply("home") && getMenuTeamCost("home") > teamPointLimit) || (doesMenuPointLimitApply("away") && getMenuBenchTeamCost("away") > benchCostLimit) || (doesMenuPointLimitApply("home") && getMenuBenchTeamCost("home") > benchCostLimit) || hasMenuBenchSinglePlayerCostOverLimit("away") || hasMenuBenchSinglePlayerCostOverLimit("home"))) {
     message = `獲得ポイントは各チーム合計${teamPointLimit}以内`;
     updateMenuPointStatus();
     return;
@@ -3414,6 +3598,8 @@ function startGame(modeOverride = null) {
     }
     : createHomeRunDerbyState();
   scores = { away: 0, home: 0 };
+  inningScores = createInningScores();
+  batterGameRecords = createBatterGameRecords();
   pitcherGameRecords = createPitcherGameRecords();
   pitcherDecisionEvents = [];
   bases = createEmptyBases();
@@ -3431,6 +3617,7 @@ function startGame(modeOverride = null) {
   shell?.classList.remove("menu-open");
   menu.classList.add("hidden");
   closePlayerChooser();
+  initializeBatterGameRecords();
   setMatchup();
   ensurePitcherGameRecord(fieldingTeam(), activePitcher);
   resetBall();
@@ -3981,6 +4168,7 @@ function declareIntentionalWalk() {
   resetBall();
   resetSwing();
   const runs = advanceRunners("walk", activeBatter);
+  recordBatterPlateAppearance("walk", { runs });
   recordCurrentPitcherWalkAllowed(1);
   resetCountOnly();
   message = runs > 0 ? `申告敬遠: ${runs}点` : "申告敬遠";
@@ -8259,6 +8447,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     if (isBuntFoul && count.strikes >= 2) {
       count.strikes += 1;
       count.outs += 1;
+      recordBatterPlateAppearance("strikeout");
       recordLastOutBatter(battingTeam, activeBatter);
       recordCurrentPitcherOuts(1);
       recordCurrentPitcherStat("strikeouts", 1);
@@ -8286,6 +8475,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     stealState = createStealState();
     if (handleHomeRunDerbyPitchResult(false)) return;
     const runs = advanceRunners("walk", activeBatter);
+    recordBatterPlateAppearance("hbp", { runs });
     recordCurrentPitcherWalkAllowed(1);
     message = runs > 0 ? `デッドボール: ${runs}点` : "デッドボール";
     showEffect(runs > 0 ? `デッドボール +${runs}` : "デッドボール", "#ff8f70");
@@ -8334,16 +8524,19 @@ function normalizeAutoHitAdvanceType(type) {
 function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
   let runs = 0;
   const scoringResponsiblePitcherIds = [];
+  const scoringRunners = [];
   const groundRuleDouble = Boolean(battedBall?.groundRuleDouble);
   type = groundRuleDouble ? "double" : normalizeAutoHitAdvanceType(type);
   if (type === "walk") {
     if (bases.first && bases.second && bases.third) {
       runs += 1;
       scoringResponsiblePitcherIds.push(bases.third.responsiblePitcherId);
+      scoringRunners.push(bases.third);
     }
     if (bases.first && bases.second) bases.third = bases.second;
     if (bases.first) bases.second = bases.first;
     bases.first = makeBaseRunner(batterInfo);
+    recordScoringRunners(battingTeam, scoringRunners);
     addRunsToBattingTeam(runs, scoringResponsiblePitcherIds);
     playScoringCheer(runs);
     return runs;
@@ -8363,6 +8556,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
     if (nextBase >= 4) {
       runs += 1;
       scoringResponsiblePitcherIds.push(runner.responsiblePitcherId);
+      scoringRunners.push(runner);
     } else if (nextBase === 3) {
       bases.third = runner;
     } else if (nextBase === 2) {
@@ -8371,6 +8565,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
       bases.first = runner;
     }
   });
+  recordScoringRunners(battingTeam, scoringRunners);
   addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { homer: type === "homer" });
   playScoringCheer(runs);
   return runs;
@@ -8392,6 +8587,7 @@ function isFinalBottomSecondBatTeamLeading() {
 
 function addRunsToBattingTeam(runs, responsiblePitcherIds = [], options = {}) {
   const beforeScores = { away: scores.away, home: scores.home };
+  recordLineScoreRuns(battingTeam, runs);
   scores[battingTeam] += runs;
   const afterScores = { away: scores.away, home: scores.home };
   if (runs > 0) {
@@ -9393,7 +9589,7 @@ function getDefensiveLineup(team) {
         arm: 5
       });
     }
-    const player = fieldersByRole.get(fielder.role) || selected[team].batters[0].player;
+    const player = applyBenchDefenseRoleAdjustment(fieldersByRole.get(fielder.role) || selected[team].batters[0].player, fielder.role);
     const defenseRating = getBatterDefenseRating(player, fielder.role);
     return clampFielderInsideFence({
       ...stadiumFielder,
@@ -14077,6 +14273,7 @@ function finishDefensePlay() {
     if (handleHomeRunDerbyPitchResult(false, metricText, defenseState.battedBall)) return;
     if (outcome?.caught) {
       count.outs += 1;
+      recordBatterPlateAppearance("out");
       recordLastOutBatter(battingTeam, activeBatter);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
       adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
@@ -14153,6 +14350,7 @@ function finishDefensePlay() {
       } else {
         applyTagOutBaseState(throwOutRunner, activeBatter);
       }
+      recordBatterPlateAppearance(isForceOut && forceOutBases.includes("first") ? "out" : "fielderChoice", { runs });
       const outMessage = outsToAdd >= 2 ? "ゲッツー" : `${defenseState.throw.baseLabel}アウト`;
       const baseMessage = runs > 0 ? `${outMessage} / 進塁 ${runs}点` : outMessage;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -14167,6 +14365,7 @@ function finishDefensePlay() {
         : defenseState.runner?.manualControlled && defenseState.runner.targetBase !== "first"
         ? applyManualDefenseAdvancement(activeBatter)
         : advanceRunners(advanceType, activeBatter, defenseState.battedBall, outcome);
+      recordBatterPlateAppearance(!outcome.fieldingError && outcome.kind === "force" ? "single" : "fielderChoice", { runs });
       const baseLabel = defenseState.throw?.baseLabel || "一塁";
       const baseMessage = `${baseLabel}セーフ: ${formatRuns(runs)}`;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -14185,6 +14384,7 @@ function finishDefensePlay() {
     recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
     adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
     const advanceRuns = count.outs < 3 ? applyDefenseOutAdvancements() : 0;
+    recordBatterPlateAppearance("out", { runs: advanceRuns });
     const advanced = count.outs < 3 && hasDefenseOutAdvancements();
     const baseMessage = advanceRuns > 0
       ? `${outcome.label}、アウト / 進塁 ${advanceRuns}点`
@@ -14195,13 +14395,16 @@ function finishDefensePlay() {
     showEffect(advanceRuns > 0 ? `進塁 +${advanceRuns}` : "アウト", "#ffcf70");
   } else if (outcome.fieldingError) {
     const runs = advanceRunners("single", activeBatter, defenseState.battedBall, outcome);
+    recordBatterPlateAppearance("error", { runs });
     const baseMessage = `${outcome.label}: ${formatRuns(runs)}`;
     message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
     showEffect(runs > 0 ? `エラー +${runs}` : "エラー", "#ff6f61");
   } else {
     const scoreType = getScoringHitType(outcome);
     if (scoringHitTypes.has(scoreType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
+    if (scoreType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
     const runs = advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
+    recordBatterPlateAppearance(scoreType, { runs });
     const label = getHitLabelByScoreType(scoreType);
     const baseMessage = `${label}: ${formatRuns(runs)}`;
     message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -14418,6 +14621,7 @@ function isTagUpRunnerSafe(runner) {
 function checkCountEnd() {
   if (count.strikes >= 3) {
     count.outs += 1;
+    recordBatterPlateAppearance("strikeout");
     recordLastOutBatter(battingTeam, activeBatter);
     recordCurrentPitcherOuts(1);
     recordCurrentPitcherStat("strikeouts", 1);
@@ -14432,6 +14636,7 @@ function checkCountEnd() {
   }
   if (count.balls >= 4) {
     const runs = advanceRunners("walk", activeBatter);
+    recordBatterPlateAppearance("walk", { runs });
     recordCurrentPitcherWalkAllowed(1);
     resetCountOnly();
     message = runs > 0 ? `四球: ${runs}点` : "四球";
@@ -19925,6 +20130,8 @@ function drawPitcherGameCard(x, y, player) {
 
 function drawPitcherGameRecordsBoard() {
   if (gamePhase !== "gameover") return;
+  drawGameResultBoard();
+  return;
   const width = 760;
   const x = (canvas.width - width) / 2;
   const awayEntries = getPitcherGameRecordEntries("away");
@@ -19959,6 +20166,193 @@ function drawPitcherGameRecordsBoard() {
   drawPitcherGameRecordColumn(x + 34, y + 142, width / 2 - 62, awayEntries, rowHeight);
   drawPitcherGameRecordColumn(x + width / 2 + 34, y + 142, width / 2 - 62, homeEntries, rowHeight);
   ctx.restore();
+}
+
+function drawGameResultBoard() {
+  const board = { x: 28, y: 18, width: canvas.width - 56, height: canvas.height - 36 };
+  ctx.save();
+  ctx.fillStyle = "rgba(248, 251, 255, 0.98)";
+  roundRect(board.x, board.y, board.width, board.height, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#233047";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#102833";
+  ctx.font = "bold 28px sans-serif";
+  ctx.fillText("試合結果", board.x + board.width / 2, board.y + 28);
+  ctx.font = "bold 20px sans-serif";
+  ctx.fillText(`${teamLabel("away")} ${scores.away} - ${scores.home} ${teamLabel("home")}`, board.x + board.width / 2, board.y + 58);
+  drawGameResultScoreTable(board.x + 24, board.y + 78, board.width - 48, 86);
+  const halfWidth = (board.width - 68) / 2;
+  drawGameResultBattingTable("away", board.x + 24, board.y + 184, halfWidth, 330);
+  drawGameResultBattingTable("home", board.x + 44 + halfWidth, board.y + 184, halfWidth, 330);
+  drawGameResultPitchingTable("away", board.x + 24, board.y + 536, halfWidth, 250);
+  drawGameResultPitchingTable("home", board.x + 44 + halfWidth, board.y + 536, halfWidth, 250);
+  ctx.restore();
+}
+
+function getBattingGameRecordEntries(team) {
+  return Object.values(batterGameRecords[team] || {})
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+    .filter((record) => record.plateAppearances > 0 || selected?.[team]?.batters?.some((entry) => entry?.player?.id === record.id));
+}
+
+function getTeamHitsFromBatters(team) {
+  return getBattingGameRecordEntries(team).reduce((total, record) => total + (record.hits || 0), 0);
+}
+
+function getLineScoreInningCount() {
+  return Math.max(maxInnings, inningScores.away.length, inningScores.home.length, inning);
+}
+
+function formatBattingAverage(record) {
+  if (!record.atBats) return ".---";
+  return (record.hits / record.atBats).toFixed(3).replace(/^0/, "");
+}
+
+function formatPitcherEra(record) {
+  if (!record.outs) return "--";
+  return ((record.runsAllowed || 0) * 27 / record.outs).toFixed(2);
+}
+
+function drawGameResultTableCell(text, x, y, width, height, options = {}) {
+  ctx.fillStyle = options.fill || "#ffffff";
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = "#d9dee7";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = options.color || "#102833";
+  const fontSize = options.fontSize || 12;
+  const weight = options.bold ? "bold" : "normal";
+  ctx.font = `${weight} ${fontSize}px sans-serif`;
+  ctx.textAlign = options.align || "center";
+  ctx.textBaseline = "middle";
+  const tx = options.align === "left" ? x + 6 : options.align === "right" ? x + width - 6 : x + width / 2;
+  drawGameResultFittedText(String(text ?? ""), tx, y + height / 2, width - 8, fontSize, weight, ctx.textAlign);
+}
+
+function drawGameResultScoreTable(x, y, width, height) {
+  const inningCount = getLineScoreInningCount();
+  const nameWidth = 140;
+  const totalWidth = 48;
+  const hitWidth = 48;
+  const inningWidth = Math.max(30, (width - nameWidth - totalWidth - hitWidth) / inningCount);
+  const rowHeight = height / 3;
+  drawGameResultTableCell("", x, y, nameWidth, rowHeight, { fill: "#e9edf2", bold: true });
+  for (let i = 0; i < inningCount; i += 1) {
+    drawGameResultTableCell(i + 1, x + nameWidth + i * inningWidth, y, inningWidth, rowHeight, { fill: "#e9edf2", bold: true });
+  }
+  drawGameResultTableCell("計", x + nameWidth + inningCount * inningWidth, y, totalWidth, rowHeight, { fill: "#e9edf2", bold: true });
+  drawGameResultTableCell("安", x + nameWidth + inningCount * inningWidth + totalWidth, y, hitWidth, rowHeight, { fill: "#e9edf2", bold: true });
+  teamIds.forEach((team, row) => {
+    const rowY = y + rowHeight * (row + 1);
+    drawGameResultTableCell(teamLabel(team), x, rowY, nameWidth, rowHeight, { align: "left", bold: true, color: "#0023b8" });
+    for (let i = 0; i < inningCount; i += 1) {
+      drawGameResultTableCell(inningScores[team]?.[i] || 0, x + nameWidth + i * inningWidth, rowY, inningWidth, rowHeight, { color: "#0023b8" });
+    }
+    drawGameResultTableCell(scores[team], x + nameWidth + inningCount * inningWidth, rowY, totalWidth, rowHeight, { fill: "#f4f4f4", bold: true });
+    drawGameResultTableCell(getTeamHitsFromBatters(team), x + nameWidth + inningCount * inningWidth + totalWidth, rowY, hitWidth, rowHeight, { fill: "#f4f4f4", bold: true });
+  });
+}
+
+function drawGameResultSectionTitle(title, x, y, width) {
+  ctx.fillStyle = "#233047";
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  drawGameResultFittedText(title, x, y, width, 16, "bold", "left");
+}
+
+function drawGameResultFittedText(text, x, y, maxWidth, startSize = 12, weight = "normal", align = "center") {
+  let fontSize = startSize;
+  ctx.textAlign = align;
+  ctx.font = `${weight} ${fontSize}px sans-serif`;
+  while (ctx.measureText(text).width > maxWidth && fontSize > 8) {
+    fontSize -= 1;
+    ctx.font = `${weight} ${fontSize}px sans-serif`;
+  }
+  ctx.fillText(text, x, y);
+}
+
+function drawGameResultBattingTable(team, x, y, width, height) {
+  drawGameResultSectionTitle(`${teamLabel(team)} 打撃成績`, x, y - 12, width);
+  const headers = ["守", "選手名", "率", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "失"];
+  const colWidths = [32, 128, 44, 30, 30, 30, 30, 28, 28, 28, 28, 28, 28, 28];
+  const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
+  const widths = colWidths.map((value) => value * scale);
+  const rowHeight = 26;
+  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize: 11 });
+  getBattingGameRecordEntries(team).slice(0, 9).forEach((record, index) => {
+    const values = [
+      getMenuRoleLabel(record.role).slice(0, 2),
+      record.name,
+      formatBattingAverage(record),
+      record.atBats,
+      record.runs,
+      record.hits,
+      record.rbi,
+      record.doubles,
+      record.triples,
+      record.homeRuns,
+      record.strikeouts,
+      record.walks,
+      record.hbp,
+      record.errorsReached
+    ];
+    drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
+  });
+}
+
+function drawGameResultPitchingTable(team, x, y, width, height) {
+  drawGameResultSectionTitle(`${teamLabel(team)} 投手成績`, x, y - 12, width);
+  const headers = ["勝敗", "選手名", "防御率", "回", "球", "打者", "安", "本", "三", "四死", "失", "責"];
+  const colWidths = [40, 118, 50, 36, 40, 40, 30, 30, 30, 36, 30, 30];
+  const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
+  const widths = colWidths.map((value) => value * scale);
+  const rowHeight = 30;
+  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize: 11 });
+  getPitcherGameRecordEntries(team).slice(0, 6).forEach((record, index) => {
+    const battersFaced = (record.outs || 0) + (record.hitsAllowed || 0) + (record.walksAllowed || 0);
+    const values = [
+      formatPitcherDecisionLabelsPlain(record),
+      record.name,
+      formatPitcherEra(record),
+      record.innings,
+      record.pitchCount || 0,
+      battersFaced,
+      record.hitsAllowed || 0,
+      record.homeRunsAllowed || 0,
+      record.strikeouts || 0,
+      record.walksAllowed || 0,
+      record.runsAllowed || 0,
+      record.runsAllowed || 0
+    ];
+    drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
+  });
+}
+
+function formatPitcherDecisionLabelsPlain(record) {
+  if (record.win) return "勝";
+  if (record.loss) return "敗";
+  if (record.save) return "S";
+  if (record.hold) return "H";
+  return "";
+}
+
+function drawGameResultRow(values, x, y, widths, height, options = {}) {
+  let cx = x;
+  values.forEach((value, index) => {
+    drawGameResultTableCell(value, cx, y, widths[index], height, {
+      fill: options.fill,
+      bold: options.bold,
+      fontSize: options.fontSize,
+      align: index === options.nameColumn ? "left" : "center",
+      color: index === options.nameColumn ? "#0023b8" : "#102833"
+    });
+    cx += widths[index];
+  });
 }
 
 function drawPitcherGameRecordColumn(x, y, width, entries, rowHeight) {
