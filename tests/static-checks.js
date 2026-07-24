@@ -87,8 +87,7 @@ assertIncludesAll(
     "now - swingState.buntAimMemoryTime <= buntAimMemoryDuration",
     "const gamepadX = Math.abs(axisX) >= 0.22 ? axisX : 0",
     "const aimedSide = Math.abs(buntAimX) > 0 ? Math.sign(buntAimX) : 0",
-    "const aimControlScore = hasAim ? 1 : 0",
-    "const noAimPitcherFrontBoost = hasAim ? 0 : 0.22"
+    "const aimControlScore = hasAim ? 1 : 0"
   ],
   "script.js bunt aim leniency"
 );
@@ -120,8 +119,7 @@ assertIncludesAll(
     "function drawDefenseCatchBallTransition",
     "function updateDefenseLandingMissVisual",
     "function drawDefenseLandingMissEffect",
-    "defenseState.catchVisual?.caughtInAir",
-    "Math.max(fieldingTime, visualFinishTime)"
+    "defenseState.catchVisual?.caughtInAir"
   ],
   "script.js visible catch-range result alignment"
 );
@@ -252,12 +250,12 @@ assertIncludesAll(
     "if (gameMode === \"watch\") return true",
     "if (gameMode === \"single\") return team !== playerTeam",
     "maybeAutoChangeCpuPitcher(fieldingTeam());",
-    "function getCpuInsidePitchTargetX",
-    "const safeDistance = (Number.isFinite(ball.radius) ? ball.radius : pitchRadius) * 3",
-    "insideEdgeX - course.direction * safeDistance",
-    "plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));"
+    "function applySharedComputerPitchAim",
+    "plan.targetX = sharedAim.targetX;",
+    "plan.targetY = sharedAim.targetY;",
+    "plan.targetSpread = sharedAim.targetSpread;"
   ],
-  "CPU pitcher auto change and inside target safety"
+  "CPU pitcher auto change and shared player/CPU pitch aim"
 );
 
 console.log("Static checks passed");

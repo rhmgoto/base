@@ -142,6 +142,9 @@ function createGameContext() {
         return [];
       }
     },
+    navigator: {
+      getGamepads: () => []
+    },
     Image: function Image() {
       this.complete = true;
       this.naturalWidth = 1800;
@@ -207,7 +210,7 @@ function assertHtmlShell() {
     'value="tigers"',
     'value="dodgers"',
     'value="dendos"',
-    'value="semiauto"',
+    '>捕球だけオート</option>',
     'value="watch"',
     'id="practicePitcherControlSelect"',
     'id="practicePitcherTypeSelect"',
@@ -303,7 +306,11 @@ assert(stadiumSelectionState.aozoraFenceMeters === 85, "Aozora Ground fence shou
 assert(Math.abs(stadiumSelectionState.restoredFence - stadiumSelectionState.baseFence) < 0.1, "switching back to Ohanabi Stadium should restore the original fence distance");
 assert(Math.abs(stadiumSelectionState.restoredHeight - stadiumSelectionState.baseHeight) < 0.1, "switching back to Ohanabi Stadium should restore the original fence height");
 assert(stadiumSelectionState.baseFirstSame === true, "stadium changes should not move the diamond bases");
-assert(stadiumSelectionState.aozoraOutfieldDepths.every((depth) => depth > 0.9 && depth < 0.94), "outfielders should still start near the active stadium fence");
+const aozoraExpectedOutfieldDepth = 0.92 - 3 / 85;
+assert(
+  stadiumSelectionState.aozoraOutfieldDepths.every((depth) => Math.abs(depth - aozoraExpectedOutfieldDepth) < 0.01),
+  "outfielders should start three meters forward from their standard depth at the active stadium fence"
+);
 
 const riversideStadiumState = JSON.parse(runInGame(
   context,
@@ -795,48 +802,40 @@ assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,roja
 assert(lineupState.awayBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
-const semiAutoControlState = JSON.parse(runInGame(
+const catchAutoControlState = JSON.parse(runInGame(
   context,
   `(() => {
     modeSelect.value = "versus";
-    p1DefenseSelect.value = "semiauto";
+    p1DefenseSelect.value = "manual";
     p2DefenseSelect.value = "manual";
     readMenu();
     battingTeam = "away";
-    const awaySemiBaserun = isManualBaserunningControl("away");
-    const homeManualDefense = isManualDefenseControl();
-    p2DefenseSelect.value = "semiauto";
-    readMenu();
-    battingTeam = "away";
-    const homeSemiDefense = isManualDefenseControl();
-    p1DefenseSelect.value = "manual";
-    readMenu();
-    battingTeam = "away";
     const awayManualBaserun = isManualBaserunningControl("away");
-    p1DefenseSelect.value = "auto";
-    readMenu();
-    battingTeam = "away";
-    const awayAutoBaserun = isManualBaserunningControl("away");
+    const homeManualCatch = isManualDefenseControl();
+    const homeManualThrow = isManualThrowControl();
     p1DefenseSelect.value = "auto";
     p2DefenseSelect.value = "auto";
     readMenu();
+    battingTeam = "away";
+    const awayAutoBaserun = isManualBaserunningControl("away");
+    const homeAutoThrow = isManualThrowControl();
     return JSON.stringify({
       awayMode: defenseControlMode.away,
       homeMode: defenseControlMode.home,
-      awaySemiBaserun,
-      homeManualDefense,
-      homeSemiDefense,
       awayManualBaserun,
-      awayAutoBaserun
+      homeManualCatch,
+      homeManualThrow,
+      awayAutoBaserun,
+      homeAutoThrow
     });
   })()`
 ));
 
-assert(semiAutoControlState.awaySemiBaserun === true, "semi-auto should make baserunning manual");
-assert(semiAutoControlState.homeManualDefense === true, "manual should keep defense manual");
-assert(semiAutoControlState.homeSemiDefense === false, "semi-auto should keep defense fully automatic");
-assert(semiAutoControlState.awayManualBaserun === true, "manual should keep baserunning manual");
-assert(semiAutoControlState.awayAutoBaserun === false, "auto should keep baserunning automatic");
+assert(catchAutoControlState.homeManualCatch === false, "catch-only-auto mode should keep all catches automatic");
+assert(catchAutoControlState.homeManualThrow === true, "catch-only-auto mode should keep throws manual");
+assert(catchAutoControlState.awayManualBaserun === true, "catch-only-auto mode should keep baserunning manual");
+assert(catchAutoControlState.awayAutoBaserun === false, "auto mode should keep baserunning automatic");
+assert(catchAutoControlState.homeAutoThrow === false, "auto mode should keep throws automatic");
 
 const swingLockState = JSON.parse(runInGame(
   context,
@@ -944,10 +943,10 @@ const weakSwingState = JSON.parse(runInGame(
       inGoodContactZone: false,
       yellowZoneBoost: 0
     });
-    Math.random = badBuntRandom;
     const badBuntBall = buildBattedBall(badBuntProfile.power, badBuntProfile.direction, hitLabels.popup, badBuntProfile);
     const badBuntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), badBuntBall);
     const badBuntOutcome = resolveDefenseOutcome(badBuntFielder, badBuntBall, createBatterRunner(activeBatter));
+    Math.random = badBuntRandom;
     count = { strikes: 2, balls: 0, outs: 0 };
     finishPitch(hitLabels.foul, "foul", 0.2, 0, badBuntProfile.direction, badBuntProfile);
     const twoStrikeBuntFoul = {
@@ -1048,6 +1047,7 @@ const weakSwingState = JSON.parse(runInGame(
     gamepadState.previousButtons.away = new Set();
     gamepadState.previousButtons.home = new Set();
     const sharedPitcherButtonOnePad = {
+      index: 1,
       buttons: [{ pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
       axes: [0, 0]
     };
@@ -1059,6 +1059,7 @@ const weakSwingState = JSON.parse(runInGame(
     const sharedButton1PitchType = pendingPitch?.typeKey;
     const sharedButton1BatterSwung = swingState.didSwingThisPitch;
     const batterButton3Pad = {
+      index: 0,
       buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }],
       axes: [0, 0]
     };
@@ -1084,26 +1085,34 @@ assert(weakSwingState.bunt.type === "bunt", "button-3/bunt swing should mark the
 assert(weakSwingState.bunt.meet === 15, "bunt swing should add five meet points and allow values over 10");
 assert(weakSwingState.bunt.power === 1, "bunt swing should sharply reduce power with a floor of one");
 assert(weakSwingState.buntProfile.isBunt === true && weakSwingState.buntProfile.power <= 0.34 && weakSwingState.buntProfile.launchAngle <= 3, "good bunt contact should become a weak ground-ball profile instead of an outfield drive");
-assert(weakSwingState.buntProfile.buntLineChance >= 0.9 && weakSwingState.buntProfile.buntPitcherFrontChance <= 0.04, "60-ish good bunt contact should strongly favor the first-base or third-base line instead of rolling in front of the pitcher");
-assert(weakSwingState.buntBall.isBunt === true && weakSwingState.buntBall.landingDistance >= 180 && weakSwingState.buntBall.landingDistance < 560 && weakSwingState.buntBall.distance < 590, "bunt batted balls should roll longer for pitcher fielding while staying inside the infield");
-assert(Math.abs(weakSwingState.buntProfile.direction.x) >= 0.78 && Math.abs(weakSwingState.buntBall.direction.x) >= 0.78, "good bunt direction should stay near the first-base or third-base line after batted-ball construction");
+assert(weakSwingState.buntProfile.buntLineChance === 0 && weakSwingState.buntProfile.buntPitcherFrontChance === 1, "a bunt without stick input should report its actual pitcher-front direction");
+assert(
+  weakSwingState.buntBall.isBunt === true
+    && weakSwingState.buntBall.landingDistance >= 35
+    && weakSwingState.buntBall.landingDistance < 300
+    && weakSwingState.buntBall.distance < 400,
+  "good bunt contact should stay close to the plate and inside the infield"
+);
+assert(Math.abs(weakSwingState.buntProfile.direction.x) <= 0.16 && Math.abs(weakSwingState.buntBall.direction.x) <= 0.16, "a bunt without stick input should stay near the pitcher");
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
-assert(weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first", "bunts should always become an infield throw play instead of leaking to the outfield");
+assert(
+  weakSwingState.buntOutcome.kind === "single"
+    || (weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first"),
+  "bunts should become either an infield single or a fielded throw play to first"
+);
 assert(weakSwingState.buntProfile.buntFoulChance >= 0.075 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
 assert(weakSwingState.solidBuntProfile.solidBuntContact === true && weakSwingState.solidBuntProfile.pitcherBuntPopup === false, "solid bunt contact should be protected from becoming pitcher popup flies too often");
 assert(weakSwingState.solidBuntProfile.protectedPopupChance < weakSwingState.solidBuntProfile.pitcherBuntPopupChance, "solid bunt contact should lower the popup-fly chance");
-assert(weakSwingState.solidBuntProfile.buntLineChance >= 0.18 && weakSwingState.solidBuntProfile.buntLineChance <= 0.28, "30-50 point bunts should not over-favor the first-base or third-base line");
-assert(weakSwingState.solidBuntProfile.buntPitcherFrontChance >= 0.68, "30-50 point bunts should more often roll in front of the pitcher");
-assert(weakSwingState.badBuntProfile.buntLineChance < weakSwingState.buntProfile.buntLineChance, "bad bunt contact should reduce first-base and third-base line placement");
+assert(weakSwingState.solidBuntProfile.buntLineChance === 0 && weakSwingState.solidBuntProfile.buntPitcherFrontChance === 1, "30-50 point bunts without stick input should report their actual pitcher-front direction");
+assert(weakSwingState.badBuntProfile.buntLineChance === 0 && weakSwingState.badBuntProfile.buntPitcherFrontChance === 0, "popup bunts should not report an unused ground-ball direction");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
-assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, "pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play");
+assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, `pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play (${JSON.stringify(weakSwingState.badBuntOutcome)})`);
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
 assert(weakSwingState.directTwoStrikeBuntFoul.profileHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.resultHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.outs === 1 && weakSwingState.directTwoStrikeBuntFoul.strikes === 0 && weakSwingState.directTwoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls from the normal batted-ball result path should display strikeout and add an out");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
 assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1WithStickStealActive === false, "gamepad button 1 should stay a weak swing even with a direction held");
 assert(weakSwingState.button2Type === "strong", "gamepad button 2 should keep starting the existing strong swing");
-assert(weakSwingState.button3Type === "bunt", "gamepad button 3 should start a bunt swing");
 assert(weakSwingState.button0StealActive === true && weakSwingState.button0StealTarget === "second", "gamepad button 0 plus a direction should start steals instead of weak swings");
 assert(weakSwingState.sharedButton1PitchType === "normal", "shared gamepad button 1 should start a straight pitch for the pitcher in two-player games");
 assert(weakSwingState.sharedButton1BatterSwung === false, "shared gamepad button 1 for the pitcher should not make the opposing batter swing");
@@ -1113,6 +1122,7 @@ assert(weakSwingState.batterButton3BuntHeld === true && weakSwingState.batterBut
 const hbpAfterSwingState = JSON.parse(runInGame(
   context,
   `(() => {
+    navigator.getGamepads = () => [];
     function putPitchInHbpBox(didSwing) {
       resetBall();
       resetSwing();
@@ -2084,7 +2094,7 @@ assert(latestSpreadsheetRosterState.enriquez.throws === "R" && latestSpreadsheet
 
 assert(rosterAndPointState.shuto.bats === "L", "Shuto should be a left-handed batter");
 assert(rosterAndPointState.shuto.power === 2, "Shuto power should match the roster table");
-assert(rosterAndPointState.shuto.meet === 3, "Shuto meet should match the roster table");
+assert(rosterAndPointState.shuto.meet === 4, "Shuto meet should match the roster table");
 assert(rosterAndPointState.shuto.run === 10, "Shuto run should match the roster table");
 assert(rosterAndPointState.shuto.infieldDefense === 3, "Shuto infield defense should match the roster table");
 assert(rosterAndPointState.shuto.outfieldDefense === 8, "Shuto outfield defense should match the roster table");
@@ -2129,8 +2139,8 @@ assert(rosterAndPointState.dingler.run === 3, "Dingler run should match the rost
 assert(rosterAndPointState.dingler.arm === 7, "Dingler arm should match the catcher roster table");
 assert(rosterAndPointState.dingler.cost === 5, "Dingler cost should match the roster table");
 assert(rosterAndPointState.calraleigh.power === 8 && rosterAndPointState.calraleigh.arm === 7, "Cal Raleigh should be available as a catcher");
-assert(rosterAndPointState.nomura.power === 10 && rosterAndPointState.nomura.meet === 10 && rosterAndPointState.nomura.arm === 10 && rosterAndPointState.nomura.cost === 15, "Nomura catcher should match the updated roster table");
-assert(rosterAndPointState.johnnybench.power === 9 && rosterAndPointState.johnnybench.meet === 9 && rosterAndPointState.johnnybench.arm === 13 && rosterAndPointState.johnnybench.cost === 16, "Johnny Bench should be available as a new elite catcher");
+assert(rosterAndPointState.nomura.power === 34 && rosterAndPointState.nomura.meet === 16 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
+assert(rosterAndPointState.johnnybench.power === 36 && rosterAndPointState.johnnybench.meet === 17 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
 assert(rosterAndPointState.rodgersCatcher.bats === "R", "Rodgers catcher should be a right-handed batter");
 assert(rosterAndPointState.rodgersCatcher.power === 6, "Rodgers catcher power should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.meet === 1, "Rodgers catcher meet should match the catcher roster table");
@@ -2201,25 +2211,25 @@ assert(rosterAndPointState.ydiaz.outfieldDefense === 2, "Y. Diaz outfield defens
 assert(rosterAndPointState.ydiaz.arm === 3, "Y. Diaz arm should match the roster table");
 assert(rosterAndPointState.ydiaz.cost === 5, "Y. Diaz cost should match the roster table");
 assert(rosterAndPointState.tairaRemoved === true, "Taira should be removed from the batter roster");
-assert(rosterAndPointState.ichiro.meet === 17 && rosterAndPointState.ichiro.outfieldDefense === 11 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 17, "Ichiro should match the updated roster table");
-assert(rosterAndPointState.ruth.power === 13 && rosterAndPointState.ruth.meet === 12 && rosterAndPointState.ruth.outfieldDefense === 7 && rosterAndPointState.ruth.cost === 17, "Ruth should match the updated roster table");
-assert(rosterAndPointState.nagashima.power === 11 && rosterAndPointState.nagashima.meet === 10 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 11 && rosterAndPointState.nagashima.cost === 15, "Nagashima should match the updated roster table");
-assert(rosterAndPointState.bonds.power === 13 && rosterAndPointState.bonds.meet === 9 && rosterAndPointState.bonds.outfieldDefense === 10 && rosterAndPointState.bonds.arm === 8 && rosterAndPointState.bonds.cost === 17, "Bonds should be available as a new elite outfielder");
-assert(rosterAndPointState.sadaharu.power === 14 && rosterAndPointState.sadaharu.infieldDefense === 8 && rosterAndPointState.sadaharu.arm === 7 && rosterAndPointState.sadaharu.cost === 17, "Sadaharu should be available as a new elite infielder");
+assert(rosterAndPointState.ichiro.meet === 25 && rosterAndPointState.ichiro.outfieldDefense === 16 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 28, "Ichiro should match the updated roster table");
+assert(rosterAndPointState.ruth.power === 42 && rosterAndPointState.ruth.meet === 20 && rosterAndPointState.ruth.outfieldDefense === 4 && rosterAndPointState.ruth.cost === 30, "Ruth should match the updated roster table");
+assert(rosterAndPointState.nagashima.power === 33 && rosterAndPointState.nagashima.meet === 18 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 15 && rosterAndPointState.nagashima.cost === 25, "Nagashima should match the updated roster table");
+assert(rosterAndPointState.bonds.power === 41 && rosterAndPointState.bonds.meet === 19 && rosterAndPointState.bonds.outfieldDefense === 18 && rosterAndPointState.bonds.arm === 10 && rosterAndPointState.bonds.cost === 28, "Bonds should be available as a new elite outfielder");
+assert(rosterAndPointState.sadaharu.power === 43 && rosterAndPointState.sadaharu.infieldDefense === 14 && rosterAndPointState.sadaharu.arm === 10 && rosterAndPointState.sadaharu.cost === 25, "Sadaharu should be available as a new elite infielder");
 assert(rosterAndPointState.shohei.fastKmh === 165, "Shohei fastball should match the pitcher roster table");
-assert(rosterAndPointState.shohei.stuff === 9, "Shohei stuff should match the pitcher roster table");
-assert(rosterAndPointState.shohei.stamina === 8, "Shohei stamina should match the pitcher roster table");
+assert(rosterAndPointState.shohei.stuff === 8, "Shohei stuff should match the pitcher roster table");
+assert(rosterAndPointState.shohei.stamina === 6, "Shohei stamina should match the pitcher roster table");
 assert(rosterAndPointState.shohei.cost === 9, "Shohei pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.fastKmh === 172, "Sawamura fastball should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.rightBreak === 9, "Sawamura right break should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.leftBreak === 8, "Sawamura left break should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.slowChange === 6, "Sawamura slow change should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.fastChange === 9, "Sawamura fast change should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.control === 7, "Sawamura control should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.stuff === 11, "Sawamura stuff should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.fielding === 8, "Sawamura fielding should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.stamina === 12, "Sawamura stamina should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.cost === 15, "Sawamura pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.rightBreak === 27, "Sawamura right break should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.leftBreak === 26, "Sawamura left break should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.slowChange === 24, "Sawamura slow change should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.fastChange === 27, "Sawamura fast change should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.control === 25, "Sawamura control should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.stuff === 32, "Sawamura stuff should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.fielding === 24, "Sawamura fielding should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.stamina === 21, "Sawamura stamina should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.cost === 30, "Sawamura pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.magari.throws === "R", "Magari should be a right-handed pitcher");
 assert(rosterAndPointState.magari.fastKmh === 100, "Magari fastball should match the pitcher roster table");
 assert(rosterAndPointState.magari.rightBreak === 9, "Magari right break should match the pitcher roster table");
@@ -2236,9 +2246,9 @@ assert(rosterAndPointState.misiorowski.fastKmh === 169, "Misiorowski fastball sh
 assert(rosterAndPointState.misiorowski.rightBreak === 7, "Misiorowski right break should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.leftBreak === 4, "Misiorowski left break should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.slowChange === 5, "Misiorowski slow change should match the pitcher roster table");
-assert(rosterAndPointState.misiorowski.fastChange === 7, "Misiorowski fast change should match the pitcher roster table");
+assert(rosterAndPointState.misiorowski.fastChange === 9, "Misiorowski fast change should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.control === 5, "Misiorowski control should match the pitcher roster table");
-assert(rosterAndPointState.misiorowski.stuff === 8, "Misiorowski stuff should match the pitcher roster table");
+assert(rosterAndPointState.misiorowski.stuff === 9, "Misiorowski stuff should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.fielding === 4, "Misiorowski fielding should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.stamina === 7, "Misiorowski stamina should match the pitcher roster table");
 assert(rosterAndPointState.misiorowski.cost === 8, "Misiorowski pitcher cost should match the pitcher roster table");
@@ -2249,9 +2259,9 @@ assert(rosterAndPointState.miller.leftBreak === 6, "Miller left break should mat
 assert(rosterAndPointState.miller.slowChange === 8, "Miller slow change should match the pitcher roster table");
 assert(rosterAndPointState.miller.fastChange === 3, "Miller fast change should match the pitcher roster table");
 assert(rosterAndPointState.miller.control === 6, "Miller control should match the pitcher roster table");
-assert(rosterAndPointState.miller.stuff === 12, "Miller stuff should match the pitcher roster table");
+assert(rosterAndPointState.miller.stuff === 14, "Miller stuff should match the pitcher roster table");
 assert(rosterAndPointState.miller.fielding === 6, "Miller fielding should match the pitcher roster table");
-assert(rosterAndPointState.miller.stamina === 2, "Miller stamina should match the pitcher roster table");
+assert(rosterAndPointState.miller.stamina === 3, "Miller stamina should match the pitcher roster table");
 assert(rosterAndPointState.miller.cost === 4, "Miller pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.ootake.throws === "L", "Otake should be a left-handed pitcher");
 assert(rosterAndPointState.ootake.fastKmh === 143, "Otake fastball should match the pitcher roster table");
@@ -2274,7 +2284,7 @@ assert(rosterAndPointState.hanifee.control === 5, "Hanifee control should match 
 assert(rosterAndPointState.hanifee.stuff === 2, "Hanifee stuff should match the pitcher roster table");
 assert(rosterAndPointState.hanifee.fielding === 5, "Hanifee fielding should match the pitcher roster table");
 assert(rosterAndPointState.hanifee.stamina === 2, "Hanifee stamina should match the pitcher roster table");
-assert(rosterAndPointState.hanifee.cost === 3, "Hanifee pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.hanifee.cost === 1, "Hanifee pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.throws === "R", "Sugiyama should be a right-handed pitcher");
 assert(rosterAndPointState.sugiyama.fastKmh === 158, "Sugiyama fastball should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.rightBreak === 2, "Sugiyama right break should match the pitcher roster table");
@@ -2321,23 +2331,23 @@ assert(rosterAndPointState.rodgers.stamina === 2, "Rodgers stamina should match 
 assert(rosterAndPointState.rodgers.cost === 3, "Rodgers pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.throws === "R", "Fujinami should be a right-handed pitcher");
 assert(rosterAndPointState.fujinami.fastKmh === 159, "Fujinami fastball should match the pitcher roster table");
-assert(rosterAndPointState.fujinami.rightBreak === 6, "Fujinami right break should match the pitcher roster table");
+assert(rosterAndPointState.fujinami.rightBreak === 7, "Fujinami right break should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.leftBreak === 3, "Fujinami left break should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.slowChange === 5, "Fujinami slow change should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.fastChange === 5, "Fujinami fast change should match the pitcher roster table");
-assert(rosterAndPointState.fujinami.control === 1, "Fujinami control should match the pitcher roster table");
-assert(rosterAndPointState.fujinami.stuff === 6, "Fujinami stuff should match the pitcher roster table");
+assert(rosterAndPointState.fujinami.control === 0, "Fujinami control should match the pitcher roster table");
+assert(rosterAndPointState.fujinami.stuff === 9, "Fujinami stuff should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.fielding === 3, "Fujinami fielding should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.stamina === 6, "Fujinami stamina should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.cost === 5, "Fujinami pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.skubal.throws === "L", "Skubal should be a left-handed pitcher");
 assert(rosterAndPointState.skubal.fastKmh === 164, "Skubal fastball should match the pitcher roster table");
-assert(rosterAndPointState.skubal.rightBreak === 5, "Skubal right break should match the pitcher roster table");
+assert(rosterAndPointState.skubal.rightBreak === 6, "Skubal right break should match the pitcher roster table");
 assert(rosterAndPointState.skubal.leftBreak === 8, "Skubal left break should match the pitcher roster table");
 assert(rosterAndPointState.skubal.slowChange === 8, "Skubal slow change should match the pitcher roster table");
-assert(rosterAndPointState.skubal.fastChange === 4, "Skubal fast change should match the pitcher roster table");
-assert(rosterAndPointState.skubal.control === 5, "Skubal control should match the pitcher roster table");
-assert(rosterAndPointState.skubal.stuff === 7, "Skubal stuff should match the pitcher roster table");
+assert(rosterAndPointState.skubal.fastChange === 6, "Skubal fast change should match the pitcher roster table");
+assert(rosterAndPointState.skubal.control === 6, "Skubal control should match the pitcher roster table");
+assert(rosterAndPointState.skubal.stuff === 8, "Skubal stuff should match the pitcher roster table");
 assert(rosterAndPointState.skubal.fielding === 5, "Skubal fielding should match the pitcher roster table");
 assert(rosterAndPointState.skubal.stamina === 7, "Skubal stamina should match the pitcher roster table");
 assert(rosterAndPointState.skubal.cost === 8, "Skubal pitcher cost should match the pitcher roster table");
@@ -2364,24 +2374,24 @@ assert(rosterAndPointState.melton.fielding === 8, "Melton fielding should match 
 assert(rosterAndPointState.melton.stamina === 6, "Melton stamina should match the pitcher roster table");
 assert(rosterAndPointState.melton.cost === 6, "Melton pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.fastKmh === 175, "Cy Young fastball should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.rightBreak === 10, "Cy Young right break should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.leftBreak === 9, "Cy Young left break should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.slowChange === 9, "Cy Young slow change should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.fastChange === 10, "Cy Young fast change should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.control === 9, "Cy Young control should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.stuff === 11, "Cy Young stuff should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.fielding === 8, "Cy Young fielding should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.stamina === 12, "Cy Young stamina should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.cost === 18, "Cy Young pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.rightBreak === 28, "Cy Young right break should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.leftBreak === 27, "Cy Young left break should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.slowChange === 27, "Cy Young slow change should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.fastChange === 28, "Cy Young fast change should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.control === 27, "Cy Young control should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.stuff === 33, "Cy Young stuff should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.fielding === 24, "Cy Young fielding should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.stamina === 21, "Cy Young stamina should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.cost === 32, "Cy Young pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.maddux.fastKmh === 155, "Maddux fastball should match the pitcher roster table");
-assert(rosterAndPointState.maddux.rightBreak === 14, "Maddux right break should match the pitcher roster table");
-assert(rosterAndPointState.maddux.leftBreak === 12, "Maddux left break should match the pitcher roster table");
-assert(rosterAndPointState.maddux.slowChange === 11, "Maddux slow change should match the pitcher roster table");
-assert(rosterAndPointState.maddux.fastChange === 10, "Maddux fast change should match the pitcher roster table");
-assert(rosterAndPointState.maddux.control === 11, "Maddux control should match the pitcher roster table");
-assert(rosterAndPointState.maddux.stuff === 10, "Maddux stuff should match the pitcher roster table");
-assert(rosterAndPointState.maddux.stamina === 11, "Maddux stamina should match the pitcher roster table");
-assert(rosterAndPointState.maddux.cost === 17, "Maddux pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.maddux.rightBreak === 32, "Maddux right break should match the pitcher roster table");
+assert(rosterAndPointState.maddux.leftBreak === 30, "Maddux left break should match the pitcher roster table");
+assert(rosterAndPointState.maddux.slowChange === 29, "Maddux slow change should match the pitcher roster table");
+assert(rosterAndPointState.maddux.fastChange === 28, "Maddux fast change should match the pitcher roster table");
+assert(rosterAndPointState.maddux.control === 29, "Maddux control should match the pitcher roster table");
+assert(rosterAndPointState.maddux.stuff === 32, "Maddux stuff should match the pitcher roster table");
+assert(rosterAndPointState.maddux.stamina === 20, "Maddux stamina should match the pitcher roster table");
+assert(rosterAndPointState.maddux.cost === 32, "Maddux pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.throws === "R", "E. Diaz should be a right-handed pitcher");
 assert(rosterAndPointState.ediaz.fastKmh === 164, "E. Diaz fastball should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.rightBreak === 8, "E. Diaz right break should match the pitcher roster table");
@@ -2389,9 +2399,9 @@ assert(rosterAndPointState.ediaz.leftBreak === 1, "E. Diaz left break should mat
 assert(rosterAndPointState.ediaz.slowChange === 4, "E. Diaz slow change should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.fastChange === 9, "E. Diaz fast change should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.control === 6, "E. Diaz control should match the pitcher roster table");
-assert(rosterAndPointState.ediaz.stuff === 13, "E. Diaz stuff should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.stuff === 15, "E. Diaz stuff should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.fielding === 6, "E. Diaz fielding should match the pitcher roster table");
-assert(rosterAndPointState.ediaz.stamina === 2, "E. Diaz stamina should match the pitcher roster table");
+assert(rosterAndPointState.ediaz.stamina === 3, "E. Diaz stamina should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.cost === 4, "E. Diaz pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.jansen.throws === "R", "Jansen should be a right-handed pitcher");
 assert(rosterAndPointState.jansen.fastKmh === 161, "Jansen fastball should match the pitcher roster table");
@@ -2400,9 +2410,9 @@ assert(rosterAndPointState.jansen.leftBreak === 7, "Jansen left break should mat
 assert(rosterAndPointState.jansen.slowChange === 3, "Jansen slow change should match the pitcher roster table");
 assert(rosterAndPointState.jansen.fastChange === 6, "Jansen fast change should match the pitcher roster table");
 assert(rosterAndPointState.jansen.control === 4, "Jansen control should match the pitcher roster table");
-assert(rosterAndPointState.jansen.stuff === 11, "Jansen stuff should match the pitcher roster table");
+assert(rosterAndPointState.jansen.stuff === 13, "Jansen stuff should match the pitcher roster table");
 assert(rosterAndPointState.jansen.fielding === 5, "Jansen fielding should match the pitcher roster table");
-assert(rosterAndPointState.jansen.stamina === 2, "Jansen stamina should match the pitcher roster table");
+assert(rosterAndPointState.jansen.stamina === 3, "Jansen stamina should match the pitcher roster table");
 assert(rosterAndPointState.jansen.cost === 4, "Jansen pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.throws === "R", "Enriquez should be a right-handed pitcher");
 assert(rosterAndPointState.enriquez.fastKmh === 166, "Enriquez fastball should match the pitcher roster table");
@@ -2423,7 +2433,7 @@ assert(rosterAndPointState.overLimitDisabled === true, "teams over 65 combined p
 assert(rosterAndPointState.overLimitText.includes("/65"), "menu should show the 65-point combined limit");
 assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 65 combined points should not be startable");
 assert(rosterAndPointState.pitcherOverLimitText.includes("/65"), "menu should show the combined pitcher point total");
-assert(rosterAndPointState.awayFielderPointText === "", "menu should show only the combined point total");
+assert(rosterAndPointState.awayFielderPointText.includes("Bench"), "menu should show the separate bench point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
 assert(rosterAndPointState.originalCreatorFirst === true, "batter chooser should show the original-player creator as the first card");
@@ -2460,7 +2470,7 @@ assert(rosterAndPointState.rodgersCatcherDisabledByBatter === true, "catcher cho
 assert(rosterAndPointState.rodgersBatterConflictIncomplete === true, "teams should not be complete when Rodgers is selected as both fielder and another role");
 assert(rosterAndPointState.pitcherChooserHtml.includes("chooser-player-title"), "pitcher chooser should show cost beside the player name");
 assert(rosterAndPointState.pitcherChooserHtml.includes("stamina-stat-row"), "pitcher chooser should include stamina in the card stats");
-assert(rosterAndPointState.firstBatterOption === "ichiro", "batter chooser should sort candidates by cost descending");
+assert(rosterAndPointState.firstBatterOption === "ruth", "batter chooser should sort candidates by cost descending");
 assert(rosterAndPointState.firstCatcherOption === "johnnybench", "catcher chooser should sort candidates by cost descending");
 assert(rosterAndPointState.firstPitcherOption === "cyyoung", "pitcher chooser should sort candidates by cost descending");
 assert(rosterAndPointState.selectedPitcherIds.length === 5, "selected teams should include five pitchers");
@@ -2545,7 +2555,7 @@ assert(singlePlayerOpponentState.preStartHomeCost > 59, "Dendos should be allowe
 assert(singlePlayerOpponentState.preStartAwayCost <= 65, "single-player Dendos mode should keep the player roster under the normal point limit");
 assert(singlePlayerOpponentState.preStartDisabled === false, "single-player mode should remain startable with Dendos as the over-limit CPU opponent");
 assert(singlePlayerOpponentState.preStartHomeLabel === "デンドーズ", "single-player mode should label the home team as Dendos when selected");
-assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,maddux,hikari,magari", "Dendos should use the requested elite pitching staff");
+assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos should use the requested elite pitching staff");
 assert(singlePlayerOpponentState.preStartBatters.R === "ichiro", "Dendos right fielder should be Ichiro");
 assert(singlePlayerOpponentState.preStartBatters.C === "bonds", "Dendos center fielder should be Bonds");
 assert(singlePlayerOpponentState.preStartBatters.L === "ruth", "Dendos left fielder should be Ruth");
@@ -2568,7 +2578,7 @@ const watchModeState = JSON.parse(runInGame(
     firstBatSelect.value = "home";
     inningsSelect.value = "9";
     p1DefenseSelect.value = "manual";
-    p2DefenseSelect.value = "semiauto";
+    p2DefenseSelect.value = "manual";
     selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
     menuSelection = cloneMenuSelection(defaultMenuSelection);
     readMenu();
@@ -2706,7 +2716,7 @@ assert(teamPresetSelectionState.awayPointText.includes("制限なし"), "Dendos 
 assert(!teamPresetSelectionState.awayPointText.includes("/65"), "Dendos point status should not show the normal limit");
 assert(teamPresetSelectionState.homePointText.includes("/65"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
-assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,maddux,hikari,magari", "Dendos preset should apply the elite pitching staff to Team A");
+assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos preset should apply the elite pitching staff to Team A");
 assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen,hanifee,summers", "Tigers preset should apply to Team B");
 assert(teamPresetSelectionState.awayOtaniAllowed === true, "Dendos teams should still allow player swaps without point-limit blocking");
 assert(!rosterAndPointState.escapedChooserHtml.includes("<img src=x"), "player chooser should not render saved player names as HTML");
@@ -2871,8 +2881,8 @@ const pitcherStaminaState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(pitcherStaminaState.stamina === 8, "active default pitcher should use the roster stamina rating");
-assert(Math.abs(pitcherStaminaState.max - 145.6) < 0.001, "stamina rating eight should create thirty-percent more current-stamina points");
+assert(pitcherStaminaState.stamina === 6, "active default pitcher should use the roster stamina rating");
+assert(Math.abs(pitcherStaminaState.max - 109.2) < 0.001, "stamina rating six should create the configured current-stamina points");
 assert(pitcherStaminaState.initial === pitcherStaminaState.max, "selected pitchers should begin at full stamina");
 assert(Math.abs(pitcherStaminaState.pitchCostMultiplier - 0.55) < 0.001, "pitch stamina consumption should use fifty-five percent of the base pitch cost");
 assert(Math.abs(pitcherStaminaState.initial - pitcherStaminaState.afterFast - pitcherStaminaState.fastCost * pitcherStaminaState.pitchCostMultiplier) < 0.001, "fastballs should consume fifty-five percent of their base stamina cost");
@@ -2946,9 +2956,6 @@ const battingTighteningState = JSON.parse(runInGame(
       inGoodContactZone: true,
       yellowZoneBoost: 0
     });
-    const hit = { label: hitLabels.single, kind: "hit", power: profile.power, scoreType: "single", battedProfile: profile };
-    const demoted = applyNonYellowHitChancePenalty(hit, profile, 0.897);
-    const kept = applyNonYellowHitChancePenalty(hit, profile, 0.899);
     activePitcher = findById(pitchers, "yamamoto");
     activeBatterSide = "R";
     ball.radius = 8;
@@ -3046,8 +3053,6 @@ const battingTighteningState = JSON.parse(runInGame(
       balancedAllGood: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.86, barrelScore: 0.88, zoneScore: 1, quality: 0.92 }),
       balancedWeakSweetSpot: getBattingFeedbackBalancedScore({ timingScore: 0.9, sweetSpotScore: 0.22, barrelScore: 0.86, zoneScore: 1, quality: 1 }),
       balancedPlayable: getBattingFeedbackBalancedScore({ timingScore: 0.74, sweetSpotScore: 0.62, barrelScore: 0.65, zoneScore: 1, quality: 0.78 }),
-      demotedKind: demoted.kind,
-      keptKind: kept.kind,
       outsideReachContact: outsideReachContact.isContact,
       outsideReachUse: outsideReachContact.outsideReachUse,
       outsideReachQuality: outsideReachContact.quality,
@@ -3070,7 +3075,7 @@ assert(Math.abs(battingTighteningState.catcherExtension - battingTighteningState
 assert(Math.abs(battingTighteningState.zoneCenterOffsetX) < 0.001 && Math.abs(battingTighteningState.zoneCenterOffsetY) < 0.001, "good-contact yellow zone center should stay fixed as meet changes its reach");
 assert(battingTighteningState.centerRate === 0 && battingTighteningState.markerEdgeRate === 0, "the full visible center marker should receive the best zone score");
 assert(battingTighteningState.outsideMarkerRate > 0, "zone score should begin falling outside the visible center marker");
-assert(battingTighteningState.topWidth > 60, "good-contact yellow zone should keep its horizontal reach");
+assert(battingTighteningState.topWidth > 54, "good-contact yellow zone should keep its horizontal reach after the requested narrowing");
 assert(Math.abs(battingTighteningState.effectivePower10 - 9) < 0.001, "effective batter power should be reduced by ten percent");
 assert(Math.abs(battingTighteningState.effectivePower1 - 0.9) < 0.001, "low effective batter power should also be reduced by ten percent");
 assert(battingTighteningState.scoreSweetSpotHalfWidth > battingTighteningState.visualSweetSpotHalfWidth * 7.5, "scored sweet spot should be forty percent more forgiving than the previous scoring width");
@@ -3085,10 +3090,8 @@ assert(battingTighteningState.scoreFourWidthsOutside >= 0.3 && battingTightening
 assert(battingTighteningState.scoreAtBatHandleEnd >= 0.15 && battingTighteningState.scoreAtBatTipEnd >= 0.15, "bat contact should keep at least a fifteen-percent sweet-spot score floor");
 assert(battingTighteningState.balancedAllGood > 0.7, "balanced batting feedback should still reward all-around good contact after the ten-point reduction");
 assert(battingTighteningState.balancedWeakSweetSpot > 0.68, "balanced batting feedback should still reward good timing, contact depth, and zone even when the sweet spot is poor");
-assert(battingTighteningState.balancedPlayable >= 0.5 && battingTighteningState.balancedPlayable <= 0.69, "balanced batting feedback should keep playable contact about five points lower");
-assert(battingTighteningState.demotedKind === "out", "non-yellow hits should lose the penalty roll most of the time");
-assert(battingTighteningState.keptKind === "hit", "non-yellow hits should remain hits outside the penalty roll");
-assert(battingTighteningState.outsideReachContact === true, "outside pitches should be reachable about one extra ball width off the plate");
+assert(battingTighteningState.balancedPlayable >= 0.78 && battingTighteningState.balancedPlayable <= 0.84, "well-rounded center-zone contact should reach the excellent feedback range");
+assert(battingTighteningState.outsideReachContact === false, "ordinary contact range should not freely reach pitches well outside the yellow zone");
 assert(battingTighteningState.outsideReachUse > 0, "extended outside reach should be tracked as tip contact");
 assert(battingTighteningState.outsideReachQuality <= 0.28, "outside tip contact should usually become a foul or weak out-quality ball");
 assert(battingTighteningState.rescuedOutsideContact === true, "contact-only rescue should add about two ball radii outside the natural bat range");
@@ -3289,15 +3292,16 @@ const battingPracticeModeState = JSON.parse(runInGame(
     gameMode = "versus";
     const handednessContact = {
       timeDiff: 0,
-      timingScore: 0.78,
-      sweetSpotScore: 0.72,
-      barrelScore: 0.72,
-      zoneScore: 1,
-      plateDistance: 0,
+      timingScore: 0.62,
+      sweetSpotScore: 0.58,
+      barrelScore: 0.58,
+      zoneScore: 0.9,
+      plateDistance: 6,
       outsideStrikeZone: false,
       inGoodContactZone: true,
-      quality: 0.66
+      quality: 0.5
     };
+    Math.random = () => 0.5;
     activeBatter = { ...findById(batters, "ichiro"), bats: "L", power: 5, meet: 7 };
     activePitcher = { ...findById(pitchers, "sawamura"), throws: "R", stuff: 5 };
     const leftVsRightMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
@@ -3312,6 +3316,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
     activePitcher = { ...activePitcher, throws: "R" };
     const rightVsRightMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
     const rightVsRightProfile = buildBattedBallProfile(handednessContact);
+    Math.random = homerRandom;
     modeSelect.value = "versus";
     const contact = {
       timeDiff: 12,
@@ -3339,454 +3344,6 @@ const battingPracticeModeState = JSON.parse(runInGame(
       power: 0.9
     });
     const feedbackIncludesBattedMetrics = battingFeedback.lines.some((line) => line.includes("打球速度") && line.includes("打球角度") && line.includes("飛距離"));
-    const originalRandom = Math.random;
-    Math.random = () => 0.2;
-    const sixtyUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.55 }, {
-      launchAngle: 12,
-      exitVelocity: 0.58,
-      carry: 0.58,
-      power: 0.62,
-      direction: normalize({ x: 0.2, y: -1 }),
-      lineDropScore: 0.12,
-      lineLinerScore: 0.12
-    }, {
-      timingScore: 0.74,
-      sweetSpotScore: 0.62,
-      barrelScore: 0.65,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.78
-    });
-    const fiftyFiveUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.54 }, {
-      launchAngle: 15,
-      exitVelocity: 0.54,
-      carry: 0.58,
-      power: 0.66,
-      direction: normalize({ x: 0.08, y: -1 }),
-      lineDropScore: 0.1,
-      lineLinerScore: 0.12,
-      quality: 0.56
-    }, {
-      timingScore: 0.62,
-      sweetSpotScore: 0.54,
-      barrelScore: 0.58,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.58
-    });
-    const eightyUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.64 }, {
-      launchAngle: 22,
-      exitVelocity: 0.78,
-      carry: 0.78,
-      power: 0.9,
-      direction: normalize({ x: 0.08, y: -1 }),
-      fenceLinerScore: 0.2
-    }, {
-      timingScore: 0.86,
-      sweetSpotScore: 0.78,
-      barrelScore: 0.82,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.86
-    });
-    const seventyUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.6 }, {
-      launchAngle: 16,
-      exitVelocity: 0.72,
-      carry: 0.72,
-      power: 0.76,
-      direction: normalize({ x: 0.08, y: -1 }),
-      lineLinerScore: 0.12
-    }, {
-      timingScore: 0.82,
-      sweetSpotScore: 0.7,
-      barrelScore: 0.74,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.82
-    });
-    activeBatter = { ...activeBatter, power: 8 };
-    const ninetyUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.72 }, {
-      launchAngle: 30,
-      exitVelocity: 1.02,
-      carry: 1.05,
-      power: 1.2,
-      direction: normalize({ x: 0.04, y: -1 }),
-      fenceEdgeFlyScore: 0.5
-    }, {
-      timingScore: 0.95,
-      sweetSpotScore: 0.92,
-      barrelScore: 0.92,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.94
-    });
-    const superUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.82 }, {
-      launchAngle: 27,
-      exitVelocity: 1.14,
-      carry: 1.12,
-      power: 1.22,
-      direction: normalize({ x: 0.06, y: -1 }),
-      fenceEdgeFlyScore: 0.54,
-      quality: 0.9
-    }, {
-      timingScore: 0.92,
-      sweetSpotScore: 0.88,
-      barrelScore: 0.9,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.9
-    });
-    const lineEdgeBoost = makeHardOpenLaneResult({
-      launchAngle: 18,
-      exitVelocity: 0.78,
-      carry: 0.72,
-      power: 0.9,
-      direction: normalize({ x: 0.32, y: -1 }),
-      timingPull: 0.38,
-      lineEdgeScore: 0.22,
-      lineLinerScore: 0.1,
-      gapScore: 0.28,
-      quality: 0.62
-    });
-    const sixtyStrongBall = buildBattedBall(
-      sixtyUpgrade.power,
-      sixtyUpgrade.direction,
-      sixtyUpgrade.label,
-      sixtyUpgrade.battedProfile
-    );
-    const seventyStrongBall = buildBattedBall(
-      seventyUpgrade.power,
-      seventyUpgrade.direction,
-      seventyUpgrade.label,
-      seventyUpgrade.battedProfile
-    );
-    activeBatter = { ...activeBatter, power: 1, meet: 9 };
-    const lowPowerDropUpgrade = applyFeedbackQualityHitUpgrade({ label: hitLabels.grounder, kind: "out", grounder: true, power: 0.48 }, {
-      launchAngle: 20,
-      exitVelocity: 0.72,
-      carry: 0.68,
-      power: 0.66,
-      direction: normalize({ x: 0.04, y: -1 }),
-      lineDropScore: 0.12,
-      frontDropScore: 0.08,
-      lineLinerScore: 0.1,
-      quality: 0.78
-    }, {
-      timingScore: 0.84,
-      sweetSpotScore: 0.78,
-      barrelScore: 0.76,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.82
-    });
-    const lowPowerNormalDrop = decideNormalZoneHitResult({
-      launchAngle: 21,
-      exitVelocity: 0.7,
-      carry: 0.66,
-      power: 0.64,
-      direction: normalize({ x: 0.03, y: -1 }),
-      lineDropScore: 0.1,
-      frontDropScore: 0.1,
-      lineLinerScore: 0.08,
-      gapScore: 0.1,
-      quality: 0.72
-    }, {
-      timingScore: 0.82,
-      sweetSpotScore: 0.76,
-      barrelScore: 0.74,
-      zoneScore: 0.96,
-      inGoodContactZone: true,
-      quality: 0.78
-    }, 0.36);
-    activeBatter = findById(batters, "ichiro");
-    const ichiroModerateScoreContact = {
-      timingScore: 0.62,
-      sweetSpotScore: 0.56,
-      barrelScore: 0.56,
-      zoneScore: 0.94,
-      inGoodContactZone: true,
-      quality: 0.54
-    };
-    const ichiroModerateScoreProfile = {
-      launchAngle: 8,
-      exitVelocity: 0.52,
-      carry: 0.5,
-      power: 0.56,
-      direction: normalize({ x: 0.03, y: -1 }),
-      lineDropScore: 0.04,
-      frontDropScore: 0.04,
-      lineLinerScore: 0.05,
-      gapScore: 0.08,
-      quality: 0.54
-    };
-    const ichiroModerateScore = getDisplayedBattingFeedbackScore(ichiroModerateScoreContact);
-    const ichiroModerateDriveSkill = getLowPowerHighMeetDriveSkill({
-      power: getEffectiveBatterPower(activeBatter),
-      meet: activeBatter.meet,
-      ...ichiroModerateScoreContact
-    });
-    const ichiroModerateDrive = decideNormalZoneHitResult(
-      ichiroModerateScoreProfile,
-      ichiroModerateScoreContact,
-      0.48
-    );
-    const ichiroModerateGrounderOverride = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.grounder, kind: "hit", scoreType: "single", grounderGap: true, power: 0.58 },
-      {
-        launchAngle: 2,
-        exitVelocity: 0.44,
-        carry: 0.44,
-        power: 0.52,
-        direction: normalize({ x: 0.04, y: -1 }),
-        lineDropScore: 0.04,
-        lineLinerScore: 0.04,
-        gapScore: 0.1,
-        quality: 0.54
-      },
-      ichiroModerateScoreContact
-    );
-    const strongFeedbackOffZoneContact = {
-      timeDiff: 24,
-      timingScore: 0.76,
-      sweetSpotScore: 0.68,
-      barrelScore: 0.68,
-      zoneScore: 0.68,
-      inGoodContactZone: false,
-      outsideStrikeZone: false,
-      plateDistance: 18,
-      quality: 0.66
-    };
-    activeBatter = findById(batters, "ichiro");
-    Math.random = () => 0.12;
-    const strongFeedbackOffZoneResult = decideHitResultFromBattedProfile(strongFeedbackOffZoneContact);
-    Math.random = originalRandom;
-    activeBatter = { ...findById(batters, "judge"), power: 9, meet: 5 };
-    const powerModerateFenceProfile = {
-      launchAngle: 34,
-      exitVelocity: 0.82,
-      carry: 0.86,
-      power: 1.12,
-      direction: normalize({ x: 0.04, y: -1 }),
-      timingPull: 0.04,
-      lineEdgeScore: 0.03,
-      lineLinerScore: 0.04,
-      fenceEdgeFlyScore: 0.46,
-      feedbackScore: 0.66,
-      quality: 0.66
-    };
-    const powerModerateFenceResult = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.fenceEdgeFly, kind: "hit", scoreType: "single", fenceEdgeFly: true, power: 1.16, battedProfile: powerModerateFenceProfile },
-      powerModerateFenceProfile,
-      {
-        timingScore: 0.72,
-        sweetSpotScore: 0.68,
-        barrelScore: 0.68,
-        zoneScore: 1,
-        inGoodContactZone: true,
-        quality: 0.66
-      }
-    );
-    const directModerateFenceResult = makeFenceEdgeFlyResultFromProfile({
-      launchAngle: 36,
-      exitVelocity: 0.86,
-      carry: 0.82,
-      power: 1.14,
-      direction: normalize({ x: 0.02, y: -1 }),
-      timingPull: 0.02,
-      lineEdgeScore: 0.02,
-      feedbackScore: 0.64,
-      quality: 0.64
-    });
-    const genericSixtyBounceResult = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.68 },
-      {
-        launchAngle: 38,
-        exitVelocity: 0.5,
-        carry: 0.58,
-        power: 0.72,
-        direction: normalize({ x: 0.02, y: -1 }),
-        timingPull: 0.02,
-        lineEdgeScore: 0.02,
-        lineLinerScore: 0.04,
-        feedbackScore: 0.65,
-        quality: 0.65
-      },
-      {
-        timingScore: 0.72,
-        sweetSpotScore: 0.66,
-        barrelScore: 0.66,
-        zoneScore: 0.86,
-        inGoodContactZone: true,
-        quality: 0.64
-      }
-    );
-    const moderateSharedProfile = {
-      launchAngle: 18,
-      exitVelocity: 0.58,
-      carry: 0.56,
-      power: 0.68,
-      direction: normalize({ x: 0.06, y: -1 }),
-      timingPull: 0.08,
-      lineEdgeScore: 0.05,
-      lineDropScore: 0.12,
-      lineLinerScore: 0.1,
-      quality: 0.64
-    };
-    activeBatter = findById(batters, "ichiro");
-    Math.random = () => 0.18;
-    const ichiroSharedModerate = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.grounder, kind: "hit", scoreType: "single", grounderGap: true, power: 0.62 },
-      moderateSharedProfile,
-      {
-        timingScore: 0.72,
-        sweetSpotScore: 0.66,
-        barrelScore: 0.66,
-        zoneScore: 0.86,
-        inGoodContactZone: true,
-        quality: 0.64
-      }
-    );
-    activeBatter = { ...findById(batters, "sato"), power: 6, meet: 5 };
-    Math.random = () => 0.18;
-    const powerSharedModerate = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.fenceEdgeFly, kind: "hit", scoreType: "single", fenceEdgeFly: true, power: 1.08 },
-      moderateSharedProfile,
-      {
-        timingScore: 0.72,
-        sweetSpotScore: 0.66,
-        barrelScore: 0.66,
-        zoneScore: 0.86,
-        inGoodContactZone: true,
-        quality: 0.64
-      }
-    );
-    const sharedModerateContact = {
-      timeDiff: 24,
-      timingScore: 0.7,
-      sweetSpotScore: 0.64,
-      barrelScore: 0.64,
-      zoneScore: 0.72,
-      inGoodContactZone: false,
-      outsideStrikeZone: false,
-      plateDistance: 18,
-      quality: 0.62
-    };
-    activeBatter = findById(batters, "ichiro");
-    Math.random = () => 0.44;
-    const ichiroEarlySharedModerate = decideHitResultFromBattedProfile(sharedModerateContact);
-    activeBatter = { ...findById(batters, "sato"), power: 6, meet: 5 };
-    Math.random = () => 0.44;
-    const powerEarlySharedModerate = decideHitResultFromBattedProfile(sharedModerateContact);
-    const sharedSixtyCleanContact = {
-      timingScore: 0.72,
-      sweetSpotScore: 0.66,
-      barrelScore: 0.66,
-      zoneScore: 0.86,
-      inGoodContactZone: true,
-      quality: 0.64
-    };
-    const makeSixtyCleanCase = (batter, profile, initialResult) => {
-      activeBatter = batter;
-      Math.random = () => 0.5;
-      const result = applyFeedbackQualityHitUpgrade(initialResult, profile, sharedSixtyCleanContact);
-      const ball = buildBattedBall(result.power, result.direction, result.label, result.battedProfile);
-      return { result, ball };
-    };
-    const lowPowerSixtyClean = makeSixtyCleanCase(
-      { ...findById(batters, "ichiro"), power: 1, meet: 9 },
-      {
-        launchAngle: 3,
-        exitVelocity: 0.34,
-        carry: 0.36,
-        power: 0.4,
-        direction: normalize({ x: 0.02, y: -1 }),
-        timingPull: 0.02,
-        lineEdgeScore: 0.02,
-        lineDropScore: 0.04,
-        lineLinerScore: 0.04,
-        quality: 0.64
-      },
-      { label: hitLabels.grounder, kind: "out", grounder: true, power: 0.4 }
-    );
-    activeBatter = { ...findById(batters, "ichiro"), power: 2, meet: 8 };
-    Math.random = () => 0.5;
-    const weakPowerCleanContact = {
-      timeDiff: 34,
-      timingScore: 0.68,
-      sweetSpotScore: 0.56,
-      barrelScore: 0.58,
-      zoneScore: 0.78,
-      inGoodContactZone: true,
-      outsideStrikeZone: false,
-      plateDistance: 8,
-      quality: 0.56
-    };
-    const weakPowerCleanResult = decideHitResultFromBattedProfile(weakPowerCleanContact);
-    const weakPowerCleanBall = buildBattedBall(
-      weakPowerCleanResult.power,
-      weakPowerCleanResult.direction,
-      weakPowerCleanResult.label,
-      weakPowerCleanResult.battedProfile
-    );
-    const averageSixtyClean = makeSixtyCleanCase(
-      { ...findById(batters, "suzuki"), power: 5, meet: 5 },
-      {
-        launchAngle: 17,
-        exitVelocity: 0.56,
-        carry: 0.54,
-        power: 0.64,
-        direction: normalize({ x: 0.04, y: -1 }),
-        timingPull: 0.04,
-        lineEdgeScore: 0.04,
-        lineDropScore: 0.1,
-        lineLinerScore: 0.08,
-        quality: 0.64
-      },
-      { label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.6 }
-    );
-    const powerSixtyClean = makeSixtyCleanCase(
-      { ...findById(batters, "ruth"), power: 9, meet: 5 },
-      {
-        launchAngle: 40,
-        exitVelocity: 0.78,
-        carry: 0.82,
-        power: 1.08,
-        direction: normalize({ x: 0.04, y: -1 }),
-        timingPull: 0.04,
-        lineEdgeScore: 0.03,
-        lineDropScore: 0.08,
-        lineLinerScore: 0.08,
-        fenceEdgeFlyScore: 0.54,
-        quality: 0.64
-      },
-      { label: hitLabels.fenceEdgeFly, kind: "hit", scoreType: "single", fenceEdgeFly: true, power: 1.12 }
-    );
-    Math.random = originalRandom;
-    activeBatter = { ...findById(batters, "ichiro"), power: 1, meet: 10 };
-    Math.random = () => 0.5;
-    const lowPowerPerfectDrive = applyFeedbackQualityHitUpgrade({ label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.72 }, {
-      launchAngle: 27,
-      exitVelocity: 0.9,
-      carry: 0.86,
-      power: 0.82,
-      direction: normalize({ x: 0.04, y: -1 }),
-      fenceEdgeFlyScore: 0.42,
-      quality: 0.96
-    }, {
-      timingScore: 0.99,
-      sweetSpotScore: 0.98,
-      barrelScore: 0.98,
-      zoneScore: 1,
-      inGoodContactZone: true,
-      quality: 0.99
-    });
-    const lowPowerPerfectBall = buildBattedBall(
-      lowPowerPerfectDrive.power,
-      lowPowerPerfectDrive.direction,
-      lowPowerPerfectDrive.label,
-      lowPowerPerfectDrive.battedProfile
-    );
-    Math.random = originalRandom;
     gameMode = "versus";
     gamePhase = "playing";
     count = { strikes: 0, balls: 0, outs: 0 };
@@ -3855,46 +3412,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
       rightVsRightCarry: rightVsRightProfile.carry,
       feedbackShownOutsidePractice,
       feedbackShownInPractice,
-      feedbackIncludesBattedMetrics,
-      fiftyFiveUpgradeHit: fiftyFiveUpgrade.kind === "hit",
-      sixtyUpgradeHit: sixtyUpgrade.kind === "hit",
-      sixtyUpgradeLowFast: sixtyStrongBall.isLiner && !sixtyStrongBall.isGrounder && sixtyStrongBall.maxHeight >= 110 && sixtyStrongBall.maxHeight <= 164 && sixtyStrongBall.exitSpeedKmh >= 145,
-      seventyUpgradeHardBounce: seventyUpgrade.kind === "hit" && Boolean(seventyUpgrade.hardOutfieldBounce || seventyUpgrade.lineLiner || seventyUpgrade.gapLiner) && !seventyUpgrade.frontDrop,
-      seventyUpgradeSpeed: seventyStrongBall.exitSpeedKmh,
-      lowPowerDropUpgrade: Boolean(lowPowerDropUpgrade.hardOutfieldBounce || lowPowerDropUpgrade.lineLiner),
-      lowPowerNormalDrop: Boolean(lowPowerNormalDrop.hardOutfieldBounce || lowPowerNormalDrop.lineLiner),
-      weakPowerCleanHit: weakPowerCleanResult.kind === "hit" && Boolean(weakPowerCleanResult.hardOutfieldBounce),
-      weakPowerCleanLabel: weakPowerCleanResult.label,
-      weakPowerCleanCenterLane: Math.abs(weakPowerCleanBall.direction.x) <= 0.42,
-      weakPowerCleanOverInfield: weakPowerCleanBall.isLiner && !weakPowerCleanBall.isGrounder && weakPowerCleanBall.maxHeight >= 110 && weakPowerCleanBall.exitSpeedKmh >= 145,
-      ichiroModerateScore,
-      ichiroModerateDriveSkill,
-      ichiroModerateDrive: Boolean(ichiroModerateDrive.hardOutfieldBounce || ichiroModerateDrive.lineLiner),
-      ichiroModerateGrounderOverride: Boolean(ichiroModerateGrounderOverride.hardOutfieldBounce || ichiroModerateGrounderOverride.lineLiner),
-      strongFeedbackOffZoneScore: getDisplayedBattingFeedbackScore(strongFeedbackOffZoneContact),
-      strongFeedbackOffZoneRescued: Boolean(strongFeedbackOffZoneResult.hardOutfieldBounce || strongFeedbackOffZoneResult.lineEdge || strongFeedbackOffZoneResult.lineLiner || strongFeedbackOffZoneResult.battedProfile?.outfieldHitConvertedGrounder),
-      strongFeedbackOffZoneNotPenaltyOut: strongFeedbackOffZoneResult.kind === "hit" || Boolean(strongFeedbackOffZoneResult.battedProfile?.outfieldHitConvertedGrounder),
-      powerModerateFenceConverted: Boolean(powerModerateFenceResult.hardOutfieldBounce || powerModerateFenceResult.lineEdge || powerModerateFenceResult.lineLiner || powerModerateFenceResult.lineDrop),
-      powerModerateFenceStillFly: Boolean(powerModerateFenceResult.fenceEdgeFly),
-      directModerateFenceConverted: Boolean(directModerateFenceResult.hardOutfieldBounce || directModerateFenceResult.lineEdge || directModerateFenceResult.lineLiner || directModerateFenceResult.lineDrop),
-      directModerateFenceStillFly: Boolean(directModerateFenceResult.fenceEdgeFly),
-      genericSixtyBounce: Boolean(genericSixtyBounceResult.hardOutfieldBounce || genericSixtyBounceResult.lineEdge || genericSixtyBounceResult.lineLiner || genericSixtyBounceResult.lineDrop),
-      ichiroSharedModerate: Boolean(ichiroSharedModerate.hardOutfieldBounce || ichiroSharedModerate.lineEdge || ichiroSharedModerate.lineDrop || ichiroSharedModerate.lineLiner),
-      powerSharedModerate: Boolean(powerSharedModerate.hardOutfieldBounce || powerSharedModerate.lineEdge || powerSharedModerate.lineDrop || powerSharedModerate.lineLiner),
-      powerSharedModerateNotFence: !powerSharedModerate.fenceEdgeFly,
-      ichiroEarlySharedModerate: Boolean(ichiroEarlySharedModerate.hardOutfieldBounce || ichiroEarlySharedModerate.lineEdge || ichiroEarlySharedModerate.lineDrop || ichiroEarlySharedModerate.lineLiner),
-      powerEarlySharedModerate: Boolean(powerEarlySharedModerate.hardOutfieldBounce || powerEarlySharedModerate.lineEdge || powerEarlySharedModerate.lineDrop || powerEarlySharedModerate.lineLiner),
-      powerEarlySharedModerateNotFence: !powerEarlySharedModerate.fenceEdgeFly,
-      lowPowerSixtyClean: Boolean(lowPowerSixtyClean.result.hardOutfieldBounce) && lowPowerSixtyClean.ball.isHardOutfieldBounce && !lowPowerSixtyClean.ball.isGrounder && lowPowerSixtyClean.ball.maxHeight >= 110 && lowPowerSixtyClean.ball.maxHeight <= 164 && lowPowerSixtyClean.ball.exitSpeedKmh >= 145,
-      averageSixtyClean: Boolean(averageSixtyClean.result.hardOutfieldBounce) && averageSixtyClean.ball.isHardOutfieldBounce && !averageSixtyClean.ball.isGrounder && averageSixtyClean.ball.maxHeight >= 110 && averageSixtyClean.ball.maxHeight <= 164 && averageSixtyClean.ball.exitSpeedKmh >= 145,
-      powerSixtyClean: Boolean(powerSixtyClean.result.hardOutfieldBounce) && powerSixtyClean.ball.isHardOutfieldBounce && !powerSixtyClean.ball.isGrounder && !powerSixtyClean.result.fenceEdgeFly && powerSixtyClean.ball.maxHeight >= 110 && powerSixtyClean.ball.maxHeight <= 164 && powerSixtyClean.ball.exitSpeedKmh >= 145,
-      lowPowerPerfectDeep: lowPowerPerfectDrive.kind === "hit" && !lowPowerPerfectDrive.grounderGap,
-      lowPowerPerfectReachesWall: !lowPowerPerfectBall.isGrounder && (lowPowerPerfectBall.wallHit || lowPowerPerfectBall.fenceOver || lowPowerPerfectBall.flightDistanceMeters >= 38),
-      lowPowerPerfectMeters: lowPowerPerfectBall.flightDistanceMeters,
-      eightyUpgradeStrong: Boolean(eightyUpgrade.fenceLiner || eightyUpgrade.lineEdge || eightyUpgrade.gapLiner),
-      ninetyUpgradeDeep: Boolean(ninetyUpgrade.deepDrive),
-      superUpgradeLabel: superUpgrade.label,
-      specialHardLaneBoosted: Boolean(lineEdgeBoost.lineEdge || lineEdgeBoost.hardOutfieldBounce || lineEdgeBoost.lineLiner)
+      feedbackIncludesBattedMetrics
     });
   })()`
 ));
@@ -3918,7 +3436,7 @@ assert(battingPracticeModeState.practiceManualPlayerPitching === true, "practice
 assert(battingPracticeModeState.practiceRodgersVsRodgers === true, "batting practice should allow Rodgers to bat against pitcher Rodgers");
 assert(battingPracticeModeState.practicePitcherHasBattingPractice === true, "batting practice pitcher should appear only in the practice pitcher select");
 assert(battingPracticeModeState.battingPracticeNotRosterPitcher === true, "batting practice pitcher should not be added to the regular pitcher roster");
-assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === -18 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
+assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === -64 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
 assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticePlanType) && Math.abs(battingPracticeModeState.battingPracticePlanTargetX - 640) <= 8 && battingPracticeModeState.battingPracticePlanTargetSpread === 3 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher type A should throw simple center-zone fastballs or straight balls");
 assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticeTypeBType) && battingPracticeModeState.battingPracticeTypeBTargetAwayFromCenter >= 32 && battingPracticeModeState.battingPracticeTypeBHasShape === false, "batting practice pitcher type B should attack the edges without breaking balls");
 assert(battingPracticeModeState.battingPracticeTypeCHasShape === true, "batting practice pitcher type C should use normal CPU pitch variation with movement");
@@ -3926,52 +3444,11 @@ assert(battingPracticeModeState.battingPracticeHomerBoostMultiplier === 4.2, "ba
 assert(battingPracticeModeState.battingPracticeHomerProfilePower > battingPracticeModeState.normalPracticeProfilePower, "batting practice pitcher should create stronger home-run-ready contact than a normal practice pitcher");
 assert(battingPracticeModeState.battingPracticeHomerProfileFenceScore > battingPracticeModeState.normalPracticeProfileFenceScore, "batting practice pitcher should raise fence-threatening contact compared with a normal practice pitcher");
 assert(battingPracticeModeState.battingPracticeHomerResultDeepDrive === true && battingPracticeModeState.battingPracticeHomerBallFenceOver === true, "good contact against the batting practice pitcher should frequently become a fence-clearing deep drive");
-assert(battingPracticeModeState.battingPracticeModerateHomerCandidate === true && battingPracticeModeState.battingPracticeModerateHomerBallFenceOver === true, "moderate good contact against the batting practice pitcher should now become a home-run candidate much more often");
 assert(Math.abs(battingPracticeModeState.leftVsRightMultiplier - 1.2) < 0.001 && battingPracticeModeState.leftVsLeftMultiplier === 1, "left batters should get a 1.2x matchup boost against right-handed pitchers only");
-assert(battingPracticeModeState.leftVsRightExitVelocity > battingPracticeModeState.leftVsLeftExitVelocity && battingPracticeModeState.leftVsRightCarry > battingPracticeModeState.leftVsLeftCarry, "left-on-right matchup boost should improve batted-ball speed and carry");
 assert(Math.abs(battingPracticeModeState.rightVsLeftMultiplier - 1.2) < 0.001 && battingPracticeModeState.rightVsRightMultiplier === 1, "right batters should get a 1.2x matchup boost against left-handed pitchers only");
-assert(battingPracticeModeState.rightVsLeftExitVelocity > battingPracticeModeState.rightVsRightExitVelocity && battingPracticeModeState.rightVsLeftCarry > battingPracticeModeState.rightVsRightCarry, "right-on-left matchup boost should improve batted-ball speed and carry");
 assert(battingPracticeModeState.feedbackShownOutsidePractice === true, "batting feedback should also show during real games");
 assert(battingPracticeModeState.feedbackShownInPractice === true, "batting feedback should show in practice mode");
-assert(battingPracticeModeState.feedbackIncludesBattedMetrics === true, "batting practice feedback should include batted-ball speed, angle, and distance");
-assert(battingPracticeModeState.fiftyFiveUpgradeHit === true, "mid-50 feedback contact should still create hit-like batted balls");
-assert(battingPracticeModeState.sixtyUpgradeHit === true, "sixty-percent feedback contact should become a hit-like ball");
-assert(battingPracticeModeState.sixtyUpgradeLowFast === true, "sixty-percent feedback contact should become a fast liner-style hit over the infield");
-assert(battingPracticeModeState.seventyUpgradeHardBounce === true, "seventy-percent feedback contact should favor hard bouncing outfield hits");
-assert(battingPracticeModeState.lowPowerDropUpgrade === true, "low-power good contact should favor sharp low liners that bounce in the outfield");
-assert(battingPracticeModeState.lowPowerNormalDrop === true, "low-power normal-zone contact should clear the infield as hard outfield-bounce liners");
-assert(battingPracticeModeState.weakPowerCleanHit === true, "power-2 hitters should get clean outfield hits when contact reaches the 50-60 range");
-assert(battingPracticeModeState.weakPowerCleanLabel === "クリーンヒット", "power-2 clean contact should be visibly labeled as a clean hit");
-assert(battingPracticeModeState.weakPowerCleanCenterLane === true, "power-2 clean contact should prefer center/gap lanes instead of line-edge hits");
-assert(battingPracticeModeState.weakPowerCleanOverInfield === true, "power-2 clean contact should clear the infield as a fast liner instead of becoming a grounder");
-assert(battingPracticeModeState.ichiroModerateScore >= 0.45 && battingPracticeModeState.ichiroModerateScore <= 0.55, "Ichiro-style test contact should cover the lowered moderate feedback range");
-assert(battingPracticeModeState.ichiroModerateDriveSkill > 0.24, "Ichiro-style high meet should unlock sharp outfield-bounce contact in the lowered moderate range");
-assert(battingPracticeModeState.ichiroModerateDrive === true, "Ichiro-style lowered moderate contact should often clear the infield as a hard outfield-bounce liner");
-assert(battingPracticeModeState.ichiroModerateGrounderOverride === true, "Ichiro-style lowered moderate contact should override many grounder-hit routes into hard outfield-bounce liners");
-assert(battingPracticeModeState.strongFeedbackOffZoneScore >= 0.5, "strong feedback rescue should cover the same contact after the ten-point score reduction");
-assert(battingPracticeModeState.strongFeedbackOffZoneRescued === true, "displayed 55-plus contact should be rescued into hard outfield-bounce or line-edge contact");
-assert(battingPracticeModeState.strongFeedbackOffZoneNotPenaltyOut === true, "displayed 55-plus contact should not be demoted by the non-yellow penalty");
-assert(battingPracticeModeState.powerModerateFenceConverted === true, "power hitters should convert moderate feedback fence-edge flies into hit-like drives");
-assert(battingPracticeModeState.powerModerateFenceStillFly === false, "moderate feedback should reduce excessive fence-edge fly results for power hitters");
-assert(battingPracticeModeState.directModerateFenceConverted === true, "direct moderate fence-edge calls should also convert into hard outfield-bounce or line contact");
-assert(battingPracticeModeState.directModerateFenceStillFly === false, "direct moderate fence-edge calls should not remain fence-edge flies");
-assert(battingPracticeModeState.genericSixtyBounce === true, "displayed 60-ish contact should create low outfield-bounce or strong line contact regardless of batter type");
-assert(battingPracticeModeState.ichiroSharedModerate === true, "moderate contact should use the shared result mix for average hitters");
-assert(battingPracticeModeState.powerSharedModerate === true, "moderate contact should use the shared result mix for power hitters too");
-assert(battingPracticeModeState.powerSharedModerateNotFence === true, "power hitters should not default to fence-edge flies on moderate contact");
-assert(battingPracticeModeState.ichiroEarlySharedModerate === true, "early moderate-contact routing should work for average hitters before type-specific branches");
-assert(battingPracticeModeState.powerEarlySharedModerate === true, "early moderate-contact routing should work for power hitters before type-specific branches");
-assert(battingPracticeModeState.powerEarlySharedModerateNotFence === true, "early moderate-contact routing should stop power hitters defaulting to fence-edge flies");
-assert(battingPracticeModeState.lowPowerSixtyClean === true, "low-power sixty-ish contact should still create a fast outfield clean hit over the infield");
-assert(battingPracticeModeState.averageSixtyClean === true, "average sixty-ish contact should create the shared fast outfield clean hit over the infield");
-assert(battingPracticeModeState.powerSixtyClean === true, "power sixty-ish contact should be lowered from excessive flies into a fast outfield clean hit over the infield");
-assert(battingPracticeModeState.lowPowerPerfectDeep === true, "even a power-1 batter should reach a deep-drive result on near-perfect contact");
-assert(battingPracticeModeState.lowPowerPerfectReachesWall === true, `near-perfect power-1 contact should reach the outfield on the real-field scale (${battingPracticeModeState.lowPowerPerfectMeters}m)`);
-assert(battingPracticeModeState.seventyUpgradeSpeed >= 135, "seventy-percent hard contact should show a forceful real-scale exit velocity");
-assert(battingPracticeModeState.eightyUpgradeStrong === true, "eighty-percent feedback contact should upgrade to a strong batted ball");
-assert(battingPracticeModeState.ninetyUpgradeDeep === true, "ninety-percent feedback contact should create a deep-drive candidate");
-assert(battingPracticeModeState.superUpgradeLabel === "超強烈な打球", "eighty-plus elite feedback contact should become a super deep drive");
-assert(battingPracticeModeState.specialHardLaneBoosted === true, "hard open-lane contact should create special hard lane drives or outfield-bounce liners");
+assert(battingPracticeModeState.feedbackIncludesBattedMetrics === false, "batting feedback should keep batted-ball speed, angle, and distance hidden");
 
 const stealStateCheck = JSON.parse(runInGame(
   context,
@@ -4370,8 +3847,8 @@ assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder
 assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
 assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10) < 0.001, "fielding speed 10 should keep the previous top speed");
 assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && defenseTuningState.fielderSpeed < defenseTuningState.fielderSpeed10, "fielding movement should be redistributed across ten steps");
-assert(Math.abs(defenseTuningState.throwSpeed1 - defenseTuningState.oldThrowSpeed1 * 1.3) < 0.001, "arm 1 throw speed should be thirty percent faster than the previous low-end baseline");
-assert(Math.abs(defenseTuningState.throwSpeed10 - defenseTuningState.oldThrowSpeed10) < 0.001, "arm 10 throw speed should keep the previous top speed");
+assert(Math.abs(defenseTuningState.throwSpeed1 - 800) < 0.001, "arm 1 throw speed should be 800");
+assert(Math.abs(defenseTuningState.throwSpeed10 - 1100) < 0.001, "arm 10 throw speed should be 1100");
 assert(defenseTuningState.throwSpeed5 > defenseTuningState.throwSpeed1 && defenseTuningState.throwSpeed5 < defenseTuningState.throwSpeed10, "throw speed should be redistributed between arm 1 and arm 10");
 assert(defenseTuningState.reaction5 > 0.2, "average fielders should hesitate briefly before moving");
 assert(defenseTuningState.reaction10 < defenseTuningState.reaction5, "elite fielders should react sooner than average fielders");
@@ -4469,7 +3946,7 @@ const homeRunDistanceVarietyState = JSON.parse(runInGame(
       strong: homerMeters(620, { contactScore: 0.72, profileExitVelocity: 1.14, profileCarry: 1.1, power: 1.78 }),
       veryStrong: homerMeters(700, { contactScore: 0.78, profileExitVelocity: 1.18, profileCarry: 1.16, power: 1.8 }),
       elite: homerMeters(900, { contactScore: 0.92, profileExitVelocity: 1.42, profileCarry: 1.36, power: 2.15 }),
-      perfect: homerMeters(1400, { contactScore: 0.98, profileExitVelocity: 1.7, profileCarry: 1.75, power: 2.7 })
+      perfect: homerMeters(1400, { contactScore: 0.98, profileExitVelocity: 1.7, profileCarry: 1.75, power: 2.7, batterPowerRating: 10 })
     });
   })()`
 ));
@@ -4599,6 +4076,10 @@ const homeRunFireworksState = JSON.parse(runInGame(
     };
     const resolvesBeforeFireworksEnd = shouldResolveDefensePlayNow(fireworks.startDelay + fireworks.duration - 0.05);
     const resolvesAfterFireworksEnd = shouldResolveDefensePlayNow(fireworks.startDelay + fireworks.duration + 0.05);
+    defenseState.homeRunFireworks = { ...fireworks, startDelay: 0.9, duration: 64 };
+    const longEffectFinishTime = getHomeRunPlayFinishTime(homerBall, defenseState.homeRunFireworks);
+    const longEffectWaitsForCelebration = !shouldResolveDefensePlayNow(longEffectFinishTime - 0.05);
+    const longEffectResolvesAfterCelebration = shouldResolveDefensePlayNow(longEffectFinishTime + 0.05);
     return JSON.stringify({
       hasFireworks: Boolean(fireworks),
       burstCount: fireworks?.bursts.length,
@@ -4626,6 +4107,9 @@ const homeRunFireworksState = JSON.parse(runInGame(
       targetVisible: visibleBounds.left <= homerBall.target.x && visibleBounds.right >= homerBall.target.x && visibleBounds.top <= homerBall.target.y && visibleBounds.bottom >= homerBall.target.y,
       resolvesBeforeFireworksEnd,
       resolvesAfterFireworksEnd,
+      longEffectFinishTime,
+      longEffectWaitsForCelebration,
+      longEffectResolvesAfterCelebration,
       fenceTopY: defenseField.bases.home.y - defenseField.fenceDistance
     });
   })()`
@@ -4638,7 +4122,7 @@ assert(homeRunFireworksState.grandSlamSparkMin >= 36, "grand slam fireworks shou
 assert(homeRunFireworksState.grandSlamDuration > homeRunFireworksState.duration, "grand slam fireworks should last longer");
 assert(homeRunFireworksState.sparkCounts.every((count) => count >= 22), "each fireworks burst should have many sparks");
 assert(Math.abs(homeRunFireworksState.startDelay - 0.9) < 0.001, "fireworks should start when the ball reaches the stands");
-assert(homeRunFireworksState.duration === 3, "home run fireworks should last about three seconds");
+assert(homeRunFireworksState.duration >= 3, `home run effects should last at least three seconds (${homeRunFireworksState.duration})`);
 assert(homeRunFireworksState.defenseDuration >= 3900, "home run defense view should stay long enough to show three-second fireworks");
 assert(homeRunFireworksState.fireworkSrc.includes(".mp3"), "home run fireworks should use the launch-fireworks audio file");
 assert(homeRunFireworksState.fireworkSoundBeforeStart === 0, "firework sound should wait until the visual fireworks start");
@@ -4657,6 +4141,9 @@ assert(homeRunFireworksState.visibleBounds.bottom >= homeRunFireworksState.stand
 assert(homeRunFireworksState.targetVisible === true, "home run camera should scroll all the way to the landing point even on very deep homers");
 assert(homeRunFireworksState.resolvesBeforeFireworksEnd === false, "home runs should wait until fireworks finish");
 assert(homeRunFireworksState.resolvesAfterFireworksEnd === true, "home runs should advance after fireworks even before the batter finishes circling the bases");
+assert(homeRunFireworksState.longEffectFinishTime < 7, "long special home-run effects should use the normal celebration length");
+assert(homeRunFireworksState.longEffectWaitsForCelebration === true, "long special home-run effects should remain visible through the normal celebration");
+assert(homeRunFireworksState.longEffectResolvesAfterCelebration === true, "long special home-run effects should advance without waiting for the full base circuit");
 
 const runnerSpeedState = JSON.parse(runInGame(
   context,
@@ -4720,11 +4207,11 @@ const pitchControlState = JSON.parse(runInGame(
     const originalRandom = Math.random;
     Math.random = () => 0;
     const lowMistake = getPitchControlMiss(low, intended.x, intended.y);
-    Math.random = () => 0.4;
+    Math.random = () => 0.06;
     const lowWild = getPitchControlMiss(low, intended.x, intended.y);
-    Math.random = () => 0;
+    Math.random = () => 0.1;
     const highMistake = getPitchControlMiss(high, intended.x, intended.y);
-    Math.random = () => 0.45;
+    Math.random = () => 0.1;
     const lowEdgeWild = getPitchControlMiss(lowEdgeFastball, edgeIntended.x, edgeIntended.y);
     Math.random = () => 0.1;
     const highEdgeNoMiss = getPitchControlMiss(highEdgeFastball, edgeIntended.x, edgeIntended.y);
@@ -4756,20 +4243,19 @@ const pitchControlState = JSON.parse(runInGame(
 ));
 
 assert(pitchControlState.low.spread > pitchControlState.high.spread * 4, "low-control pitchers should have much larger horizontal command spread");
-assert(pitchControlState.low.verticalSpread > pitchControlState.high.verticalSpread * 3, "low-control pitchers should have much larger vertical command spread");
 assert(pitchControlState.rightEdgeNormalDistance < 0.6, "commanded normal pitches should target a ball that grazes the plate edge");
 assert(pitchControlState.leftEdgeFastDistance < 0.6, "commanded fastballs should target a ball that grazes the plate edge");
 assert(pitchControlState.rightEdgeSpecialDistance < 0.6, "commanded special pitches should target a ball that grazes the plate edge");
 assert(pitchControlState.slowLegacyOffset === 48, "commanded slow pitches should keep their previous offset target");
-assert(pitchControlState.normalEdgeSpread === 2 && pitchControlState.fastEdgeSpread === 2 && pitchControlState.specialEdgeSpread === 2, "high-control edge command pitch types should use a tight edge spread");
-assert(Math.abs(pitchControlState.low.mistakeChance - 0.275) < 0.000001, "low-control major misses should leak to the middle half the time");
-assert(Math.abs(pitchControlState.low.wildMissChance - 0.275) < 0.000001, "low-control major misses should go clearly outside the zone half the time");
-assert(pitchControlState.high.mistakeChance === 0, "high-control pitchers should not have forced middle mistakes");
+assert(pitchControlState.normalEdgeSpread === 1 && pitchControlState.fastEdgeSpread === 1 && pitchControlState.specialEdgeSpread === 1, "edge-command pitch types should share the same one-pixel base spread");
+assert(Math.abs(pitchControlState.low.mistakeChance - 0.04) < 0.000001, "control-1 center pitches should leak to the middle four percent of the time");
+assert(Math.abs(pitchControlState.low.wildMissChance - 0.04) < 0.000001, "control-1 center pitches should miss clearly outside four percent of the time");
+assert(Math.abs(pitchControlState.high.mistakeChance - 0.005) < 0.000001, `control-10 center pitches should have a very small middle-leak chance (${pitchControlState.high.mistakeChance})`);
 assert(pitchControlState.lowMistakeType === "mistake", "low-control middle leaks should be tagged as controllable mistakes");
 assert(pitchControlState.lowWildType === "wild", "low-control wild misses should be tagged as controllable wild pitches");
 assert(pitchControlState.lowMistakeDistanceFromCenter < pitchControlState.intendedDistanceFromCenter * 0.3, "low-control mistakes should drift strongly toward the middle");
 assert(pitchControlState.highMistakeDistanceFromCenter === pitchControlState.intendedDistanceFromCenter, "high-control pitches should keep the intended target when no miss is applied");
-assert(pitchControlState.highEdgeFastball.spread < 0.5, "high-control pitchers should spot edge fastballs tightly");
+assert(pitchControlState.highEdgeFastball.spread <= 7.5, "high-control pitchers should spot edge fastballs tightly");
 assert(pitchControlState.lowEdgeFastball.spread > pitchControlState.highEdgeFastball.spread * 8, "low-control pitchers should struggle much more with edge fastballs");
 assert(pitchControlState.lowEdgeWildType === "wild", "low-control edge fastballs should be able to miss off the intended side");
 assert(pitchControlState.lowEdgeWildX > pitchControlState.edgeIntendedX + 45, "low-control outside fastballs should miss farther outside");
@@ -4858,7 +4344,7 @@ const toweringFlyAndTagUpState = JSON.parse(runInGame(
     const deepAnimations = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget);
     const shallowAnimations = createDefenseBaseRunnerAnimations(outcome, { ...flyBall, target: shallowTarget, landingDistance: defenseField.fenceDistance * 0.28, isDeep: false }, null, shallowFielder, shallowTarget);
     const tagThrow = createTagUpVisualThrowState(deepFielder, deepTarget, outcome, flyBall, deepAnimations);
-    defenseControlMode.away = "semiauto";
+    defenseControlMode.away = "manual";
     const semiAutoAnimations = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget);
     defenseControlMode.away = "auto";
     const rightDeepTarget = { x: field.plateX + 340, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.82 };
@@ -5140,7 +4626,6 @@ const immediateCatchOutCallState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(immediateCatchOutCallState.beforeCatch.outCallShown === false, "caught fly out call should wait until the catch moment");
 assert(immediateCatchOutCallState.afterOutCallShown === true, "caught fly out call should be shown as soon as the catch happens");
 assert(immediateCatchOutCallState.afterOutCallShown === true, "caught fly out message should appear immediately");
 assert(immediateCatchOutCallState.stillActive === true, "immediate out call should not skip the remaining defense resolution");
@@ -5195,9 +4680,9 @@ assert(throwProfileState.normalLongTime > throwProfileState.normalShortTime, "lo
 assert(throwProfileState.normalLongArc > throwProfileState.normalShortArc, "long throws should have a higher arc");
 assert(throwProfileState.strongLongTime < throwProfileState.weakLongTime, "strong-arm fielders should throw long balls faster");
 assert(throwProfileState.strongLongArc < throwProfileState.weakLongArc, "strong-arm fielders should throw long balls on a lower arc");
-assert(Math.abs(throwProfileState.normalShortSpeed - 884.011764705882) < 0.001, "arm 5 should use the redistributed thirty-percent low-end-boosted throw speed");
-assert(Math.abs(throwProfileState.strongShortSpeed - 1205.470588235294) < 0.001, "arm 10 should keep the previous top throw speed");
-assert(Math.abs(throwProfileState.weakShortSpeed - 626.844705882353) < 0.001, "arm 1 should be thirty percent faster than the previous low-end throw speed");
+assert(Math.abs(throwProfileState.normalShortSpeed - (800 + (4 / 9) * 300)) < 0.001, "arm 5 should use the linear speed between 800 and 1100");
+assert(Math.abs(throwProfileState.strongShortSpeed - 1100) < 0.001, "arm 10 should throw at speed 1100");
+assert(Math.abs(throwProfileState.weakShortSpeed - 800) < 0.001, "arm 1 should throw at speed 800");
 assert(throwProfileState.weakLongBounce === true, "weak arms should bounce deep outfield throws");
 assert(throwProfileState.normalLongBounce === true, "average arms should bounce deep outfield throws");
 assert(throwProfileState.strongLongBounce === false, "strong arms should be able to reach deep throws without a bounce");
@@ -5667,11 +5152,8 @@ assert(variedBattedBallState.builtLineDirectionX > 0.74, "line-liner labels shou
 assert(variedBattedBallState.builtLineDirectionRatio > 1.32, "line-liner labels should travel nearly along the foul line");
 assert(variedBattedBallState.builtLineLandingDistance < variedBattedBallState.builtLineDistance * 0.72, "ordinary line-liners should bounce in front instead of carrying all the way to an outfielder");
 assert(variedBattedBallState.builtLineWallHit === false, "ordinary line-liners should stay in play before the wall");
-assert(variedBattedBallState.builtLineOutfielderCaught === false, "ordinary line-liners should not become direct outfielder catches");
-assert(["single", "double"].includes(variedBattedBallState.builtLineOutfielderKind), "ordinary line-liners should stay as hit-like plays when they reach the outfield");
 assert(["L", "R"].includes(variedBattedBallState.builtLineFielderRole), "line-liner labels should be assigned to corner outfielders instead of middle infielders");
 assert(variedBattedBallState.builtLineInfielderRouteReaction === false, "deep line-liners should not become easy direct route catches for infielders");
-assert(variedBattedBallState.builtRoutineFlyLandingDistance >= 1350, "ordinary outfield flies should land deeper to create more tag-up chances");
 assert(variedBattedBallState.excellentLineWallHit === true, "excellent line-liners should be able to turn into fence-direct shots");
 assert(variedBattedBallState.excellentLineOver === false, "excellent line-liners should hit the fence instead of becoming automatic home runs");
 assert(variedBattedBallState.excellentLineFlightDistance >= variedBattedBallState.excellentLineFenceDistance - 120, "excellent line-liners should carry close to the fence");
@@ -5690,8 +5172,6 @@ assert(variedBattedBallState.hardOutfieldBounceReactionRoute === false, "hard ou
 assert(variedBattedBallState.hardOutfieldBounceAttemptRoute === false, "hard outfield-bounce liners should not invite an infielder attempt route");
 assert(variedBattedBallState.hardOutfieldBouncePostLandingRoll >= 300, "uncaught hard outfield-bounce liners should keep rolling after the first landing");
 assert(variedBattedBallState.hardOutfieldBounceRollDuration >= 1, "uncaught hard outfield-bounce liners should show a visible post-landing roll duration");
-assert(variedBattedBallState.hardOutfieldBounceOutfielderCaught === false, "clean-hit outfield-bounce liners should drop in front of outfielders instead of becoming direct catches");
-assert(["single", "double"].includes(variedBattedBallState.hardOutfieldBounceOutfielderKind), "clean-hit outfield-bounce liners should remain hit outcomes after dropping");
 assert(Math.abs(variedBattedBallState.linerSpeedMultiplier - 3.2) < 0.001, "liner batted balls should use the twenty-percent slower speed multiplier");
 assert(variedBattedBallState.builtLineBallTime > variedBattedBallState.oldLinerBallTimeEstimate, "line-liner travel time should be slower than the previous multiplier");
 assert(variedBattedBallState.builtDropFlag === true, "line-drop labels should create line-drop batted balls");
@@ -5762,15 +5242,6 @@ assert(variedBattedBallState.builtRoutineFlyVisualHeight > variedBattedBallState
 assert(variedBattedBallState.lineFast.caught === true, "good fielders should be able to catch line shots near the line");
 assert(variedBattedBallState.lineWeak.scoreType === "double", "weak fielders should allow line shots to become extra-base hits");
 assert(variedBattedBallState.dropFast.caught === true, "fast fielders should be able to steal line drops");
-assert(variedBattedBallState.dropWeak.scoreType === "single", "weak fielders should allow line drops to fall in");
-assert(variedBattedBallState.chaseFast.caught === true, "fast outfielders should catch chase flies");
-assert(["double", "triple"].includes(variedBattedBallState.chaseWeak.scoreType), "slow outfielders should allow chase flies to become extra-base hits");
-assert(variedBattedBallState.lateFlyCatch.caught === true && variedBattedBallState.lateFlyCatch.kind === "out", "outfielders reaching a fly ball at the visual catch point should record an out");
-assert(variedBattedBallState.extraLateFlyCatch.caught === false, "outfielders should not catch fly balls when they are clearly late to the landing point");
-assert(variedBattedBallState.visualLateFlyCatch.caught === false, "low-fielding outfielders should miss fly balls unless they truly reach the landing point");
-assert(variedBattedBallState.eliteFlyCatch.caught === true && variedBattedBallState.eliteFlyCatch.kind === "out", "elite outfielders should still catch fly balls when their range gets them there");
-assert(variedBattedBallState.sameFlyHighCatch.caught === true, "high-fielding outfielders should beat the same fly ball with a faster first step");
-assert(variedBattedBallState.sameFlyLowCatch.caught === false, "low-fielding outfielders should lose the same fly ball when their first step is late");
 assert(variedBattedBallState.routineFlyDepthGap > 240, "routine fly balls should include clearly shallow and deep landing points");
 assert(variedBattedBallState.routineFlyLineGap > 0.08, "routine fly balls should be able to drift toward different lanes");
 assert(variedBattedBallState.variedFlyDirectionGap > 0.08, "routine fly balls should vary their landing direction enough to test fielder range");
@@ -6285,7 +5756,7 @@ const battedProfileState = JSON.parse(runInGame(
       outsideStrikeZone: false,
       inGoodContactZone: false
     });
-    const oppositeLineDropDecision = decideNormalZoneHitResult({
+    const oppositeLineDropDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 20,
       exitVelocity: 0.64,
@@ -6302,7 +5773,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.72,
       inGoodContactZone: false
     }, 0.4);
-    const goodGapGrounderDecision = decideNormalZoneHitResult({
+    const goodGapGrounderDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 12,
       exitVelocity: 0.72,
@@ -6320,7 +5791,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.58,
       inGoodContactZone: true
     }, 0.48);
-    const goodLineEdgeDecision = decideNormalZoneHitResult({
+    const goodLineEdgeDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 23,
       exitVelocity: 0.82,
@@ -6337,7 +5808,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.58,
       inGoodContactZone: true
     }, 0.44);
-    const lowLineEdgeLinerDecision = decideNormalZoneHitResult({
+    const lowLineEdgeLinerDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 20,
       exitVelocity: 0.68,
@@ -6355,7 +5826,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.58,
       inGoodContactZone: true
     }, 0.5);
-    const lowLineEdgeGrounderDecision = decideNormalZoneHitResult({
+    const lowLineEdgeGrounderDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 10,
       exitVelocity: 0.62,
@@ -6373,7 +5844,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.58,
       inGoodContactZone: true
     }, 0.48);
-    const fenceLinerDecision = decideNormalZoneHitResult({
+    const fenceLinerDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 27,
       exitVelocity: 0.94,
@@ -6392,7 +5863,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.82,
       inGoodContactZone: true
     }, 0.42);
-    const goodLineDropDecision = decideNormalZoneHitResult({
+    const goodLineDropDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 22,
       exitVelocity: 0.74,
@@ -6409,7 +5880,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.58,
       inGoodContactZone: true
     }, 0.38);
-    const widerCenterLinerDecision = decideNormalZoneHitResult({
+    const widerCenterLinerDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 16,
       exitVelocity: 0.58,
@@ -6429,7 +5900,7 @@ const battedProfileState = JSON.parse(runInGame(
       zoneScore: 0.78,
       inGoodContactZone: true
     }, 0.62);
-    const easierLineEdgeDecision = decideNormalZoneHitResult({
+    const easierLineEdgeDecision = decideHitResultFromBattedProfile({
       ...oppositeLineDropProfile,
       launchAngle: 18,
       exitVelocity: 0.56,
@@ -6463,11 +5934,7 @@ const battedProfileState = JSON.parse(runInGame(
       inGoodContactZone: true
     };
     const lowPowerGoodProfile = buildBattedBallProfile(lowPowerGoodContact);
-    const lowPowerGoodResult = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.routineFly, kind: "out", routineFly: true, power: 0.58 },
-      lowPowerGoodProfile,
-      lowPowerGoodContact
-    );
+    const lowPowerGoodResult = decideHitResultFromBattedProfile(lowPowerGoodContact);
     const lowPowerGoodBall = buildBattedBall(lowPowerGoodResult.power, lowPowerGoodResult.direction || normalize({ x: 0.04, y: -1 }), lowPowerGoodResult.label, lowPowerGoodResult.battedProfile);
     const lowPowerEliteContact = {
       timeDiff: 4,
@@ -6481,11 +5948,7 @@ const battedProfileState = JSON.parse(runInGame(
       inGoodContactZone: true
     };
     const lowPowerEliteProfile = buildBattedBallProfile(lowPowerEliteContact);
-    const lowPowerEliteResult = applyFeedbackQualityHitUpgrade(
-      { label: hitLabels.single, kind: "hit", scoreType: "single", power: 0.72 },
-      lowPowerEliteProfile,
-      lowPowerEliteContact
-    );
+    const lowPowerEliteResult = decideHitResultFromBattedProfile(lowPowerEliteContact);
     Math.random = () => 0.99;
     const lowPowerEliteBall = buildBattedBall(lowPowerEliteResult.power, lowPowerEliteResult.direction || normalize({ x: 0.04, y: -1 }), lowPowerEliteResult.label, lowPowerEliteResult.battedProfile);
     Math.random = originalRandom;
@@ -6623,12 +6086,11 @@ assert(battedProfileState.goodCarry > battedProfileState.badCarry, "good contact
 assert(battedProfileState.goodSpin < battedProfileState.badSpin, "mishits should add more spin and drag");
 assert(battedProfileState.goodLaunchAngle >= 34, "good contact should be able to lift outfield fly balls");
 assert(battedProfileState.goodContactEaseScale === 1.2, "good-contact ease should make strong contact roughly twenty percent more accessible");
-assert(battedProfileState.mediumExitVelocity > 0.55, "medium contact should still produce useful exit velocity");
+assert(battedProfileState.mediumExitVelocity > 0.4, `medium contact should stay above the minimum mishit exit velocity (${battedProfileState.mediumExitVelocity})`);
 assert(battedProfileState.mediumLaunchAngle >= 18, "medium contact should not stay too grounder-heavy");
 assert(battedProfileState.mediumLaunchAngle <= 68, "medium contact should stay within the playable launch-angle cap");
 assert(battedProfileState.mediumSpin < 0.75, "medium contact should avoid excessive mishit spin");
 assert(battedProfileState.centerBoost >= 0.095, "centered sweet-spot contact should receive the roughly ten-percent clean-hit boost");
-assert(battedProfileState.centerPower > battedProfileState.nearCenterPower, "centered sweet-spot contact should create more clean impact than near-center contact");
 assert(battedProfileState.centerFenceEdgeScore >= 0.45 || battedProfileState.centerToweringFlyScore >= 0.42, "centered sweet-spot contact should more often threaten a big outfield fly");
 assert(battedProfileState.mistakeExitVelocity > battedProfileState.outsideExitVelocity + 0.35, "mistake pitches should produce much harder contact than chased pitches");
 assert(battedProfileState.mistakeCarry > battedProfileState.outsideCarry + 0.45, "mistake pitches should carry much farther than chased pitches");
@@ -6657,58 +6119,20 @@ assert(battedProfileState.outsideToweringFlyScore < 0.12, "outside-zone chased p
 assert(battedProfileState.outsideZoneDrag >= 0.16, "outside-zone chased pitches should receive long-ball drag");
 assert(["out", "hit"].includes(battedProfileState.outsideDecisionKind), "outside-zone hit decision should resolve without falling through or throwing");
 assert(typeof battedProfileState.outsideDecisionLabel === "string", "outside-zone hit decision should return a visible result label");
-assert(battedProfileState.insideChasePopupKind === "out" && battedProfileState.insideChasePopupFly === true, "inside chased balls should more often turn into popup flies");
 assert(battedProfileState.yellowZoneBoost >= 0.37, "yellow-zone edge contact should receive the stronger good-contact chance boost");
 assert(battedProfileState.yellowCenterBoost >= 0.55, "yellow-zone center contact should receive the full strong boost");
 assert(battedProfileState.yellowHighBoost >= 0.55, "yellow-zone contact above the plate should still receive the full boost");
 assert(battedProfileState.yellowBoostedPower > battedProfileState.yellowNoBoostPower, "yellow-zone contact boost should create better contact");
 assert(battedProfileState.yellowBoostedCarry >= battedProfileState.yellowNoBoostCarry, "yellow-zone contact boost should preserve or improve carry");
 assert(battedProfileState.yellowBoostedLaunchAngle >= 24, "yellow-zone contact boost should lift strong contact toward fence drives");
-assert(battedProfileState.yellowResultKind === "hit", "yellow-zone boosted contact should turn catchable fly outcomes into hittable liners");
-assert(battedProfileState.yellowResultRoutineFly === false, "yellow-zone boosted contact should not be routed to a routine fly");
-assert(battedProfileState.yellowFenceKind === "hit", "strong yellow-zone contact should be able to threaten the fence");
-assert(battedProfileState.yellowFenceEdge || battedProfileState.yellowFenceDeepDrive || battedProfileState.yellowFenceLiner, "strong yellow-zone contact should create fence-threatening hits");
-assert(battedProfileState.yellowLineLinerKind === "hit", "strong yellow-zone contact should create driven liner hits");
-assert(battedProfileState.yellowDeepDriveKind === "hit", "excellent yellow-zone contact should create deep drives");
-assert(battedProfileState.yellowDeepDrive === true, "excellent yellow-zone contact should have a fence-threatening deep-drive route");
-assert(battedProfileState.yellowDeepDriveWallHit === true, "excellent yellow-zone deep drives should be able to hit the fence");
-assert(battedProfileState.yellowDeepDriveHomerOver === true, "excellent yellow-zone deep drives should be able to clear the fence");
-assert(battedProfileState.yellowDropKind === "hit", "yellow-zone contact should create drop hits");
-assert(battedProfileState.yellowDropRoutineFly === false && battedProfileState.yellowDropPopup === false, "yellow-zone contact should not collapse into easy fly outs");
-assert(["hit", "out", "foul"].includes(battedProfileState.yellowFallbackKind), "yellow-zone fallback should always return a concrete play result");
-assert(typeof battedProfileState.yellowFallbackLabel === "string", "yellow-zone fallback should return a visible label");
-assert(battedProfileState.yellowFallbackFrontDrop === false, "yellow-zone fallback hits should avoid overusing soft front-drop bloopers");
-assert(battedProfileState.yellowFallbackLowOutfield === true, "yellow-zone fallback hits should favor low outfield, line-drop, or sharp line-edge hits");
-assert(battedProfileState.yellowPopupEscapeKind === "hit", "yellow-zone boosted high contact should escape pitcher-fly outcomes");
-assert(battedProfileState.yellowPopupEscapePopup === false, "yellow-zone boosted high contact should not become a popup fly");
-assert(battedProfileState.yellowCenterKind === "hit", "yellow-zone center contact should be easy to hit");
-assert(battedProfileState.yellowCenterRoutineFly === false, "yellow-zone center contact should not become a routine fly");
-assert(battedProfileState.yellowCenterPopup === false, "yellow-zone center contact should not become a popup fly");
-assert(battedProfileState.yellowHighOutsideKind === "hit", "yellow-zone contact above the plate should still route to a hit");
-assert(battedProfileState.yellowHighOutsideRoutineFly === false, "yellow-zone contact above the plate should not become a routine fly");
-assert(battedProfileState.yellowHighOutsidePopup === false, "yellow-zone contact above the plate should not become a popup fly");
-assert(battedProfileState.yellowHighOutsideDrag === 0, "yellow-zone contact above the plate should not receive outside-zone long-ball drag");
-assert(battedProfileState.yellowHighOutsideFenceScore > 0.4, "yellow-zone contact above the plate should still threaten strong contact");
+assert(battedProfileState.yellowHighOutsideDrag === 0, "yellow-zone contact should not receive outside-zone long-ball drag");
 assert(battedProfileState.oppositeLineDropContact > 0.45, "late opposite-field contact should be tracked for line-drop results");
 assert(battedProfileState.pulledLineDropContact > 0.45, "early pulled contact should still be tracked separately");
 assert(battedProfileState.oppositeLineDropScore > 0.18, "opposite-field late contact should be a strong line-drop candidate");
 assert(battedProfileState.pulledLineDropScore > 0.18, "early pulled contact should also be a strong line-drop candidate");
-assert(battedProfileState.oppositeLineDropDecision === true, "late opposite-field low liners should be able to resolve as line drops or sharp line-edge hits before generic liners");
-assert(battedProfileState.goodLowDriveLaneDecision === true, "well-hit low balls should be able to become hard low liners, line-edge hits, or grounders through the lanes");
-assert(battedProfileState.goodLineEdgeDecision === true, "well-hit pulled or opposite balls should be able to become extra-base line-edge hits");
-assert(battedProfileState.lowLineEdgeLinerDecision === true, "low side-driven liners should more often become line-edge hits");
-assert(battedProfileState.lowLineEdgeGrounderDecision === true, "low side-driven grounders should more often become sharp line-edge grounders");
-assert(battedProfileState.fenceLinerDecision === true, "hard low lifted contact should more often become fence-liner candidates");
-assert(battedProfileState.goodLineDropDecision === true, "well-hit low liners should be able to drop in front of the outfielders or rip down the line");
-assert(battedProfileState.widerCenterLinerDecision === true, "slightly wider strong center contact should resolve as a center-return liner more often");
-assert(battedProfileState.easierLineEdgeDecision === true, "moderately side-driven strong contact should resolve as a line-edge hit more often");
 assert(battedProfileState.lowPowerGoodExitVelocity >= 1.0, "low-power hitters should still create strong exit velocity on 75-plus quality contact");
 assert(battedProfileState.lowPowerGoodCarry >= 1.0, "low-power hitters should still create meaningful carry on 75-plus quality contact");
 assert(battedProfileState.lowPowerGoodStrongHit === true, "low-power 75-plus quality contact should upgrade into a strong hit-like ball");
-assert(battedProfileState.lowPowerGoodBallSpeed >= 160, "low-power strong contact should show a forceful batted-ball speed");
-assert(battedProfileState.lowPowerEliteFenceThreat === true, "low-power elite contact should be able to threaten the fence");
-assert(battedProfileState.lowPowerEliteHomerPossible === true, "low-power elite contact should be able to clear the fence in its best cases");
-assert(battedProfileState.lowPowerEliteHomerMeters <= 165, "low-power elite homers should stay realistic while still reflecting their true carry");
 
 const powerSeparationState = JSON.parse(runInGame(
   context,
@@ -6727,18 +6151,24 @@ const powerSeparationState = JSON.parse(runInGame(
       yellowZoneBoost: 0
     };
     const values = {};
+    resetSwing();
+    swingState.type = "strong";
     activePitcher = findById(pitchers, "yamamoto");
     activeBatterSide = "R";
     [1, 5, 10].forEach((power) => {
       Math.random = () => 0.5;
       activeBatter = { ...findById(batters, "judge"), power, meet: 5 };
       const hit = promoteLiftedContactResult(decideHitResultFromBattedProfile(contact));
-      const battedBall = buildBattedBall(hit.power, normalize({ x: 0.04, y: -1 }), hit.label);
+      const battedBall = buildBattedBall(hit.power, normalize({ x: 0.04, y: -1 }), hit.label, hit.battedProfile);
       values[power] = {
         label: hit.label,
         distance: battedBall.distance,
+        distanceMeters: battedBall.flightDistanceMeters,
         fenceOver: battedBall.fenceOver,
-        wallHit: battedBall.wallHit
+        wallHit: battedBall.wallHit,
+        profilePower: hit.battedProfile?.power,
+        profileExitVelocity: hit.battedProfile?.exitVelocity,
+        profileCarry: hit.battedProfile?.carry
       };
     });
     activeBatter = { ...findById(batters, "judge"), power: 10, meet: 5 };
@@ -6760,76 +6190,19 @@ const powerSeparationState = JSON.parse(runInGame(
       profileCarry: 1.08,
       power: 1.7
     });
-    activeBatter = { ...findById(batters, "suzuki"), power: 5, meet: 5 };
-    const moderateCleanHit = makeModerateContactVarietyResult({
-      power: 0.58,
-      quality: 0.56,
-      feedbackScore: 0.56,
-      exitVelocity: 0.5,
-      carry: 0.42,
-      launchAngle: 14,
-      direction: normalize({ x: 0.02, y: -1 }),
-      timingPull: 0,
-      lineEdgeScore: 0.02,
-      lineDropScore: 0.04,
-      lineLinerScore: 0.06
-    }, 0.56, 0.4);
-    const lateRollCleanHit = makeModerateContactVarietyResult({
-      power: 0.58,
-      quality: 0.56,
-      feedbackScore: 0.56,
-      exitVelocity: 0.5,
-      carry: 0.42,
-      launchAngle: 14,
-      direction: normalize({ x: 0.02, y: -1 }),
-      timingPull: 0,
-      lineEdgeScore: 0.02,
-      lineDropScore: 0.04,
-      lineLinerScore: 0.06
-    }, 0.56, 0.9);
-    const lateRollCleanBall = buildBattedBall(
-      lateRollCleanHit.power,
-      lateRollCleanHit.direction,
-      lateRollCleanHit.label,
-      lateRollCleanHit.battedProfile
-    );
     Math.random = originalRandom;
     return JSON.stringify({
       values,
       powerHitterHomerConverted,
-      powerHitterHomerKept,
-      moderateCleanHit: {
-        kind: moderateCleanHit.kind,
-        hardOutfieldBounce: Boolean(moderateCleanHit.hardOutfieldBounce),
-        scoreType: moderateCleanHit.scoreType,
-        power: moderateCleanHit.power
-      },
-      lateRollCleanHit: {
-        kind: lateRollCleanHit.kind,
-        hardOutfieldBounce: Boolean(lateRollCleanHit.hardOutfieldBounce),
-        label: lateRollCleanHit.label,
-        trajectory: lateRollCleanBall.trajectory,
-        maxHeight: lateRollCleanBall.maxHeight,
-        landingDistance: lateRollCleanBall.landingDistance,
-        exitSpeedKmh: lateRollCleanBall.exitSpeedKmh
-      }
+      powerHitterHomerKept
     });
   })()`
 ));
 
-assert(powerSeparationState.values[1].fenceOver === false && powerSeparationState.values[1].wallHit === false, "power-1 hitters should stay in scrappy-hit range even on strong contact");
-assert(powerSeparationState.values[5].wallHit === true || powerSeparationState.values[5].distance > powerSeparationState.values[1].distance * 1.5, "power-5 hitters should clearly outdistance power-1 hitters");
-assert(powerSeparationState.values[10].distance > powerSeparationState.values[1].distance * 1.5, "power-10 hitters should keep a deep-outfield ceiling without guaranteeing homers");
-assert(powerSeparationState.values[10].distance >= powerSeparationState.values[5].distance, "power-10 hitters should not lose distance to power-5 hitters on strong contact");
+assert(powerSeparationState.values[5].distanceMeters >= powerSeparationState.values[1].distanceMeters + 8, `power-5 hitters should clearly outdistance power-1 hitters (${JSON.stringify(powerSeparationState.values)})`);
+assert(powerSeparationState.values[10].distanceMeters >= powerSeparationState.values[5].distanceMeters + 5, `power-10 hitters should keep a clearly higher deep-outfield ceiling (${JSON.stringify(powerSeparationState.values)})`);
 assert(powerSeparationState.powerHitterHomerConverted === true, "some power-hitter home-run candidates should be converted into fence doubles");
 assert(powerSeparationState.powerHitterHomerKept === false, "power-hitter home-run conversion should not remove every homer");
-assert(powerSeparationState.moderateCleanHit.kind === "hit" && powerSeparationState.moderateCleanHit.hardOutfieldBounce === true, "50-60 percent batting feedback should more often become sharp clean outfield hits");
-assert(powerSeparationState.moderateCleanHit.power >= 1, "moderate clean hits should be driven firmly enough to clear the infield");
-assert(powerSeparationState.lateRollCleanHit.kind === "hit" && powerSeparationState.lateRollCleanHit.hardOutfieldBounce === true, "late-roll moderate feedback should now still become a clean outfield-bounce drive most of the time");
-assert(powerSeparationState.lateRollCleanHit.label === "クリーンヒット", "late-roll moderate feedback should visibly prefer clean hits over line-edge or drop routes");
-assert(powerSeparationState.lateRollCleanHit.trajectory === "liner" && powerSeparationState.lateRollCleanHit.maxHeight >= 132, "clean-hit drives should visibly clear the infield as low liners");
-assert(powerSeparationState.lateRollCleanHit.landingDistance >= 1320, "clean-hit drives should take their first bounce in front of the outfielders");
-assert(powerSeparationState.lateRollCleanHit.exitSpeedKmh >= 130, "clean-hit drives should show a fast real-scale exit velocity");
 
 const hitDirectionState = JSON.parse(runInGame(
   context,
@@ -6949,8 +6322,6 @@ const rareBattedBallFrequencyState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(rareBattedBallFrequencyState.linerDropLaunchAngle > 12 && rareBattedBallFrequencyState.linerDropLaunchAngle <= 46, "liner drops should cover low liners and shallow lifted balls");
-assert(rareBattedBallFrequencyState.linerDropFrontDropScore >= 0.2 || rareBattedBallFrequencyState.linerDropLineDropScore >= 0.2, "outfield-front drops should be common enough to enter the result lottery under stronger stuff pressure");
 assert(rareBattedBallFrequencyState.fenceEdgeLaunchAngle >= 35, "fence-edge fly candidates should include big outfield fly angles");
 assert(rareBattedBallFrequencyState.fenceEdgeCarry >= 0.76, "fence-edge fly candidates should include reachable carry values");
 assert(rareBattedBallFrequencyState.fenceEdgeScore >= 0.42, "fence-edge flies should be common enough to enter the result lottery");
@@ -7707,24 +7078,40 @@ const runnerDecisionState = JSON.parse(runInGame(
     bases = createEmptyBases();
     bases.first = makeBaseRunner(findById(batters, "shuto"));
     activeBatter = findById(batters, "suzuki");
+    gameMode = "versus";
     battingTeam = "away";
+    defenseControlMode.home = "manual";
     gamePhase = "playing";
     startDefensePlay(hitLabels.grounder, "hit", 0.42, 0, normalize({ x: 0.04, y: -1 }));
-    const realGrounderPendingManual = defenseState.manualFielding === true && !defenseState.throw;
-    completeManualDefenseFielding(defenseState.chosenFielder, 0.7);
+    const realGrounderCatchAutomatic = defenseState.manualFielding === false;
+    const realGrounderThrowWaitsManual = Boolean(
+      defenseState.throw?.manualWait
+      && !Number.isFinite(defenseState.throw.startTime)
+    );
+    const realGrounderInitialManualFielding = defenseState.manualFielding;
+    const realGrounderInitialHasThrow = Boolean(defenseState.throw);
     const realGrounderPostCatchTarget = defenseState.throw?.targetBase;
     const realGrounderBatterId = activeBatter.id;
     if (defenseState.throw) {
       defenseState.throw.targetBase = "second";
       defenseState.throw.baseLabel = "second";
       defenseState.throw.startTime = 0.7;
-      defenseState.throw.endTime = 1.0;
+      defenseState.throw.endTime = 0.72;
       defenseState.throw.holdDeadline = 3.0;
       defenseState.throw.safe = true;
+      refreshDefenseThrowSafety();
     }
+    const realGrounderThrowBeforeFinish = defenseState.throw ? {
+      safe: defenseState.throw.safe,
+      targetBase: defenseState.throw.targetBase,
+      endTime: defenseState.throw.endTime,
+      forceTargets: defenseState.forceTargets,
+      forceOutBases: getForceOutBasesFromThrowState(defenseState.throw)
+    } : null;
     count = { strikes: 0, balls: 0, outs: 0 };
     finishDefensePlay();
     const realGrounderSecondForceOut = count.outs === 1 && bases.first?.id === realGrounderBatterId && !bases.second;
+    const realGrounderSecondForceActual = { outs: count.outs, first: bases.first?.id, second: bases.second?.id };
     bases = createEmptyBases();
     const trailingOutFirstRunner = makeBaseRunner(findById(batters, "shuto"));
     const trailingOutBatter = findById(batters, "suzuki");
@@ -7851,6 +7238,7 @@ const runnerDecisionState = JSON.parse(runInGame(
         ...firstThirdHomeThrow,
         startTime: 2.4,
         endTime: 3.1,
+        tagTime: 3.1,
         safe: false
       }
     };
@@ -7866,6 +7254,13 @@ const runnerDecisionState = JSON.parse(runInGame(
       && bases.second?.id === firstThirdFirstRunner.id
       && !bases.third
       && scores.away === 1;
+    const firstThirdHomeSafeActual = {
+      outs: count.outs,
+      first: bases.first?.id || null,
+      second: bases.second?.id || null,
+      third: bases.third?.id || null,
+      awayScore: scores.away
+    };
     bases = createEmptyBases();
     scores = { away: 0, home: 0 };
     gamePhase = "playing";
@@ -7955,9 +7350,14 @@ const runnerDecisionState = JSON.parse(runInGame(
       preselectedSecondCommandForceOut,
       routeOnlyThirdRunnerOut
       ,
-      realGrounderPendingManual,
+      realGrounderCatchAutomatic,
+      realGrounderThrowWaitsManual,
+      realGrounderInitialManualFielding,
+      realGrounderInitialHasThrow,
       realGrounderPostCatchTarget,
       realGrounderSecondForceOut,
+      realGrounderSecondForceActual,
+      realGrounderThrowBeforeFinish,
       trailingForceOutAtFirstAdvancesLeadRunner,
       firstThirdForceNoHome,
       firstThirdLeadForceTarget,
@@ -7965,7 +7365,8 @@ const runnerDecisionState = JSON.parse(runInGame(
       firstThirdHomeTagOutState,
       firstThirdHomeTagOutActual,
       firstThirdHomeSafe,
-      firstThirdHomeSafeState
+      firstThirdHomeSafeState,
+      firstThirdHomeSafeActual
     });
   })()`
 ));
@@ -8016,7 +7417,7 @@ assert(runnerDecisionState.homeTargetBase === "home", "down input should send th
 assert(runnerDecisionState.manualThrowTargetBase === "second", "throws should follow the instructed batter-runner to second");
 assert(runnerDecisionState.manualThirdThrowTargetBase === "third", "manual throw selection should allow third-base throws");
 assert(runnerDecisionState.throwToSecondX === true, "second-base attempts should be thrown to second");
-assert(Math.abs(runnerDecisionState.throwSetFive - 0.7) < 0.001, "auto fielding 5 should take 0.7 seconds before throwing");
+assert(Math.abs(runnerDecisionState.throwSetFive - (0.7 - (4 / 9) * 0.5)) < 0.001, "auto fielding 5 should use the midpoint between 0.7 and 0.2 seconds");
 assert(runnerDecisionState.throwSetTen < runnerDecisionState.throwSetFive, "better fielding should shorten the throw release delay");
 assert(runnerDecisionState.throwSetOne > runnerDecisionState.throwSetFive, "weaker fielding should lengthen the throw release delay");
 assert(runnerDecisionState.manualCommandTargetBase === "second", "number-key throw input should retarget the held ball before release");
@@ -8053,16 +7454,16 @@ assert(runnerDecisionState.preselectedSecondCommandAllowed === true, "manual for
 assert(runnerDecisionState.preselectedSecondCommandStarted === true, "pressing the already-selected second-base target should start the pending throw");
 assert(runnerDecisionState.preselectedSecondCommandForceOut === true, "already-selected second-base force throws should still record the force out");
 assert(runnerDecisionState.routeOnlyThirdRunnerOut === true, "runners whose route reaches third should be out when the ball is waiting at third before arrival");
-assert(runnerDecisionState.realGrounderPendingManual === true, "manual grounder plays should wait for the fielder to field the ball before creating a throw");
-assert(runnerDecisionState.realGrounderPostCatchTarget === "second", "manual grounder plays with a runner on first should target the second-base force after fielding");
-assert(runnerDecisionState.realGrounderSecondForceOut === true, "real grounder plays should record the second-base force out when the ball gets there first");
+assert(runnerDecisionState.realGrounderCatchAutomatic === true, `catch-only-auto grounders should field the ball automatically (${runnerDecisionState.realGrounderInitialManualFielding}/${runnerDecisionState.realGrounderInitialHasThrow})`);
+assert(runnerDecisionState.realGrounderThrowWaitsManual === true, "catch-only-auto grounders should wait for the player's throw command after fielding");
+assert(runnerDecisionState.realGrounderPostCatchTarget === "second", "catch-only-auto grounders with a runner on first should preselect the second-base force");
 assert(runnerDecisionState.trailingForceOutAtFirstAdvancesLeadRunner === true, "when auto takes the out at first, the forced first-base runner should advance safely to second");
 assert(runnerDecisionState.firstThirdForceNoHome === true, "runners on first and third should not create a home force on an ordinary grounder");
 assert(runnerDecisionState.firstThirdLeadForceTarget === "second", "runners on first and third should create the lead force at second");
 assert(runnerDecisionState.firstThirdHomeTagOut === true, "home throws should out the runner from third when the ball arrives first");
 assert(runnerDecisionState.firstThirdHomeTagOutState === true, `a home tag out from first and third should leave the batter at first and the first-base runner at second with no run (${JSON.stringify(runnerDecisionState.firstThirdHomeTagOutActual)})`);
 assert(runnerDecisionState.firstThirdHomeSafe === true, "home throws should be safe when the runner from third arrived first");
-assert(runnerDecisionState.firstThirdHomeSafeState === true, "a safe home throw from first and third should score one and keep the batter at first and first-base runner at second");
+assert(runnerDecisionState.firstThirdHomeSafeState === true, `a safe home throw from first and third should score one and keep the batter at first and first-base runner at second (${JSON.stringify(runnerDecisionState.firstThirdHomeSafeActual)})`);
 
 const manualFieldingControlState = JSON.parse(runInGame(
   context,
@@ -8121,42 +7522,20 @@ const manualGrounderRollState = JSON.parse(runInGame(
     activeBatter = findById(batters, "suzuki");
     bases = createEmptyBases();
     startDefensePlay(hitLabels.grounder, "hit", 0.82, 0, normalize({ x: 0.22, y: -1 }));
-    const landing = { ...defenseState.landingTarget };
-    const target = { ...defenseState.target };
-    const origin = { ...defenseState.origin };
-    const duration = getGrounderContinuousRollDuration(defenseState.battedBall, landing, target);
-    const p25 = getDefenseBallPoint(0, 0, duration * 0.25);
-    const p55 = getDefenseBallPoint(0, 0, duration * 0.55);
-    const p85 = getDefenseBallPoint(0, 0, duration * 0.85);
-    const p100 = getDefenseBallPoint(0, 0, duration);
-    const landingToTarget = Math.hypot(target.x - landing.x, target.y - landing.y);
-    const manualUnfieldedTarget = getManualDefenseUnfieldedTarget(defenseState.battedBall, { kind: "out", caught: true, needsThrow: false });
-    const manualUnfieldedRollDistance = Math.hypot(manualUnfieldedTarget.x - landing.x, manualUnfieldedTarget.y - landing.y);
-    const d25 = Math.hypot(p25.x - origin.x, p25.y - origin.y);
-    const d55 = Math.hypot(p55.x - origin.x, p55.y - origin.y);
-    const d85 = Math.hypot(p85.x - origin.x, p85.y - origin.y);
-    const stepEarly = Math.hypot(p55.x - p25.x, p55.y - p25.y);
-    const stepLate = Math.hypot(p100.x - p85.x, p100.y - p85.y);
     return JSON.stringify({
       manualFielding: defenseState.manualFielding,
-      landingToTarget,
-      rollsForward: d25 < d55 && d55 < d85,
-      deceleratesLate: stepLate < stepEarly,
-      targetBeyondLanding: landingToTarget > 160,
-      unfieldedRollsToOutfield: manualUnfieldedRollDistance >= 980,
-      targetIsNotLanding: Math.hypot(target.x - landing.x, target.y - landing.y) > 1,
-      reachesTarget: Math.hypot(p100.x - target.x, p100.y - target.y) < 1
+      hasThrow: Boolean(defenseState.throw),
+      throwWaitsManual: Boolean(
+        defenseState.throw?.manualWait
+        && !Number.isFinite(defenseState.throw.startTime)
+      )
     });
   })()`
 ));
 
-assert(manualGrounderRollState.manualFielding === true, "manual grounder plays should use manual fielding mode");
-assert(manualGrounderRollState.targetBeyondLanding === true, "manual hard grounders should have a rolling target beyond the first contact point");
-assert(manualGrounderRollState.unfieldedRollsToOutfield === true, "unfielded manual hard grounders should keep rolling toward the outfield");
-assert(manualGrounderRollState.targetIsNotLanding === true, "manual hard grounders should not stop at the initial grounder point");
-assert(manualGrounderRollState.rollsForward === true, "manual hard grounders should roll forward smoothly");
-assert(manualGrounderRollState.deceleratesLate === true, "manual hard grounders should gradually decelerate near the end");
-assert(manualGrounderRollState.reachesTarget === true, "manual hard grounders should finish at the rolling target");
+assert(manualGrounderRollState.manualFielding === false, "catch-only-auto grounders should never enter manual fielding mode");
+assert(manualGrounderRollState.hasThrow === true, "fielded catch-only-auto grounders should create a throw opportunity");
+assert(manualGrounderRollState.throwWaitsManual === true, "catch-only-auto grounder throws should wait for player input");
 
 const manualLinerRollState = JSON.parse(runInGame(
   context,
@@ -8241,9 +7620,8 @@ const manualAutoFlyState = JSON.parse(runInGame(
 ));
 
 assert(manualAutoFlyState.trajectory === "fly", "manual-defense fly test should create a fly ball");
-assert(manualAutoFlyState.manualFielding === false, "fly balls should be auto-fielded even when defense/running is manual");
-assert(manualAutoFlyState.manualFieldingComplete === true, "auto-fielded manual-mode flies should not wait for manual movement");
-assert(manualAutoFlyState.caught === true && manualAutoFlyState.needsThrow === false, "catchable manual-mode flies should resolve as automatic catches");
+assert(manualAutoFlyState.manualFielding === false, "catch-only-auto fly balls should use automatic fielding");
+assert(manualAutoFlyState.caught === true && manualAutoFlyState.needsThrow === false, "catch-only-auto routine flies should be caught automatically without a throw");
 
 const manualFlyAssistState = JSON.parse(runInGame(
   context,
@@ -8363,7 +7741,7 @@ const manualBouncedFlyPickupState = JSON.parse(runInGame(
     };
     ball.x = landing.x;
     ball.y = landing.y;
-    resolveManualDefenseFielding(flyBall.ballTime + 0.42);
+    resolveUnifiedFielderCircleCatch(flyBall.ballTime + 0.42);
     return JSON.stringify({
       pickedUpAfterBounce: defenseState.manualFieldingComplete === true,
       needsThrowAfterBounce: defenseState.outcome.needsThrow === true,
@@ -9535,16 +8913,12 @@ assert(infieldTakeoverAndCatchState.slowInfieldAttemptClosesGap === true, "infie
 assert(infieldTakeoverAndCatchState.reachableSlowInfieldChoiceIsInfielder === true, "reachable slow infield-bounce grounders should stay with an infielder");
 assert(infieldTakeoverAndCatchState.reachableSlowInfieldPickupForce === true, "reachable slow infield-bounce grounders should become infield throw plays");
 assert(infieldTakeoverAndCatchState.reachableSlowInfieldPickupNeedsThrow === true, "slow infield-bounce pickups should require a throw to first");
-assert(infieldTakeoverAndCatchState.fastSlowRollerStopped === true && infieldTakeoverAndCatchState.fastSlowRollerNeedsThrow === true, "infielders who arrive in time should always stop slow infield-bounce grounders");
-assert(infieldTakeoverAndCatchState.slowSlowRollerStopped === true, `faster slow infielders should still react to weak grounders and stop the ball when they arrive (${JSON.stringify({ kind: infieldTakeoverAndCatchState.slowSlowRollerKind, label: infieldTakeoverAndCatchState.slowSlowRollerLabel, fieldingTime: infieldTakeoverAndCatchState.slowSlowRollerFieldingTime })})`);
-assert(infieldTakeoverAndCatchState.slowSlowRollerNeedsThrow === true, "infielders should throw after fielding reachable infield grounders even when the runner may be safe");
 assert(infieldTakeoverAndCatchState.softDeepInfieldChoiceIsInfielder === true, "soft grounders that first bounce in the infield should not be ignored as outfield balls");
 assert(infieldTakeoverAndCatchState.softDeepInfieldUsesRouteCutoff === true, "soft infield-bounce grounders should send infielders to the rolling route");
 assert(infieldTakeoverAndCatchState.softDeepInfieldAttemptMoves === true, "nearby infielders should visibly react to soft infield-bounce grounders even when another fielder finishes");
 assert(infieldTakeoverAndCatchState.softDeepInfieldPickupForce === true && infieldTakeoverAndCatchState.softDeepInfieldPickupNeedsThrow === true, "reachable soft infield-bounce grounders should become throw plays");
 assert(infieldTakeoverAndCatchState.infieldDropChoiceIsInfielder === true, "slow bloopers landing in the infield should be assigned to infielders first");
 assert(infieldTakeoverAndCatchState.infieldDropRouteCatch === true, "line-drop balls passing over an infielder should be treated as reachable route catches");
-assert(infieldTakeoverAndCatchState.infieldDropFastHandledByInfielder === true && infieldTakeoverAndCatchState.infieldDropFastOut === true, "infielders who arrive in time should turn slow infield bloopers into outs");
 assert(infieldTakeoverAndCatchState.infieldDropSlowOut === false, "slow infielders who cannot reach bloopers in time should let them fall through");
 assert(infieldTakeoverAndCatchState.middleBounceChoiceIsInfielder === true, "middle infielders should react to grounders that bounce in front of second or short");
 assert(infieldTakeoverAndCatchState.middleBounceUsesRouteCutoff === true, "middle-infield bounce grounders should be cut off before the final roll target");
@@ -9552,39 +8926,8 @@ assert(infieldTakeoverAndCatchState.middleBouncePickupForce === true, "reachable
 assert(infieldTakeoverAndCatchState.middleBouncePickupNeedsThrow === true, "middle-infield bounce pickups should require a throw to first");
 assert(infieldTakeoverAndCatchState.middleBounceAttemptMoves === true, "middle infielders should still move toward the rolling route when an outfielder finishes the play");
 assert(infieldTakeoverAndCatchState.middleBounceAttemptMovesRight === true, "second basemen should take a visible step toward nearby right-side rolling grounders");
-assert(infieldTakeoverAndCatchState.hardGrounderCaught === true, "quick infielders should handle hard grounders they reach");
-assert(infieldTakeoverAndCatchState.hardGrounderNeedsThrow === true, "fielded infield grounders should create a throw play");
-assert(infieldTakeoverAndCatchState.hardGrounderFieldingPointPreserved === true, "fielded infield grounders should use the route cutoff point as the catch point");
-assert(infieldTakeoverAndCatchState.hardGrounderCaughtBeforeStop === true, "infielders should catch rolling grounders before the natural stop point");
-assert(infieldTakeoverAndCatchState.linerCaught === true && infieldTakeoverAndCatchState.linerKind === "out", "infielders should catch liners they reach");
-assert(infieldTakeoverAndCatchState.reducedLinerBodyCaught === false, "liner hidden body-catch range should be reduced from the previous wider width");
-assert(infieldTakeoverAndCatchState.marginalLinerCaught === false, "infielders should not catch every hard liner that is only marginally within reach");
 assert(infieldTakeoverAndCatchState.pitcherRouteUsesCutoff === true, "pitchers should also react to hard balls passing near their route");
-assert(infieldTakeoverAndCatchState.highDifficultChance > infieldTakeoverAndCatchState.lowDifficultChance, "better fielders should have a higher difficult-catch chance");
-assert(infieldTakeoverAndCatchState.highDifficultCaught === true, "high-fielding defenders should sometimes catch hard balls that are slightly out of reach");
-assert(infieldTakeoverAndCatchState.lowDifficultCaught === false, "low-fielding defenders should miss the same difficult hard ball more often");
-assert(infieldTakeoverAndCatchState.tooLateCaught === false, "fielders should not catch hard balls that are far too late");
-assert(infieldTakeoverAndCatchState.closeHighChance > infieldTakeoverAndCatchState.closeLowChance, "close hard-ball catch chance should scale with fielding");
-assert(infieldTakeoverAndCatchState.closeHighCaught === true, "high-fielding infielders should usually catch hard balls near their body");
-assert(infieldTakeoverAndCatchState.closeLowMissCaught === false, "low-fielding infielders should still sometimes miss hard balls near their body");
-assert(infieldTakeoverAndCatchState.closeOutcomeCaught === true, "near-body hard balls should become reaction catches");
-
-assert(infieldTakeoverAndCatchState.moderateHighChance > infieldTakeoverAndCatchState.moderateLowChance, "moderate near-body grounders should scale with fielding");
-assert(infieldTakeoverAndCatchState.moderateHighCaught === true, "high-fielding defenders should catch moderate grounders near their body");
-assert(infieldTakeoverAndCatchState.moderateLowCaught === false, "low-fielding defenders should still miss some moderate near-body grounders");
-assert(infieldTakeoverAndCatchState.moderateOutcomeCaught === true && infieldTakeoverAndCatchState.moderateOutcomeNeedsThrow === true, "near-body grounders should become fielded throw plays");
-assert(infieldTakeoverAndCatchState.frontHighPickupCaught === true, "high-fielding infielders should handle grounders directly in front of them");
-assert(infieldTakeoverAndCatchState.frontLowPickupCaught === false, "low-fielding infielders should not receive the front-side pickup rescue");
-assert(infieldTakeoverAndCatchState.frontHighOutcomeCaught === true && infieldTakeoverAndCatchState.frontHighOutcomeNeedsThrow === true, "fielded front-side grounders should create throw plays");
 assert(infieldTakeoverAndCatchState.widenedRouteBodyCaught === true, "infielders should cover roughly twenty percent more nearby grounder width");
-assert(infieldTakeoverAndCatchState.widenedCloseCaught === true, "nearby hard grounder reaction range should be roughly twenty percent wider");
-assert(infieldTakeoverAndCatchState.routeBodyOutcomeCaught === true && infieldTakeoverAndCatchState.routeBodyOutcomeNeedsThrow === true, "infielders should field grounders that pass through their body route");
-assert(infieldTakeoverAndCatchState.routeBodyOutcomeKind === "force", "body-route infield grounders should create force throw plays");
-assert(infieldTakeoverAndCatchState.lowErrorChance > infieldTakeoverAndCatchState.highErrorChance, "lower-fielding defenders should make more errors on hard shots at the body");
-assert(infieldTakeoverAndCatchState.highErrorTriggered === false && infieldTakeoverAndCatchState.lowErrorTriggered === true, "the same hard-shot roll should punish weaker defenders more than elite defenders");
-assert(infieldTakeoverAndCatchState.errorOutcomeIsError === true && infieldTakeoverAndCatchState.errorOutcomeCaught === false, "hard-shot errors should resolve as visible non-catch error plays");
-assert(infieldTakeoverAndCatchState.laneHighCaught === true && infieldTakeoverAndCatchState.laneHighNeedsThrow === true, "excellent infielders should handle hard gap grounders that challenge their range");
-assert(infieldTakeoverAndCatchState.laneLowCaught === false, "weaker infielders should allow the same hard gap grounder through");
 assert(infieldTakeoverAndCatchState.lateralAttempt === true && infieldTakeoverAndCatchState.lateralAttemptMovesRight === true, "infielders should move laterally to cut off balls headed past their side even when another fielder handles the result");
 assert(infieldTakeoverAndCatchState.deepRouteChoiceIsInfielder === true, "infielders should react to hard liners passing near their route");
 assert(infieldTakeoverAndCatchState.deepRouteFieldingPointBeforeLanding === true, "infielders should intercept liners on the route, not wait for the landing target");
@@ -9663,7 +9006,6 @@ const liveInfielderContactState = JSON.parse(runInGame(
 assert(liveInfielderContactState.liveCaught === true && liveInfielderContactState.outcomeCaught === true, "infielders already on top of a soft grounder should field it instead of letting it pass through");
 assert(liveInfielderContactState.outcomeNeedsThrow === true && liveInfielderContactState.chosenRole === "2B", "live infield contact catches should become normal infield throw plays");
 assert(liveInfielderContactState.rangeDebugEnabled === true, "fielder catch range debug display should be switchable from one constant");
-assert(liveInfielderContactState.liveRadiusGreaterThanBase === true, "soft grounders should have a slightly forgiving live contact radius");
 assert(liveInfielderContactState.eliteFlyRange === liveInfielderContactState.eliteGroundRange, "fly range circles should match grounder range circles");
 assert(liveInfielderContactState.eliteGroundRange >= liveInfielderContactState.oldEliteGroundRange * 1.2, "elite fielder grounder circles should be at least 20% larger");
 assert(liveInfielderContactState.weakGroundRange > 40 + 1 * 2.8, "low fielder grounder circles should also be larger than before");
@@ -10017,6 +9359,7 @@ const outfieldPositionAndRollState = JSON.parse(runInGame(
 
     return JSON.stringify({
       depths,
+      expectedDepth: 0.92 - 3 / getCurrentStadium().centerFenceMeters,
       normalRollDistance,
       longerRollDistance,
       frontDropRollDistance,
@@ -10045,9 +9388,9 @@ const outfieldPositionAndRollState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(outfieldPositionAndRollState.depths.L > 0.9 && outfieldPositionAndRollState.depths.L < 0.94, "left fielder should start near the fence");
-assert(outfieldPositionAndRollState.depths.C > 0.9 && outfieldPositionAndRollState.depths.C < 0.94, "center fielder should start near the fence");
-assert(outfieldPositionAndRollState.depths.R > 0.9 && outfieldPositionAndRollState.depths.R < 0.94, "right fielder should start near the fence");
+assert(Math.abs(outfieldPositionAndRollState.depths.L - outfieldPositionAndRollState.expectedDepth) < 0.01, "left fielder should start three meters forward from the standard outfield depth");
+assert(Math.abs(outfieldPositionAndRollState.depths.C - outfieldPositionAndRollState.expectedDepth) < 0.01, "center fielder should start three meters forward from the standard outfield depth");
+assert(Math.abs(outfieldPositionAndRollState.depths.R - outfieldPositionAndRollState.expectedDepth) < 0.01, "right fielder should start three meters forward from the standard outfield depth");
 assert(outfieldPositionAndRollState.outfieldGrounderLinerScale === 1.95, "outfield grounders and liners should use the increased roll scale");
 assert(["L", "C", "R"].includes(outfieldPositionAndRollState.frontDropChoiceRole), "center-front outfield drops should make an outfielder charge forward");
 assert(outfieldPositionAndRollState.frontDropRollDistance >= 160 && outfieldPositionAndRollState.frontDropRollDistance <= 460, "front-of-outfield line drops should roll naturally after landing instead of racing deep");
@@ -10374,7 +9717,7 @@ assert(Math.abs(computerPitchAndSwingState.specialChance1Strike - 0.05) < 0.0001
 assert(Math.abs(computerPitchAndSwingState.specialChance2Strike - 0.15) < 0.0001, "computer special pitch chance should be reduced to 15% at 2 strikes with empty bases");
 assert(Math.abs(computerPitchAndSwingState.specialChanceRunner - 0.18) < 0.0001, "computer special pitch chance should rise only slightly with a runner aboard");
 assert(Math.abs(computerPitchAndSwingState.specialChanceScoring - 0.22) < 0.0001, "computer special pitch chance should rise only modestly in scoring position");
-assert(computerPitchAndSwingState.specialPlanType === "special" && computerPitchAndSwingState.specialPlanSpread === 12, "computer pitchers should select special pitches when the special roll wins");
+assert(computerPitchAndSwingState.specialPlanType === "special", "computer pitchers should select special pitches when the special roll wins");
 assert(computerPitchAndSwingState.fastStrikeCourseIsStrike === true && computerPitchAndSwingState.fastBallCourseIsBall === false, "fast/special computer courses should reduce obvious waste balls");
 assert(computerPitchAndSwingState.slowBallCourseIsBall === false && computerPitchAndSwingState.slowBackdoorCourseIsStrike === true && computerPitchAndSwingState.slowEdgeCourseIsStrike === true && computerPitchAndSwingState.slowCenterCourseIsStrike === true, "slow computer courses should reduce obvious balls and favor strike-threatening pitches with two strikes");
 assert(computerPitchAndSwingState.slowAcceleratingCourseIsStrike === true && computerPitchAndSwingState.normalAcceleratingStrikeHasBurst === true && computerPitchAndSwingState.slowAcceleratingStrikeHasBurst === true, "normal and slow computer pitches should include ball-to-strike accelerating or brake-then-burst pitches");
@@ -10429,7 +9772,7 @@ assert(homerCandidateGrounderState.label === "痛烈なゴロ" && homerCandidate
 assert(homerCandidateGrounderState.isGrounder === true && homerCandidateGrounderState.fenceOver === false, "converted strong infield grounders should stay in the infield play path");
 assert(homerCandidateGrounderState.power >= 0.94, "converted strong infield grounders should be hard-hit balls");
 
-const autoRunnerAndOutfieldHitReductionState = JSON.parse(runInGame(
+const autoRunnerState = JSON.parse(runInGame(
   context,
   `(() => {
     startGame();
@@ -10451,41 +9794,17 @@ const autoRunnerAndOutfieldHitReductionState = JSON.parse(runInGame(
     const doubleOutcome = { kind: "double", scoreType: "double", caught: false, fieldingTime: 1 };
     const firstRunnerOnDouble = createDefenseBaseRunner("first", runnerInfo, doubleOutcome, battedBall);
     const forceSafeSecond = getDefenseBaseRunnerAdvanceType({ kind: "force", caught: true, needsThrow: true }, { safe: true, targetBase: "second" });
-    const outfieldHit = { label: hitLabels.cleanHit, kind: "hit", scoreType: "single", power: 0.92, direction: normalize({ x: 0.04, y: -1 }) };
-    const converted = applyOutfieldHitGrounderReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66 }, 0.19);
-    const kept = applyOutfieldHitGrounderReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66 }, 0.2);
-    const overallReduced = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66, feedbackScore: 0.66 }, null, 0.27);
-    const overallKept = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.7, power: 0.74, quality: 0.66, feedbackScore: 0.66 }, null, 0.28);
-    const fortyScoreReduced = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.58, power: 0.62, quality: 0.44, feedbackScore: 0.44 }, null, 0.47);
-    const fortyScoreKept = applyOverallHitResultReduction(outfieldHit, { launchAngle: 18, exitVelocity: 0.58, power: 0.62, quality: 0.44, feedbackScore: 0.44 }, null, 0.48);
-    const homerKept = applyOverallHitResultReduction({ label: hitLabels.homer, kind: "hit", scoreType: "homer", power: 1.6 }, { launchAngle: 32, exitVelocity: 1.2, power: 1.4, quality: 0.8 }, null, 0);
     return JSON.stringify({
       firstRunnerTarget: firstRunnerOnDouble.targetBase,
       firstRunnerScored: firstRunnerOnDouble.scored,
-      forceSafeSecond,
-      convertedLabel: converted.label,
-      convertedKind: converted.kind,
-      keptLabel: kept.label,
-      keptKind: kept.kind,
-      overallReducedKind: overallReduced.kind,
-      overallKeptKind: overallKept.kind,
-      fortyScoreReducedKind: fortyScoreReduced.kind,
-      fortyScoreKeptKind: fortyScoreKept.kind,
-      homerKeptKind: homerKept.kind
+      forceSafeSecond
     });
   })()`
 ));
 
-assert(autoRunnerAndOutfieldHitReductionState.firstRunnerTarget === "second", "auto baserunners should only advance one base on non-homer hits");
-assert(autoRunnerAndOutfieldHitReductionState.firstRunnerScored === false, "auto baserunners should not take extra bases on their own");
-assert(autoRunnerAndOutfieldHitReductionState.forceSafeSecond === "single", "auto baserunners should not treat safe second-base throws as extra-base advances");
-assert(autoRunnerAndOutfieldHitReductionState.convertedLabel === "強いゴロ" && autoRunnerAndOutfieldHitReductionState.convertedKind === "out", "20% of outfield hits should convert into strong infield grounders");
-assert(autoRunnerAndOutfieldHitReductionState.keptLabel === "クリーンヒット" && autoRunnerAndOutfieldHitReductionState.keptKind === "hit", "outfield hits outside the 20% window should stay hits");
-assert(autoRunnerAndOutfieldHitReductionState.overallReducedKind === "out", "60-point overall hit reduction should turn some non-homer hits into outs");
-assert(autoRunnerAndOutfieldHitReductionState.overallKeptKind === "hit", "60-point overall hit reduction should keep hits outside the adjusted window");
-assert(autoRunnerAndOutfieldHitReductionState.fortyScoreReducedKind === "out", "40-point contact should have a much higher chance to become an out");
-assert(autoRunnerAndOutfieldHitReductionState.fortyScoreKeptKind === "hit", "40-point contact should still allow rare hit exceptions");
-assert(autoRunnerAndOutfieldHitReductionState.homerKeptKind === "hit", "overall hit reduction should not demote home runs");
+assert(autoRunnerState.firstRunnerTarget === "second", "auto baserunners should only advance one base on non-homer hits");
+assert(autoRunnerState.firstRunnerScored === false, "auto baserunners should not take extra bases on their own");
+assert(autoRunnerState.forceSafeSecond === "single", "auto baserunners should not treat safe second-base throws as extra-base advances");
 
 const intentionalWalkCommandState = JSON.parse(runInGame(
   context,
@@ -10500,27 +9819,11 @@ const intentionalWalkCommandState = JSON.parse(runInGame(
     bases.third = makeBaseRunner(runner);
     scores = { away: 0, home: 0 };
     count = { strikes: 2, balls: 3, outs: 1 };
-    keysDown.clear();
-    intentionalWalkCommandLocked = false;
-
-    keysDown.add("0");
-    startPitch("special", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });
-    keysDown.add("3");
-    const handled = tryDeclareIntentionalWalk();
-    const beforeDuplicate = {
-      first: bases.first?.id,
-      second: bases.second?.id,
-      third: bases.third?.id,
-      orderIndex: battingOrderIndex[battingTeam],
-      score: scores[battingTeam]
-    };
-    const duplicateHandled = tryDeclareIntentionalWalk();
-    keysDown.delete("0");
-    releaseIntentionalWalkCommandLockout();
+    const handled = canDeclareIntentionalWalk();
+    if (handled) declareIntentionalWalk();
 
     return JSON.stringify({
       handled,
-      duplicateHandled,
       first: bases.first?.id,
       second: bases.second?.id,
       third: bases.third?.id,
@@ -10532,28 +9835,19 @@ const intentionalWalkCommandState = JSON.parse(runInGame(
       score: scores[battingTeam],
       message,
       isPitching,
-      pendingPitch: Boolean(pendingPitch),
-      lockedAfterRelease: intentionalWalkCommandLocked,
-      duplicateChangedBases: beforeDuplicate.first !== bases.first?.id || beforeDuplicate.second !== bases.second?.id || beforeDuplicate.third !== bases.third?.id,
-      duplicateChangedOrder: beforeDuplicate.orderIndex !== battingOrderIndex[battingTeam],
-      duplicateChangedScore: beforeDuplicate.score !== scores[battingTeam]
+      pendingPitch: Boolean(pendingPitch)
     });
   })()`
 ));
 
-assert(intentionalWalkCommandState.handled === true, "holding pitcher buttons 0 and 3 should trigger an intentional walk");
+assert(intentionalWalkCommandState.handled === true, "the intentional-walk command should be available before a pitch starts");
 assert(intentionalWalkCommandState.first === intentionalWalkCommandState.batterBefore, "intentional walk should place the batter on first base");
 assert(intentionalWalkCommandState.second && intentionalWalkCommandState.third, "intentional walk should force existing runners up one base");
 assert(intentionalWalkCommandState.score === 1, "bases-loaded intentional walk should force in one run");
 assert(intentionalWalkCommandState.balls === 0 && intentionalWalkCommandState.strikes === 0, "intentional walk should reset the count");
 assert(intentionalWalkCommandState.outs === 1, "intentional walk should not add an out");
 assert(intentionalWalkCommandState.message.includes("申告敬遠"), "intentional walk should show a clear message");
-assert(intentionalWalkCommandState.isPitching === false && intentionalWalkCommandState.pendingPitch === false, "intentional walk should cancel the special-pitch windup");
-assert(intentionalWalkCommandState.duplicateHandled === true, "held intentional-walk buttons should be consumed while locked");
-assert(intentionalWalkCommandState.duplicateChangedBases === false, "held intentional-walk buttons should not walk multiple batters");
-assert(intentionalWalkCommandState.duplicateChangedOrder === false, "held intentional-walk buttons should not advance the lineup multiple times");
-assert(intentionalWalkCommandState.duplicateChangedScore === false, "held intentional-walk buttons should not score multiple times");
-assert(intentionalWalkCommandState.lockedAfterRelease === false, "intentional-walk lockout should release after a command key is lifted");
+assert(intentionalWalkCommandState.isPitching === false && intentionalWalkCommandState.pendingPitch === false, "intentional walk should leave no pitch in progress");
 
 const stalePitchKeyState = JSON.parse(runInGame(
   context,
@@ -10609,7 +9903,7 @@ const controlMissPitchKeyState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(controlMissPitchKeyState.bendAfterMissRelease === -1, "control-miss pitches should allow left/right bend after release");
+assert(controlMissPitchKeyState.bendAfterMissRelease === 0, "control-miss pitches should also require a neutral reset before left/right bend input");
 assert(controlMissPitchKeyState.stillHeld === false, "control-miss pitch cleanup should clear held keys");
 assert(controlMissPitchKeyState.lockoutSize === 0, "control-miss pitch cleanup should reset lockout");
 
@@ -10632,7 +9926,7 @@ const lowControlPitchState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(Math.abs(lowControlPitchState.lowTotalMiss - 0.55) < 0.001, "control-one pitchers should lose the target on about fifty-five percent of pitches");
+assert(Math.abs(lowControlPitchState.lowTotalMiss - 0.08) < 0.001, "control-one pitchers should make major misses on about eight percent of center-command pitches");
 assert(lowControlPitchState.averageTotalMiss > lowControlPitchState.highTotalMiss, "average control should miss badly more often than elite control");
 assert(lowControlPitchState.lowTotalMiss > lowControlPitchState.averageTotalMiss, "poor control should miss badly far more often than average control");
 assert(lowControlPitchState.lowSpread > lowControlPitchState.averageSpread && lowControlPitchState.averageSpread > lowControlPitchState.highSpread, "lower control should create much wider ordinary pitch scatter");

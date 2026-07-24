@@ -759,8 +759,6 @@ const yellowZoneHitTuning = {
   fenceScoreBoost: 0.28
 };
 const effectiveBatterPowerScale = 0.9;
-const nonYellowHitChancePenalty = 0.94;
-const overallHitResultReductionChance = 0.28;
 const goodContactEaseScale = 1.2;
 
 const defenseThrowResultHoldSeconds = 2.0;
@@ -2028,7 +2026,7 @@ function isAnyPracticeMode() {
 }
 
 function getDefenseRunControlMode(value) {
-  return value === "manual" || value === "semiauto" ? value : "auto";
+  return value === "manual" || value === "semiauto" ? "manual" : "auto";
 }
 
 function findById(list, id) {
@@ -3812,6 +3810,10 @@ function isPlayerFielding() {
 }
 
 function isManualDefenseControl() {
+  return false;
+}
+
+function isManualThrowControl() {
   const team = fieldingTeam();
   if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
@@ -3822,7 +3824,7 @@ function isManualBaserunningControl(team = battingTeam) {
   if (isAnyPracticeMode()) return false;
   if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
-  return isPlayerBatting() && (defenseControlMode[team] === "manual" || defenseControlMode[team] === "semiauto");
+  return isPlayerBatting() && defenseControlMode[team] === "manual";
 }
 
 const computerJudgmentNextPitchDelay = 2000;
@@ -4067,7 +4069,6 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
   const severeWildness = Math.pow(wildness, 1.18);
   const countPressure = clamp(options.countPressure ?? 0, 0, 1);
   const commandTightening = 1 - countPressure * 0.58;
-  const verticalTightening = 1 - countPressure * 0.64;
   const missTightening = 1 - countPressure * 0.74;
   const wildMissTightening = 1 - countPressure * 0.82;
   const edgeMajorMissChance = getEdgeCommandMajorMissChance(effectiveControl, staminaFatigue) * missTightening;
@@ -4082,7 +4083,6 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
     spread: edgeCommandPitch
       ? clamp(edgeSpread, 3.3, 69)
       : clamp((0.38 + wildness * 3.35) * fatigueSpread * commandTightening * 1.5, 0.51, 8.78),
-    verticalSpread: clamp((0.58 + wildness * 2.75 + edgeFastballPressure * 0.36) * (1 + staminaFatigue * 0.72) * verticalTightening, 0.48, 4.95),
     wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
   };
@@ -4195,13 +4195,6 @@ function getSharedPitchCourseAim(course, pitchRadius = 8, typeKey = "normal", pi
     targetY: field.plateY,
     targetSpread: getPitchCourseBaseSpread(sharedCourse, typeKey, pitch)
   };
-}
-
-function getCpuInsidePitchTargetX(targetX, course, pitchRadius = ball.radius) {
-  if (!course?.direction || course.direction !== getDangerousBendDirectionForBatter()) return targetX;
-  const insideEdgeX = getHomePlateEdgeXAtY(field.plateY, course.direction);
-  const safeDistance = (Number.isFinite(ball.radius) ? ball.radius : pitchRadius) * 3;
-  return insideEdgeX - course.direction * safeDistance;
 }
 
 function getPitchCourseBaseSpread(course, typeKey, pitch) {
@@ -4672,7 +4665,6 @@ function choosePracticePitchPlan() {
       type: pitchType,
       course: { direction: 0, offset: 0, intent: "practiceCenter" },
       targetX: field.plateX + randomBetween(-8, 8),
-      targetY: field.plateY + randomBetween(-6, 6),
       targetSpread: 3,
       bendSegments: [],
       speedChangeSegments: []
@@ -4739,7 +4731,7 @@ function chooseComputerPitchPlan() {
     const regularRoll = (typeRoll - specialChance) / Math.max(0.01, 1 - specialChance);
     type = chooseWeightedComputerPitchType(getComputerPitchTypeWeights(planPitcher), regularRoll);
   }
-  if (countPressure >= 0.8 && (type === "special" || type === "slow") && Math.random() < 0.72) {
+  if (countPressure >= 0.8 && type === "slow" && Math.random() < 0.72) {
     type = "normal";
   } else if (countPressure >= 0.55 && type === "slow" && Math.random() < 0.48) {
     type = "normal";
@@ -4761,34 +4753,28 @@ function chooseComputerPitchPlan() {
   if (course.intent === "awayBall") {
     const side = awayFromBatter;
     plan.targetX = edgeTargetX(side);
-    plan.targetY = field.plateY + randomBetween(-12, 14);
     plan.targetSpread = 1;
   } else if (course.intent === "ballToStrikeBurst" || course.intent === "acceleratingStrike") {
     const side = course.direction || awayFromBatter;
     const edgeX = edgeTargetX(side);
     plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 4));
-    plan.targetY = field.plateY + randomBetween(-8, 10);
     plan.targetSpread = 1;
   } else if (course.intent === "strikeToBallBurst" || course.intent === "strikeToBall") {
     const side = course.direction || awayFromBatter;
     plan.targetX = edgeTargetX(side);
-    plan.targetY = field.plateY + randomBetween(-12, 14);
     plan.targetSpread = 1;
   } else if (course.intent === "hbpBackdoor") {
     const side = dangerousDirection;
     const edgeX = edgeTargetX(side);
     plan.targetX = field.plateX + side * randomBetween(18, Math.max(20, Math.abs(edgeX - field.plateX) - 8));
-    plan.targetY = field.plateY + randomBetween(-8, 12);
     plan.targetSpread = 1;
   } else if (course.intent === "plainEdge") {
     const side = course.direction || awayFromBatter;
     plan.targetX = edgeTargetX(side);
-    plan.targetY = field.plateY + randomBetween(-8, 10);
     plan.targetSpread = 0;
     plan.lockTarget = true;
   } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
     plan.targetX = field.plateX + randomBetween(-18, 18);
-    plan.targetY = field.plateY + randomBetween(-10, 10);
     plan.targetSpread = 7;
   }
   applySharedComputerPitchAim(plan);
@@ -4805,7 +4791,6 @@ function applySharedComputerPitchAim(plan) {
     pitchTypes[plan.type]
   );
   plan.targetX = sharedAim.targetX;
-  plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));
   plan.targetY = sharedAim.targetY;
   plan.targetSpread = sharedAim.targetSpread;
   plan.lockTarget = false;
@@ -4820,7 +4805,6 @@ function constrainComputerPitchPlanToPlayerReach(plan) {
   if (plan.course?.direction) {
     const sharedAim = getSharedPitchCourseAim(plan.course, getPitchRadius(plan.type), plan.type, pitchTypes[plan.type]);
     plan.targetX = sharedAim.targetX;
-    plan.targetX = getCpuInsidePitchTargetX(plan.targetX, sharedAim.course, getPitchRadius(plan.type));
     plan.targetSpread = sharedAim.targetSpread;
     plan.lockTarget = false;
   }
@@ -5011,9 +4995,6 @@ function getBuntAimForContact(now = performance.now()) {
   return aim;
 }
 
-function getBuntAimDirection() {
-  return getBuntAimForContact().x;
-}
 
 function getProjectedPitchPlatePosition() {
   if (!ball.inPitch || !Number.isFinite(ball.vy) || Math.abs(ball.vy) < 0.001) {
@@ -6362,7 +6343,12 @@ function updateAudioToggleButtons() {
     button.setAttribute("aria-pressed", String(audioSettings.soundEffects));
   });
   bgmToggleButtons.forEach((button) => {
-    button.textContent = audioSettings.bgm ? "BGM開始" : "BGM OFF";
+    const isPlayingOrStarting = audioSettings.bgm && currentBgmKey && !bgmNeedsUserGesture;
+    button.textContent = !audioSettings.bgm
+      ? "BGM OFF"
+      : isPlayingOrStarting
+        ? "BGM ON"
+        : "BGM開始";
     button.setAttribute("aria-pressed", String(audioSettings.bgm));
   });
 }
@@ -6682,76 +6668,12 @@ function decideHitResult(contact) {
   return decideHitResultFromBattedProfile(contact);
 }
 
-function decideZoneBandHitResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const zoneBand = contact.zoneBand ?? getContactZoneBand(contact);
-  if (zoneBand === "center") return decideCenterZoneBandResult(contact, profile, feedbackScore, roll);
-  if (zoneBand === "middle") return decideMiddleZoneBandResult(contact, profile, feedbackScore, roll);
-  if (zoneBand === "edge") return decideEdgeZoneBandResult(contact, profile, feedbackScore, roll);
-  if (zoneBand === "slightOutside") return decideSlightOutsideZoneBandResult(contact, profile, feedbackScore, roll);
-  if (zoneBand === "outside") return decideOutsideZoneBandResult(contact, profile, feedbackScore, roll);
-  return decideFarOutsideZoneBandResult(contact, profile, feedbackScore, roll);
-}
 
-function decideCenterZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  if (shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll)) {
-    return makeBattingPracticeHomeRunResult(profile, feedbackScore);
-  }
-  if (shouldMakeCenterZoneHomeRunCandidate(contact, profile, feedbackScore, roll)) {
-    return makeCenterZoneHomeRunCandidateResult(profile, feedbackScore);
-  }
-  const scoreDrivenLongBall = tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll);
-  if (scoreDrivenLongBall) return scoreDrivenLongBall;
-  return decideNormalZoneHitResult(profile, contact, roll);
-}
 
-function decideMiddleZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const score = getZoneBandContactScore(contact, profile);
-  const powerDriveScore = getPowerDriveScore();
-  if (score >= 0.86 && powerDriveScore >= 0.42 && profile.exitVelocity >= 0.9 && profile.carry >= 0.82 && roll < 0.18) {
-    return makeFenceEdgeFlyResultFromProfile({ ...profile, feedbackScore: Math.max(feedbackScore, score) });
-  }
-  if (score >= 0.62 && profile.exitVelocity >= 0.58) {
-    return profile.launchAngle <= 14
-      ? makeGapGrounderResult(profile)
-      : makeLineLinerResultFromProfile({ ...profile, feedbackScore: Math.max(feedbackScore, score) });
-  }
-  if (score >= 0.44 && roll < 0.34) return makeLowOutfieldHitResultFromProfile(profile);
-  return profile.launchAngle >= 18 ? makeRoutineFlyResultFromProfile(profile) : makeGrounderOutResultFromProfile(profile);
-}
 
-function decideEdgeZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const score = getZoneBandContactScore(contact, profile);
-  if (score >= 0.82 && profile.exitVelocity >= 0.68 && roll < 0.18) {
-    return makeLowOutfieldHitResultFromProfile({ ...profile, feedbackScore: Math.max(feedbackScore, score), power: Math.min(profile.power ?? 0.66, 0.74) });
-  }
-  if (score >= 0.68 && profile.launchAngle <= 12 && roll < 0.16) {
-    return makeGapGrounderResult({ ...profile, power: Math.min(profile.power ?? 0.58, 0.66) });
-  }
-  if (roll < 0.24) return { label: hitLabels.foul, kind: "foul", power: clamp(profile.power ?? 0.36, 0.18, 0.52), direction: profile.direction, battedProfile: profile };
-  return profile.launchAngle >= 15 ? makeRoutineFlyResultFromProfile(profile) : makeGrounderOutResultFromProfile(profile, Math.min(profile.power ?? 0.58, 0.68));
-}
 
-function decideSlightOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const score = getZoneBandContactScore(contact, profile);
-  if (score >= 0.9 && profile.exitVelocity >= 0.74 && roll < 0.08) {
-    return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.62, 0.66) });
-  }
-  if (roll < 0.36) return { label: hitLabels.foul, kind: "foul", power: clamp(profile.power ?? 0.34, 0.16, 0.54), direction: profile.direction, battedProfile: profile };
-  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 0.45, roll, "slight");
-}
 
-function decideOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  const score = getZoneBandContactScore(contact, profile);
-  if (score >= 0.94 && profile.exitVelocity >= 0.78 && roll < 0.025) {
-    return makeLowOutfieldHitResultFromProfile({ ...profile, power: Math.min(profile.power ?? 0.54, 0.58) });
-  }
-  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 1.2, roll, "clear");
-}
 
-function decideFarOutsideZoneBandResult(contact, profile, feedbackScore, roll = Math.random()) {
-  if (roll < 0.52) return { label: hitLabels.foul, kind: "foul", power: clamp(profile.power ?? 0.24, 0.1, 0.38), direction: profile.direction, battedProfile: profile };
-  return makeZoneMissWeakContactResult(profile, contact.zoneMissUnits ?? 2.4, roll, "severe");
-}
 
 function decideHitResultFromBattedProfile(contact) {
   const profile = buildBattedBallProfile(contact);
@@ -7022,247 +6944,15 @@ function makeUnifiedRoutineFlyResult(profile, distanceRatio) {
   });
 }
 
-function applyFinalHitResultBalance(result, profile, contact = null) {
-  const zoneAdjusted = applyZoneBandResultCap(applyOutfieldHitGrounderReduction(result, profile), profile, contact);
-  return applyOverallHitResultReduction(zoneAdjusted, profile, contact);
-}
 
-function applyZoneBandResultCap(result, profile, contact = null, roll = Math.random()) {
-  if (!result || result.kind === "foul" || result.kind === "out") return result;
-  const source = contact || profile || {};
-  const zoneBand = source.zoneBand ?? profile?.zoneBand ?? getContactZoneBand(source);
-  const missDistance = source.plateDistance ?? profile?.plateDistance ?? 0;
-  const missUnits = source.zoneMissUnits ?? profile?.zoneMissUnits ?? 0;
-  if (zoneBand === "center") return result;
-  if (zoneBand === "slightOutside" || zoneBand === "outside" || zoneBand === "farOutside") {
-    if (missDistance >= 40) return makeZoneMissWeakContactResult(profile, Math.max(missUnits, 2.4), roll, "severe");
-    if (missDistance >= 30) return makeZoneMissWeakContactResult(profile, Math.max(missUnits, 1.8), roll, "forcedWeak");
-    if (missDistance >= 16 && (isStrongHitResult(result) || result.scoreType === "double" || result.scoreType === "homer")) {
-      return makeZoneMissWeakContactResult(profile, Math.max(missUnits, 1.1), roll, "clear");
-    }
-    if (missDistance > 0 && (result.scoreType === "homer" || result.scoreType === "double" || result.deepDrive || result.fenceLiner || result.hardOutfieldBounce)) {
-      return makeLowOutfieldHitResultFromProfile({
-        ...(result.battedProfile || profile || {}),
-        power: Math.min(result.power ?? profile?.power ?? 0.62, 0.68),
-        exitVelocity: Math.min(profile?.exitVelocity ?? 0.6, 0.68),
-        carry: Math.min(profile?.carry ?? 0.52, 0.62)
-      });
-    }
-    return result;
-  }
-  if (zoneBand === "edge") {
-    if (result.scoreType === "homer" || result.deepDrive || result.fenceLiner || result.hardOutfieldBounce || result.hardOutfieldHit) {
-      return makeZoneMissWeakContactResult(profile, 0.35, roll, "clear");
-    }
-    if (result.scoreType === "double" && roll < 0.62) {
-      return makeGrounderOutResultFromProfile(profile, Math.min(result.power ?? profile?.power ?? 0.58, 0.68));
-    }
-  }
-  if (zoneBand === "middle" && result.scoreType === "homer") {
-    const score = contact ? getZoneBandContactScore(contact, profile) : clamp(profile?.feedbackScore ?? profile?.quality ?? 0.5, 0, 1);
-    const homeRunPower = getHomeRunPowerProfile();
-    const minimumScore = 0.9 - homeRunPower.mishitRescue * 0.8;
-    const wallConversionChance = clamp(0.5 - homeRunPower.candidateBonus * 0.35, 0.12, 0.5);
-    if (score < minimumScore || (profile?.exitVelocity ?? 0) < 0.96 - homeRunPower.mishitRescue * 0.24 || roll < wallConversionChance) {
-      return makeFenceEdgeFlyResultFromProfile({
-        ...(result.battedProfile || profile || {}),
-        power: Math.min(result.power ?? profile?.power ?? 1.1, 1.22),
-        carry: Math.min(profile?.carry ?? 0.9, 0.96)
-      });
-    }
-  }
-  return result;
-}
 
-function applyOverallHitResultReduction(result, profile, contact = null, roll = Math.random()) {
-  if (!result || result.kind !== "hit") return result;
-  if (result.scoreType === "homer" || result.deepDrive || result.fenceLiner) return result;
-  if (profile?.battingPracticeHomerCandidate || result.battedProfile?.battingPracticeHomerCandidate) return result;
-  if (profile?.centerZoneHomerCandidate || result.battedProfile?.centerZoneHomerCandidate) return result;
-  if (roll >= getOverallHitResultReductionChance(result, profile, contact)) return result;
-  const sourceProfile = {
-    ...(result.battedProfile || profile || {}),
-    direction: result.direction || profile?.direction,
-    quality: Math.max(profile?.quality ?? 0.42, result.battedProfile?.quality ?? 0.42, contact?.quality ?? 0),
-    exitVelocity: Math.max(profile?.exitVelocity ?? 0.46, result.battedProfile?.exitVelocity ?? 0.46),
-    launchAngle: result.battedProfile?.launchAngle ?? profile?.launchAngle ?? 8
-  };
-  if (sourceProfile.launchAngle <= 10) {
-    return makeGrounderOutResultFromProfile(sourceProfile, Math.min(result.power ?? sourceProfile.power ?? 0.7, 0.74));
-  }
-  if (sourceProfile.launchAngle >= 24) return makeRoutineFlyResultFromProfile(sourceProfile);
-  return makeRoutineFlyResultFromProfile({
-    ...sourceProfile,
-    quality: Math.max(sourceProfile.quality ?? 0, 0.4),
-    exitVelocity: Math.max(sourceProfile.exitVelocity ?? 0, 0.54),
-    reducedHitResult: true
-  });
-}
 
-function getOverallHitResultReductionChance(result, profile, contact = null) {
-  const score = clamp(
-    contact ? getContactFeedbackScore(contact) : result?.battedProfile?.feedbackScore ?? profile?.feedbackScore ?? profile?.quality ?? 0.5,
-    0,
-    1
-  );
-  if (score < 0.46) return clamp(0.64 - score * 0.38, overallHitResultReductionChance, 0.54);
-  if (score < 0.5) return 0.42;
-  if (score < 0.6) return 0.34;
-  if (score < 0.7) return overallHitResultReductionChance;
-  return 0.2;
-}
 
-function applyOutfieldHitGrounderReduction(result, profile, roll = Math.random()) {
-  if (!result || result.kind !== "hit") return result;
-  if (result.scoreType === "homer" || result.deepDrive || result.fenceLiner) return result;
-  if (result.grounderGap || result.lineEdgeGrounder || result.centerReturnGrounder) return result;
-  if (roll >= 0.2) return result;
-  return makeGrounderOutResultFromProfile({
-    ...(result.battedProfile || profile || {}),
-    direction: result.direction || profile?.direction,
-    quality: Math.max(profile?.quality ?? 0.42, result.battedProfile?.quality ?? 0.42),
-    exitVelocity: Math.max(profile?.exitVelocity ?? 0.48, result.battedProfile?.exitVelocity ?? 0.48),
-    launchAngle: Math.min(profile?.launchAngle ?? 4, 5),
-    outfieldHitConvertedGrounder: true
-  }, clamp((result.power ?? profile?.power ?? 0.62) + 0.04, 0.58, 1.12));
-}
 
-function shouldMakeBattingPracticeHomeRunCandidate(contact, profile, feedbackScore, roll = Math.random()) {
-  if (!(gameMode === "practice" || isHomeRunDerbyMode()) || !activePitcher?.practiceOnly || getCurrentSwingType() === "bunt") return false;
-  if (!contact?.inGoodContactZone || contact.outsideStrikeZone || profile?.isFoul) return false;
-  const lowStuffBoost = getLowPitcherStuffProfileBoost(activePitcher);
-  const veryLowStuff = lowStuffBoost >= pitcherAbilityTuning.lowStuffProfileBoost * 0.8;
-  const minFeedback = veryLowStuff ? 0.38 : 0.48;
-  const minQuality = veryLowStuff ? 0.24 : 0.34;
-  const minTiming = veryLowStuff ? 0.32 : 0.42;
-  const minSweetSpot = veryLowStuff ? 0.28 : 0.38;
-  const minBarrel = veryLowStuff ? 0.28 : 0.38;
-  if (feedbackScore < minFeedback || (contact.quality ?? 0) < minQuality || (contact.timingScore ?? 0) < minTiming || (contact.sweetSpotScore ?? 0) < minSweetSpot || (contact.barrelScore ?? 0) < minBarrel) return false;
-  const powerDrive = getPowerDriveScore(getEffectiveBatterPower(activeBatter));
-  const practicePower = clamp(((profile?.power ?? 1) - 1.1) / 1.1, 0, 1) * 0.12;
-  const veryLowStuffChance = veryLowStuff ? lowStuffBoost * 1.1 + clamp((feedbackScore - 0.38) / 0.24, 0, 1) * 0.18 : 0;
-  const chance = clamp(0.5 + feedbackScore * 0.42 + powerDrive * 0.18 + practicePower + veryLowStuffChance, veryLowStuff ? 0.72 : 0.68, 0.98);
-  return roll < chance;
-}
 
-function shouldMakeCenterZoneHomeRunCandidate(contact, profile, feedbackScore, roll = Math.random()) {
-  if (!contact?.inGoodContactZone || !profile || profile.isFoul || profile.isBunt || contact.outsideStrikeZone) return false;
-  const zoneScore = clamp(contact.zoneScore ?? 0, 0, 1);
-  if (zoneScore < 0.92) return false;
-  const power = getEffectiveBatterPower(activeBatter);
-  const powerDriveScore = getPowerDriveScore(power);
-  const timing = clamp(contact.timingScore ?? 0, 0, 1);
-  const sweetSpot = clamp(contact.sweetSpotScore ?? 0, 0, 1);
-  const barrel = clamp(contact.barrelScore ?? 0, 0, 1);
-  const quality = clamp(contact.quality ?? 0, 0, 1);
-  const centerScore = clamp((zoneScore - 0.92) / 0.08, 0, 1);
-  const contactScore = clamp(feedbackScore * 0.34 + timing * 0.18 + Math.max(sweetSpot, barrel) * 0.22 + quality * 0.16 + centerScore * 0.1, 0, 1);
-  if (contactScore < 0.62 || powerDriveScore < 0.18 || profile.exitVelocity < 0.62 || profile.carry < 0.56) return false;
-  const chance = clamp(
-    0.14
-      + centerScore * 0.24
-      + clamp((contactScore - 0.62) / 0.28, 0, 1) * 0.3
-      + powerDriveScore * 0.32
-      + clamp((profile.carry - 0.62) / 0.54, 0, 1) * 0.18,
-    0.12,
-    0.82
-  );
-  return roll < chance;
-}
 
-function makeCenterZoneHomeRunCandidateResult(profile, feedbackScore = profile?.feedbackScore ?? profile?.quality ?? 0.72) {
-  const powerDriveScore = getPowerDriveScore();
-  const boostedProfile = {
-    ...profile,
-    centerZoneHomerCandidate: true,
-    feedbackScore: Math.max(feedbackScore, profile.feedbackScore ?? 0, 0.78),
-    power: Math.max(profile.power ?? 1, 1.7 + powerDriveScore * 0.64),
-    exitVelocity: Math.max(profile.exitVelocity ?? 0.8, 1.02 + powerDriveScore * 0.36),
-    carry: Math.max(profile.carry ?? 0.72, 1.02 + powerDriveScore * 0.46),
-    launchAngle: clamp(Math.max(profile.launchAngle ?? 24, 23), 22, 38),
-    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 0.76 + powerDriveScore * 0.16),
-    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.42 + powerDriveScore * 0.24)
-  };
-  return makeDeepDriveResultFromProfile(boostedProfile);
-}
 
-function makeBattingPracticeHomeRunResult(profile, feedbackScore = profile?.feedbackScore ?? profile?.quality ?? 0.7) {
-  const boostedProfile = {
-    ...profile,
-    battingPracticeHomerCandidate: true,
-    feedbackScore: Math.max(feedbackScore, profile.feedbackScore ?? 0, 0.86),
-    power: Math.max(profile.power ?? 1, 2.35),
-    exitVelocity: Math.max(profile.exitVelocity ?? 0.9, 1.52),
-    carry: Math.max(profile.carry ?? 0.9, 1.72),
-    launchAngle: clamp(profile.launchAngle ?? 32, 26, 42),
-    fenceEdgeFlyScore: Math.max(profile.fenceEdgeFlyScore ?? 0, 1),
-    toweringFlyScore: Math.max(profile.toweringFlyScore ?? 0, 0.78)
-  };
-  return makeDeepDriveResultFromProfile(boostedProfile);
-}
 
-function tryMakeScoreDrivenLongBallResult(contact, profile, feedbackScore, roll = Math.random()) {
-  if (!contact || !profile || profile.isFoul || profile.isBunt || contact.outsideStrikeZone) return null;
-  if (!contact.inGoodContactZone) return null;
-  const score = clamp(feedbackScore ?? profile.feedbackScore ?? profile.quality ?? 0, 0, 1);
-  if (score < 0.56) return null;
-  const zoneCenter = clamp(((contact.zoneScore ?? 0) - 0.88) / 0.12, 0, 1);
-  if (zoneCenter <= 0.12) return null;
-  if ((contact.zoneScore ?? 0) < 0.82 && score < 0.78) return null;
-  const timing = clamp(contact.timingScore ?? 0, 0, 1);
-  const sweetSpot = clamp(contact.sweetSpotScore ?? 0, 0, 1);
-  const barrel = clamp(contact.barrelScore ?? 0, 0, 1);
-  const quality = clamp(contact.quality ?? 0, 0, 1);
-  const contactFloor = Math.min(timing, Math.max(sweetSpot, barrel), quality);
-  if (contactFloor < 0.3 && score < 0.66) return null;
-
-  const power = getEffectiveBatterPower(activeBatter);
-  const powerDriveScore = getPowerDriveScore(power);
-  const scoreTier = clamp((score - 0.56) / 0.24, 0, 1);
-  const greatScore = clamp((score - 0.66) / 0.22, 0, 1);
-  const superScore = clamp((score - 0.8) / 0.2, 0, 1);
-  const lowPower = clamp((4.4 - power) / 3.4, 0, 1);
-  const ordinaryPower = clamp((power - 4.2) / 3.8, 0, 1);
-  const longBallChance = clamp(
-    0.22
-      + scoreTier * 0.34
-      + greatScore * 0.22
-      + superScore * 0.2
-      + zoneCenter * 0.26
-      + powerDriveScore * 0.34
-      - lowPower * 0.24,
-    0.2,
-    0.94
-  );
-  if (roll > longBallChance) return null;
-
-  const boostedProfile = makeScoreDrivenLongBallProfile(profile, {
-    score,
-    zoneCenter,
-    powerDriveScore,
-    lowPower,
-    ordinaryPower,
-    superScore
-  });
-  const deepDriveChance = clamp(
-    0.04
-      + scoreTier * 0.28
-      + greatScore * 0.24
-      + superScore * 0.28
-      + zoneCenter * 0.22
-      + powerDriveScore * 0.38
-      - lowPower * 0.3,
-    0.08,
-    0.92
-  );
-  const fenceLinerChance = clamp(0.08 + greatScore * 0.12 + powerDriveScore * 0.18 - lowPower * 0.08, 0.06, 0.34);
-  const secondRoll = Math.random();
-  if (secondRoll < deepDriveChance) return makeDeepDriveResultFromProfile(boostedProfile);
-  if (secondRoll < deepDriveChance + fenceLinerChance && boostedProfile.launchAngle <= 30) {
-    return makeFenceLinerResultFromProfile(boostedProfile);
-  }
-  return makeFenceEdgeFlyResultFromProfile(boostedProfile);
-}
 
 function makeScoreDrivenLongBallProfile(profile, { score = 0.6, zoneCenter = 0, powerDriveScore = 0, lowPower = 0, ordinaryPower = 0, superScore = 0 } = {}) {
   const scoreLift = clamp((score - 0.54) / 0.34, 0, 1);
@@ -7357,320 +7047,7 @@ function makeZoneMissWeakContactResult(profile, missUnits = 0, roll = Math.rando
   );
 }
 
-function isInsideChaseContact(contact) {
-  if (!contact?.outsideStrikeZone || contact.inGoodContactZone) return false;
-  const insideOffset = activeBatterSide === "R"
-    ? field.plateX - contact.x
-    : contact.x - field.plateX;
-  return insideOffset > field.strikeZoneWidth * 0.5;
-}
 
-function decideNormalZoneHitResult(profile, contact, roll) {
-  const { quality, timingScore, sweetSpotScore, zoneScore, inGoodContactZone } = contact;
-  const powerRating = getEffectiveBatterPower(activeBatter);
-  const powerDriveScore = getPowerDriveScore(powerRating);
-  const lowPowerDropSkill = getLowPowerContactDropSkill({
-    power: powerRating,
-    quality,
-    timingScore,
-    sweetSpotScore,
-    barrelScore: contact.barrelScore ?? 0,
-    zoneScore,
-    inGoodContactZone
-  });
-  const lowPowerHighMeetDriveSkill = getLowPowerHighMeetDriveSkill({
-    power: powerRating,
-    meet: getEffectiveBatterMeet(activeBatter),
-    quality,
-    timingScore,
-    sweetSpotScore,
-    barrelScore: contact.barrelScore ?? 0,
-    zoneScore,
-    inGoodContactZone
-  });
-  const easyCenterDrive = inGoodContactZone
-    && zoneScore >= 0.9
-    && profile.exitVelocity >= 0.5
-    && profile.carry >= 0.42
-    && quality >= 0.16
-    && sweetSpotScore >= 0.16;
-  const easyCenterHomerDrive = inGoodContactZone
-    && zoneScore >= 0.94
-    && powerDriveScore >= 0.35
-    && profile.exitVelocity >= 0.84
-    && profile.carry >= 0.78
-    && quality >= 0.46
-    && sweetSpotScore >= 0.62;
-  const centerDriveRoll = clamp(0.08 + quality * 0.04 + sweetSpotScore * 0.04, 0.09, 0.22);
-  const centerHomerRoll = clamp(0.42 - quality * 0.08 - sweetSpotScore * 0.05, 0.24, 0.42);
-
-  if (profile.launchAngle >= 64) {
-    if (easyCenterHomerDrive) return makeDeepDriveResultFromProfile(profile);
-    if (easyCenterDrive && powerDriveScore >= 0.18) return makeFenceEdgeFlyResultFromProfile(profile);
-    const liftedMistake = inGoodContactZone
-      && powerDriveScore >= 0.35
-      && profile.exitVelocity >= 1.0
-      && profile.carry >= 0.95
-      && quality >= 0.62
-      && sweetSpotScore >= 0.76;
-    if (liftedMistake) {
-      if (roll < profile.fenceEdgeFlyScore * 0.42) return makeFenceEdgeFlyResultFromProfile(profile);
-      return makeDeepDriveResultFromProfile(profile);
-    }
-    if (easyCenterDrive) return makeGapLinerResult(profile);
-    return makePopupFlyResultFromProfile(profile);
-  }
-
-  if (easyCenterHomerDrive && powerDriveScore >= 0.42 && profile.launchAngle >= 4 && roll > centerHomerRoll) {
-    return makeDeepDriveResultFromProfile(profile);
-  }
-
-  const strongLowDrive = inGoodContactZone
-    && profile.launchAngle >= 8
-    && profile.launchAngle <= 32
-    && profile.exitVelocity >= 0.5
-    && quality >= 0.3
-    && sweetSpotScore >= 0.3;
-  if (lowPowerHighMeetDriveSkill > 0.34
-    && profile.launchAngle >= 0
-    && profile.launchAngle <= 22
-    && profile.exitVelocity >= 0.42
-    && quality >= 0.22
-    && sweetSpotScore >= 0.22
-    && roll < 0.38 + lowPowerHighMeetDriveSkill * 0.24) {
-    return makeHardOutfieldBounceHitResultFromProfile({
-      ...profile,
-      lowPowerHighMeetDriveSkill,
-      feedbackScore: Math.max(profile.feedbackScore ?? 0, quality),
-      launchAngle: Math.max(profile.launchAngle, 9)
-    });
-  }
-  if (strongLowDrive && roll < 0.9) {
-    if (lowPowerHighMeetDriveSkill > 0.32 && profile.launchAngle <= 22 && profile.exitVelocity <= 0.94 && roll < 0.24 + lowPowerHighMeetDriveSkill * 0.28) {
-      return makeHardOutfieldBounceHitResultFromProfile({
-        ...profile,
-        lowPowerHighMeetDriveSkill,
-        feedbackScore: Math.max(profile.feedbackScore ?? 0, quality)
-      });
-    }
-    if (lowPowerDropSkill > 0.34 && profile.launchAngle >= 20 && profile.launchAngle <= 28 && profile.exitVelocity <= 0.88 && roll < 0.12 + lowPowerDropSkill * 0.28) {
-      return makeLineDropResultFromProfile(profile);
-    }
-    if (isCleanCenterReturnCandidate(profile) && roll < 0.7 + quality * 0.22) return makeCenterReturnResultFromProfile(profile);
-    const sideDrive = Math.abs(profile.direction?.x ?? 0) > 0.045 || profile.lineEdgeScore > 0.018 || Math.abs(profile.timingPull ?? 0) > 0.085;
-    const lineEdgeGrounder = sideDrive
-      && profile.launchAngle <= 17
-      && profile.exitVelocity >= 0.44
-      && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.18
-      && (profile.lineEdgeScore > 0.01 || Math.abs(profile.direction?.x ?? 0) > 0.052);
-    const lineEdgeLiner = sideDrive
-      && profile.launchAngle <= 26
-      && profile.exitVelocity >= 0.48
-      && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.2
-      && (profile.lineEdgeScore > 0.012 || Math.abs(profile.direction?.x ?? 0) > 0.052);
-    if (lineEdgeGrounder && roll < 0.78 + profile.lineEdgeScore * 1.15) return makeLineEdgeGrounderResultFromProfile(profile);
-    if (lineEdgeLiner && roll < 0.98 + profile.lineEdgeScore * 1.05) return makeLineEdgeResultFromProfile(profile);
-    if (profile.fenceLinerScore > 0.22 && profile.exitVelocity >= 0.78 && roll < profile.fenceLinerScore + 0.12) return makeFenceLinerResultFromProfile(profile);
-    if (profile.launchAngle <= 18 && profile.gapScore > 0.2 && roll < 0.2 + profile.gapScore * 0.14) return makeGapGrounderResult(profile);
-    if (profile.launchAngle >= 13 && profile.exitVelocity >= 0.58 && roll < 0.42) return makeLineLinerResultFromProfile(profile);
-    if (lowPowerHighMeetDriveSkill > 0.3 && profile.launchAngle >= 11 && profile.launchAngle <= 22 && profile.exitVelocity <= 0.94 && roll < 0.32 + lowPowerHighMeetDriveSkill * 0.24) {
-      return makeHardOutfieldBounceHitResultFromProfile({
-        ...profile,
-        lowPowerHighMeetDriveSkill,
-        feedbackScore: Math.max(profile.feedbackScore ?? 0, quality)
-      });
-    }
-    if (profile.lineDropScore > 0.1 && roll < profile.lineDropScore + 0.44) return makeLineDropResultFromProfile(profile);
-    if (sideDrive && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.18 && roll < 0.96 + profile.lineEdgeScore * 1.18) return makeLineEdgeResultFromProfile(profile);
-    if (profile.launchAngle >= 16 && roll < 0.58 + profile.lineDropScore * 0.28) return makeLineDropResultFromProfile(profile);
-    return makeLineLinerResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle <= 17
-    && profile.exitVelocity >= 0.48
-    && quality >= 0.3
-    && profile.lineEdgeScore > 0.025
-    && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.34
-    && Math.abs(profile.direction?.x ?? 0) > 0.12
-    && roll < profile.lineEdgeScore + 0.78) {
-    return makeLineEdgeGrounderResultFromProfile(profile);
-  }
-
-  if (shouldRouteHardContactToOpenLane(profile, contact, roll)) {
-    return makeHardOpenLaneResult({
-      ...profile,
-      lowPowerHighMeetDriveSkill,
-      feedbackScore: Math.max(profile.feedbackScore ?? 0, quality)
-    });
-  }
-
-  if (easyCenterDrive && profile.launchAngle >= 4 && roll > centerDriveRoll) {
-    if (profile.launchAngle >= 16 && profile.launchAngle <= 30 && profile.exitVelocity >= 0.68 && roll < 0.46) {
-      return profile.lineEdgeScore > 0.12 && Math.abs(profile.direction?.x ?? 0) > 0.18
-        ? makeLineEdgeResultFromProfile(profile)
-        : makeLineDropResultFromProfile(profile);
-    }
-    if (powerDriveScore < 0.18) return makeGapLinerResult(profile);
-    if (shouldTurnModerateLiftIntoStrongHit(profile, profile.feedbackScore ?? quality)) {
-      return makeStrongFeedbackGroundDriveResult({
-        ...profile,
-        feedbackScore: Math.max(profile.feedbackScore ?? 0, quality)
-      });
-    }
-    return roll > centerDriveRoll + 0.22 && powerDriveScore >= 0.42 && sweetSpotScore >= 0.64
-      ? makeDeepDriveResultFromProfile(profile)
-      : makeFenceEdgeFlyResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle >= 30) {
-    if (profile.launchAngle <= 34 && profile.fenceLinerScore > 0.24 && profile.exitVelocity >= 0.82 && roll < profile.fenceLinerScore + 0.12) return makeFenceLinerResultFromProfile(profile);
-    if (profile.fenceEdgeFlyScore > 0.46 && roll < profile.fenceEdgeFlyScore * 0.22) return makeFenceEdgeFlyResultFromProfile(profile);
-    if (profile.chaseFlyScore > 0.26 && roll < profile.chaseFlyScore * 1.08) return makeChaseFlyResultFromProfile(profile);
-    if (profile.toweringFlyScore > 0.42 && roll < profile.toweringFlyScore) return makeToweringFlyResultFromProfile(profile);
-    if (profile.exitVelocity >= 1.12 && profile.carry >= 1.12 && roll > 0.56) return makeDeepDriveResultFromProfile(profile);
-    if (!inGoodContactZone && profile.launchAngle <= 38 && profile.exitVelocity >= 0.62 && quality >= 0.34) {
-      if (roll < 0.34 + sweetSpotScore * 0.08) return makeGapLinerResult(profile);
-    }
-    return makeRoutineFlyResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle <= 7) {
-    if (easyCenterHomerDrive && roll > 0.2) return makeDeepDriveResultFromProfile(profile);
-    if (easyCenterDrive && powerDriveScore >= 0.28 && sweetSpotScore >= 0.58 && roll > 0.24) return makeFenceEdgeFlyResultFromProfile(profile);
-    if (lowPowerHighMeetDriveSkill > 0.2 && profile.launchAngle >= 0 && profile.exitVelocity >= 0.42 && quality >= 0.22 && roll > 0.04) {
-      return makeHardOutfieldBounceHitResultFromProfile({
-        ...profile,
-        lowPowerHighMeetDriveSkill,
-        feedbackScore: Math.max(profile.feedbackScore ?? 0, quality),
-        launchAngle: Math.max(profile.launchAngle, 9)
-      });
-    }
-    if (isCleanCenterReturnCandidate(profile) && roll > 0.06) return makeCenterReturnGrounderResultFromProfile(profile);
-    if (profile.launchAngle >= 5 && profile.exitVelocity >= 0.56 && quality >= 0.34 && roll > 0.24) return makeLineLinerResultFromProfile(profile);
-    if (profile.exitVelocity >= 0.48 && (profile.gapScore > 0.16 || quality > 0.26 || Math.abs(profile.direction?.x ?? 0) > 0.11)) return makeGapGrounderResult(profile);
-    if (profile.launchAngle >= 4 && profile.exitVelocity >= 0.46 && roll > 0.58) return makeRoutineFlyResultFromProfile(profile);
-    return makeGrounderOutResultFromProfile(profile);
-  }
-
-  if (profile.exitVelocity < 0.44 || timingScore < 0.17 || zoneScore < 0.13) {
-    if (profile.launchAngle >= 12 && roll > 0.42) return makeRoutineFlyResultFromProfile(profile);
-    if (profile.launchAngle >= 8 && profile.exitVelocity >= 0.38 && roll > 0.62) return makeRoutineFlyResultFromProfile(profile);
-    return roll < 0.62
-      ? makeGrounderOutResultFromProfile(profile)
-      : roll < 0.82
-        ? makeRoutineFlyResultFromProfile(profile)
-        : makePopupFlyResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle < 15) {
-    if (easyCenterHomerDrive && roll > 0.22) return makeDeepDriveResultFromProfile(profile);
-    if (easyCenterDrive && powerDriveScore >= 0.28 && sweetSpotScore >= 0.58 && roll > 0.28) return makeFenceEdgeFlyResultFromProfile(profile);
-    if (lowPowerHighMeetDriveSkill > 0.18 && profile.launchAngle >= 4 && profile.exitVelocity >= 0.42 && roll < 0.68 + lowPowerHighMeetDriveSkill * 0.28) {
-      return makeHardOutfieldBounceHitResultFromProfile({
-        ...profile,
-        lowPowerHighMeetDriveSkill,
-        feedbackScore: Math.max(profile.feedbackScore ?? 0, quality)
-      });
-    }
-    if (isCleanCenterReturnCandidate(profile) && roll > 0.04) return makeCenterReturnResultFromProfile(profile);
-    if (profile.launchAngle >= 10 && profile.exitVelocity >= 0.56 && quality >= 0.32 && roll > 0.24) return makeLineLinerResultFromProfile(profile);
-    if (profile.exitVelocity >= 0.48 && profile.lineEdgeScore > 0.04 && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.45 && Math.abs(profile.direction?.x ?? 0) > 0.16 && roll < profile.lineEdgeScore + 0.68) return makeLineEdgeGrounderResultFromProfile(profile);
-    if (lowPowerDropSkill > 0.24 && profile.launchAngle >= 11 && profile.exitVelocity >= 0.48 && roll < 0.16 + lowPowerDropSkill * 0.28) {
-      return makeLowOutfieldHitResultFromProfile(profile);
-    }
-    if (profile.exitVelocity >= 0.44 || sweetSpotScore > 0.26 || (profile.gapScore > 0.18 && roll < 0.86)) return makeGapGrounderResult(profile);
-    if (profile.launchAngle >= 10 && profile.exitVelocity >= 0.42 && roll > 0.52) return makeRoutineFlyResultFromProfile(profile);
-    if (profile.launchAngle >= 9 && profile.exitVelocity >= 0.52 && quality >= 0.28 && roll > 0.48) return makeGapLinerResult(profile);
-    return profile.exitVelocity >= 0.43 || sweetSpotScore > 0.24 || (profile.gapScore > 0.17 && roll < 0.86)
-      ? makeGapGrounderResult(profile)
-      : makeGrounderOutResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle <= 29) {
-    if (easyCenterHomerDrive && roll > 0.34) return makeDeepDriveResultFromProfile(profile);
-    if (profile.launchAngle >= 20 && easyCenterDrive && powerDriveScore >= 0.18) {
-      if (roll > 0.58 && sweetSpotScore >= 0.58) {
-        return shouldTurnModerateLiftIntoStrongHit(profile, profile.feedbackScore ?? quality)
-          ? makeStrongFeedbackGroundDriveResult({ ...profile, feedbackScore: Math.max(profile.feedbackScore ?? 0, quality) })
-          : makeFenceEdgeFlyResultFromProfile(profile);
-      }
-      if (roll > 0.38 && powerDriveScore >= 0.42 && sweetSpotScore >= 0.68) return makeDeepDriveResultFromProfile(profile);
-    }
-    if (profile.launchAngle >= 24 && profile.exitVelocity >= 0.96 && profile.carry >= 0.84 && quality >= 0.56 && sweetSpotScore >= 0.72) {
-      if (roll > 0.6) {
-        return shouldTurnModerateLiftIntoStrongHit(profile, profile.feedbackScore ?? quality)
-          ? makeStrongFeedbackGroundDriveResult({ ...profile, feedbackScore: Math.max(profile.feedbackScore ?? 0, quality) })
-          : makeFenceEdgeFlyResultFromProfile(profile);
-      }
-      if (roll > 0.42) return makeDeepDriveResultFromProfile(profile);
-    }
-    if (!inGoodContactZone && profile.launchAngle >= 22 && profile.exitVelocity < 0.82 && roll < 0.42) {
-      return makeRoutineFlyResultFromProfile(profile);
-    }
-    if (profile.launchAngle >= 23 && profile.exitVelocity < 0.98 && quality < 0.58 && roll > 0.76) {
-      return makeRoutineFlyResultFromProfile(profile);
-    }
-    if (!inGoodContactZone && profile.frontDropScore > 0.22 && roll < profile.frontDropScore + 0.06) return makeFrontDropResultFromProfile(profile);
-    if (profile.fenceLinerScore > 0.22 && roll < profile.fenceLinerScore + 0.16) return makeFenceLinerResultFromProfile(profile);
-    if (lowPowerDropSkill > 0.18 && profile.exitVelocity <= 0.94 && profile.launchAngle >= 16 && profile.launchAngle <= 28 && roll < 0.2 + lowPowerDropSkill * 0.56) {
-      return profile.launchAngle >= 21 || roll < 0.12 + lowPowerDropSkill * 0.26
-        ? makeLineDropResultFromProfile(profile)
-        : makeFrontDropResultFromProfile(profile);
-    }
-    if (!inGoodContactZone && (profile.oppositeFieldContact ?? 0) > 0.28 && profile.lineDropScore > 0.18 && roll < profile.lineDropScore + profile.oppositeFieldContact * 0.22) {
-      return makeLineDropResultFromProfile(profile);
-    }
-    if (profile.launchAngle <= 17 && profile.exitVelocity >= 0.46 && profile.lineEdgeScore > 0.025 && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.34 && Math.abs(profile.direction?.x ?? 0) > 0.12 && roll < profile.lineEdgeScore + 0.78) {
-      return makeLineEdgeGrounderResultFromProfile(profile);
-    }
-    if (isCleanCenterReturnCandidate(profile) && roll < 0.68 + quality * 0.16) return makeCenterReturnResultFromProfile(profile);
-    if (profile.launchAngle <= 26 && profile.exitVelocity >= 0.5 && profile.lineEdgeScore > 0.015 && profile.lineEdgeScore >= (profile.lineDropScore ?? 0) * 0.36 && Math.abs(profile.direction?.x ?? 0) > 0.12 && roll < profile.lineEdgeScore + 0.94) {
-      return makeLineEdgeResultFromProfile(profile);
-    }
-    if (isHardOutfieldBounceCandidate(profile, quality) && roll < 0.48 + quality * 0.18) {
-      return makeHardOutfieldBounceHitResultFromProfile(profile);
-    }
-    if (quality >= 0.28 && profile.launchAngle >= 12 && profile.exitVelocity >= 0.48 && profile.lineEdgeScore > 0.025 && roll < profile.lineEdgeScore + 0.76) {
-      return makeLineEdgeResultFromProfile(profile);
-    }
-    if (quality >= 0.28 && profile.launchAngle >= 12 && profile.exitVelocity >= 0.5 && profile.lineDropScore > 0.06 && roll < profile.lineDropScore + 0.58) {
-      return makeLineDropResultFromProfile(profile);
-    }
-    if (quality >= 0.28 && profile.launchAngle >= 9 && profile.lineLinerScore > 0.05 && roll < profile.lineLinerScore + 0.58) {
-      return makeLineLinerResultFromProfile(profile);
-    }
-    if (profile.launchAngle <= 18 && profile.exitVelocity >= 0.5 && quality >= 0.28 && (profile.gapScore > 0.16 || Math.abs(profile.direction?.x ?? 0) > 0.1) && roll < 0.72 + profile.gapScore * 0.24) {
-      return makeGapGrounderResult(profile);
-    }
-    if (!inGoodContactZone && profile.launchAngle <= 18 && profile.exitVelocity >= 0.5 && (profile.gapScore > 0.18 || quality >= 0.22) && roll < 0.7 + profile.gapScore * 0.3) {
-      return makeGapGrounderResult(profile);
-    }
-    if (!inGoodContactZone && profile.lineEdgeScore > 0.18 && roll < profile.lineEdgeScore + 0.28) return makeLineEdgeResultFromProfile(profile);
-    if (quality >= 0.24 && profile.lineEdgeScore > 0.1 && profile.exitVelocity >= 0.48 && roll < profile.lineEdgeScore + 0.42) return makeLineEdgeResultFromProfile(profile);
-    if (!inGoodContactZone && (profile.oppositeFieldContact ?? 0) > 0.28 && profile.lineDropScore > 0.24 && roll < profile.lineDropScore + profile.oppositeFieldContact * 0.08) return makeLineDropResultFromProfile(profile);
-    if (!inGoodContactZone && profile.lineDropScore > 0.16 && profile.exitVelocity < 1.06 && roll < profile.lineDropScore + 0.16) return makeLineDropResultFromProfile(profile);
-    if (quality >= 0.26 && profile.lineDropScore > 0.12 && profile.exitVelocity < 1.1 && roll < profile.lineDropScore + 0.2) return makeLineDropResultFromProfile(profile);
-    if (!inGoodContactZone && profile.lineLinerScore > 0.2 && roll < profile.lineLinerScore + 0.22) return makeLineLinerResultFromProfile(profile);
-    if (!inGoodContactZone && profile.frontDropScore > 0.16 && roll < profile.frontDropScore + 0.12) return makeFrontDropResultFromProfile(profile);
-    if (profile.exitVelocity >= 0.62 && quality >= 0.34) return makeLineLinerResultFromProfile(profile);
-    if (profile.launchAngle >= 18 && profile.exitVelocity >= 0.56 && quality >= 0.28) return makeLineLinerResultFromProfile(profile);
-    if (profile.exitVelocity >= 0.5 && profile.lineLinerScore > 0.06) return makeLineLinerResultFromProfile(profile);
-    if (profile.exitVelocity >= 0.46 && roll < 0.5 + sweetSpotScore * 0.08) {
-      return inGoodContactZone
-        ? makeLowOutfieldHitResultFromProfile(profile)
-        : makeFrontDropResult(profile);
-    }
-    return profile.exitVelocity >= 0.52 ? makeGapLinerResult(profile) : makeRoutineFlyResultFromProfile(profile);
-  }
-
-  if (profile.launchAngle >= 29 && profile.fenceEdgeFlyScore > 0.52 && roll < profile.fenceEdgeFlyScore * 0.2) return makeFenceEdgeFlyResultFromProfile(profile);
-  if (profile.launchAngle >= 29 && profile.launchAngle <= 34 && profile.fenceLinerScore > 0.22 && roll < profile.fenceLinerScore + 0.08) return makeFenceLinerResultFromProfile(profile);
-  if (profile.launchAngle >= 27 && profile.chaseFlyScore > 0.18 && roll < profile.chaseFlyScore * 1.08) return makeChaseFlyResultFromProfile(profile);
-  if (profile.launchAngle >= 29 && profile.exitVelocity >= 0.74 && roll < 0.62) return makeRoutineFlyResultFromProfile(profile);
-  if (profile.exitVelocity >= 0.68 && quality >= 0.38) return makeGapLinerResult(profile);
-  if (profile.exitVelocity >= 0.98 && quality >= 0.62 && sweetSpotScore >= 0.74 && powerDriveScore >= 0.48) return makeDeepDriveResultFromProfile(profile);
-  return makeRoutineFlyResultFromProfile(profile);
-}
 
 function shouldRouteHardContactToOpenLane(profile, contact, roll) {
   if (!profile || !contact) return false;
@@ -7774,7 +7151,7 @@ function buildBattedBallProfile(contact) {
   const handednessContactBoost = handednessContactMultiplier - 1;
   const practicePitcherContactBoost = (gameMode === "practice" || isHomeRunDerbyMode()) && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
   const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 5.1) * 0.88 : 0;
-  const zoneEdgeDrag = inGoodContactZone ? (Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22) * 1.5 : 0;
+  const zoneEdgeDrag = inGoodContactZone ? (Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22) * 0.08 : 0;
   const centerSweetSpotDriveBoost = inGoodContactZone ? zoneCenterBoost * clamp((sweetSpotScore - 0.42) / 0.48, 0, 1) : 0;
   const pitchQualityBoost = inGoodContactZone ? -0.04 + Math.pow(zoneScore, 4.1) * 0.2 + zoneCenterBoost : -0.62 - (1 - zoneScore) * 0.48 - goodZoneMissDrag * 0.46;
   const outsideZoneDrag = !inGoodContactZone ? clamp(0.5 + goodZoneMissDrag * 0.82, 0.5, 1.65) : 0;
@@ -7792,7 +7169,7 @@ function buildBattedBallProfile(contact) {
   const yellowDriveScore = yellowZoneBoost > 0
     ? yellowZoneBoost * clamp((quality - 0.42) / 0.36, 0, 1) * clamp((sweetSpotScore - 0.52) / 0.34, 0, 1)
     : 0;
-  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.42 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 1.28 + goodZoneMissDrag * 0.86 + rescueContactDrag * 0.72;
+  const qualityDrag = sweetSpotMiss * (0.17 + lowMeetPressure * 0.13) + chasePenalty * 0.42 + stuffPressure + outsideZoneDrag * 1.22 + zoneEdgeDrag * 0.45 + goodZoneMissDrag * 0.86 + rescueContactDrag * 0.72;
   const centerDriveScore = inGoodContactZone
     ? clamp((zoneScore - 0.74) / 0.26, 0, 1) * clamp((quality - 0.1) / 0.38, 0, 1) * clamp((sweetSpotScore - 0.1) / 0.54, 0, 1)
     : 0;
@@ -7815,7 +7192,7 @@ function buildBattedBallProfile(contact) {
     : 0;
   const yellowDriveLiftAssist = yellowDriveScore * yellowZoneHitTuning.driveLiftAssist;
   const hardContactLiftAssist = hardLiftScore * (inGoodContactZone ? 22 : 14);
-  const liftBoost = hittableLiftBoost + readableQuality * 9.4 + sweetSpotScore * 6.6 + sweetSpotCenterBoost * 10 + centerDriveLiftAssist + yellowDriveLiftAssist + hardContactLiftAssist + lowStuffProfileBoost * 12 - yellowLiftDamping - outsideZoneDrag * 46 - zoneEdgeDrag * 38 - goodZoneMissDrag * 30;
+  const liftBoost = hittableLiftBoost + readableQuality * 9.4 + sweetSpotScore * 6.6 + sweetSpotCenterBoost * 10 + centerDriveLiftAssist + yellowDriveLiftAssist + hardContactLiftAssist + lowStuffProfileBoost * 12 - yellowLiftDamping - outsideZoneDrag * 46 - zoneEdgeDrag * 12 - goodZoneMissDrag * 30;
   const mishitLift = Math.max(0, sweetSpotMiss - 0.6) * 20 + lowMeetPressure * sweetSpotMiss * 5;
   const launchAngle = clamp(
     2
@@ -7834,7 +7211,7 @@ function buildBattedBallProfile(contact) {
     68
   );
   const spin = clamp((1 - sweetSpotScore) * 0.58 + Math.abs(timingPull) * 0.3 + (!inGoodContactZone ? 0.18 : 0), 0, 1.35);
-  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.01 + Math.pow(zoneScore, 4.2) * 0.12 + centerDriveScore * (0.3 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.86) + centerMistakeDrive * (0.16 + powerDriveScore * 0.28) + zoneCenterBoost * 0.72 + centerSweetSpotDriveBoost * 0.24 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.08 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.56 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 1.05 - goodZoneMissDrag * 0.52 - weakGrounderBias * 0.045, 0.08, 1.85);
+  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.01 + Math.pow(zoneScore, 4.2) * 0.12 + centerDriveScore * (0.3 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.86) + centerMistakeDrive * (0.16 + powerDriveScore * 0.28) + zoneCenterBoost * 0.72 + centerSweetSpotDriveBoost * 0.24 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.08 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.56 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 0.35 - goodZoneMissDrag * 0.52 - weakGrounderBias * 0.045, 0.08, 1.85);
   const direction = getPhysicsHitDirection(timingPull, spin, launchAngle);
   const gapScore = clamp(exitVelocity * 0.46 + sweetSpotScore * 0.3 + zoneScore * 0.22 - spin * 0.18 + Math.abs(direction.x) * 0.14, 0, 1);
   const lineContact = clamp((Math.abs(timingPull) - 0.28) / 0.58, 0, 1);
@@ -7979,7 +7356,6 @@ function buildBattedBallProfile(contact) {
       : solidBuntContact
       ? clamp(buntTuning.solidPitcherFrontChance + (buntContactScore - buntTuning.solidFeedback) * 0.42, 0.68, 0.76)
       : clamp(0.32 + buntContactScore * 0.5, 0.32, 0.52);
-    const noAimPitcherFrontBoost = hasAim ? 0 : 0.22;
     const roll = Math.random();
     const side = aimedSide || (Math.random() < 0.5 ? -1 : 1);
     const aimAssist = aimedSide ? 0.16 + buntMeetSkill * 0.08 : 0;
@@ -8029,7 +7405,7 @@ function buildBattedBallProfile(contact) {
       ? goodBunt
         ? normalize({ x: side * randomBetween(0.95 + aimAssist, 1.25 + aimAssist), y: -randomBetween(0.42, 0.66) })
         : normalize({ x: side * randomBetween(0.72 + aimAssist * 0.7, 1.02 + aimAssist * 0.7), y: -randomBetween(0.58, 0.82) })
-      : roll < lineChance + clamp(pitcherFrontChance + noAimPitcherFrontBoost, 0, 0.9)
+      : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92 + aimAssist, 1.18 + aimAssist), y: -randomBetween(0.38, 0.68) });
     const noAimPowerBoost = hasAim ? 0 : 0.1;
@@ -8069,8 +7445,8 @@ function buildBattedBallProfile(contact) {
       buntAimControl: aimControlScore,
       buntHasAim: hasAim,
       buntAimY,
-      buntLineChance: lineChance,
-      buntPitcherFrontChance: pitcherFrontChance,
+      buntLineChance: pitcherBuntPopup || noAimPitcherFront ? 0 : lineChance,
+      buntPitcherFrontChance: pitcherBuntPopup ? 0 : noAimPitcherFront ? 1 : pitcherFrontChance,
       buntFoulChance,
       badBuntScore,
       pitcherBuntPopupChance,
@@ -8665,9 +8041,6 @@ function getOutfieldBounceLaneDirection(profile) {
   });
 }
 
-function makeHitResult(scoreType, power) {
-  return { label: hitLabels[scoreType], kind: "hit", power, scoreType };
-}
 
 function makeDeepDriveResult(contact, bonus = 0) {
   const batterPower = getEffectiveBatterPower(activeBatter);
@@ -9497,7 +8870,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
     return;
   }
   const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
-  const manualFielding = false;
+  const manualFielding = isManualDefenseControl();
   let chosenFielder = battedBall.isBunt ? chooseBuntDefenseFielder(fielders, battedBall) : chooseDefenseFielder(fielders, battedBall);
   const runner = createBatterRunner(activeBatter);
   let outcome = resolveDefenseOutcome(chosenFielder, battedBall, runner);
@@ -9562,13 +8935,13 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   let throwState = manualFielding
     ? null
     : createThrowState(chosenFielder, fieldingTarget, outcome, runner, {
-      manualWait: isManualDefenseControl(),
+      manualWait: isManualThrowControl(),
       targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, runner, {
         fielder: chosenFielder,
         fieldingTarget,
         baseRunners,
         minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, chosenFielder),
-        autoFallback: !isManualDefenseControl()
+        autoFallback: !isManualThrowControl()
       }),
       baseRunners,
       minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, chosenFielder)
@@ -10585,7 +9958,7 @@ function retargetDefenseThrowToBatterRunner(elapsedSeconds = 0) {
     )
   };
   defenseState.throw = createThrowState(defenseState.chosenFielder, defenseState.target, defenseState.outcome, runner, {
-    manualWait: isManualDefenseControl(),
+    manualWait: isManualThrowControl(),
     minStartTime: getFieldingTimeForThrowDecision(
       defenseState.outcome,
       defenseState.battedBall,
@@ -10658,7 +10031,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
 
 function canManualDefenseThrow(targetBase) {
   if (!targetBase || !defenseState.throw || !defenseState.outcome?.needsThrow) return false;
-  if (gamePhase !== "defense" || !isManualDefenseControl() || !defenseState.active || defenseState.resolved) return false;
+  if (gamePhase !== "defense" || !isManualThrowControl() || !defenseState.active || defenseState.resolved) return false;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   if (!Number.isFinite(defenseState.throw.startTime)) {
     return defenseState.throw.manualWait || elapsedSeconds < defenseState.throw.holdDeadline || !isBatterRunnerSettledForResolution();
@@ -12097,19 +11470,6 @@ function shouldReducePowerHitterHomeRunToWallHit(traits = {}) {
   return Math.random() < conversionChance;
 }
 
-function getHomeRunDistanceSeparationBonus({ contactScore = 0.5, profileExitVelocity = 1, profileCarry = 1, power = 1.2 } = {}) {
-  const quality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
-  const powerQuality = clamp((power - 1.22) / 1.22, 0, 1);
-  const exitQuality = clamp((profileExitVelocity - 0.9) / 0.72, 0, 1);
-  const carryQuality = clamp((profileCarry - 0.92) / 0.78, 0, 1);
-  const eliteContact = clamp((contactScore - 0.78) / 0.22, 0, 1);
-  return Math.pow(quality, 2.25) * 250
-    + Math.pow(powerQuality, 1.35) * 155
-    + Math.pow(exitQuality, 1.35) * 130
-    + Math.pow(carryQuality, 1.35) * 120
-    + eliteContact * 190;
-}
-
 function getHomeRunBallSpeedScale({ contactScore = 0.5, profileExitVelocity = 1, power = 1.2, flightDistance = 0, fenceTravelDistance = defenseField.fenceDistance, isLiner = false } = {}) {
   if (isLiner) return 0.96 + getHomeRunQuality({ contactScore, profileExitVelocity, power }) * 0.14;
   const quality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
@@ -12224,6 +11584,8 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
   const carryQuality = clamp((profileCarry - 0.88) / 0.78, 0, 1);
   const powerQuality = clamp((power - 1.18) / 1.22, 0, 1);
   const eliteQuality = clamp((quality - 0.82) / 0.18, 0, 1);
+  const lowPowerCarryPenaltyMeters = clamp((5 - batterHomeRunPower.standardPower) / 4, 0, 1) * 14;
+  const batterPowerCarryMeters = batterHomeRunPower.standardDrive * 12;
   const ordinaryCarryCompression = clamp((rawMeters - 118) / 48, 0, 1) * (0.34 + (1 - eliteQuality) * 0.22);
   const compressedRawMeters = rawMeters - Math.max(0, rawMeters - 118) * ordinaryCarryCompression;
   const rawCarryMeters = Math.max(0, rawMeters - 98) * clamp(0.025 + quality * 0.055 + exitQuality * 0.018, 0.025, 0.1);
@@ -12236,6 +11598,8 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
     + Math.pow(carryQuality, 1.25) * 2.5 * modestFlyFactor
     + Math.pow(powerQuality, 1.2) * 2.5 * modestFlyFactor
     + Math.pow(eliteQuality, 1.55) * 18
+    + batterPowerCarryMeters * modestFlyFactor
+    - lowPowerCarryPenaltyMeters * modestFlyFactor
     + batterHomeRunPower.carryBonusMeters * modestFlyFactor;
   const styleBonus = traits.isFenceEdgeFly
     ? -7
@@ -12254,7 +11618,10 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
       ? 140 + clamp((contactScore - 0.7) / 0.1, 0, 1) * 10 + exitQuality * 2.5 + carryQuality * 2.5
       : 152 + clamp((contactScore - 0.8) / 0.2, 0, 1) * 18 + exitQuality * 4 + carryQuality * 4;
   const minimumOverFenceMeters = fenceMeters + (contactScore >= 0.8 ? 4 : 2);
-  const absoluteMaximumMeters = 180 + batterHomeRunPower.superPower * 1.6;
+  const absoluteMaximumMeters =
+    142
+    + batterHomeRunPower.standardPower * 3.8
+    + batterHomeRunPower.superPower * 1.6;
   const maximumMeters = clamp(
     Math.max(minimumOverFenceMeters, scoreLimitedMaximumMeters + batterHomeRunPower.carryBonusMeters),
     0,
@@ -13152,7 +12519,9 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
     : Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
   const runDistance = Math.max(0, distanceToTarget - adjustedFielderReach);
   const reactionDelay = getFielderReactionDelay(fielder);
-  const fielderTime = reactionDelay + runDistance / speed;
+  const fielderTime = runDistance <= 0
+    ? 0
+    : reactionDelay + runDistance / speed;
   const ballTime = battedBall.ballTime;
   const routeProgress = getBattedBallRouteProgressForPoint(fieldingPoint, battedBall);
   const useRouteArrivalTime = isInfielderRole(fielder.role)
@@ -13167,210 +12536,6 @@ function resolveDefenseOutcome(fielder, battedBall, runner = null) {
     return makeStrictCircleCatchOutcome(fielder, battedBall, fieldingPoint, strictFieldingTime, runner);
   }
   return makeStrictCircleMissOutcome(fielder, battedBall, fieldingPoint, fielderTime, fieldingPointBallTime);
-  const grounderPenalty = battedBall.isGrounder
-    ? isTemporaryInfielderRole(fielder.role)
-      ? 0.2 + (battedBall.grounderGap ? clamp(0.24 - getFielderFieldingRating(fielder) * 0.018, 0.04, 0.2) : 0)
-      : 0.55
-      : battedBall.isLiner
-        ? isTemporaryInfielderRole(fielder.role) ? 0.18 : 0.08
-      : 0;
-  const canField = fielderTime <= fieldingPointBallTime - grounderPenalty + defenseRangeTuning.nearMissCatchGrace;
-  const relation = getBattedBallFielderRelation(fielder, { ...battedBall, target: fieldingPoint });
-  const fielderFielding = getFielderFieldingRating(fielder);
-  const routeBodyCatch = getInfielderRouteBodyCatch(fielder, battedBall, fieldingPoint);
-  const frontGrounderPickup = getInfielderFrontGrounderPickup(fielder, battedBall, fieldingPoint, relation);
-  const guaranteedSlowPickup = getGuaranteedSlowInfieldGrounderPickup(fielder, battedBall, fieldingPoint);
-  const guaranteedSlowDropPlay = getGuaranteedSlowInfieldDropPlay(fielder, battedBall, fieldingPoint);
-
-  if (guaranteedSlowDropPlay.handled) {
-    return makeSlowInfieldDropOutcome(fielder, guaranteedSlowDropPlay, fieldingPoint, runner);
-  }
-  if (isInfielderRole(fielder.role) && isSlowInfieldDropBall(battedBall)) {
-    return resolveDroppedBallOutcome(fielder, battedBall, relation);
-  }
-  if (guaranteedSlowPickup.caught) {
-    return makeInfieldGrounderPickupOutcome(fielder, guaranteedSlowPickup.fieldingTime, fieldingPoint, runner);
-  }
-  if (isInfielderRole(fielder.role) && isSlowInfieldBounceGrounder(battedBall)) {
-    return resolveDroppedBallOutcome(fielder, battedBall, relation);
-  }
-
-  if (routeBodyCatch.caught) {
-    const fieldingTime = Math.max(fieldingPointBallTime, Math.min(fielderTime, fieldingPointBallTime + routeBodyCatch.timeGrace));
-    const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-    if (fieldingError.error) return makeFieldingErrorOutcome(fielder, battedBall, fieldingTime, fieldingPoint);
-    if (battedBall.isGrounder && runner) {
-      return { kind: "force", label: `${fielder.role} 正面ゴロ処理`, caught: true, needsThrow: true, fieldingTime, fieldingPoint };
-    }
-    return { kind: "out", label: `${fielder.role} 正面捕球`, caught: true, needsThrow: false, fieldingTime, fieldingPoint };
-  }
-
-  if (frontGrounderPickup.caught) {
-    const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-    if (fieldingError.error) return makeFieldingErrorOutcome(fielder, battedBall, frontGrounderPickup.fieldingTime, fieldingPoint);
-    if (runner) {
-      return makeInfieldGrounderPickupOutcome(fielder, frontGrounderPickup.fieldingTime, fieldingPoint, runner, "正面ゴロ処理");
-    }
-    return { kind: "out", label: `${fielder.role} 正面ゴロ処理`, caught: true, needsThrow: false, fieldingTime: frontGrounderPickup.fieldingTime, fieldingPoint };
-  }
-
-  if (battedBall.grounderGap && isTemporaryInfielderRole(fielder.role) && fielderFielding < 5 && relation.sideGap > 110) {
-    return resolveDroppedBallOutcome(fielder, battedBall, relation);
-  }
-
-  const closeCatch = getCloseHardBallCatch(fielder, battedBall, fieldingPoint);
-  if (!canField && closeCatch.caught) {
-    const fieldingTime = Math.max(fieldingPointBallTime, Math.min(fielderTime, fieldingPointBallTime + 0.12));
-    const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-    if (fieldingError.error) return makeFieldingErrorOutcome(fielder, battedBall, fieldingTime, fieldingPoint);
-    if (battedBall.isGrounder && runner) {
-      return { kind: "force", label: `${fielder.role} 反応捕球`, caught: true, needsThrow: true, fieldingTime, fieldingPoint };
-    }
-    return { kind: "out", label: `${fielder.role} 反応捕球`, caught: true, needsThrow: false, fieldingTime, fieldingPoint };
-  }
-
-  const difficultCatch = getDifficultHardBallCatch(fielder, battedBall, fielderTime, fieldingPointBallTime);
-  if (!canField && difficultCatch.caught) {
-    const fieldingTime = Math.max(fieldingPointBallTime, fielderTime);
-    const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-    if (fieldingError.error) return makeFieldingErrorOutcome(fielder, battedBall, fieldingTime, fieldingPoint);
-    if (battedBall.isGrounder && runner) {
-      return { kind: "force", label: `${fielder.role} 好捕`, caught: true, needsThrow: true, fieldingTime, fieldingPoint };
-    }
-    return { kind: "out", label: `${fielder.role} 好捕`, caught: true, needsThrow: false, fieldingTime, fieldingPoint };
-  }
-
-  if (battedBall.isLineLiner) {
-    if (!isInfielderRole(fielder.role)) {
-      const lineLandingDistance = battedBall.landingDistance ?? battedBall.distance ?? 0;
-      const lineTotalDistance = Math.max(1, battedBall.distance ?? lineLandingDistance);
-      const landingRatio = lineLandingDistance / lineTotalDistance;
-      if (landingRatio <= 0.68) {
-        const deepEnoughForExtraBase = lineLandingDistance > defenseField.fenceDistance * 0.58;
-        return {
-          kind: deepEnoughForExtraBase ? "double" : "single",
-          label: deepEnoughForExtraBase ? hitLabels.double : hitLabels.single,
-          scoreType: deepEnoughForExtraBase ? "double" : "single",
-          caught: false,
-          fieldingTime: Math.max(ballTime + 0.18, fielderTime + 0.12),
-          fieldingPoint
-        };
-      }
-    }
-    const reactionWindow = ballTime + 0.04 + (fielder.fielding ?? 5) * 0.012;
-      if (fielderTime <= reactionWindow) {
-      return { kind: "out", label: `${fielder.role} ライン際好捕`, caught: true, needsThrow: false, fieldingTime: Math.max(ballTime, fielderTime), fieldingPoint };
-    }
-    return { kind: "double", label: hitLabels.double, scoreType: "double", caught: false, fieldingTime: ballTime };
-  }
-
-  if (battedBall.isLineDrop) {
-    const catchWindow = ballTime - 0.1 + (fielder.fielding ?? 5) * 0.018;
-    if (fielder.role !== "P" && fielderTime <= catchWindow) {
-      return { kind: "out", label: `${fielder.role} スライディング捕球`, caught: true, needsThrow: false, fieldingTime: ballTime, fieldingPoint };
-    }
-    return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: Math.max(ballTime, fielderTime + 0.18) };
-  }
-
-  if (battedBall.isChaseFly) {
-    const chaseWindow = ballTime + 0.18 + (fielder.fielding ?? 5) * 0.024;
-    if (fielder.role !== "P" && fielderTime <= chaseWindow) {
-      return { kind: "out", label: `${fielder.role} 追いついた`, caught: true, needsThrow: false, fieldingTime: Math.max(ballTime, fielderTime), fieldingPoint };
-    }
-    const missDistance = Math.max(0, fielder.distanceToTarget - getFielderSpeed(fielder) * Math.max(0, ballTime - reactionDelay));
-    return missDistance > 190
-      ? { kind: "triple", label: hitLabels.triple, scoreType: "triple", caught: false, fieldingTime: ballTime }
-      : { kind: "double", label: hitLabels.double, scoreType: "double", caught: false, fieldingTime: ballTime };
-  }
-
-  if (battedBall.isSoftDrop && fielder.role !== "P") {
-    const softDropCatchWindow = ballTime + 0.04 + fielderFielding * 0.018;
-    if (fielderTime <= softDropCatchWindow && fielderFielding >= 6) {
-      return { kind: "out", label: `${fielder.role} 前進捕球`, caught: true, needsThrow: false, fieldingTime: Math.max(ballTime, fielderTime), fieldingPoint };
-    }
-    const pickupTime = Math.max(ballTime + 0.12, fielderTime + 0.08);
-    return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: pickupTime, fieldingPoint };
-  }
-
-  if (battedBall.isDeepDrive && !battedBall.isSuperDeepDrive && !battedBall.wallHit && !battedBall.fenceOver) {
-    const scoreType = battedBall.landingDistance > defenseField.doubleDistance * 0.58 ? "double" : "single";
-    return {
-      kind: scoreType,
-      label: hitLabels[scoreType],
-      scoreType,
-      caught: false,
-      fieldingTime: Math.max(ballTime + 0.1, fielderTime + 0.08),
-      fieldingPoint
-    };
-  }
-
-  if (battedBall.isHardOutfieldBounce && !isInfielderRole(fielder.role)) {
-    const landingDistance = battedBall.landingDistance ?? getFenceDistance(battedBall.target);
-    const scoreType = landingDistance >= defenseField.fenceDistance * 0.62 ? "double" : "single";
-    return {
-      kind: scoreType,
-      label: hitLabels[scoreType],
-      scoreType,
-      caught: false,
-      fieldingTime: Math.max(ballTime + 0.16, fielderTime + 0.1),
-      fieldingPoint
-    };
-  }
-
-  if (isCatchableOutfieldFly(battedBall, fielder, fielderTime, ballTime)) {
-    return { kind: "out", label: `${fielder.role} 追いついた`, caught: true, needsThrow: false, fieldingTime: Math.max(ballTime, fielderTime), fieldingPoint };
-  }
-
-  if (canField) {
-    const fieldingError = getHardShotFieldingError(fielder, battedBall, relation);
-    if (fieldingError.error) {
-      return makeFieldingErrorOutcome(fielder, battedBall, fieldingPointBallTime, fieldingPoint);
-    }
-    if (fielder.role === "P") {
-      if (battedBall.isGrounder && runner) {
-        return { kind: "force", label: "P ゴロ処理", caught: true, needsThrow: true, fieldingTime: ballTime, fieldingPoint };
-      }
-      return { kind: "out", label: "P 捕球", caught: true, needsThrow: false, fieldingTime: ballTime, fieldingPoint };
-    }
-    const straightAtFielder = relation.sideGap < 92;
-    if (battedBall.isGrounder) {
-      const grounderFieldingTime = Math.max(fieldingPointBallTime, fielderTime);
-      if ((straightAtFielder || isTemporaryInfielderRole(fielder.role)) && runner) {
-        return { kind: "force", label: `${fielder.role} バウンド捕球`, caught: true, needsThrow: true, fieldingTime: grounderFieldingTime, fieldingPoint };
-      }
-      return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: grounderFieldingTime, fieldingPoint };
-    }
-    if (battedBall.isLiner && !straightAtFielder && !isTemporaryInfielderRole(fielder.role)) {
-      return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: ballTime };
-    }
-    if (battedBall.isLiner && isTemporaryInfielderRole(fielder.role)) {
-      const linerCatchWidth = 46 + fielderFielding * 3.4 - Math.max(0, (battedBall.power ?? 0.7) - 0.78) * 46;
-      if (relation.sideGap > linerCatchWidth) {
-        return resolveDroppedBallOutcome(fielder, battedBall, relation);
-      }
-    }
-    return { kind: "out", label: `${fielder.role} 捕球`, caught: true, needsThrow: false, fieldingTime: ballTime, fieldingPoint };
-  }
-  if (battedBall.isGrounder) {
-    const pickupTime = Math.max(fieldingPointBallTime + 0.08, fielderTime + 0.12);
-    const routeGap = Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
-    if (isTemporaryInfielderRole(fielder.role) && routeGap <= defenseRangeTuning.infielderGrounderRouteReach && runner) {
-      return { kind: "force", label: `${fielder.role} 好捕`, caught: true, needsThrow: true, fieldingTime: pickupTime, fieldingPoint };
-    }
-    if (fielder.role === "P" && isPitcherHandledGrounder(battedBall)) {
-      return { kind: "force", label: "P ゴロ処理", caught: true, needsThrow: true, fieldingTime: pickupTime, fieldingPoint };
-    }
-    if ((relation.sideGap < 92 || isTemporaryInfielderRole(fielder.role)) && runner) {
-      return { kind: "force", label: `${fielder.role} バウンド捕球`, caught: true, needsThrow: true, fieldingTime: pickupTime, fieldingPoint };
-    }
-  }
-  if (relation.splitsGap) return { kind: "double", label: hitLabels.double, scoreType: "double", caught: false };
-  if (relation.landsInFront) return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false };
-  if (battedBall.isGrounder || battedBall.isLiner) {
-    return resolveDroppedBallOutcome(fielder, battedBall, relation);
-  }
-  if (battedBall.isDeep || battedBall.distance > defenseField.doubleDistance) return { kind: "double", label: hitLabels.double, scoreType: "double", caught: false };
-  return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false };
 }
 
 function isCatchableOutfieldFly(battedBall, fielder, fielderTime, ballTime) {
@@ -13478,6 +12643,7 @@ function updateDefensePlay(now) {
   resolveUnifiedFielderCircleCatch(elapsedSeconds);
   resolveUnifiedCircleMissAfterArrival(elapsedSeconds);
   updateDefenseLandingMissVisual(elapsedSeconds);
+  showImmediateCatchOutCall(elapsedSeconds);
 
   if (shouldResolveDefensePlayNow(elapsedSeconds)) {
     finishDefensePlay();
@@ -13582,7 +12748,7 @@ function completeUnifiedCircleCatch(fielder, fieldingPoint, elapsedSeconds) {
   }
 
   if (defenseState.manualFielding) {
-    completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPoint);
+    completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPoint, caughtInAir);
     return;
   }
   completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAir);
@@ -13739,7 +12905,7 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   if (outcome.needsThrow) {
     defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
-      manualWait: isManualDefenseControl(),
+      manualWait: isManualThrowControl(),
       targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner),
       baseRunners: defenseState.baseRunners,
       minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder)
@@ -13833,7 +12999,7 @@ function completeLivePostLandingPickup(fielder, fieldingPoint, elapsedSeconds) {
   defenseState.baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
-    manualWait: isManualDefenseControl(),
+    manualWait: isManualThrowControl(),
     targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner),
     baseRunners: defenseState.baseRunners,
     minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder)
@@ -14084,10 +13250,10 @@ function getManualDefenseMissGrace(battedBall) {
   return 6.2;
 }
 
-function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOverride = null) {
+function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOverride = null, caughtInAirOverride = null) {
   const battedBall = defenseState.battedBall;
   const fieldingPoint = fieldingPointOverride || { x: fielder.currentX ?? fielder.x, y: fielder.currentY ?? fielder.y };
-  const caughtInAir = isCaughtAirBattedBall(battedBall);
+  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
   const label = caughtInAir ? `${fielder.role} 捕球` : `${fielder.role} 捕球処理`;
   defenseState.manualFieldingComplete = true;
   defenseState.target = fieldingPoint;
@@ -14233,10 +13399,7 @@ function showImmediateCatchOutCall(elapsedSeconds) {
   if (!defenseState.unifiedCircleCatchComplete) return;
   if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return;
   const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
-  const visualFinishTime = defenseState.catchVisual
-    ? defenseState.catchVisual.startTime + defenseState.catchVisual.duration
-    : fieldingTime;
-  if (elapsedSeconds < Math.max(fieldingTime, visualFinishTime)) return;
+  if (elapsedSeconds < fieldingTime) return;
   defenseState.outCallShown = true;
   message = `${outcome.label}、アウト`;
   showEffect("アウト", "#ffcf70");
@@ -14275,11 +13438,10 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   refreshDefenseThrowSafety();
 
   if (outcome.kind === "homer" || outcome.scoreType === "homer" || defenseState.battedBall?.fenceOver) {
-    const fireworks = defenseState.homeRunFireworks;
-    const finishTime = fireworks
-      ? (fireworks.startDelay ?? 0) + (fireworks.duration ?? 0)
-      : (defenseState.battedBall?.ballTime ?? 0.7) + 1.2;
-    return elapsedSeconds >= finishTime;
+    return elapsedSeconds >= getHomeRunPlayFinishTime(
+      defenseState.battedBall,
+      defenseState.homeRunFireworks
+    );
   }
 
   if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) {
@@ -14308,6 +13470,15 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   }
 
   return false;
+}
+
+function getHomeRunPlayFinishTime(battedBall, fireworks) {
+  const ballTime = Math.max(0.15, battedBall?.ballTime ?? 0.7);
+  if (!fireworks) return ballTime + 1.2;
+  const startDelay = Math.max(ballTime, fireworks.startDelay ?? 0);
+  const fullEffectFinish = startDelay + Math.max(0, fireworks.duration ?? 0);
+  const standardCelebrationFinish = startDelay + 5.8;
+  return Math.min(fullEffectFinish, standardCelebrationFinish);
 }
 
 function isBatterRunnerSettledForResolution() {
@@ -15143,20 +14314,6 @@ function endGame() {
   showEffect(result, "#ff6f61");
 }
 
-function launchHitBall(power, timeDiff, isFoul, directionOverride = null) {
-  const direction = directionOverride || getHitDirection(timeDiff, isFoul);
-  const speed = 4.2 + Math.pow(power, 1.22) * 16;
-  ball.x = field.plateX;
-  ball.y = field.plateY - 10;
-  ball.vx = direction.x * speed;
-  ball.vy = direction.y * speed;
-  ball.radius = 8;
-  ball.active = true;
-  ball.inPitch = false;
-  ball.crossedPlate = true;
-  ball.wasHit = true;
-  ball.trail = [];
-}
 
 function getHitDirection(timeDiff, isFoul) {
   if (isFoul) {
@@ -15427,18 +14584,6 @@ function isBallInGoodContactZone(x = ball.x, y = ball.y, radius = ball.radius) {
   return distanceToGoodContactZone(x, y, radius) <= 0;
 }
 
-function getGoodContactZoneCenterScore(x = ball.x, y = ball.y) {
-  const points = getGoodContactZonePoints();
-  const center = points.reduce((sum, point) => ({
-    x: sum.x + point.x / points.length,
-    y: sum.y + point.y / points.length
-  }), { x: 0, y: 0 });
-  const maxDistance = points.reduce((max, point) => Math.max(max, Math.hypot(point.x - center.x, point.y - center.y)), 1);
-  const distance = Math.hypot(x - center.x, y - center.y);
-  const markerRadius = getGoodContactZoneCenterMarkerRadius();
-  const scoredDistance = Math.max(0, distance - markerRadius);
-  return clamp(1 - Math.pow(scoredDistance / Math.max(1, maxDistance - markerRadius), 1.18), 0.02, 1);
-}
 
 function getZoneScoreFromDistanceRate(rate = 100) {
   const zoneDistanceRate = Math.max(0, rate);
