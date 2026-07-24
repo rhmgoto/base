@@ -10604,4 +10604,66 @@ assert(pitchAimSimulation.byControl.every((item) => item.normalPitchCount > 3000
 assert(pitchAimSimulation.byControl.every((item) => item.maximumDeviation <= 69.001), "non-mistake straight pitches should stay within the shared maximum edge spread");
 console.log("Pitch aim simulation", JSON.stringify(pitchAimSimulation));
 
+const defenseThrowTimingState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const team = "home";
+    const stamp = performance.now();
+    gamepadState.lastDirectionPress[team] = { time: stamp, directions: new Set(["up"]) };
+    gamepadState.lastThrowButtonPress[team] = stamp;
+    const quickOptions = getDefenseThrowTimingOptions(team);
+    gamepadState.lastDirectionPress[team] = { time: stamp - 400, directions: new Set(["up"]) };
+    gamepadState.lastThrowButtonPress[team] = stamp;
+    const normalOptions = getDefenseThrowTimingOptions(team);
+    const fielder = {
+      role: "SS",
+      x: field.centerX,
+      y: field.plateY - 560,
+      fielding: 7,
+      arm: 7
+    };
+    const runner = createBatterRunner(findById(batters, "suzuki"));
+    setBatterRunnerDestination(runner, "second");
+    const outcome = { kind: "force", caught: true, needsThrow: true, fieldingTime: 0 };
+    defenseState = {
+      ...createDefenseState(),
+      battedBall: {
+        isGrounder: true,
+        direction: normalize({ x: 0, y: -1 })
+      },
+      runner,
+      baseRunners: []
+    };
+    const quickThrow = createThrowState(fielder, fielder, outcome, runner, {
+      ...quickOptions,
+      targetBase: "second",
+      immediate: true,
+      startTime: 0
+    });
+    const normalThrow = createThrowState(fielder, fielder, outcome, runner, {
+      ...normalOptions,
+      targetBase: "second",
+      immediate: true,
+      startTime: 0
+    });
+    return JSON.stringify({
+      quickSuccess: quickOptions.throwTimingSuccess,
+      normalSuccess: normalOptions.throwTimingSuccess,
+      quickMultiplier: quickOptions.throwTimeMultiplier,
+      normalMultiplier: normalOptions.throwTimeMultiplier,
+      normalSpeedRatio: quickThrow.throwTime / normalThrow.throwTime,
+      quickLabel: quickOptions.throwTimingLabel,
+      normalLabel: normalOptions.throwTimingLabel
+    });
+  })()`
+));
+
+assert(defenseThrowTimingState.quickSuccess === true, "simultaneous stick and button-2 input should produce a quick throw");
+assert(defenseThrowTimingState.normalSuccess === false, "mistimed stick and button-2 input should produce a normal throw");
+assert(Math.abs(defenseThrowTimingState.quickMultiplier - 1) < 0.0001, "quick throws should keep the existing throw speed");
+assert(Math.abs(defenseThrowTimingState.normalMultiplier - 1.25) < 0.0001, "normal throws should take twenty-five percent longer");
+assert(Math.abs(defenseThrowTimingState.normalSpeedRatio - 0.8) < 0.0001, "normal throws should travel at eighty percent of quick-throw speed");
+assert(defenseThrowTimingState.quickLabel === "クイック送球", "successful timing should use the quick-throw label");
+assert(defenseThrowTimingState.normalLabel === "普通送球", "missed timing should use the normal-throw label");
+
 console.log("Smoke check passed");

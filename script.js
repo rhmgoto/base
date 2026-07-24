@@ -5637,6 +5637,9 @@ function updateDefenseThrowDirectionTiming(team, directions) {
   };
 }
 
+const normalDefenseThrowSpeedScale = 0.8;
+const normalDefenseThrowTimeMultiplier = 1 / normalDefenseThrowSpeedScale;
+
 function getDefenseThrowTimingOptions(team) {
   const now = performance.now();
   const directionTime = gamepadState.lastDirectionPress[team]?.time || 0;
@@ -5646,9 +5649,9 @@ function getDefenseThrowTimingOptions(team) {
   const quick = timingSuccess;
   return {
     throwTimingSuccess: timingSuccess,
-    throwTimeMultiplier: timingSuccess ? 1 : 1.25,
+    throwTimeMultiplier: timingSuccess ? 1 : normalDefenseThrowTimeMultiplier,
     throwArcMultiplier: timingSuccess ? 1 : 1.22,
-    throwTimingLabel: quick ? "クイック送球" : "送球"
+    throwTimingLabel: quick ? "クイック送球" : "普通送球"
   };
 }
 
@@ -10029,7 +10032,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   }
   message = `${getBaseLabel(targetBase)}へ送球指示`;
   if (options.throwTimingSuccess) message = `${getBaseLabel(targetBase)}へナイス送球`;
-  else if (options.throwTimingLabel) message = `${getBaseLabel(targetBase)}へ山なり送球`;
+  else if (options.throwTimingLabel) message = `${getBaseLabel(targetBase)}へ${options.throwTimingLabel}`;
 }
 
 function canManualDefenseThrow(targetBase) {
@@ -12763,6 +12766,8 @@ function startDefenseCatchVisual(fielder, fieldingPoint, elapsedSeconds, caughtI
   const progress = clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1);
   const height = getDefenseBallHeightAtPoint(progress, elapsedSeconds);
   const visualHeight = getDefenseBallVisualHeightOffset(height, battedBall);
+  const catchRadius = getVisibleFielderCatchRangeRadius(fielder, battedBall);
+  const catchDistance = Math.hypot(ball.x - fieldingPoint.x, ball.y - fieldingPoint.y);
   defenseState.catchVisual = {
     startTime: elapsedSeconds,
     duration: caughtInAir ? 0.2 : 0.14,
@@ -12773,7 +12778,8 @@ function startDefenseCatchVisual(fielder, fieldingPoint, elapsedSeconds, caughtI
     toX: fieldingPoint.x,
     toY: fieldingPoint.y - 32,
     point: { x: fieldingPoint.x, y: fieldingPoint.y },
-    catchRadius: getVisibleFielderCatchRangeRadius(fielder, battedBall),
+    catchRadius,
+    edgeCatchRatio: catchRadius > 0 ? catchDistance / catchRadius : 0,
     caughtInAir: Boolean(caughtInAir),
     fielderRole: fielder?.role || ""
   };
@@ -17485,22 +17491,20 @@ function drawDefenseCatchEffect() {
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   const age = elapsedSeconds - fieldingTime;
   const noBounceCatch = isNoBounceDefenseCatch(outcome, defenseState.battedBall);
-  const duration = noBounceCatch ? 1.05 : 0.58;
+  const duration = noBounceCatch ? 0.46 : 0.58;
   if (age < 0 || age > duration) return;
   const point = catchVisual?.point || outcome.fieldingPoint || defenseState.target;
   if (!point) return;
   const progress = clamp(age / duration, 0, 1);
-  const alpha = 1 - progress;
-  if (catchVisual?.catchRadius > 0) {
-    const circleAlpha = clamp(1 - age / 0.48, 0, 1);
+  const alpha = Math.pow(1 - progress, 1.35);
+  if (noBounceCatch && catchVisual?.catchRadius > 0) {
+    const circleAlpha = clamp(1 - age / 0.18, 0, 1);
     if (circleAlpha > 0) {
       ctx.save();
-      ctx.strokeStyle = `rgba(140, 255, 196, ${0.92 * circleAlpha})`;
-      ctx.fillStyle = `rgba(174, 255, 218, ${0.12 * circleAlpha})`;
-      ctx.lineWidth = 5;
+      ctx.strokeStyle = `rgba(190, 238, 244, ${0.18 * circleAlpha})`;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(catchVisual.point.x, catchVisual.point.y, catchVisual.catchRadius + progress * 7, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(catchVisual.point.x, catchVisual.point.y, catchVisual.catchRadius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -17509,45 +17513,62 @@ function drawDefenseCatchEffect() {
     drawSimpleDefensePickupEffect(point, progress, alpha);
     return;
   }
-  const pulse = 1 + Math.sin(age * 24) * 0.08;
-  const innerRadius = (18 + progress * 22) * pulse;
-  const outerRadius = (36 + progress * 68) * pulse;
+  const effectPoint = {
+    x: catchVisual?.toX ?? point.x,
+    y: catchVisual?.toY ?? point.y - 32
+  };
+  const edgeCatch = (catchVisual?.edgeCatchRatio ?? 0) >= 0.78;
+  const ringRadius = 10 + progress * (edgeCatch ? 29 : 23);
+  const glowRadius = 13 + progress * 8;
+  const particleCount = edgeCatch ? 12 : 9;
 
   ctx.save();
-  ctx.lineCap = "round";
   ctx.globalCompositeOperation = "lighter";
-  ctx.fillStyle = `rgba(174, 231, 255, ${0.34 * alpha})`;
+  const glow = ctx.createRadialGradient(
+    effectPoint.x,
+    effectPoint.y,
+    0,
+    effectPoint.x,
+    effectPoint.y,
+    glowRadius
+  );
+  glow.addColorStop(0, `rgba(255, 255, 255, ${0.52 * alpha})`);
+  glow.addColorStop(0.45, edgeCatch
+    ? `rgba(255, 225, 145, ${0.26 * alpha})`
+    : `rgba(188, 239, 255, ${0.24 * alpha})`);
+  glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(point.x, point.y, innerRadius, 0, Math.PI * 2);
+  ctx.arc(effectPoint.x, effectPoint.y, glowRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(255, 242, 168, ${0.98 * alpha})`;
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = edgeCatch
+    ? `rgba(255, 225, 145, ${0.78 * alpha})`
+    : `rgba(215, 247, 255, ${0.72 * alpha})`;
+  ctx.lineWidth = edgeCatch ? 2.5 : 2;
   ctx.beginPath();
-  ctx.arc(point.x, point.y, outerRadius, 0, Math.PI * 2);
+  ctx.arc(effectPoint.x, effectPoint.y, ringRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  for (let i = 0; i < 12; i += 1) {
-    const angle = (Math.PI * 2 * i) / 12 + progress * 0.35;
-    const rayStart = outerRadius + 8;
-    const rayEnd = rayStart + 24 + progress * 34;
-    drawLine(
-      point.x + Math.cos(angle) * rayStart,
-      point.y + Math.sin(angle) * rayStart,
-      point.x + Math.cos(angle) * rayEnd,
-      point.y + Math.sin(angle) * rayEnd
+  for (let index = 0; index < particleCount; index += 1) {
+    const angle = (Math.PI * 2 * index) / particleCount + 0.24;
+    const distance = 7 + progress * (edgeCatch ? 31 : 24) + (index % 3) * 2;
+    const particleRadius = Math.max(0.8, (edgeCatch ? 2.4 : 2) * (1 - progress * 0.55));
+    ctx.fillStyle = index % 2 === 0
+      ? `rgba(255, 255, 255, ${0.82 * alpha})`
+      : edgeCatch
+      ? `rgba(255, 218, 126, ${0.76 * alpha})`
+      : `rgba(164, 235, 255, ${0.7 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(
+      effectPoint.x + Math.cos(angle) * distance,
+      effectPoint.y + Math.sin(angle) * distance,
+      particleRadius,
+      0,
+      Math.PI * 2
     );
+    ctx.fill();
   }
-
-  ctx.globalCompositeOperation = "source-over";
-  ctx.strokeStyle = `rgba(20, 52, 72, ${0.86 * alpha})`;
-  ctx.lineWidth = 5;
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
-  ctx.font = "bold 24px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.strokeText("キャッチ!", point.x, point.y - 68 - progress * 24);
-  ctx.fillText("キャッチ!", point.x, point.y - 68 - progress * 24);
   ctx.restore();
 }
 
@@ -18365,24 +18386,40 @@ function drawThrowPath() {
     y: ballPoint.y - previousPoint.y || throwState.to.y - throwState.from.y
   });
   const arrowPoint = getThrowPointAtProgress(throwState, 0.72);
+  const quickThrow = throwState.throwTimingSuccess && !isPreparing;
 
   ctx.save();
-  if (throwState.throwTimingSuccess && !isPreparing) {
+  if (quickThrow) {
     const effectAge = Math.max(0, elapsedSeconds - throwState.startTime);
-    const alpha = clamp(1 - effectAge / 0.45, 0, 1) * 0.34;
+    const alpha = clamp(1 - effectAge / 0.38, 0, 1);
     if (alpha > 0) {
-      ctx.fillStyle = `rgba(174, 231, 255, ${alpha * 0.45})`;
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.lineWidth = 3;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.shadowColor = `rgba(144, 232, 255, ${0.8 * alpha})`;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = `rgba(174, 231, 255, ${alpha * 0.22})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.88 * alpha})`;
+      ctx.lineWidth = 3.5;
       ctx.beginPath();
-      ctx.arc(throwState.from.x, throwState.from.y, 18 + effectAge * 54, 0, Math.PI * 2);
+      ctx.arc(throwState.from.x, throwState.from.y, 14 + effectAge * 68, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = "source-over";
     }
   }
-  ctx.strokeStyle = isPreparing ? "rgba(255, 242, 168, 0.44)" : throwState.safe ? "rgba(255, 227, 116, 0.9)" : "rgba(174, 231, 255, 0.95)";
-  ctx.lineWidth = isPreparing ? 4 : 9;
-  ctx.setLineDash(isPreparing ? [6, 12] : [18, 10]);
+  ctx.strokeStyle = isPreparing
+    ? "rgba(255, 242, 168, 0.44)"
+    : quickThrow
+    ? "rgba(183, 242, 255, 0.98)"
+    : throwState.safe
+    ? "rgba(255, 227, 116, 0.74)"
+    : "rgba(174, 231, 255, 0.78)";
+  ctx.lineWidth = isPreparing ? 4 : quickThrow ? 11 : 7;
+  ctx.setLineDash(isPreparing ? [6, 12] : quickThrow ? [24, 7] : [15, 12]);
+  if (quickThrow) {
+    ctx.shadowColor = "rgba(120, 225, 255, 0.92)";
+    ctx.shadowBlur = 15;
+  }
   if (throwState.bounce?.enabled) {
     const bouncePoint = getThrowBouncePoint(throwState);
     drawLine(throwState.from.x, throwState.from.y, bouncePoint.x, bouncePoint.y);
@@ -18391,11 +18428,52 @@ function drawThrowPath() {
     drawLine(throwState.from.x, throwState.from.y, throwState.to.x, throwState.to.y);
   }
   ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
 
   if (!isPreparing) {
-    ctx.strokeStyle = throwState.safe ? "rgba(255, 255, 255, 0.72)" : "rgba(255, 255, 255, 0.86)";
-    ctx.lineWidth = 4;
-    drawLine(ballPoint.x - direction.x * 44, ballPoint.y - direction.y * 44, ballPoint.x + direction.x * 16, ballPoint.y + direction.y * 16);
+    ctx.strokeStyle = quickThrow
+      ? "rgba(255, 255, 255, 0.96)"
+      : throwState.safe
+      ? "rgba(255, 255, 255, 0.62)"
+      : "rgba(255, 255, 255, 0.74)";
+    ctx.lineWidth = quickThrow ? 5 : 3;
+    const trailLength = quickThrow ? 76 : 44;
+    drawLine(
+      ballPoint.x - direction.x * trailLength,
+      ballPoint.y - direction.y * trailLength,
+      ballPoint.x + direction.x * 12,
+      ballPoint.y + direction.y * 12
+    );
+    if (quickThrow) {
+      const normalX = -direction.y;
+      const normalY = direction.x;
+      ctx.strokeStyle = "rgba(138, 226, 255, 0.64)";
+      ctx.lineWidth = 2.5;
+      [-7, 7].forEach((offset) => {
+        drawLine(
+          ballPoint.x - direction.x * 58 + normalX * offset,
+          ballPoint.y - direction.y * 58 + normalY * offset,
+          ballPoint.x - direction.x * 5 + normalX * offset * 0.35,
+          ballPoint.y - direction.y * 5 + normalY * offset * 0.35
+        );
+      });
+      ctx.globalCompositeOperation = "lighter";
+      for (let index = 0; index < 5; index += 1) {
+        const distance = 17 + index * 12;
+        const side = (index % 2 === 0 ? -1 : 1) * (2 + index);
+        ctx.fillStyle = `rgba(205, 248, 255, ${0.75 - index * 0.11})`;
+        ctx.beginPath();
+        ctx.arc(
+          ballPoint.x - direction.x * distance + normalX * side,
+          ballPoint.y - direction.y * distance + normalY * side,
+          Math.max(1.2, 3.1 - index * 0.38),
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
   }
 
   if (throwState.bounce?.enabled) {
@@ -18407,13 +18485,41 @@ function drawThrowPath() {
   }
 
   if (!isPreparing) {
-    ctx.fillStyle = throwState.safe ? "#ffe374" : "#aee7ff";
+    ctx.fillStyle = quickThrow ? "#d9f8ff" : throwState.safe ? "#ffe374" : "#aee7ff";
     ctx.beginPath();
     ctx.moveTo(arrowPoint.x + direction.x * 24, arrowPoint.y + direction.y * 24);
     ctx.lineTo(arrowPoint.x - direction.x * 18 - direction.y * 13, arrowPoint.y - direction.y * 18 + direction.x * 13);
     ctx.lineTo(arrowPoint.x - direction.x * 18 + direction.y * 13, arrowPoint.y - direction.y * 18 - direction.x * 13);
     ctx.closePath();
     ctx.fill();
+  }
+  if (quickThrow) {
+    const arrivalAge = elapsedSeconds - throwState.endTime;
+    if (arrivalAge >= 0 && arrivalAge <= 0.32) {
+      const arrivalProgress = arrivalAge / 0.32;
+      const arrivalAlpha = 1 - arrivalProgress;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(210, 249, 255, ${0.78 * arrivalAlpha})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(throwState.to.x, throwState.to.y, 10 + arrivalProgress * 28, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let index = 0; index < 8; index += 1) {
+        const angle = Math.PI * 2 * index / 8;
+        const distance = 8 + arrivalProgress * 24;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.7 * arrivalAlpha})`;
+        ctx.beginPath();
+        ctx.arc(
+          throwState.to.x + Math.cos(angle) * distance,
+          throwState.to.y + Math.sin(angle) * distance,
+          1.8,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
   }
   ctx.restore();
 }

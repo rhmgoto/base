@@ -97,7 +97,9 @@ assertIncludesAll(
   [
     "function drawDefenseCatchEffect()",
     "outcome?.caught || outcome.fieldingError",
-    'ctx.strokeText("キャッチ!"',
+    "const edgeCatch = (catchVisual?.edgeCatchRatio ?? 0) >= 0.78",
+    "const particleCount = edgeCatch ? 12 : 9",
+    "ctx.createRadialGradient(",
     "function isNoBounceDefenseCatch",
     "battedBall.isGrounder || outcome.postLandingPickup",
     "function drawSimpleDefensePickupEffect",
@@ -106,6 +108,20 @@ assertIncludesAll(
     'ctx.strokeText("エラー!"'
   ],
   "script.js defense result effects"
+);
+assert(!script.includes('ctx.strokeText("キャッチ!"'), "catch effects should not use the old large catch text");
+
+assertIncludesAll(
+  script,
+  [
+    "const normalDefenseThrowSpeedScale = 0.8",
+    "const normalDefenseThrowTimeMultiplier = 1 / normalDefenseThrowSpeedScale",
+    "const quickThrow = throwState.throwTimingSuccess && !isPreparing",
+    'ctx.shadowColor = "rgba(120, 225, 255, 0.92)"',
+    "const trailLength = quickThrow ? 76 : 44",
+    "const arrivalAge = elapsedSeconds - throwState.endTime"
+  ],
+  "script.js quick and normal throw distinction"
 );
 
 assertIncludesAll(
