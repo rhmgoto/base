@@ -10747,4 +10747,116 @@ assert(defenseThrowTimingState.button3Ignored === true, "screen BTN 3 should not
 assert(defenseThrowTimingState.shortCameraHeld === true, "short infield throws should keep the defense camera steady");
 assert(defenseThrowTimingState.longCameraHeld === false, "long outfield throws should retain ball-following camera movement");
 
+const manualBatterRunnerTargetState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    gameMode = "single";
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "auto" };
+    activeBatter = findById(batters, "ichiro");
+    const fielder = {
+      role: "C",
+      x: field.centerX,
+      y: defenseField.bases.home.y - defenseField.fenceDistance * 0.7,
+      speed: 5,
+      fielding: 5,
+      arm: 5
+    };
+    const ordinaryTargets = [];
+    for (let index = 0; index < 500; index += 1) {
+      const runner = createBatterRunner(activeBatter);
+      const scoreType = index % 2 === 0 ? "double" : "triple";
+      const battedBall = {
+        target: { x: fielder.x, y: fielder.y },
+        fenceOver: false,
+        groundRuleDouble: false,
+        wallHit: index % 3 === 0,
+        ballTime: runner.arrivalTime + 3
+      };
+      ordinaryTargets.push(getBatterRunnerTargetBase(
+        { kind: scoreType, scoreType, caught: false, fieldingTime: runner.arrivalTime + 3 },
+        battedBall,
+        fielder,
+        fielder,
+        runner
+      ));
+    }
+    const ruleRunner = createBatterRunner(activeBatter);
+    return JSON.stringify({
+      ordinaryTargets,
+      groundRuleTarget: getBatterRunnerTargetBase(
+        { kind: "double", scoreType: "double", caught: false, fieldingTime: 5 },
+        { fenceOver: false, groundRuleDouble: true },
+        fielder,
+        fielder,
+        ruleRunner
+      ),
+      homerTarget: getBatterRunnerTargetBase(
+        { kind: "homer", scoreType: "homer", caught: false },
+        { fenceOver: true, groundRuleDouble: false },
+        fielder,
+        fielder,
+        ruleRunner
+      )
+    });
+  })()`
+));
+
+assert(manualBatterRunnerTargetState.ordinaryTargets.length === 500, "manual batter-runner regression should inspect many extra-base hit paths");
+assert(manualBatterRunnerTargetState.ordinaryTargets.every((target) => target === "first"), "manual batter-runners should stop at first until the player advances them");
+assert(manualBatterRunnerTargetState.groundRuleTarget === "second", "ground-rule doubles should still award second automatically");
+assert(manualBatterRunnerTargetState.homerTarget === "home", "home runs should still send the batter-runner home automatically");
+
+const buntPopupReductionState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const originalRandom = Math.random;
+    let seed = 246813579;
+    Math.random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    let popupCount = 0;
+    let pitcherFrontCount = 0;
+    let candidateCount = 0;
+    for (let index = 0; index < 100000; index += 1) {
+      const outcome = resolveBuntPopupOutcome(false, true, 1);
+      candidateCount += outcome.popupCandidate ? 1 : 0;
+      popupCount += outcome.pitcherBuntPopup ? 1 : 0;
+      pitcherFrontCount += outcome.popupConvertedToPitcherFront ? 1 : 0;
+    }
+    const nonCandidate = resolveBuntPopupOutcome(true, true, 1);
+    Math.random = originalRandom;
+    return JSON.stringify({
+      candidateCount,
+      popupCount,
+      pitcherFrontCount,
+      nonCandidate
+    });
+  })()`
+));
+
+assert(buntPopupReductionState.candidateCount === 100000, "forced bunt popup simulation should begin with popup candidates");
+assert(
+  buntPopupReductionState.popupCount >= 69000
+    && buntPopupReductionState.popupCount <= 71000,
+  `bunt popup flies should retain about 70% of their former candidates (${buntPopupReductionState.popupCount})`
+);
+assert(
+  buntPopupReductionState.pitcherFrontCount >= 29000
+    && buntPopupReductionState.pitcherFrontCount <= 31000,
+  `about 30% of former bunt popup candidates should become pitcher-front grounders (${buntPopupReductionState.pitcherFrontCount})`
+);
+assert(
+  buntPopupReductionState.popupCount + buntPopupReductionState.pitcherFrontCount
+    === buntPopupReductionState.candidateCount,
+  "every removed bunt popup should be reassigned to a pitcher-front grounder"
+);
+assert(
+  buntPopupReductionState.nonCandidate.popupCandidate === false
+    && buntPopupReductionState.nonCandidate.pitcherBuntPopup === false
+    && buntPopupReductionState.nonCandidate.popupConvertedToPitcherFront === false,
+  "good bunts should not enter the popup conversion path"
+);
+
 console.log("Smoke check passed");

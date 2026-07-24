@@ -346,11 +346,24 @@ const buntTuning = {
   popupMin: 0.018,
   popupMax: 0.9,
   forcePopupBadScore: 0.72,
+  popupReductionRate: 0.3,
   solidContactQuality: 0.48,
   solidContactTiming: 0.46,
   solidContactSweetSpot: 0.44,
   solidContactPopupReduction: 0.98
 };
+
+function resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance) {
+  const popupCandidate = !goodBunt && (forcePopup || Math.random() < protectedPopupChance);
+  const popupConvertedToPitcherFront = popupCandidate
+    && Math.random() < buntTuning.popupReductionRate;
+  return {
+    popupCandidate,
+    popupConvertedToPitcherFront,
+    pitcherBuntPopup: popupCandidate && !popupConvertedToPitcherFront
+  };
+}
+
 const pitchWindupDuration = 940;
 const pitchSpeedChangeLimit = 0.7;
 const pitchBendEffect = 1.15;
@@ -7396,9 +7409,16 @@ function buildBattedBallProfile(contact) {
     const forcePopup = buntContactScore <= buntTuning.forcePopupFeedback
       && (buntContactScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
       && !solidBuntContact;
-    const pitcherBuntPopup = !goodBunt && (forcePopup || Math.random() < protectedPopupChance);
-    const finalBuntIsFoul = buntIsFoul && !pitcherBuntPopup;
-    const noAimPitcherFront = !hasAim && !pitcherBuntPopup;
+    const {
+      popupCandidate,
+      popupConvertedToPitcherFront,
+      pitcherBuntPopup
+    } = resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance);
+    const finalBuntIsFoul = buntIsFoul
+      && !pitcherBuntPopup
+      && !popupConvertedToPitcherFront;
+    const pitcherFrontGrounder = popupConvertedToPitcherFront
+      || (!hasAim && !pitcherBuntPopup);
     const directionFromAim = hasAim
       ? buntAimY > 0.4
         ? normalize({ x: side * randomBetween(0.05, 0.28), y: -randomBetween(0.2, 0.42) })
@@ -7408,7 +7428,7 @@ function buildBattedBallProfile(contact) {
       : null;
     const buntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
-      : noAimPitcherFront
+      : pitcherFrontGrounder
       ? normalize({ x: randomBetween(-0.14, 0.14), y: -1 })
       : directionFromAim
       ? directionFromAim
@@ -7425,7 +7445,11 @@ function buildBattedBallProfile(contact) {
     const badBuntLift = goodBunt ? 0 : clamp((0.62 - buntQuality) / 0.62, 0, 1) * randomBetween(0, 16);
     return {
       exitVelocity: pitcherBuntPopup ? clamp(0.1 + buntQuality * 0.08, 0.1, 0.22) : clamp(0.08 + buntQuality * 0.1 + noAimPowerBoost - deadenBonus, 0.07, 0.28),
-      launchAngle: pitcherBuntPopup ? randomBetween(30, 58) : clamp(-4 + buntContactScore * 2 + badBuntLift, -10, goodBunt ? 3 : 18),
+      launchAngle: pitcherBuntPopup
+        ? randomBetween(30, 58)
+        : popupConvertedToPitcherFront
+          ? randomBetween(-6, 1)
+          : clamp(-4 + buntContactScore * 2 + badBuntLift, -10, goodBunt ? 3 : 18),
       direction: buntDirection,
       spin: clamp(0.26 + badBuntScore * 0.3 + (hasAim ? 0 : 0.08), 0.18, 0.82),
       carry: pitcherBuntPopup ? clamp(0.08 + badBuntScore * 0.08, 0.08, 0.18) : clamp(0.02 + buntQuality * 0.035, 0.02, 0.065),
@@ -7456,12 +7480,14 @@ function buildBattedBallProfile(contact) {
       buntAimControl: aimControlScore,
       buntHasAim: hasAim,
       buntAimY,
-      buntLineChance: pitcherBuntPopup || noAimPitcherFront ? 0 : lineChance,
-      buntPitcherFrontChance: pitcherBuntPopup ? 0 : noAimPitcherFront ? 1 : pitcherFrontChance,
+      buntLineChance: pitcherBuntPopup || pitcherFrontGrounder ? 0 : lineChance,
+      buntPitcherFrontChance: pitcherBuntPopup ? 0 : pitcherFrontGrounder ? 1 : pitcherFrontChance,
       buntFoulChance,
       badBuntScore,
       pitcherBuntPopupChance,
       protectedPopupChance,
+      popupCandidate,
+      popupConvertedToPitcherFront,
       solidBuntContact,
       pitcherBuntPopup,
       isBunt: true
@@ -9425,14 +9451,9 @@ function createBatterRunner(batterInfo) {
 }
 
 function getBatterRunnerTargetBase(outcome, battedBall = null, fieldingTarget = null, fielder = null, runner = null) {
+  if (battedBall?.fenceOver || outcome?.scoreType === "homer") return "home";
+  if (battedBall?.groundRuleDouble) return "second";
   if (outcome?.targetBase) return outcome.targetBase;
-  if (!outcome || outcome.kind === "force" || outcome.kind === "out") return "first";
-  if (battedBall?.fenceOver || outcome.scoreType === "homer") return "home";
-  if (!isManualBaserunningControl()) return "first";
-  if (!battedBall || !fieldingTarget || !fielder || !runner) return "first";
-  if (!hasBatterRunnerReachedFirstAtFielding(outcome, battedBall, fieldingTarget, fielder, runner)) return "first";
-  if (outcome.scoreType === "triple") return "third";
-  if (outcome.scoreType === "double" || battedBall?.wallHit || battedBall?.groundRuleDouble) return "second";
   return "first";
 }
 

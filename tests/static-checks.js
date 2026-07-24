@@ -147,6 +147,13 @@ const defenseGamepadInputSection = script.slice(defenseGamepadInputStart, defens
 assert(defenseGamepadInputSection.includes("justPressed(gamepadButtons.A)"), "screen BTN 2 should be the defense throw button");
 assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.B)"), "screen BTN 1 should not throw");
 assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.X)"), "screen BTN 3 should not throw");
+const batterRunnerTargetSection = script.slice(
+  script.indexOf("function getBatterRunnerTargetBase"),
+  script.indexOf("function shouldUseRunnerPositionForOutfieldThrow")
+);
+assert(batterRunnerTargetSection.includes('if (battedBall?.groundRuleDouble) return "second"'), "ground-rule doubles should still award second");
+assert(!batterRunnerTargetSection.includes('outcome.scoreType === "double"'), "ordinary double labels should not auto-send a manual batter-runner to second");
+assert(!batterRunnerTargetSection.includes('return "third"'), "ordinary triple labels should not auto-send a manual batter-runner to third");
 assertIncludesAll(
   script,
   [
@@ -306,6 +313,19 @@ assertIncludesAll(
     "plan.targetSpread = sharedAim.targetSpread;"
   ],
   "CPU pitcher auto change and shared player/CPU pitch aim"
+);
+
+assertIncludesAll(
+  script,
+  [
+    "popupReductionRate: 0.3",
+    "function resolveBuntPopupOutcome",
+    "&& Math.random() < buntTuning.popupReductionRate",
+    "popupConvertedToPitcherFront",
+    "const pitcherFrontGrounder = popupConvertedToPitcherFront",
+    "popupConvertedToPitcherFront\n          ? randomBetween(-6, 1)"
+  ],
+  "bunt popup reduction and pitcher-front grounder conversion"
 );
 
 console.log("Static checks passed");
