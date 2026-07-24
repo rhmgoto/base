@@ -10611,10 +10611,13 @@ const defenseThrowTimingState = JSON.parse(runInGame(
     const stamp = performance.now();
     gamepadState.lastDirectionPress[team] = { time: stamp, directions: new Set(["up"]) };
     gamepadState.lastThrowButtonPress[team] = stamp;
-    const quickOptions = getDefenseThrowTimingOptions(team);
-    gamepadState.lastDirectionPress[team] = { time: stamp - 400, directions: new Set(["up"]) };
+    const quickOptions = getDefenseThrowTimingOptions(team, new Set(["up"]));
+    gamepadState.lastDirectionPress[team] = { time: stamp - 300, directions: new Set(["up"]) };
     gamepadState.lastThrowButtonPress[team] = stamp;
-    const normalOptions = getDefenseThrowTimingOptions(team);
+    const humanChordOptions = getDefenseThrowTimingOptions(team, new Set(["up"]));
+    gamepadState.lastDirectionPress[team] = { time: stamp - 600, directions: new Set(["up"]) };
+    gamepadState.lastThrowButtonPress[team] = stamp;
+    const normalOptions = getDefenseThrowTimingOptions(team, new Set(["up"]));
     const fielder = {
       role: "SS",
       x: field.centerX,
@@ -10646,24 +10649,102 @@ const defenseThrowTimingState = JSON.parse(runInGame(
       immediate: true,
       startTime: 0
     });
+    gameMode = "single";
+    battingTeam = "home";
+    defenseControlMode = { away: "manual", home: "auto" };
+    gamePhase = "defense";
+    const liveRunner = createBatterRunner(findById(batters, "suzuki"));
+    setBatterRunnerDestination(liveRunner, "second");
+    defenseState = {
+      ...createDefenseState(),
+      active: true,
+      resolved: false,
+      startTime: performance.now(),
+      chosenFielder: fielder,
+      target: fielder,
+      battedBall: {
+        isGrounder: true,
+        direction: normalize({ x: 0, y: -1 }),
+        target: { ...fielder },
+        ballTime: 0
+      },
+      outcome,
+      runner: liveRunner,
+      baseRunners: []
+    };
+    defenseState.throw = createThrowState(fielder, fielder, outcome, liveRunner, {
+      targetBase: "second",
+      manualWait: true,
+      minStartTime: 0
+    });
+    gamepadState.previousButtons.away = new Set();
+    gamepadState.previousDirections.away = new Set();
+    gamepadState.lastDirectionPress.away = { time: 0, directions: new Set() };
+    gamepadState.lastThrowButtonPress.away = 0;
+    const button1 = Array.from({ length: 13 }, () => ({ pressed: false }));
+    button1[gamepadButtons.B] = { pressed: true };
+    handleGamepadButtonPresses({ buttons: button1, axes: [0, -1] }, "away");
+    const button1Ignored = !Number.isFinite(defenseState.throw?.startTime);
+    gamepadState.previousButtons.away = new Set();
+    const button3 = Array.from({ length: 13 }, () => ({ pressed: false }));
+    button3[gamepadButtons.X] = { pressed: true };
+    handleGamepadButtonPresses({ buttons: button3, axes: [0, -1] }, "away");
+    const button3Ignored = !Number.isFinite(defenseState.throw?.startTime);
+    gamepadState.previousButtons.away = new Set();
+    gamepadState.previousDirections.away = new Set();
+    gamepadState.lastDirectionPress.away = { time: 0, directions: new Set() };
+    const liveButtons = Array.from({ length: 13 }, () => ({ pressed: false }));
+    liveButtons[gamepadButtons.A] = { pressed: true };
+    handleGamepadButtonPresses({ buttons: liveButtons, axes: [0, -1] }, "away");
+    const liveQuickThrow = {
+      success: defenseState.throw?.throwTimingSuccess === true,
+      label: defenseState.throw?.throwTimingLabel,
+      finiteStart: Number.isFinite(defenseState.throw?.startTime)
+    };
+    const shortCameraThrow = {
+      from: { x: field.centerX, y: field.plateY - 520 },
+      to: { ...defenseField.bases.second },
+      startTime: 0,
+      endTime: 0.5
+    };
+    const longCameraThrow = {
+      ...shortCameraThrow,
+      to: { x: field.centerX + 1300, y: field.plateY - 1350 }
+    };
     return JSON.stringify({
       quickSuccess: quickOptions.throwTimingSuccess,
+      humanChordSuccess: humanChordOptions.throwTimingSuccess,
       normalSuccess: normalOptions.throwTimingSuccess,
       quickMultiplier: quickOptions.throwTimeMultiplier,
       normalMultiplier: normalOptions.throwTimeMultiplier,
       normalSpeedRatio: quickThrow.throwTime / normalThrow.throwTime,
+      quickArcHeight: quickThrow.arcHeight,
+      normalArcHeight: normalThrow.arcHeight,
       quickLabel: quickOptions.throwTimingLabel,
-      normalLabel: normalOptions.throwTimingLabel
+      normalLabel: normalOptions.throwTimingLabel,
+      liveQuickThrow,
+      button1Ignored,
+      button3Ignored,
+      shortCameraHeld: shouldHoldCameraForShortDefenseThrow(shortCameraThrow, 0.25),
+      longCameraHeld: shouldHoldCameraForShortDefenseThrow(longCameraThrow, 0.25)
     });
   })()`
 ));
 
 assert(defenseThrowTimingState.quickSuccess === true, "simultaneous stick and button-2 input should produce a quick throw");
+assert(defenseThrowTimingState.humanChordSuccess === true, "a human-scale stick-first chord should still produce a quick throw");
 assert(defenseThrowTimingState.normalSuccess === false, "mistimed stick and button-2 input should produce a normal throw");
-assert(Math.abs(defenseThrowTimingState.quickMultiplier - 1) < 0.0001, "quick throws should keep the existing throw speed");
-assert(Math.abs(defenseThrowTimingState.normalMultiplier - 1.25) < 0.0001, "normal throws should take twenty-five percent longer");
-assert(Math.abs(defenseThrowTimingState.normalSpeedRatio - 0.8) < 0.0001, "normal throws should travel at eighty percent of quick-throw speed");
+assert(Math.abs(defenseThrowTimingState.quickMultiplier - (1 / 1.1)) < 0.0001, "quick throws should be ten percent faster than the base throw speed");
+assert(Math.abs(defenseThrowTimingState.normalMultiplier - (1 / 0.68)) < 0.0001, "normal throws should be fifteen percent slower than their previous eighty-percent speed");
+assert(Math.abs(defenseThrowTimingState.normalSpeedRatio - (0.68 / 1.1)) < 0.0001, "normal throws should be visibly slower than quick throws");
+assert(Math.abs(defenseThrowTimingState.normalArcHeight / defenseThrowTimingState.quickArcHeight - 1.5) < 0.0001, "normal throws should use a clearly higher arc");
 assert(defenseThrowTimingState.quickLabel === "クイック送球", "successful timing should use the quick-throw label");
 assert(defenseThrowTimingState.normalLabel === "普通送球", "missed timing should use the normal-throw label");
+assert(defenseThrowTimingState.liveQuickThrow.success === true, "a real same-frame stick and button-2 input should preserve the quick-throw effect flag");
+assert(defenseThrowTimingState.liveQuickThrow.label === "ナイス送球" && defenseThrowTimingState.liveQuickThrow.finiteStart === true, "a real quick-throw input should start a visible manual throw");
+assert(defenseThrowTimingState.button1Ignored === true, "screen BTN 1 should not issue a defense throw");
+assert(defenseThrowTimingState.button3Ignored === true, "screen BTN 3 should not issue a defense throw");
+assert(defenseThrowTimingState.shortCameraHeld === true, "short infield throws should keep the defense camera steady");
+assert(defenseThrowTimingState.longCameraHeld === false, "long outfield throws should retain ball-following camera movement");
 
 console.log("Smoke check passed");

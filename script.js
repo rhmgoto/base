@@ -5601,12 +5601,10 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   }
   if (gamePhase === "defense" && team === fieldingTeam()) {
     const throwTarget = getGamepadThrowTarget(directions);
-    if (justPressed(gamepadButtons.B)) {
+    if (justPressed(gamepadButtons.A)) {
       gamepadState.lastThrowButtonPress[team] = performance.now();
-      handleDefenseThrowCommand(throwTarget, getDefenseThrowTimingOptions(team));
+      handleDefenseThrowCommand(throwTarget, getDefenseThrowTimingOptions(team, directions));
     }
-    if (justPressed(gamepadButtons.A)) handleDefenseThrowCommand(throwTarget);
-    if (justPressed(gamepadButtons.X)) handleDefenseThrowCommand(throwTarget);
   }
   if (gamePhase === "defense" && team === battingTeam) {
     if (justPressed(gamepadButtons.A)) handleBatterRunnerBaseCommand(getGamepadThrowTarget(directions), "advance");
@@ -5637,20 +5635,30 @@ function updateDefenseThrowDirectionTiming(team, directions) {
   };
 }
 
-const normalDefenseThrowSpeedScale = 0.8;
+const quickDefenseThrowSpeedScale = 1.1;
+const normalDefenseThrowSpeedScale = 0.8 * 0.85;
+const normalDefenseThrowArcMultiplier = 1.5;
+const quickDefenseThrowTimeMultiplier = 1 / quickDefenseThrowSpeedScale;
 const normalDefenseThrowTimeMultiplier = 1 / normalDefenseThrowSpeedScale;
+const quickDefenseThrowTimingWindowMs = 450;
 
-function getDefenseThrowTimingOptions(team) {
+function getDefenseThrowTimingOptions(team, activeDirections = null) {
   const now = performance.now();
-  const directionTime = gamepadState.lastDirectionPress[team]?.time || 0;
+  const directionPress = gamepadState.lastDirectionPress[team];
+  const directionTime = directionPress?.time || 0;
   const buttonTime = gamepadState.lastThrowButtonPress[team] || now;
   const diff = Math.abs(buttonTime - directionTime);
-  const timingSuccess = directionTime > 0 && diff <= 180;
+  const currentDirections = activeDirections instanceof Set ? activeDirections : directionPress?.directions;
+  const hasMatchingDirection = currentDirections?.size > 0
+    && [...currentDirections].some((direction) => directionPress?.directions?.has(direction));
+  const timingSuccess = directionTime > 0
+    && hasMatchingDirection
+    && diff <= quickDefenseThrowTimingWindowMs;
   const quick = timingSuccess;
   return {
     throwTimingSuccess: timingSuccess,
-    throwTimeMultiplier: timingSuccess ? 1 : normalDefenseThrowTimeMultiplier,
-    throwArcMultiplier: timingSuccess ? 1 : 1.22,
+    throwTimeMultiplier: timingSuccess ? quickDefenseThrowTimeMultiplier : normalDefenseThrowTimeMultiplier,
+    throwArcMultiplier: timingSuccess ? 1 : normalDefenseThrowArcMultiplier,
     throwTimingLabel: quick ? "クイック送球" : "普通送球"
   };
 }
@@ -10031,8 +10039,11 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
     defenseState.duration = elapsedSeconds * 1000 + 1200;
   }
   message = `${getBaseLabel(targetBase)}へ送球指示`;
-  if (options.throwTimingSuccess) message = `${getBaseLabel(targetBase)}へナイス送球`;
-  else if (options.throwTimingLabel) message = `${getBaseLabel(targetBase)}へ${options.throwTimingLabel}`;
+  if (options.throwTimingSuccess) {
+    message = `${getBaseLabel(targetBase)}へナイス送球`;
+  } else if (options.throwTimingLabel) {
+    message = `${getBaseLabel(targetBase)}へ${options.throwTimingLabel}`;
+  }
 }
 
 function canManualDefenseThrow(targetBase) {
@@ -18012,19 +18023,32 @@ function drawAmericanRoyalWoodFence(homeY, wallHeight) {
   ctx.restore();
 }
 
+function shouldHoldCameraForShortDefenseThrow(throwState, elapsedSeconds) {
+  if (!throwState || !Number.isFinite(throwState.startTime) || elapsedSeconds < throwState.startTime) return false;
+  const distance = Math.hypot(
+    (throwState.to?.x ?? 0) - (throwState.from?.x ?? 0),
+    (throwState.to?.y ?? 0) - (throwState.from?.y ?? 0)
+  );
+  return distance <= 820 && elapsedSeconds <= (throwState.endTime ?? throwState.startTime) + 0.2;
+}
+
 function getDefenseCameraOffset() {
   if (!defenseState.active) return { x: 0, y: 0 };
   if (defenseState.battedBall?.fenceOver) return getHomeRunCameraOffset();
+  const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   const chosen = defenseState.fielders.find((fielder) => fielder.role === defenseState.chosenFielder.role);
   let focusX = chosen ? ball.x * 0.68 + chosen.currentX * 0.32 : ball.x;
   let focusY = chosen ? ball.y * 0.68 + chosen.currentY * 0.32 : ball.y;
+  if (shouldHoldCameraForShortDefenseThrow(defenseState.throw, elapsedSeconds)) {
+    focusX = defenseState.throw.from.x;
+    focusY = defenseState.throw.from.y;
+  }
   const homeY = field.plateY + 42;
   let minX = field.plateX - defenseField.fenceDistance - 160;
   let maxX = field.plateX + defenseField.fenceDistance + 160;
   let minY = homeY - defenseField.fenceDistance - 180;
   const maxY = homeY + 120;
   if (isHomeRunVisionField()) {
-    const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
     const vision = getHomeRunVisionScreenFocusPoint();
     const visionWeight = clamp((elapsedSeconds - Math.max(0.8, defenseState.battedBall?.ballTime ?? 0.8)) / 1.05, 0, 1);
     focusX = focusX * (1 - visionWeight) + vision.x * visionWeight;
@@ -18389,37 +18413,13 @@ function drawThrowPath() {
   const quickThrow = throwState.throwTimingSuccess && !isPreparing;
 
   ctx.save();
-  if (quickThrow) {
-    const effectAge = Math.max(0, elapsedSeconds - throwState.startTime);
-    const alpha = clamp(1 - effectAge / 0.38, 0, 1);
-    if (alpha > 0) {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.shadowColor = `rgba(144, 232, 255, ${0.8 * alpha})`;
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = `rgba(174, 231, 255, ${alpha * 0.22})`;
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.88 * alpha})`;
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.arc(throwState.from.x, throwState.from.y, 14 + effectAge * 68, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.globalCompositeOperation = "source-over";
-    }
-  }
   ctx.strokeStyle = isPreparing
     ? "rgba(255, 242, 168, 0.44)"
-    : quickThrow
-    ? "rgba(183, 242, 255, 0.98)"
     : throwState.safe
     ? "rgba(255, 227, 116, 0.74)"
     : "rgba(174, 231, 255, 0.78)";
-  ctx.lineWidth = isPreparing ? 4 : quickThrow ? 11 : 7;
-  ctx.setLineDash(isPreparing ? [6, 12] : quickThrow ? [24, 7] : [15, 12]);
-  if (quickThrow) {
-    ctx.shadowColor = "rgba(120, 225, 255, 0.92)";
-    ctx.shadowBlur = 15;
-  }
+  ctx.lineWidth = isPreparing ? 4 : 7;
+  ctx.setLineDash(isPreparing ? [6, 12] : [15, 12]);
   if (throwState.bounce?.enabled) {
     const bouncePoint = getThrowBouncePoint(throwState);
     drawLine(throwState.from.x, throwState.from.y, bouncePoint.x, bouncePoint.y);
@@ -18428,52 +18428,19 @@ function drawThrowPath() {
     drawLine(throwState.from.x, throwState.from.y, throwState.to.x, throwState.to.y);
   }
   ctx.setLineDash([]);
-  ctx.shadowBlur = 0;
 
   if (!isPreparing) {
-    ctx.strokeStyle = quickThrow
-      ? "rgba(255, 255, 255, 0.96)"
-      : throwState.safe
+    ctx.strokeStyle = throwState.safe
       ? "rgba(255, 255, 255, 0.62)"
       : "rgba(255, 255, 255, 0.74)";
-    ctx.lineWidth = quickThrow ? 5 : 3;
-    const trailLength = quickThrow ? 76 : 44;
+    ctx.lineWidth = 3;
+    const trailLength = 44;
     drawLine(
       ballPoint.x - direction.x * trailLength,
       ballPoint.y - direction.y * trailLength,
       ballPoint.x + direction.x * 12,
       ballPoint.y + direction.y * 12
     );
-    if (quickThrow) {
-      const normalX = -direction.y;
-      const normalY = direction.x;
-      ctx.strokeStyle = "rgba(138, 226, 255, 0.64)";
-      ctx.lineWidth = 2.5;
-      [-7, 7].forEach((offset) => {
-        drawLine(
-          ballPoint.x - direction.x * 58 + normalX * offset,
-          ballPoint.y - direction.y * 58 + normalY * offset,
-          ballPoint.x - direction.x * 5 + normalX * offset * 0.35,
-          ballPoint.y - direction.y * 5 + normalY * offset * 0.35
-        );
-      });
-      ctx.globalCompositeOperation = "lighter";
-      for (let index = 0; index < 5; index += 1) {
-        const distance = 17 + index * 12;
-        const side = (index % 2 === 0 ? -1 : 1) * (2 + index);
-        ctx.fillStyle = `rgba(205, 248, 255, ${0.75 - index * 0.11})`;
-        ctx.beginPath();
-        ctx.arc(
-          ballPoint.x - direction.x * distance + normalX * side,
-          ballPoint.y - direction.y * distance + normalY * side,
-          Math.max(1.2, 3.1 - index * 0.38),
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-      ctx.globalCompositeOperation = "source-over";
-    }
   }
 
   if (throwState.bounce?.enabled) {
@@ -18484,42 +18451,14 @@ function drawThrowPath() {
     ctx.fill();
   }
 
-  if (!isPreparing) {
-    ctx.fillStyle = quickThrow ? "#d9f8ff" : throwState.safe ? "#ffe374" : "#aee7ff";
+  if (!isPreparing && !quickThrow) {
+    ctx.fillStyle = throwState.safe ? "#ffe374" : "#aee7ff";
     ctx.beginPath();
     ctx.moveTo(arrowPoint.x + direction.x * 24, arrowPoint.y + direction.y * 24);
     ctx.lineTo(arrowPoint.x - direction.x * 18 - direction.y * 13, arrowPoint.y - direction.y * 18 + direction.x * 13);
     ctx.lineTo(arrowPoint.x - direction.x * 18 + direction.y * 13, arrowPoint.y - direction.y * 18 - direction.x * 13);
     ctx.closePath();
     ctx.fill();
-  }
-  if (quickThrow) {
-    const arrivalAge = elapsedSeconds - throwState.endTime;
-    if (arrivalAge >= 0 && arrivalAge <= 0.32) {
-      const arrivalProgress = arrivalAge / 0.32;
-      const arrivalAlpha = 1 - arrivalProgress;
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = `rgba(210, 249, 255, ${0.78 * arrivalAlpha})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(throwState.to.x, throwState.to.y, 10 + arrivalProgress * 28, 0, Math.PI * 2);
-      ctx.stroke();
-      for (let index = 0; index < 8; index += 1) {
-        const angle = Math.PI * 2 * index / 8;
-        const distance = 8 + arrivalProgress * 24;
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.7 * arrivalAlpha})`;
-        ctx.beginPath();
-        ctx.arc(
-          throwState.to.x + Math.cos(angle) * distance,
-          throwState.to.y + Math.sin(angle) * distance,
-          1.8,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-      ctx.globalCompositeOperation = "source-over";
-    }
   }
   ctx.restore();
 }
@@ -19306,7 +19245,10 @@ function drawDefenseBall() {
     ctx.stroke();
   }
 
-  drawBaseballIcon(ball.x, ball.y - visualHeightOffset, radius);
+  const defenseThrowBallFill = defenseState.throw?.active && defenseState.throw.throwTimingSuccess
+    ? "#ff8a83"
+    : "#ffffff";
+  drawBaseballIcon(ball.x, ball.y - visualHeightOffset, radius, defenseThrowBallFill);
 }
 
 function drawDefenseCatchBallTransition(elapsedSeconds, radius) {
@@ -20055,7 +19997,7 @@ function drawMiniHelp() {
   ctx.fillText("打撃: 左スティック移動 / ボタン2強スイング / ボタン1弱スイング", 34, 750);
   ctx.fillText("走塁: A+方向 進塁 / B+方向 帰塁 / X全進 / Y全帰", 34, 776);
   ctx.fillText("投球: A速球 B直球 Y遅球 X決め球", 34, 802);
-  ctx.fillText("守備: 左スティック移動 / X+方向 送球", 34, 824);
+  ctx.fillText("守備: 左スティック方向 + ボタン2 送球", 34, 824);
 }
 
 function drawHitEffect() {

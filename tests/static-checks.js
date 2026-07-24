@@ -114,14 +114,48 @@ assert(!script.includes('ctx.strokeText("キャッチ!"'), "catch effects should
 assertIncludesAll(
   script,
   [
-    "const normalDefenseThrowSpeedScale = 0.8",
+    "const quickDefenseThrowSpeedScale = 1.1",
+    "const normalDefenseThrowSpeedScale = 0.8 * 0.85",
+    "const normalDefenseThrowArcMultiplier = 1.5",
+    "const quickDefenseThrowTimeMultiplier = 1 / quickDefenseThrowSpeedScale",
     "const normalDefenseThrowTimeMultiplier = 1 / normalDefenseThrowSpeedScale",
+    "const quickDefenseThrowTimingWindowMs = 450",
     "const quickThrow = throwState.throwTimingSuccess && !isPreparing",
-    'ctx.shadowColor = "rgba(120, 225, 255, 0.92)"',
-    "const trailLength = quickThrow ? 76 : 44",
-    "const arrivalAge = elapsedSeconds - throwState.endTime"
+    "const defenseThrowBallFill = defenseState.throw?.active && defenseState.throw.throwTimingSuccess",
+    '? "#ff8a83"',
+    "drawBaseballIcon(ball.x, ball.y - visualHeightOffset, radius, defenseThrowBallFill)",
+    "const trailLength = 44",
+    "if (!isPreparing && !quickThrow)",
+    'ctx.fillText("守備: 左スティック方向 + ボタン2 送球", 34, 824)'
   ],
   "script.js quick and normal throw distinction"
+);
+assert(!script.includes("早い送球！"), "quick throws should no longer show the temporary diagnostic text");
+assert(!script.includes("defenseThrowNotice"), "quick throw diagnostic notice state should be removed");
+const quickThrowDrawSection = script.slice(
+  script.indexOf("function drawThrowPath()"),
+  script.indexOf("function drawBatterRunner()")
+);
+assert(!quickThrowDrawSection.includes("globalCompositeOperation"), "quick throws should not use full-canvas additive blending");
+assert(!quickThrowDrawSection.includes("shadowBlur"), "quick throws should not use large shadow blurs that can flash the canvas");
+assert(!quickThrowDrawSection.includes("arrivalAge"), "quick throws should not use the old arrival burst");
+assert(!quickThrowDrawSection.includes("radius: 20"), "quick throws should not use the old large red ball layers");
+assert(!quickThrowDrawSection.includes("rgba(255, 92, 84"), "quick throws should color the baseball itself instead of drawing a red shadow");
+const defenseGamepadInputStart = script.indexOf('if (gamePhase === "defense" && team === fieldingTeam())');
+const defenseGamepadInputEnd = script.indexOf('if (gamePhase === "defense" && team === battingTeam)', defenseGamepadInputStart);
+const defenseGamepadInputSection = script.slice(defenseGamepadInputStart, defenseGamepadInputEnd);
+assert(defenseGamepadInputSection.includes("justPressed(gamepadButtons.A)"), "screen BTN 2 should be the defense throw button");
+assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.B)"), "screen BTN 1 should not throw");
+assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.X)"), "screen BTN 3 should not throw");
+assertIncludesAll(
+  script,
+  [
+    "function shouldHoldCameraForShortDefenseThrow",
+    "return distance <= 820",
+    "focusX = defenseState.throw.from.x",
+    "focusY = defenseState.throw.from.y"
+  ],
+  "short infield throw camera stability"
 );
 
 assertIncludesAll(
