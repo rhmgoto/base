@@ -5919,6 +5919,7 @@ const quickDefenseThrowTimingWindowMs = 450;
 const catcherStealThrowTiming = {
   perfectWindowMs: 140,
   goodWindowMs: 360,
+  strongThrowArrivalBonusSeconds: 0.2,
   perfectSpeedScale: 1.18,
   goodSpeedScale: 1.0,
   badSpeedScale: 0.8,
@@ -6169,7 +6170,11 @@ function handleStealDefenseThrow(targetBase, now = performance.now(), options = 
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
   const throwSpeedScale = options.throwSpeedScale ?? (stealTuning.manualQuickThrowSpeedScale ?? 1.18);
   const throwSpeed = (stealTuning.catcherThrowBaseSpeed + getTeamCatcherArm(fieldingTeam()) * 22) * throwSpeedScale;
-  const throwTime = stealTuning.catcherExchangeSeconds + distance / throwSpeed;
+  const rawThrowTime = stealTuning.catcherExchangeSeconds + distance / throwSpeed;
+  const strongThrowArrivalBonus = targetBase === "second" && ["perfect", "good"].includes(options.timingRank)
+    ? catcherStealThrowTiming.strongThrowArrivalBonusSeconds
+    : 0;
+  const throwTime = Math.max(0.1, rawThrowTime - strongThrowArrivalBonus);
   const swingMissDelay = stealState.swingMissDelaySeconds ?? 0;
   const startTime = elapsedSeconds + (stealTuning.catcherReleaseDelaySeconds ?? 0.3) + swingMissDelay;
   const endTime = startTime + throwTime;
@@ -9384,10 +9389,12 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
       baseRunners,
       minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, chosenFielder)
     });
-  if (!throwState) {
-    throwState = createTagUpVisualThrowState(chosenFielder, fieldingTarget, outcome, battedBall, baseRunners);
+  if (!throwState && !isManualThrowControl()) {
+    throwState = createTagUpVisualThrowState(chosenFielder, fieldingTarget, outcome, battedBall, baseRunners, {
+      live: true
+    });
   }
-  if (outcome.caught && !outcome.needsThrow) throwState = null;
+  if (outcome.caught && !outcome.needsThrow && !throwState) throwState = null;
 
   gamePhase = "defense";
   isPitching = false;
@@ -10426,15 +10433,22 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   updateBatterRunner(elapsedSeconds);
   updateDefenseBaseRunners(elapsedSeconds);
   const previousThrow = defenseState.throw;
-  const isBaseRelay = Number.isFinite(previousThrow.endTime) && elapsedSeconds >= previousThrow.endTime;
+  const isTagUpThrow = isManualTagUpThrowOpportunity(targetBase, elapsedSeconds);
+  const isBaseRelay = previousThrow && Number.isFinite(previousThrow.endTime) && elapsedSeconds >= previousThrow.endTime;
   const from = isBaseRelay ? previousThrow.to : defenseState.target;
   const commandStartTime = isBaseRelay
     ? elapsedSeconds
-    : Math.max(elapsedSeconds, previousThrow.prepareStartTime ?? elapsedSeconds);
+    : Math.max(elapsedSeconds, previousThrow?.prepareStartTime ?? elapsedSeconds);
   const thrower = isBaseRelay
     ? { ...(defenseState.chosenFielder || {}), arm: 5, fielding: 5 }
     : defenseState.chosenFielder;
-  defenseState.throw = createThrowState(thrower, from, defenseState.outcome, defenseState.runner, {
+  const throwOutcome = isTagUpThrow
+    ? { ...(defenseState.outcome || {}), caught: true, needsThrow: true }
+    : defenseState.outcome;
+  const throwRunner = isTagUpThrow
+    ? getLeadTagUpRunnerForTarget(targetBase) || defenseState.runner
+    : defenseState.runner;
+  defenseState.throw = createThrowState(thrower, from, throwOutcome, throwRunner, {
     targetBase,
     immediate: true,
     startTime: commandStartTime,
@@ -10443,6 +10457,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
     throwTimeMultiplier: options.throwTimeMultiplier ?? 1,
     throwArcMultiplier: options.throwArcMultiplier ?? 1,
     throwTimingSuccess: Boolean(options.throwTimingSuccess),
+    tagUpPlay: isTagUpThrow,
     throwTimingLabel: options.throwTimingSuccess ? "ナイス送球" : options.throwTimingLabel || ""
   });
   if (isForceThrowTargetBase(targetBase, defenseState.outcome, defenseState.battedBall)) {
@@ -10469,9 +10484,12 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
 }
 
 function canManualDefenseThrow(targetBase) {
-  if (!targetBase || !defenseState.throw || !defenseState.outcome?.needsThrow) return false;
   if (gamePhase !== "defense" || !isManualThrowControl() || !defenseState.active || defenseState.resolved) return false;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
+  const tagUpThrow = isManualTagUpThrowOpportunity(targetBase, elapsedSeconds);
+  if (!targetBase || (!defenseState.throw && !tagUpThrow)) return false;
+  if (!defenseState.outcome?.needsThrow && !tagUpThrow) return false;
+  if (!defenseState.throw && tagUpThrow) return true;
   if (!Number.isFinite(defenseState.throw.startTime)) {
     return defenseState.throw.manualWait || elapsedSeconds < defenseState.throw.holdDeadline || !isBatterRunnerSettledForResolution();
   }
@@ -10525,6 +10543,7 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
     tagTime: playType === "tag" ? fieldingTime + throwTime : null,
     holdDeadline,
     manualWait: Boolean(options.manualWait),
+    tagUpPlay: Boolean(options.tagUpPlay),
     throwTime,
     throwTimingLabel: options.throwTimingLabel || "",
     throwTimingSuccess: Boolean(options.throwTimingSuccess),
@@ -10536,12 +10555,36 @@ function createThrowState(fielder, fieldingTarget, outcome, runner, options = {}
   };
 }
 
-function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBall, baseRunners = []) {
+function getLeadTagUpRunnerForTarget(targetBase = null, baseRunners = defenseState.baseRunners) {
+  return (baseRunners || [])
+    .filter((runner) => runner?.tagUp && runner.targetBase && runner.targetBase !== runner.startBase)
+    .filter((runner) => !targetBase || runner.targetBase === targetBase)
+    .sort((a, b) => getRunnerBaseIndex(b.targetBase) - getRunnerBaseIndex(a.targetBase))[0] || null;
+}
+
+function isManualTagUpThrowOpportunity(targetBase, elapsedSeconds = (performance.now() - defenseState.startTime) / 1000) {
+  if (!targetBase || !isManualThrowControl() || gamePhase !== "defense" || !defenseState.active || defenseState.resolved) return false;
+  const outcome = defenseState.outcome;
+  if (outcome?.kind !== "out" || !outcome.caught || outcome.needsThrow) return false;
+  if (!defenseState.chosenFielder || !defenseState.target) return false;
+  const tagRunner = getLeadTagUpRunnerForTarget(targetBase);
+  if (!tagRunner || tagRunner.isOut) return false;
+  const catchTime = outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 0;
+  return elapsedSeconds >= catchTime;
+}
+
+function getManualTagUpHoldDeadline(outcome = defenseState.outcome) {
+  if (!isManualThrowControl() || outcome?.kind !== "out" || !outcome.caught || outcome.needsThrow) return null;
+  const tagRunners = (defenseState.baseRunners || []).filter((runner) => runner?.tagUp && runner.targetBase && runner.targetBase !== runner.startBase);
+  if (!tagRunners.length) return null;
+  const latestArrival = Math.max(...tagRunners.map((runner) => runner.arrivalTime || 0));
+  return latestArrival + defenseThrowResultHoldSeconds;
+}
+
+function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBall, baseRunners = [], options = {}) {
   if (!fielder || !fieldingTarget || !outcome || !battedBall) return null;
   if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return null;
-  const tagRunner = (baseRunners || [])
-    .filter((runner) => runner.tagUp && runner.targetBase && runner.targetBase !== runner.startBase)
-    .sort((a, b) => getRunnerBaseIndex(b.targetBase) - getRunnerBaseIndex(a.targetBase))[0];
+  const tagRunner = getLeadTagUpRunnerForTarget(null, baseRunners);
   if (!tagRunner) return null;
   const targetBase = tagRunner.targetBase;
   const destination = getDefenseBasePointByName(targetBase);
@@ -10553,22 +10596,27 @@ function createTagUpVisualThrowState(fielder, fieldingTarget, outcome, battedBal
   const prepareStartTime = Math.max(0, outcome.fieldingTime ?? battedBall.ballTime ?? 0);
   const startTime = prepareStartTime + Math.max(0.12, getAutoThrowSetSeconds(fielder) * 0.42);
   const throwTime = throwProfile.throwTime;
+  const endTime = startTime + throwTime;
+  const live = options.live === true;
   return {
     active: false,
-    visualOnly: true,
+    visualOnly: !live,
+    tagUpPlay: live,
     from: { ...fieldingTarget },
     to: { ...destination },
     prepareStartTime,
     startTime,
-    endTime: startTime + throwTime,
-    holdDeadline: startTime + throwTime + defenseThrowResultHoldSeconds,
+    endTime,
+    playType: "tag",
+    tagTime: live ? endTime : null,
+    holdDeadline: endTime + defenseThrowResultHoldSeconds,
     manualWait: false,
     throwTime,
     arcHeight: throwProfile.arcHeight,
     bounce: throwProfile.bounce,
     baseLabel: getBaseLabel(targetBase),
     targetBase,
-    safe: true
+    safe: live ? isDefenseThrowSafeAtBase(targetBase, endTime, null, baseRunners, outcome) : true
   };
 }
 
@@ -13775,13 +13823,16 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
     }
     refreshDefenseThrowSafety();
   } else {
-    defenseState.throw = createTagUpVisualThrowState(
-      defenseState.chosenFielder,
-      fieldingPoint,
-      defenseState.outcome,
-      battedBall,
-      defenseState.baseRunners
-    );
+    defenseState.throw = isManualThrowControl()
+      ? null
+      : createTagUpVisualThrowState(
+        defenseState.chosenFielder,
+        fieldingPoint,
+        defenseState.outcome,
+        battedBall,
+        defenseState.baseRunners,
+        { live: true }
+      );
   }
   defenseState.duration = Math.max(
     elapsedSeconds * 1000 + 1600,
@@ -13921,7 +13972,11 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
     const tagUpThrowHold = Number.isFinite(defenseState.throw?.holdDeadline)
       ? defenseState.throw.holdDeadline
       : outcome.fieldingTime + defenseThrowResultHoldSeconds;
-    return elapsedSeconds >= tagUpThrowHold
+    const manualTagUpHold = getManualTagUpHoldDeadline(outcome);
+    const holdDeadline = Number.isFinite(manualTagUpHold)
+      ? Math.max(tagUpThrowHold, manualTagUpHold)
+      : tagUpThrowHold;
+    return elapsedSeconds >= holdDeadline
       && isBatterRunnerSettledForResolution();
   }
 
@@ -14000,7 +14055,7 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
   });
   if (!nextThrow) return false;
   if (caughtFly) {
-    nextThrow.visualOnly = true;
+    nextThrow.tagUpPlay = true;
   } else {
     defenseState.outcome = {
       ...defenseState.outcome,
@@ -14190,6 +14245,7 @@ function getForceOutBasesFromThrowState(throwState) {
 
 function getThrowOutRunner(throwState) {
   if (throwState?.visualOnly) return null;
+  if (throwState?.tagUpPlay) return null;
   if (!throwState?.targetBase || !Number.isFinite(throwState.endTime)) return null;
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
   if (forcedRunner) {
@@ -14789,8 +14845,9 @@ function applyDefenseOutAdvancements() {
 function isTagUpRunnerSafe(runner) {
   const throwState = defenseState.throw;
   if (!runner?.tagUp || !throwState || throwState.targetBase !== runner.targetBase) return true;
+  if (throwState.visualOnly) return true;
   if (!Number.isFinite(runner.arrivalTime) || !Number.isFinite(throwState.endTime)) return true;
-  return runner.arrivalTime <= throwState.endTime;
+  return !judgeOutPlay(runner, runner.targetBase, throwState).out;
 }
 
 function checkCountEnd() {

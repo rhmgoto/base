@@ -8313,7 +8313,7 @@ const defenseOutAdvancementState = JSON.parse(runInGame(
     count.outs = 2;
     defenseState = {
       ...createDefenseState(),
-      throw: { visualOnly: true, targetBase: "home", endTime: 2.0 },
+      throw: { tagUpPlay: true, playType: "tag", targetBase: "home", endTime: 2.0, tagTime: 2.0 },
       baseRunners: [
         { ...thirdRunner, startBase: "third", targetBase: "home", tagUp: true, scored: true, arrivalTime: 2.6 }
       ]
