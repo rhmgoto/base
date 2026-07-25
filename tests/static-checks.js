@@ -301,7 +301,8 @@ assert(
 assertIncludesAll(
   script,
   [
-    "cpuAutoChangeThreshold: 40",
+    "cpuAutoChangeThresholdRatio: 0.5",
+    "const changeThreshold = maxStamina * (staminaTuning.cpuAutoChangeThresholdRatio ?? 0.5)",
     "function maybeAutoChangeCpuPitcher",
     "function getNextUnusedPitcher",
     "if (gameMode === \"watch\") return true",

@@ -126,8 +126,8 @@ function createGameContext() {
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "1";
   makeElement("stadiumSelect").value = "fireworks";
-  makeElement("p1DefenseSelect").value = "auto";
-  makeElement("p2DefenseSelect").value = "auto";
+  makeElement("p1DefenseSelect").value = "manual";
+  makeElement("p2DefenseSelect").value = "manual";
 
   let now = 1000;
   const context = {
@@ -835,8 +835,8 @@ const catchAutoControlState = JSON.parse(runInGame(
 assert(catchAutoControlState.homeManualCatch === false, "catch-only-auto mode should keep all catches automatic");
 assert(catchAutoControlState.homeManualThrow === true, "catch-only-auto mode should keep throws manual");
 assert(catchAutoControlState.awayManualBaserun === true, "catch-only-auto mode should keep baserunning manual");
-assert(catchAutoControlState.awayAutoBaserun === false, "auto mode should keep baserunning automatic");
-assert(catchAutoControlState.homeAutoThrow === false, "auto mode should keep throws automatic");
+assert(catchAutoControlState.awayAutoBaserun === true, "removed auto mode should fall back to catch-only-auto baserunning");
+assert(catchAutoControlState.homeAutoThrow === true, "removed auto mode should fall back to catch-only-auto manual throws");
 
 const swingLockState = JSON.parse(runInGame(
   context,
@@ -948,6 +948,21 @@ const weakSwingState = JSON.parse(runInGame(
     const badBuntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), badBuntBall);
     const badBuntOutcome = resolveDefenseOutcome(badBuntFielder, badBuntBall, createBatterRunner(activeBatter));
     Math.random = badBuntRandom;
+    const convertedBuntProfile = {
+      ...badBuntProfile,
+      pitcherBuntPopup: false,
+      popupConvertedToPitcherFront: true,
+      buntPitcherFrontGrounder: true,
+      launchAngle: 12,
+      power: 0.18
+    };
+    const convertedBuntResult = makeBuntGrounderResultFromProfile(convertedBuntProfile);
+    const convertedBuntBall = buildBattedBall(
+      convertedBuntResult.power,
+      convertedBuntResult.direction,
+      convertedBuntResult.label,
+      convertedBuntResult.battedProfile
+    );
     count = { strikes: 2, balls: 0, outs: 0 };
     finishPitch(hitLabels.foul, "foul", 0.2, 0, badBuntProfile.direction, badBuntProfile);
     const twoStrikeBuntFoul = {
@@ -1074,7 +1089,7 @@ const weakSwingState = JSON.parse(runInGame(
     updateBuntStance();
     const batterButton3BuntHeld = isBuntButtonHeld();
     const batterButton3BuntType = swingState.type;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
+    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1089,10 +1104,12 @@ assert(weakSwingState.buntProfile.isBunt === true && weakSwingState.buntProfile.
 assert(weakSwingState.buntProfile.buntLineChance === 0 && weakSwingState.buntProfile.buntPitcherFrontChance === 1, "a bunt without stick input should report its actual pitcher-front direction");
 assert(
   weakSwingState.buntBall.isBunt === true
+    && weakSwingState.buntBall.isGrounder === true
+    && weakSwingState.buntBall.isPopupFly === false
     && weakSwingState.buntBall.landingDistance >= 35
     && weakSwingState.buntBall.landingDistance < 300
     && weakSwingState.buntBall.distance < 400,
-  "good bunt contact should stay close to the plate and inside the infield"
+  "good bunt contact should stay close to the plate as a bouncing grounder inside the infield"
 );
 assert(Math.abs(weakSwingState.buntProfile.direction.x) <= 0.16 && Math.abs(weakSwingState.buntBall.direction.x) <= 0.16, "a bunt without stick input should stay near the pitcher");
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
@@ -1109,6 +1126,8 @@ assert(weakSwingState.badBuntProfile.buntLineChance === 0 && weakSwingState.badB
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
 assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, `pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play (${JSON.stringify(weakSwingState.badBuntOutcome)})`);
+assert(weakSwingState.convertedBuntResult.battedProfile.launchAngle <= 2, "bunt popups converted to pitcher-front balls should keep a low visual launch angle");
+assert(weakSwingState.convertedBuntBall.isGrounder === true && weakSwingState.convertedBuntBall.isPopupFly === false && weakSwingState.convertedBuntBall.trajectory === "grounder", "bunt popups converted to pitcher-front balls should render and resolve as bouncing grounders");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
 assert(weakSwingState.directTwoStrikeBuntFoul.profileHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.resultHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.outs === 1 && weakSwingState.directTwoStrikeBuntFoul.strikes === 0 && weakSwingState.directTwoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls from the normal batted-ball result path should display strikeout and add an out");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
@@ -2701,7 +2720,7 @@ assert(watchModeState.readState.maxInnings === 9, "watch mode should honor the i
 assert(watchModeState.readState.awayPreset === "tigers", "watch mode should honor Team A preset selection");
 assert(watchModeState.readState.homePreset === "dodgers", "watch mode should honor Team B preset selection");
 assert(watchModeState.readState.awayDefenseControl === "auto" && watchModeState.readState.homeDefenseControl === "auto", "watch mode should force defense and baserunning to auto");
-assert(watchModeState.readState.awayDefenseSelect === "auto" && watchModeState.readState.homeDefenseSelect === "auto", "watch mode should show auto in both defense and baserunning selectors");
+assert(watchModeState.readState.awayDefenseSelect === "manual" && watchModeState.readState.homeDefenseSelect === "manual", "watch mode should keep the catch-only-auto selectors visible");
 assert(watchModeState.awayBattingPlayerControlled === false && watchModeState.homeBattingPlayerControlled === false, "watch mode should not let either batter side wait for player input");
 assert(watchModeState.homePitchingPlayerControlled === false && watchModeState.awayPitchingPlayerControlled === false, "watch mode should not let either pitcher side wait for player input");
 assert(watchModeState.manualHomeDefense === false && watchModeState.manualAwayDefense === false, "watch mode should disable manual defense");
@@ -2838,6 +2857,43 @@ assert(pitcherChangeState.changed === true, "teams should be able to change to a
 assert(pitcherChangeState.afterChange === pitcherChangeState.activeAfterChange, "active pitcher should update after a pitching change");
 assert(pitcherChangeState.backToStarter === false, "removed pitchers should not be able to re-enter");
 assert(pitcherChangeState.usedIds.includes(pitcherChangeState.starter), "the starter should count as used");
+
+const cpuPitcherAutoChangeState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    selected = createSelectedTeams(defaultMenuSelection);
+    gameMode = "single";
+    battingTeam = "away";
+    gamePhase = "playing";
+    isPitching = false;
+    pendingPitch = null;
+    ball.active = false;
+    stealState = createStealState();
+    setMatchup();
+    const starter = selected.home.activePitcherId;
+    const starterInfo = getTeamActivePitcher("home");
+    const max = getPitcherMaxStamina(starterInfo);
+    starterInfo.currentStamina = max * 0.5;
+    const atHalfChanged = maybeAutoChangeCpuPitcher("home");
+    const atHalfPitcher = selected.home.activePitcherId;
+    starterInfo.currentStamina = max * 0.5 - 0.01;
+    const belowHalfChanged = maybeAutoChangeCpuPitcher("home");
+    return JSON.stringify({
+      starter,
+      max,
+      thresholdRatio: staminaTuning.cpuAutoChangeThresholdRatio,
+      atHalfChanged,
+      atHalfPitcher,
+      belowHalfChanged,
+      nextPitcher: selected.home.activePitcherId,
+      expectedNext: selected.home.pitchers[1].id
+    });
+  })()`
+));
+
+assert(cpuPitcherAutoChangeState.thresholdRatio === 0.5, "CPU pitcher auto changes should use a half-stamina threshold");
+assert(cpuPitcherAutoChangeState.atHalfChanged === false && cpuPitcherAutoChangeState.atHalfPitcher === cpuPitcherAutoChangeState.starter, "CPU pitchers should not change at exactly 50% stamina");
+assert(cpuPitcherAutoChangeState.belowHalfChanged === true && cpuPitcherAutoChangeState.nextPitcher === cpuPitcherAutoChangeState.expectedNext, "CPU pitchers should change to the next unused pitcher below 50% stamina");
 
 const pitcherStaminaState = JSON.parse(runInGame(
   context,
@@ -3551,7 +3607,8 @@ const stealStateCheck = JSON.parse(runInGame(
   `(() => {
     const originalEnabled = stealTuning.enabled;
     stealTuning.enabled = true;
-    gameMode = "versus";
+    gameMode = "single";
+    defenseControlMode = { away: "manual", home: "manual" };
     battingTeam = "away";
     gamePhase = "playing";
     bases = createEmptyBases();
@@ -3559,20 +3616,63 @@ const stealStateCheck = JSON.parse(runInGame(
     const runner = { ...findById(batters, "shuto"), run: 7 };
     bases.first = makeBaseRunner(runner);
     isPitching = true;
-    pendingPitch = { releaseTime: 1000, typeKey: "normal" };
+    const cpuAutoBaseNow = performance.now();
+    pendingPitch = { releaseTime: cpuAutoBaseNow, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const normalStarted = tryStartSteal("second", 1000);
+    const normalStarted = tryStartSteal("second", cpuAutoBaseNow);
     const normalArrival = stealState.arrivalTime;
     stealState.plateReached = true;
-    updateStealState(2350);
+    updateStealState(cpuAutoBaseNow + 1350);
     const normalThrowStarted = Boolean(stealState.throw);
     const normalThrowStart = stealState.throw.startTime;
     const normalThrowEnd = stealState.throw.endTime;
     const normalThrowTime = stealState.throw.throwTime;
     const normalSafe = stealState.throw.safe;
-    updateStealState(1000 + normalArrival * 1000 + 5);
+    updateStealState(cpuAutoBaseNow + normalArrival * 1000 + 5);
     const normalSuccess = bases.second?.id === runner.id && !bases.first;
+
+    gameMode = "versus";
+    battingTeam = "away";
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner(runner);
+    stealState = createStealState();
+    isPitching = true;
+    const manualBaseNow = performance.now();
+    pendingPitch = { releaseTime: manualBaseNow, typeKey: "normal" };
+    ball.crossedPlate = false;
+    currentPitchType = "normal";
+    const manualStarted = tryStartSteal("second", manualBaseNow);
+    stealState.plateReached = true;
+    updateStealState(manualBaseNow + 1350);
+    const manualWaitsForThrow = manualStarted && !stealState.throw && stealState.catcherThrowReady === true && stealState.manualThrowRequired === true;
+    gamepadState.previousButtons.home = new Set();
+    gamepadState.previousDirections.home = new Set();
+    gamepadState.lastDirectionPress.home = { time: 0, directions: new Set() };
+    const manualButtons = Array.from({ length: 13 }, () => ({ pressed: false }));
+    manualButtons[gamepadButtons.A] = { pressed: true };
+    handleGamepadButtonPresses({ buttons: manualButtons, axes: [0, -1] }, "home");
+    const manualThrowStarted = Boolean(stealState.throw);
+    const manualThrowTarget = stealState.throw?.targetBase;
+    const manualThrowRank = stealState.throw?.timingRank;
+    const manualThrowScale = stealState.throw?.throwSpeedScale;
+
+    gamepadState.lastDirectionPress.home = { time: 1000, directions: new Set(["up"]) };
+    gamepadState.lastThrowButtonPress.home = 1090;
+    const perfectThrowOptions = getStealCatcherThrowTimingOptions("home", new Set(["up"]));
+    gamepadState.lastThrowButtonPress.home = 1250;
+    const goodThrowOptions = getStealCatcherThrowTimingOptions("home", new Set(["up"]));
+    gamepadState.lastThrowButtonPress.home = 1500;
+    const badThrowOptions = getStealCatcherThrowTimingOptions("home", new Set(["up"]));
+    const throwBallColors = {
+      perfect: getStealThrowBallColor({ timingRank: "perfect" }),
+      good: getStealThrowBallColor({ timingRank: "good" }),
+      bad: getStealThrowBallColor({ timingRank: "bad" })
+    };
+
+    gameMode = "single";
+    defenseControlMode = { away: "manual", home: "manual" };
+    battingTeam = "away";
 
     bases = createEmptyBases();
     bases.first = makeBaseRunner(runner);
@@ -3699,6 +3799,18 @@ const stealStateCheck = JSON.parse(runInGame(
       swingMissThrowStart,
       normalSafe,
       normalSuccess,
+      manualWaitsForThrow,
+      manualThrowStarted,
+      manualThrowTarget,
+      manualThrowRank,
+      manualThrowScale,
+      perfectThrowRank: perfectThrowOptions.timingRank,
+      goodThrowRank: goodThrowOptions.timingRank,
+      badThrowRank: badThrowOptions.timingRank,
+      perfectThrowScale: perfectThrowOptions.throwSpeedScale,
+      goodThrowScale: goodThrowOptions.throwSpeedScale,
+      badThrowScale: badThrowOptions.throwSpeedScale,
+      throwBallColors,
       slowArrival,
       fastArrival,
       slowSafe,
@@ -3719,8 +3831,14 @@ const stealStateCheck = JSON.parse(runInGame(
 ));
 
 assert(stealStateCheck.normalStarted === true, "first-base runners should be able to start a steal with stick+B during the pitch motion");
-assert(stealStateCheck.normalThrowStarted === true, "catchers should automatically throw to the steal base after the ball reaches home");
+assert(stealStateCheck.normalThrowStarted === true, "CPU catchers should automatically throw to the steal base after the ball reaches home");
 assert(Math.abs(stealStateCheck.catcherThrowSpeedScale - 0.95) < 0.001, "catcher steal throws should use the requested 0.95 speed scale");
+assert(stealStateCheck.manualWaitsForThrow === true, "player-controlled catchers should wait for a manual throw after receiving a steal pitch");
+assert(stealStateCheck.manualThrowStarted === true && stealStateCheck.manualThrowTarget === "second", "player catcher button-2 plus up input should throw to second");
+assert(stealStateCheck.manualThrowRank === "perfect" && Math.abs(stealStateCheck.manualThrowScale - 1.18) < 0.001, "same-frame catcher throw input should use the highest throw speed");
+assert(stealStateCheck.perfectThrowRank === "perfect" && stealStateCheck.goodThrowRank === "good" && stealStateCheck.badThrowRank === "bad", "catcher steal throws should grade timing into three ranks");
+assert(stealStateCheck.perfectThrowScale > stealStateCheck.goodThrowScale && stealStateCheck.goodThrowScale > stealStateCheck.badThrowScale, "better catcher throw timing should produce faster throws");
+assert(stealStateCheck.throwBallColors.perfect === "#ff4f4f" && stealStateCheck.throwBallColors.good === "#ffe45c" && stealStateCheck.throwBallColors.bad === "#fff2a8", "catcher steal throw ball colors should show perfect red, good yellow, and late normal");
 assert(Math.abs(stealStateCheck.swingMissDelay - 0.16) < 0.001, "catcher steal throws should add a 0.16-second delay after a swing-and-miss");
 assert(Math.abs(stealStateCheck.swingMissThrowStart - stealStateCheck.normalThrowStart - 0.16) < 0.001, "swing-and-miss steal throws should start 0.16 seconds later than a clean catch");
 assert(stealStateCheck.normalThrowTime > 0.85, "catcher throws should keep a visible exchange and travel time with the 0.95 arm scale");
@@ -4625,6 +4743,7 @@ const outAdvancementState = JSON.parse(runInGame(
     bases = createEmptyBases();
     const thirdRunner = makeBaseRunner(findById(batters, "shuto"));
     bases.third = thirdRunner;
+    defenseControlMode.away = "auto";
     const deepTarget = { x: field.plateX + 70, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.72 };
     const flyBall = {
       target: deepTarget,
