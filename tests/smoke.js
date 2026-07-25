@@ -210,6 +210,7 @@ function assertHtmlShell() {
     'value="tigers"',
     'value="dodgers"',
     'value="dendos"',
+    'value="allstar"',
     '>捕球だけオート</option>',
     'value="watch"',
     'id="practicePitcherControlSelect"',
@@ -797,8 +798,8 @@ assert(lineupState.awayRoles.join(",") === "R,L,2B,CA,C,SS,DH", "away lineup sho
 assert(lineupState.homeRoles.join(",") === "R,L,2B,CA,C,SS,DH", "home lineup should use the requested batting order");
 assert(lineupState.awayPitchers.length === 5 && lineupState.homePitchers.length === 5, "each team should carry five pitchers");
 assert(lineupState.awayActivePitcher === lineupState.awayPitchers[0], "the first pitcher slot should be the starter");
-assert(lineupState.awayPitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,rojas", "away default pitchers should match the requested regular roster");
-assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,rojas", "home default pitchers should match the requested regular roster");
+assert(lineupState.awayPitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,glasnow", "away default pitchers should match the requested regular roster");
+assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,glasnow", "home default pitchers should match the requested regular roster");
 assert(lineupState.awayBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
@@ -1325,7 +1326,7 @@ assert(teamResetState.autoPitcher === "shohei", "auto fill should restore the de
 assert(teamResetState.autoShortstop === "kimhyesong", "auto fill should restore the default fielder selections");
 assert(teamResetState.autoLineup === "R,L,2B,CA,C,SS,DH", "auto fill should restore the default batting order");
 assert(teamResetState.autoComplete === true, "auto fill should make the team complete");
-assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 65, "auto fill should restore a valid point total");
+assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 70, "auto fill should restore a valid point total");
 
 const rosterAndPointState = JSON.parse(runInGame(
   context,
@@ -1367,6 +1368,8 @@ const rosterAndPointState = JSON.parse(runInGame(
     const ediaz = findById(pitchers, "ediaz");
     const jansen = findById(pitchers, "jansen");
     const enriquez = findById(pitchers, "enriquez");
+    const wheeler = findById(pitchers, "wheeler");
+    const valdes = findById(pitchers, "valdes");
     const ichiro = findById(batters, "ichiro");
     const ruth = findById(batters, "ruth");
     const nagashima = findById(batters, "nagashima");
@@ -2001,6 +2004,32 @@ const rosterAndPointState = JSON.parse(runInGame(
         stamina: enriquez.stamina,
         cost: enriquez.cost
       },
+      wheeler: {
+        throws: wheeler.throws,
+        fastKmh: wheeler.fastKmh,
+        rightBreak: wheeler.rightBreak,
+        leftBreak: wheeler.leftBreak,
+        slowChange: wheeler.slowChange,
+        fastChange: wheeler.fastChange,
+        control: wheeler.control,
+        stuff: wheeler.stuff,
+        fielding: wheeler.fielding,
+        stamina: wheeler.stamina,
+        cost: wheeler.cost
+      },
+      valdes: {
+        throws: valdes.throws,
+        fastKmh: valdes.fastKmh,
+        rightBreak: valdes.rightBreak,
+        leftBreak: valdes.leftBreak,
+        slowChange: valdes.slowChange,
+        fastChange: valdes.fastChange,
+        control: valdes.control,
+        stuff: valdes.stuff,
+        fielding: valdes.fielding,
+        stamina: valdes.stamina,
+        cost: valdes.cost
+      },
       baseCost,
       pitcherIncludedCost,
       defaultAwayPitcherCost,
@@ -2075,6 +2104,10 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
     carpenter: findById(batters, "carpenter"),
     mcgonigle: findById(batters, "mcgonigle"),
     darvish: findById(pitchers, "darvish"),
+    yamamoto: findById(pitchers, "yamamoto"),
+    yamaoka: findById(pitchers, "yamaoka"),
+    wheeler: findById(pitchers, "wheeler"),
+    valdes: findById(pitchers, "valdes"),
     rojas: findById(pitchers, "rojas"),
     summers: findById(pitchers, "summers"),
     enriquez: findById(pitchers, "enriquez")
@@ -2088,6 +2121,10 @@ assert(latestSpreadsheetRosterState.mcgonigle.arm === 6, "McGonigle arm should m
 assert(latestSpreadsheetRosterState.darvish.rightBreak === 9, "Darvish right break should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.cost === 6, "Darvish cost should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.yamamoto.control === 9, "Yamamoto control should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.yamaoka.slowChange === 8 && latestSpreadsheetRosterState.yamaoka.fastChange === 8 && latestSpreadsheetRosterState.yamaoka.control === 8 && latestSpreadsheetRosterState.yamaoka.stuff === 8 && latestSpreadsheetRosterState.yamaoka.fielding === 6, "Yamaoka should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.wheeler.throws === "R" && latestSpreadsheetRosterState.wheeler.fastKmh === 159 && latestSpreadsheetRosterState.wheeler.cost === 7, "Wheeler should be available as a new pitcher");
+assert(latestSpreadsheetRosterState.valdes.throws === "L" && latestSpreadsheetRosterState.valdes.fastKmh === 158 && latestSpreadsheetRosterState.valdes.cost === 7, "Valdes should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRosterState.rojas.fastKmh === 77 && latestSpreadsheetRosterState.rojas.cost === 1, "Rojas should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.summers.throws === "L" && latestSpreadsheetRosterState.summers.fastKmh === 152 && latestSpreadsheetRosterState.summers.cost === 1, "Summers should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.enriquez.throws === "R" && latestSpreadsheetRosterState.enriquez.fastKmh === 166 && latestSpreadsheetRosterState.enriquez.cost === 1, "Enriquez should be available as a new pitcher");
@@ -2136,16 +2173,16 @@ assert(rosterAndPointState.dingler.bats === "R", "Dingler should be a right-hand
 assert(rosterAndPointState.dingler.power === 7, "Dingler power should match the catcher roster table");
 assert(rosterAndPointState.dingler.meet === 3, "Dingler meet should match the catcher roster table");
 assert(rosterAndPointState.dingler.run === 3, "Dingler run should match the roster table");
-assert(rosterAndPointState.dingler.arm === 7, "Dingler arm should match the catcher roster table");
+assert(rosterAndPointState.dingler.arm === 8, "Dingler arm should match the catcher roster table");
 assert(rosterAndPointState.dingler.cost === 5, "Dingler cost should match the roster table");
-assert(rosterAndPointState.calraleigh.power === 8 && rosterAndPointState.calraleigh.arm === 7, "Cal Raleigh should be available as a catcher");
+assert(rosterAndPointState.calraleigh.power === 8 && rosterAndPointState.calraleigh.arm === 8, "Cal Raleigh should be available as a catcher");
 assert(rosterAndPointState.nomura.power === 34 && rosterAndPointState.nomura.meet === 16 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
 assert(rosterAndPointState.johnnybench.power === 36 && rosterAndPointState.johnnybench.meet === 17 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
 assert(rosterAndPointState.rodgersCatcher.bats === "R", "Rodgers catcher should be a right-handed batter");
 assert(rosterAndPointState.rodgersCatcher.power === 6, "Rodgers catcher power should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.meet === 1, "Rodgers catcher meet should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.run === 3, "Rodgers catcher run should match the catcher roster table");
-assert(rosterAndPointState.rodgersCatcher.arm === 6, "Rodgers catcher arm should match the catcher roster table");
+assert(rosterAndPointState.rodgersCatcher.arm === 7, "Rodgers catcher arm should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.cost === 3, "Rodgers catcher cost should match the catcher roster table");
 assert(rosterAndPointState.rodgersBatter.bats === "R", "Rodgers fielder should be a right-handed batter");
 assert(rosterAndPointState.rodgersBatter.power === 6, "Rodgers fielder power should match the roster table");
@@ -2425,14 +2462,16 @@ assert(rosterAndPointState.enriquez.stuff === 6, "Enriquez stuff should match th
 assert(rosterAndPointState.enriquez.fielding === 3, "Enriquez fielding should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.stamina === 2, "Enriquez stamina should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.wheeler.fastKmh === 159 && rosterAndPointState.wheeler.rightBreak === 8 && rosterAndPointState.wheeler.leftBreak === 8 && rosterAndPointState.wheeler.cost === 7, "Wheeler pitcher should match the pitcher roster table");
+assert(rosterAndPointState.valdes.throws === "L" && rosterAndPointState.valdes.fastKmh === 158 && rosterAndPointState.valdes.rightBreak === 9 && rosterAndPointState.valdes.leftBreak === 7 && rosterAndPointState.valdes.cost === 7, "Valdes pitcher should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
-assert(rosterAndPointState.teamPointLimit === 65, "combined point limit should be 65 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 28, "default away pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.defaultHomePitcherCost === 28, "default home pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.overLimitDisabled === true, "teams over 65 combined points should not be startable");
-assert(rosterAndPointState.overLimitText.includes("/65"), "menu should show the 65-point combined limit");
-assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 65 combined points should not be startable");
-assert(rosterAndPointState.pitcherOverLimitText.includes("/65"), "menu should show the combined pitcher point total");
+assert(rosterAndPointState.teamPointLimit === 70, "combined point limit should be 70 per team");
+assert(rosterAndPointState.defaultAwayPitcherCost === 33, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultHomePitcherCost === 33, "default home pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.overLimitDisabled === true, "teams over 70 combined points should not be startable");
+assert(rosterAndPointState.overLimitText.includes("/70"), "menu should show the 70-point combined limit");
+assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 70 combined points should not be startable");
+assert(rosterAndPointState.pitcherOverLimitText.includes("/70"), "menu should show the combined pitcher point total");
 assert(rosterAndPointState.awayFielderPointText.includes("Bench"), "menu should show the separate bench point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
@@ -2552,7 +2591,7 @@ const singlePlayerOpponentState = JSON.parse(runInGame(
 ));
 
 assert(singlePlayerOpponentState.preStartHomeCost > 59, "Dendos should be allowed to exceed the normal point limit as a CPU opponent");
-assert(singlePlayerOpponentState.preStartAwayCost <= 65, "single-player Dendos mode should keep the player roster under the normal point limit");
+assert(singlePlayerOpponentState.preStartAwayCost <= 70, "single-player Dendos mode should keep the player roster under the normal point limit");
 assert(singlePlayerOpponentState.preStartDisabled === false, "single-player mode should remain startable with Dendos as the over-limit CPU opponent");
 assert(singlePlayerOpponentState.preStartHomeLabel === "デンドーズ", "single-player mode should label the home team as Dendos when selected");
 assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos should use the requested elite pitching staff");
@@ -2713,13 +2752,70 @@ assert(teamPresetSelectionState.awayLabel === "デンドーズ", "Team A label s
 assert(teamPresetSelectionState.homeLabel === "タイガース", "Team B label should follow the selected preset");
 assert(teamPresetSelectionState.awayCost > 59, "Dendos should exceed the normal point limit");
 assert(teamPresetSelectionState.awayPointText.includes("制限なし"), "Dendos point status should show no limit");
-assert(!teamPresetSelectionState.awayPointText.includes("/65"), "Dendos point status should not show the normal limit");
-assert(teamPresetSelectionState.homePointText.includes("/65"), "non-Dendos teams should keep the normal point limit");
+assert(!teamPresetSelectionState.awayPointText.includes("/70"), "Dendos point status should not show the normal limit");
+assert(teamPresetSelectionState.homePointText.includes("/70"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
 assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos preset should apply the elite pitching staff to Team A");
-assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen,hanifee,summers", "Tigers preset should apply to Team B");
+assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen,valdes,summers", "Tigers preset should apply to Team B");
 assert(teamPresetSelectionState.awayOtaniAllowed === true, "Dendos teams should still allow player swaps without point-limit blocking");
 assert(!rosterAndPointState.escapedChooserHtml.includes("<img src=x"), "player chooser should not render saved player names as HTML");
+
+const allstarPresetState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    modeSelect.value = "versus";
+    awayPresetSelect.value = "allstar";
+    homePresetSelect.value = "dodgers";
+    readMenu();
+    updateMenuPointStatus();
+    const beforeSelection = { ...menuSelection.away, lineupOrder: [...menuSelection.away.lineupOrder] };
+    const beforeOrder = getMenuLineupOrder("away").join(",");
+    openPlayerChooser({ dataset: { team: "away", role: "R", kind: "batter" } });
+    const chooserStayedClosed = playerChooser.classList.contains("hidden") || chooserOptions.innerHTML === "";
+    selectMenuPlayer({ dataset: { team: "away", role: "R", kind: "batter", playerId: "ruth" } });
+    const afterSelectRight = menuSelection.away.R;
+    const moved = moveMenuLineupRoleToSlot("away", "R", 6);
+    const swapped = swapMenuLineupPlayers("away", "R", "C");
+    resetMenuTeam("away");
+    const afterReset = { ...menuSelection.away, lineupOrder: [...menuSelection.away.lineupOrder] };
+    updateMenuPointStatus();
+    const pointText = awayPitcherPointStatus.textContent;
+    const preset = getSelectedTeamPresetId("away");
+    const label = teamLabel("away");
+    const cost = getMenuTeamCost("away");
+    awayPresetSelect.value = "tigers";
+    homePresetSelect.value = "dodgers";
+    readMenu();
+    updateMenuAbilityPanels();
+    return JSON.stringify({
+      preset,
+      label,
+      cost,
+      pointText,
+      chooserStayedClosed,
+      beforeSelection,
+      beforeOrder,
+      afterSelectRight,
+      moved,
+      swapped,
+      afterReset
+    });
+  })()`
+));
+
+assert(allstarPresetState.preset === "allstar", "All-Star preset should be selectable");
+assert(allstarPresetState.label === "オールスター", "All-Star label should be shown");
+assert(allstarPresetState.pointText.includes("制限なし"), "All-Star should have no point limit");
+assert(allstarPresetState.chooserStayedClosed === true, "All-Star members should not be swappable through the chooser");
+assert(allstarPresetState.afterSelectRight === "otani", "All-Star right fielder should remain Otani after a blocked selection");
+assert(allstarPresetState.moved === false && allstarPresetState.swapped === false, "All-Star lineup should be locked");
+assert(allstarPresetState.beforeOrder === "R,C,2B,SS,L,DH,CA", "All-Star batting order should match the requested order");
+assert(allstarPresetState.afterReset.pitcher === "shohei" && allstarPresetState.afterReset.pitcher2 === "yamamoto", "All-Star pitchers should stay fixed after reset");
+assert(allstarPresetState.afterReset.pitcher3 === "misiorowski" && allstarPresetState.afterReset.pitcher4 === "skubal" && allstarPresetState.afterReset.pitcher5 === "wheeler", "All-Star reserve pitchers should stay fixed");
+assert(allstarPresetState.afterReset.R === "otani" && allstarPresetState.afterReset.C === "judge" && allstarPresetState.afterReset.L === "acunajr", "All-Star outfield should match the requested members");
+assert(allstarPresetState.afterReset.CA === "calraleigh" && allstarPresetState.afterReset.SS === "wittjr" && allstarPresetState.afterReset["2B"] === "harper" && allstarPresetState.afterReset.DH === "freeman", "All-Star infield, catcher, and DH should match the requested members");
+assert(allstarPresetState.afterReset.bench1 === "trout" && allstarPresetState.afterReset.bench2 === "goldschmidt" && allstarPresetState.afterReset.bench3 === "schwarber", "All-Star bench fielders should match the requested members");
+assert(allstarPresetState.afterReset.lineupOrder.join(",") === "R,C,2B,SS,L,DH,CA", "All-Star reset should preserve the requested batting order");
 
 const pitcherChangeState = JSON.parse(runInGame(
   context,

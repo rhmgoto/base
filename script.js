@@ -198,19 +198,19 @@ const batters = [
 ];
 
 const catchers = [
-  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 7, cost: 6 },
-  { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 5, cost: 5 },
+  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 8, cost: 6 },
+  { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 7, cost: 5 },
   { id: "nomura", name: "ノムラ", bats: "R", power: 34, meet: 16, run: 5, arm: 21, cost: 27 },
-  { id: "kaicannon", name: "カイキャノン", bats: "R", power: 2, meet: 3, run: 4, arm: 9, cost: 4 },
-  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 7, cost: 5 },
-  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 6, cost: 3 },
+  { id: "kaicannon", name: "カイキャノン", bats: "R", power: 2, meet: 3, run: 4, arm: 10, cost: 4 },
+  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 8, cost: 5 },
+  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 3 },
   { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 36, meet: 17, run: 5, arm: 24, cost: 29 },
-  { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 4, cost: 4 }
+  { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 6, cost: 4 }
 ];
 
 const pitchers = [
   { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 8, fastChange: 8, control: 6, stuff: 8, fielding: 7, stamina: 6, cost: 9 },
-  { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 7, control: 8, stuff: 7, fielding: 6, stamina: 7, cost: 8 },
+  { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 7, control: 9, stuff: 7, fielding: 6, stamina: 7, cost: 8 },
   { id: "saiki", name: "サイキ", throws: "R", fastKmh: 155, rightBreak: 5, leftBreak: 2, slowChange: 10, fastChange: 6, control: 6, stuff: 6, fielding: 5, stamina: 7, cost: 6 },
   { id: "kershaw", name: "カーショウ", throws: "L", fastKmh: 148, rightBreak: 4, leftBreak: 10, slowChange: 6, fastChange: 4, control: 8, stuff: 5, fielding: 4, stamina: 5, cost: 6 },
   { id: "hikari", name: "ヒカリ", throws: "L", fastKmh: 220, rightBreak: 1, leftBreak: 1, slowChange: 9, fastChange: 1, control: 3, stuff: 6, fielding: 4, stamina: 6, cost: 5 },
@@ -233,7 +233,7 @@ const pitchers = [
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 28, leftBreak: 27, slowChange: 27, fastChange: 28, control: 27, stuff: 33, fielding: 24, stamina: 21, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 32, leftBreak: 30, slowChange: 29, fastChange: 28, control: 29, stuff: 32, fielding: 23, stamina: 20, cost: 32 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 9, fastChange: 9, control: 5, stuff: 9, fielding: 5, stamina: 7, cost: 6 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 8, fastChange: 8, control: 8, stuff: 8, fielding: 6, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 4, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 2, cost: 1 },
@@ -241,6 +241,8 @@ const pitchers = [
   { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 2, cost: 1 },
   { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 3, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
   { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
+  { id: "wheeler", name: "ウィーラー", throws: "R", fastKmh: 159, rightBreak: 8, leftBreak: 8, slowChange: 5, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 7 },
+  { id: "valdes", name: "バルデス", throws: "L", fastKmh: 158, rightBreak: 9, leftBreak: 7, slowChange: 7, fastChange: 6, control: 5, stuff: 7, fielding: 4, stamina: 7, cost: 7 },
   { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 28, leftBreak: 23, slowChange: 32, fastChange: 24, control: 30, stuff: 31, fielding: 23, stamina: 21, cost: 30 },
   { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 27, control: 27, stuff: 33, fielding: 23, stamina: 20, cost: 29 }
 ];
@@ -302,6 +304,7 @@ const stealTuning = {
   catcherExchangeSeconds: 0.52,
   catcherThrowBaseSpeed: 760,
   catcherThrowSpeedScale: 0.95,
+  manualQuickThrowSpeedScale: 1.18,
   pitcherTypeLead: {
     slow: 1.1,
     normal: 0.9,
@@ -432,21 +435,26 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 65;
+const teamPointLimit = 70;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
   tigers: {
     label: "タイガース",
-    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "hanifee", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", bench1: "", bench2: "", bench3: "", lineupOrder: [...awayRegularLineupOrder] }
+    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "valdes", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", bench1: "", bench2: "", bench3: "", lineupOrder: [...awayRegularLineupOrder] }
   },
   dodgers: {
     label: "ドジャース",
-    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "rojas", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", bench1: "", bench2: "", bench3: "", lineupOrder: [...homeRegularLineupOrder] }
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "glasnow", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", bench1: "", bench2: "", bench3: "", lineupOrder: [...homeRegularLineupOrder] }
   },
   dendos: {
     label: "デンドーズ",
     selection: { pitcher: "cyyoung", pitcher2: "sawamura", pitcher3: "clemens", pitcher4: "johnson", pitcher5: "maddux", SS: "nagashima", "2B": "sadaharu", L: "ruth", C: "bonds", R: "ichiro", CA: "johnnybench", DH: "nomura", bench1: "rose", bench2: "henderson", bench3: "", lineupOrder: [...batterRoles] }
+  },
+  allstar: {
+    label: "オールスター",
+    locked: true,
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "misiorowski", pitcher4: "skubal", pitcher5: "wheeler", SS: "wittjr", "2B": "harper", L: "acunajr", C: "judge", R: "otani", CA: "calraleigh", DH: "freeman", bench1: "trout", bench2: "goldschmidt", bench3: "schwarber", lineupOrder: ["R", "C", "2B", "SS", "L", "DH", "CA"] }
   }
 };
 const defaultTeamPresetBySide = { away: "dodgers", home: "dodgers" };
@@ -1826,8 +1834,16 @@ function isDendosTeam(team) {
   return getSelectedTeamPresetId(team) === "dendos";
 }
 
+function isUnlimitedCostTeam(team) {
+  return ["dendos", "allstar"].includes(getSelectedTeamPresetId(team));
+}
+
+function isMenuTeamLocked(team) {
+  return Boolean(getSelectedTeamPreset(team)?.locked);
+}
+
 function doesMenuPointLimitApply(team) {
-  return !isAnyPracticeMode() && !isDendosTeam(team);
+  return !isAnyPracticeMode() && !isUnlimitedCostTeam(team);
 }
 
 function applyTeamPresetMenuSelection(team, presetId) {
@@ -2803,6 +2819,7 @@ function getLineupSlotNumber(team, role) {
 }
 
 function moveMenuLineupRoleToSlot(team, role, slotIndex) {
+  if (isMenuTeamLocked(team)) return false;
   const order = getMenuLineupOrder(team);
   const currentIndex = order.indexOf(role);
   const targetIndex = clamp(slotIndex, 0, order.length - 1);
@@ -2814,6 +2831,7 @@ function moveMenuLineupRoleToSlot(team, role, slotIndex) {
 }
 
 function swapMenuLineupPlayers(team, firstRole, secondRole) {
+  if (isMenuTeamLocked(team)) return false;
   if (!team || !batterRoles.includes(firstRole) || !batterRoles.includes(secondRole) || firstRole === secondRole) return false;
   if (getChooserKindForRole(firstRole) !== getChooserKindForRole(secondRole)) return false;
   const firstPlayerId = menuSelection[team][firstRole];
@@ -2823,6 +2841,7 @@ function swapMenuLineupPlayers(team, firstRole, secondRole) {
 }
 
 function changeLineupSlotPosition(team, oldRole, newRole) {
+  if (isMenuTeamLocked(team)) return false;
   if (!team || !batterRoles.includes(oldRole) || !batterRoles.includes(newRole) || oldRole === newRole) return false;
   if (getChooserKindForRole(oldRole) !== getChooserKindForRole(newRole)) return false;
   const order = getMenuLineupOrder(team);
@@ -2852,7 +2871,7 @@ function updateLineupCardShell(team, role) {
   card.classList.toggle("pitcher-list-item", isPitcher);
   card.classList.toggle("lineup-order-pending", activeLineupOrderPicker?.team === team && activeLineupOrderPicker?.role === role);
   card.classList.toggle("lineup-slot-dragging", false);
-  card.draggable = isBatter;
+  card.draggable = isBatter && !isMenuTeamLocked(team);
   if (isBatter) {
     const slotNumber = getLineupSlotNumber(team, role);
     card.classList.add(`field-role-${role}`);
@@ -3135,6 +3154,11 @@ function openPlayerChooser(card) {
   const team = card.dataset.team;
   const role = card.dataset.role;
   const kind = getChooserKindForRole(role) || card.dataset.kind;
+  if (isMenuTeamLocked(team)) {
+    closePlayerChooser(team);
+    message = `${teamLabel(team)}はメンバー固定です`;
+    return;
+  }
   chooserSortStates[team] = { team, role, kind, key: "" };
   chooserSortState = chooserSortStates[team];
   const elements = getChooserElements(team);
@@ -3240,6 +3264,7 @@ function selectMenuPlayer(option) {
   const team = option.dataset.team;
   const role = option.dataset.role;
   const kind = option.dataset.kind;
+  if (isMenuTeamLocked(team)) return;
   if (isMenuPlayerUnavailable(team, role, kind, option.dataset.playerId)) return;
   menuSelection[team][role] = option.dataset.playerId;
   closePlayerChooser(team);
@@ -3347,6 +3372,13 @@ function renderMenuFielderSymbol(team, role, player, nameElement, statsElement) 
 
 function resetMenuTeam(team) {
   if (!menuSelection[team]) return;
+  if (isMenuTeamLocked(team)) {
+    applyTeamPresetMenuSelection(team, getSelectedTeamPresetId(team));
+    activeLineupOrderPicker = null;
+    closePlayerChooser();
+    updateMenuAbilityPanels();
+    return;
+  }
   [...pitcherRoles, ...batterRoles, ...benchRoles].forEach((role) => {
     menuSelection[team][role] = "";
   });
@@ -6013,7 +6045,7 @@ function handleStealDefenseThrow(targetBase, now = performance.now()) {
   const from = { ...defenseField.bases.home };
   const to = { ...getDefenseBasePointByName(targetBase) };
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
-  const throwSpeed = (stealTuning.catcherThrowBaseSpeed + getTeamCatcherArm(fieldingTeam()) * 22) * (stealTuning.catcherThrowSpeedScale ?? 1);
+  const throwSpeed = (stealTuning.catcherThrowBaseSpeed + getTeamCatcherArm(fieldingTeam()) * 22) * (stealTuning.manualQuickThrowSpeedScale ?? 1.18);
   const throwTime = stealTuning.catcherExchangeSeconds + distance / throwSpeed;
   const swingMissDelay = stealState.swingMissDelaySeconds ?? 0;
   const startTime = elapsedSeconds + (stealTuning.catcherReleaseDelaySeconds ?? 0.3) + swingMissDelay;
@@ -20795,7 +20827,7 @@ function switchLiveMode(mode) {
 
 function handleLineupDragStart(event) {
   const card = event.currentTarget;
-  if (card.dataset.kind !== "batter") {
+  if (card.dataset.kind !== "batter" || isMenuTeamLocked(card.dataset.team)) {
     event.preventDefault();
     return;
   }
@@ -20809,14 +20841,14 @@ function handleLineupDragStart(event) {
 
 function handleLineupDragOver(event) {
   const card = event.currentTarget;
-  if (card.dataset.kind !== "batter") return;
+  if (card.dataset.kind !== "batter" || isMenuTeamLocked(card.dataset.team)) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 }
 
 function handleLineupDrop(event) {
   const targetCard = event.currentTarget;
-  if (!batterRoles.includes(targetCard.dataset.role)) return;
+  if (!batterRoles.includes(targetCard.dataset.role) || isMenuTeamLocked(targetCard.dataset.team)) return;
   event.preventDefault();
   let source = null;
   try {
@@ -20839,6 +20871,7 @@ function handleLineupOrderButtonClick(event) {
   if (choice) {
     event.preventDefault();
     event.stopPropagation();
+    if (isMenuTeamLocked(choice.dataset.team)) return true;
     moveMenuLineupRoleToSlot(choice.dataset.team, choice.dataset.role, Number(choice.dataset.orderIndex));
     activeLineupOrderPicker = null;
     updateMenuAbilityPanels();
@@ -20851,6 +20884,7 @@ function handleLineupOrderButtonClick(event) {
   const team = button.dataset.team;
   const role = button.dataset.role;
   if (!team || !role) return true;
+  if (isMenuTeamLocked(team)) return true;
   activeLineupOrderPicker = activeLineupOrderPicker?.team === team && activeLineupOrderPicker?.role === role
     ? null
     : { team, role };
@@ -21035,4 +21069,3 @@ updateAudioToggleButtons();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
-
