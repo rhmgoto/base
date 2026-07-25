@@ -10708,6 +10708,12 @@ function hasForceObligationToBase(runner, targetBase, forceMap = recalculateForc
   return Boolean(targetBase && getRunnerForceBase(runner, forceMap) === targetBase);
 }
 
+function canRunnerBeForceOutAtBase(runner, targetBase, forceMap = recalculateForceStateForPlay()) {
+  if (!runner || !targetBase) return false;
+  if (runner.manualTargetBase) return hasForceObligationToBase(runner, targetBase, forceMap);
+  return getRunnerForceBase(runner, forceMap) === targetBase;
+}
+
 function logDefenseJudgment(entry) {
   defenseState.judgmentLog = defenseState.judgmentLog || [];
   defenseState.judgmentLog.push({
@@ -10749,7 +10755,7 @@ function judgeOutPlay(runner, targetBase, throwState, options = {}) {
   }
   const forceMap = recalculateForceStateForPlay(options.completedForceOutBases);
   const forcedBase = getRunnerForceBase(runner, forceMap);
-  const forced = forcedBase === targetBase;
+  const forced = canRunnerBeForceOutAtBase(runner, targetBase, forceMap);
   if (forced) {
     const baseTouchTime = throwState.baseTouchTime ?? ballSecureTime;
     const out = baseTouchTime + SAFE_TOLERANCE < runnerArrivalTime;
@@ -10855,11 +10861,15 @@ function getForcedRunnerForThrowTarget(targetBase, batterRunner = null, baseRunn
   if (!isForceTargetActive(targetBase)) return null;
   const forceTarget = getForceTargetsForCurrentPlay().find((entry) => entry.targetBase === targetBase);
   const startBase = forceTarget?.startBase || getForcedRunnerStartBaseForTarget(targetBase);
-  if (startBase === "batter") return batterRunner;
+  if (startBase === "batter") {
+    return canRunnerBeForceOutAtBase(batterRunner, targetBase) ? batterRunner : null;
+  }
   if (!startBase) return null;
-  return (baseRunners || defenseState.baseRunners || []).find((runner) => runner.startBase === startBase)
-    || createForcedRunnerFromForceTarget(forceTarget)
+  const activeRunner = (baseRunners || defenseState.baseRunners || []).find((runner) => runner.startBase === startBase);
+  if (activeRunner) return canRunnerBeForceOutAtBase(activeRunner, targetBase) ? activeRunner : null;
+  const forceRunner = createForcedRunnerFromForceTarget(forceTarget)
     || createForcedRunnerFromBaseState(startBase, targetBase);
+  return canRunnerBeForceOutAtBase(forceRunner, targetBase) ? forceRunner : null;
 }
 
 function createForcedRunnerFromForceTarget(forceTarget) {
