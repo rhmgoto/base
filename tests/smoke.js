@@ -891,6 +891,27 @@ const weakSwingState = JSON.parse(runInGame(
       meet: getEffectiveBatterMeet(activeBatter),
       power: getEffectiveBatterPower(activeBatter) / effectiveBatterPowerScale
     };
+    const grounderContact = {
+      timeDiff: 0,
+      quality: 0.82,
+      timingScore: 0.88,
+      barrelScore: 0.86,
+      zoneScore: 0.94,
+      plateDistance: 0,
+      outsideStrikeZone: false,
+      sweetSpotScore: 0.88,
+      inGoodContactZone: true,
+      yellowZoneBoost: 0
+    };
+    const strongProfile = buildBattedBallProfile(grounderContact);
+    resetSwing();
+    startSwing(performance.now(), "grounder");
+    const grounder = {
+      type: swingState.type,
+      meet: getEffectiveBatterMeet(activeBatter),
+      power: getEffectiveBatterPower(activeBatter) / effectiveBatterPowerScale
+    };
+    const grounderProfile = buildBattedBallProfile(grounderContact);
     resetSwing();
     startSwing(performance.now(), "bunt");
     const bunt = {
@@ -1037,6 +1058,13 @@ const weakSwingState = JSON.parse(runInGame(
     }, "away");
     const button3Type = swingState.type;
     resetSwing();
+    gamepadState.previousButtons.away = new Set();
+    handleGamepadButtonPresses({
+      buttons: [{ pressed: true }, { pressed: false }, { pressed: false }, { pressed: false }],
+      axes: [0, 0]
+    }, "away");
+    const button0GrounderType = swingState.type;
+    resetSwing();
     bases = createEmptyBases();
     bases.first = makeBaseRunner(findById(batters, "shuto"));
     stealState = createStealState();
@@ -1089,7 +1117,7 @@ const weakSwingState = JSON.parse(runInGame(
     updateBuntStance();
     const batterButton3BuntHeld = isBuntButtonHeld();
     const batterButton3BuntType = swingState.type;
-    return JSON.stringify({ weak, strong, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
+    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1097,6 +1125,10 @@ assert(weakSwingState.weak.type === "weak", "button-1/weak swing should mark the
 assert(weakSwingState.weak.meet === 12, "weak swing should allow high-meet batters to exceed 10 by adding two meet points");
 assert(weakSwingState.weak.power === 1, "weak swing should lower power by two with a floor of one");
 assert(weakSwingState.strong.meet === 10 && weakSwingState.strong.power === 3, "strong swing should keep the batter's normal meet and power");
+assert(weakSwingState.grounder.type === "grounder", "gamepad button 0/Y swing should mark the grounder swing type");
+assert(weakSwingState.grounder.meet === weakSwingState.strong.meet && weakSwingState.grounder.power === weakSwingState.strong.power, "grounder swing should keep A-swing meet and power");
+assert(weakSwingState.grounderProfile.grounderSwing === true && weakSwingState.grounderProfile.swingType === "grounder", "grounder swing profiles should preserve the swing type");
+assert(weakSwingState.grounderProfile.launchAngle <= weakSwingState.strongProfile.launchAngle - 10, `grounder swing should lower the launch angle versus A swing (${weakSwingState.strongProfile.launchAngle} -> ${weakSwingState.grounderProfile.launchAngle})`);
 assert(weakSwingState.bunt.type === "bunt", "button-3/bunt swing should mark the swing type");
 assert(weakSwingState.bunt.meet === 15, "bunt swing should add five meet points and allow values over 10");
 assert(weakSwingState.bunt.power === 1, "bunt swing should sharply reduce power with a floor of one");
@@ -1133,6 +1165,7 @@ assert(weakSwingState.directTwoStrikeBuntFoul.profileHasBunt === true && weakSwi
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
 assert(weakSwingState.button1WithStickType === "weak" && weakSwingState.button1WithStickStealActive === false, "gamepad button 1 should stay a weak swing even with a direction held");
 assert(weakSwingState.button2Type === "strong", "gamepad button 2 should keep starting the existing strong swing");
+assert(weakSwingState.button0GrounderType === "grounder", "gamepad button 0/Y should start the grounder swing when pressed without a steal direction");
 assert(weakSwingState.button0StealActive === true && weakSwingState.button0StealTarget === "second", "gamepad button 0 plus a direction should start steals instead of weak swings");
 assert(weakSwingState.sharedButton1PitchType === "normal", "shared gamepad button 1 should start a straight pitch for the pitcher in two-player games");
 assert(weakSwingState.sharedButton1BatterSwung === false, "shared gamepad button 1 for the pitcher should not make the opposing batter swing");
@@ -2195,8 +2228,8 @@ assert(rosterAndPointState.dingler.run === 3, "Dingler run should match the rost
 assert(rosterAndPointState.dingler.arm === 8, "Dingler arm should match the catcher roster table");
 assert(rosterAndPointState.dingler.cost === 5, "Dingler cost should match the roster table");
 assert(rosterAndPointState.calraleigh.power === 8 && rosterAndPointState.calraleigh.arm === 8, "Cal Raleigh should be available as a catcher");
-assert(rosterAndPointState.nomura.power === 34 && rosterAndPointState.nomura.meet === 16 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
-assert(rosterAndPointState.johnnybench.power === 36 && rosterAndPointState.johnnybench.meet === 17 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
+assert(rosterAndPointState.nomura.power === 24 && rosterAndPointState.nomura.meet === 16 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
+assert(rosterAndPointState.johnnybench.power === 26 && rosterAndPointState.johnnybench.meet === 17 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
 assert(rosterAndPointState.rodgersCatcher.bats === "R", "Rodgers catcher should be a right-handed batter");
 assert(rosterAndPointState.rodgersCatcher.power === 6, "Rodgers catcher power should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.meet === 1, "Rodgers catcher meet should match the catcher roster table");
@@ -2268,23 +2301,23 @@ assert(rosterAndPointState.ydiaz.arm === 3, "Y. Diaz arm should match the roster
 assert(rosterAndPointState.ydiaz.cost === 5, "Y. Diaz cost should match the roster table");
 assert(rosterAndPointState.tairaRemoved === true, "Taira should be removed from the batter roster");
 assert(rosterAndPointState.ichiro.meet === 25 && rosterAndPointState.ichiro.outfieldDefense === 16 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 28, "Ichiro should match the updated roster table");
-assert(rosterAndPointState.ruth.power === 42 && rosterAndPointState.ruth.meet === 20 && rosterAndPointState.ruth.outfieldDefense === 4 && rosterAndPointState.ruth.cost === 30, "Ruth should match the updated roster table");
-assert(rosterAndPointState.nagashima.power === 33 && rosterAndPointState.nagashima.meet === 18 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 15 && rosterAndPointState.nagashima.cost === 25, "Nagashima should match the updated roster table");
-assert(rosterAndPointState.bonds.power === 41 && rosterAndPointState.bonds.meet === 19 && rosterAndPointState.bonds.outfieldDefense === 18 && rosterAndPointState.bonds.arm === 10 && rosterAndPointState.bonds.cost === 28, "Bonds should be available as a new elite outfielder");
-assert(rosterAndPointState.sadaharu.power === 43 && rosterAndPointState.sadaharu.infieldDefense === 14 && rosterAndPointState.sadaharu.arm === 10 && rosterAndPointState.sadaharu.cost === 25, "Sadaharu should be available as a new elite infielder");
+assert(rosterAndPointState.ruth.power === 32 && rosterAndPointState.ruth.meet === 20 && rosterAndPointState.ruth.outfieldDefense === 4 && rosterAndPointState.ruth.cost === 30, "Ruth should match the updated roster table");
+assert(rosterAndPointState.nagashima.power === 23 && rosterAndPointState.nagashima.meet === 18 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 15 && rosterAndPointState.nagashima.cost === 25, "Nagashima should match the updated roster table");
+assert(rosterAndPointState.bonds.power === 31 && rosterAndPointState.bonds.meet === 19 && rosterAndPointState.bonds.outfieldDefense === 18 && rosterAndPointState.bonds.arm === 10 && rosterAndPointState.bonds.cost === 28, "Bonds should be available as a new elite outfielder");
+assert(rosterAndPointState.sadaharu.power === 33 && rosterAndPointState.sadaharu.infieldDefense === 14 && rosterAndPointState.sadaharu.arm === 10 && rosterAndPointState.sadaharu.cost === 25, "Sadaharu should be available as a new elite infielder");
 assert(rosterAndPointState.shohei.fastKmh === 165, "Shohei fastball should match the pitcher roster table");
 assert(rosterAndPointState.shohei.stuff === 8, "Shohei stuff should match the pitcher roster table");
 assert(rosterAndPointState.shohei.stamina === 6, "Shohei stamina should match the pitcher roster table");
 assert(rosterAndPointState.shohei.cost === 9, "Shohei pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.fastKmh === 172, "Sawamura fastball should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.rightBreak === 27, "Sawamura right break should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.leftBreak === 26, "Sawamura left break should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.rightBreak === 17, "Sawamura right break should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.leftBreak === 16, "Sawamura left break should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.slowChange === 24, "Sawamura slow change should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.fastChange === 27, "Sawamura fast change should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.fastChange === 17, "Sawamura fast change should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.control === 25, "Sawamura control should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.stuff === 32, "Sawamura stuff should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.fielding === 24, "Sawamura fielding should match the pitcher roster table");
-assert(rosterAndPointState.sawamura.stamina === 21, "Sawamura stamina should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.fielding === 14, "Sawamura fielding should match the pitcher roster table");
+assert(rosterAndPointState.sawamura.stamina === 16, "Sawamura stamina should match the pitcher roster table");
 assert(rosterAndPointState.sawamura.cost === 30, "Sawamura pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.magari.throws === "R", "Magari should be a right-handed pitcher");
 assert(rosterAndPointState.magari.fastKmh === 100, "Magari fastball should match the pitcher roster table");
@@ -2430,23 +2463,23 @@ assert(rosterAndPointState.melton.fielding === 8, "Melton fielding should match 
 assert(rosterAndPointState.melton.stamina === 6, "Melton stamina should match the pitcher roster table");
 assert(rosterAndPointState.melton.cost === 6, "Melton pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.fastKmh === 175, "Cy Young fastball should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.rightBreak === 28, "Cy Young right break should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.leftBreak === 27, "Cy Young left break should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.rightBreak === 18, "Cy Young right break should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.leftBreak === 17, "Cy Young left break should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.slowChange === 27, "Cy Young slow change should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.fastChange === 28, "Cy Young fast change should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.fastChange === 17, "Cy Young fast change should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.control === 27, "Cy Young control should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.stuff === 33, "Cy Young stuff should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.fielding === 24, "Cy Young fielding should match the pitcher roster table");
-assert(rosterAndPointState.cyyoung.stamina === 21, "Cy Young stamina should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.fielding === 14, "Cy Young fielding should match the pitcher roster table");
+assert(rosterAndPointState.cyyoung.stamina === 16, "Cy Young stamina should match the pitcher roster table");
 assert(rosterAndPointState.cyyoung.cost === 32, "Cy Young pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.maddux.fastKmh === 155, "Maddux fastball should match the pitcher roster table");
-assert(rosterAndPointState.maddux.rightBreak === 32, "Maddux right break should match the pitcher roster table");
-assert(rosterAndPointState.maddux.leftBreak === 30, "Maddux left break should match the pitcher roster table");
+assert(rosterAndPointState.maddux.rightBreak === 22, "Maddux right break should match the pitcher roster table");
+assert(rosterAndPointState.maddux.leftBreak === 20, "Maddux left break should match the pitcher roster table");
 assert(rosterAndPointState.maddux.slowChange === 29, "Maddux slow change should match the pitcher roster table");
-assert(rosterAndPointState.maddux.fastChange === 28, "Maddux fast change should match the pitcher roster table");
+assert(rosterAndPointState.maddux.fastChange === 18, "Maddux fast change should match the pitcher roster table");
 assert(rosterAndPointState.maddux.control === 29, "Maddux control should match the pitcher roster table");
 assert(rosterAndPointState.maddux.stuff === 32, "Maddux stuff should match the pitcher roster table");
-assert(rosterAndPointState.maddux.stamina === 20, "Maddux stamina should match the pitcher roster table");
+assert(rosterAndPointState.maddux.stamina === 15, "Maddux stamina should match the pitcher roster table");
 assert(rosterAndPointState.maddux.cost === 32, "Maddux pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.ediaz.throws === "R", "E. Diaz should be a right-handed pitcher");
 assert(rosterAndPointState.ediaz.fastKmh === 164, "E. Diaz fastball should match the pitcher roster table");
@@ -3351,7 +3384,10 @@ const battingPracticeModeState = JSON.parse(runInGame(
       && activePitcher.fastKmh === 125;
     renderPracticePlayerSelects();
     const practicePitcherHasBattingPractice = practicePitcherSelect.innerHTML.includes('value="battingpractice"') && practicePitcherSelect.innerHTML.includes("打撃投手");
+    const practicePitcherHasTestPitcherA = practicePitcherSelect.innerHTML.includes('value="testpitchera"') && practicePitcherSelect.innerHTML.includes("試験用投手A");
     const battingPracticeNotRosterPitcher = !pitchers.some((pitcher) => pitcher.id === "battingpractice");
+    const testPitcherANotRosterPitcher = !pitchers.some((pitcher) => pitcher.id === "testpitchera");
+    const testPitcherA = findById(getPracticePitchers(), "testpitchera");
     practicePitcherSelect.value = "battingpractice";
     practicePitcherTypeSelect.value = "A";
     readMenu();
@@ -3530,8 +3566,11 @@ const battingPracticeModeState = JSON.parse(runInGame(
       practiceManualPlayerPitching,
       practiceRodgersVsRodgers,
       practicePitcherHasBattingPractice,
+      practicePitcherHasTestPitcherA,
       battingPracticeNotRosterPitcher,
+      testPitcherANotRosterPitcher,
       battingPracticePitcher,
+      testPitcherA,
       battingPracticePlanType: battingPracticePlan.type,
       battingPracticePlanTargetX: battingPracticePlan.targetX,
       battingPracticePlanTargetSpread: battingPracticePlan.targetSpread,
@@ -3587,8 +3626,11 @@ assert(battingPracticeModeState.practiceAutoJudgmentSchedulesNextPitch === true,
 assert(battingPracticeModeState.practiceManualPlayerPitching === true, "practice manual pitcher should be player-controlled");
 assert(battingPracticeModeState.practiceRodgersVsRodgers === true, "batting practice should allow Rodgers to bat against pitcher Rodgers");
 assert(battingPracticeModeState.practicePitcherHasBattingPractice === true, "batting practice pitcher should appear only in the practice pitcher select");
+assert(battingPracticeModeState.practicePitcherHasTestPitcherA === true, "test pitcher A should appear in the practice pitcher select");
 assert(battingPracticeModeState.battingPracticeNotRosterPitcher === true, "batting practice pitcher should not be added to the regular pitcher roster");
+assert(battingPracticeModeState.testPitcherANotRosterPitcher === true, "test pitcher A should not be added to the regular pitcher roster");
 assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === -64 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
+assert(battingPracticeModeState.testPitcherA.id === "testpitchera" && battingPracticeModeState.testPitcherA.throws === "R" && battingPracticeModeState.testPitcherA.fastKmh === 150 && battingPracticeModeState.testPitcherA.rightBreak === 5 && battingPracticeModeState.testPitcherA.leftBreak === 5 && battingPracticeModeState.testPitcherA.slowChange === 5 && battingPracticeModeState.testPitcherA.fastChange === 5 && battingPracticeModeState.testPitcherA.control === 5 && battingPracticeModeState.testPitcherA.stuff === 4096 && battingPracticeModeState.testPitcherA.fielding === 5 && battingPracticeModeState.testPitcherA.stamina === 5 && battingPracticeModeState.testPitcherA.cost === 5 && battingPracticeModeState.testPitcherA.practiceOnly === true, "test pitcher A should use the spreadsheet practice-only ratings");
 assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticePlanType) && Math.abs(battingPracticeModeState.battingPracticePlanTargetX - 640) <= 8 && battingPracticeModeState.battingPracticePlanTargetSpread === 3 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher type A should throw simple center-zone fastballs or straight balls");
 assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticeTypeBType) && battingPracticeModeState.battingPracticeTypeBTargetAwayFromCenter >= 32 && battingPracticeModeState.battingPracticeTypeBHasShape === false, "batting practice pitcher type B should attack the edges without breaking balls");
 assert(battingPracticeModeState.battingPracticeTypeCHasShape === true, "batting practice pitcher type C should use normal CPU pitch variation with movement");
@@ -4649,13 +4691,48 @@ const grounderLeadRunnerState = JSON.parse(runInGame(
     bases.first = fastRunner;
     const fastLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder);
     const hitRunLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder, null, null, null, { active: true, startBase: "first", targetBase: "second", runnerId: "fast" });
+    const runningLeadDistance = getRunnerRouteDistance(createBaseRunnerRoute(1, 2)) * 0.72;
+    const nearSecondRunningLeadDistance = getRunnerRouteDistance(createBaseRunnerRoute(1, 2)) * 0.97;
+    const actualHitRunLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder, null, null, null, {
+      active: true,
+      startBase: "first",
+      targetBase: "second",
+      runnerId: "fast",
+      leadDistance: runningLeadDistance
+    });
+    const lineHitRunLead = createDefenseBaseRunner(
+      "first",
+      fastRunner,
+      { kind: "single", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 1.0 },
+      { ...grounder, isGrounder: false, isLiner: true, trajectory: "liner" },
+      null,
+      null,
+      null,
+      { active: true, startBase: "first", targetBase: "second", runnerId: "fast", leadDistance: runningLeadDistance }
+    );
+    const nearSecondHitRunLead = createDefenseBaseRunner("first", fastRunner, outcome, grounder, null, null, null, {
+      active: true,
+      startBase: "first",
+      targetBase: "second",
+      runnerId: "fast",
+      leadDistance: nearSecondRunningLeadDistance
+    });
     const firstBase = defenseField.bases.first;
     return JSON.stringify({
       slowLeadDistance: Math.hypot(slowLead.x - firstBase.x, slowLead.y - firstBase.y),
       fastLeadDistance: Math.hypot(fastLead.x - firstBase.x, fastLead.y - firstBase.y),
       hitRunLeadDistance: Math.hypot(hitRunLead.x - firstBase.x, hitRunLead.y - firstBase.y),
+      actualHitRunLeadDistance: Math.hypot(actualHitRunLead.x - firstBase.x, actualHitRunLead.y - firstBase.y),
+      actualHitRunRouteLeadDistance: getRunnerRouteDistance([{ ...firstBase }, actualHitRunLead.route[0]]),
+      requestedRunningLeadDistance: runningLeadDistance,
+      nearSecondHitRunLeadDistance: Math.hypot(nearSecondHitRunLead.x - firstBase.x, nearSecondHitRunLead.y - firstBase.y),
+      nearSecondHitRunRouteLeadDistance: getRunnerRouteDistance([{ ...firstBase }, nearSecondHitRunLead.route[0]]),
+      requestedNearSecondRunningLeadDistance: nearSecondRunningLeadDistance,
+      lineHitRunLeadDistance: Math.hypot(lineHitRunLead.x - firstBase.x, lineHitRunLead.y - firstBase.y),
       fastArrivalEarlier: fastLead.arrivalTime < createForcedRunnerFromInfo(fastRunner, "first", "second").arrivalTime,
-      hitRunArrivalEarlier: hitRunLead.arrivalTime < fastLead.arrivalTime
+      hitRunArrivalEarlier: hitRunLead.arrivalTime < fastLead.arrivalTime,
+      actualHitRunArrivalEarlier: actualHitRunLead.arrivalTime < hitRunLead.arrivalTime,
+      lineHitRunArrivalEarlier: lineHitRunLead.arrivalTime < createForcedRunnerFromInfo(fastRunner, "first", "second").arrivalTime
     });
   })()`
 ));
@@ -4663,7 +4740,11 @@ const grounderLeadRunnerState = JSON.parse(runInGame(
 assert(grounderLeadRunnerState.slowLeadDistance > 0, "ground-ball base runners should start with a visible lead from the base");
 assert(grounderLeadRunnerState.fastLeadDistance > grounderLeadRunnerState.slowLeadDistance, "faster runners should take a larger ground-ball lead");
 assert(grounderLeadRunnerState.hitRunLeadDistance > grounderLeadRunnerState.fastLeadDistance, "hit-and-run runners should start much farther toward the next base");
+assert(Math.abs(grounderLeadRunnerState.actualHitRunRouteLeadDistance - grounderLeadRunnerState.requestedRunningLeadDistance) < 2, "hit-and-run runners should use the position already gained before contact");
+assert(Math.abs(grounderLeadRunnerState.nearSecondHitRunRouteLeadDistance - grounderLeadRunnerState.requestedNearSecondRunningLeadDistance) < 2, `hit-and-run runners near the next base should not be pulled back by a conservative lead cap (${grounderLeadRunnerState.requestedNearSecondRunningLeadDistance} -> ${grounderLeadRunnerState.nearSecondHitRunRouteLeadDistance})`);
+assert(grounderLeadRunnerState.lineHitRunLeadDistance > 0, "hit-and-run runners should keep their running position on fair non-grounder hits too");
 assert(grounderLeadRunnerState.fastArrivalEarlier === true && grounderLeadRunnerState.hitRunArrivalEarlier === true, "runner leads should make force-play arrival times earlier");
+assert(grounderLeadRunnerState.actualHitRunArrivalEarlier === true && grounderLeadRunnerState.lineHitRunArrivalEarlier === true, "the carried hit-and-run position should make the next-base arrival earlier");
 
 const outAdvancementState = JSON.parse(runInGame(
   context,
@@ -6765,6 +6846,29 @@ const runnerDecisionState = JSON.parse(runInGame(
       minStartTime: 0.6,
       autoFallback: true
     });
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner(findById(batters, "shuto"));
+    bases.second = makeBaseRunner(findById(batters, "ichiro"));
+    battingTeam = "away";
+    defenseControlMode = { away: "auto", home: "auto" };
+    const liveFirstBaseGrounder = {
+      ...forceGrounder,
+      target: { ...defenseField.bases.first },
+      direction: normalize({ x: 0.6, y: -1 }),
+      ballTime: 0.62
+    };
+    const liveFirstBaseRunner = createBatterRunner(activeBatter);
+    setBatterRunnerDestination(liveFirstBaseRunner, "first");
+    defenseState = {
+      ...createDefenseState(),
+      battedBall: liveFirstBaseGrounder,
+      runner: liveFirstBaseRunner,
+      fielders: [{ ...fielder, role: "1B", x: defenseField.bases.first.x, y: defenseField.bases.first.y, currentX: defenseField.bases.first.x, currentY: defenseField.bases.first.y, fielding: 8, arm: 8 }],
+      startTime: performance.now(),
+      duration: 2400
+    };
+    completeLiveInfielderContactCatch(defenseState.fielders[0], { ...defenseField.bases.first }, 0.62, false);
+    const liveAutoFallbackThrowTarget = defenseState.throw?.targetBase || null;
     gameMode = "versus";
     battingTeam = "away";
     defenseControlMode = { away: "manual", home: "auto" };
@@ -7505,6 +7609,7 @@ const runnerDecisionState = JSON.parse(runInGame(
       loadedForceTarget,
       fallbackLeadForceTarget,
       autoFallbackForceTarget,
+      liveAutoFallbackThrowTarget,
       manualRunFirstTarget,
       manualRunSecondTarget,
       manualSpecificBaseRunnerTarget,
@@ -7611,6 +7716,7 @@ assert(runnerDecisionState.batterOutRemovesSecondForce === false, "putting out t
 assert(runnerDecisionState.loadedForceTarget === "home", "loaded bases should create a force play at home");
 assert(runnerDecisionState.fallbackLeadForceTarget === "third", "first-and-second grounders should first consider the lead force at third");
 assert(runnerDecisionState.autoFallbackForceTarget === "second", "auto throws should fall back to the trailing force base when the lead force is too late");
+assert(runnerDecisionState.liveAutoFallbackThrowTarget === "first", "CPU live grounder pickups should throw to first when the batter-runner can still be retired instead of forcing a risky lead-runner fielder's choice");
 assert(runnerDecisionState.manualRunFirstTarget === "second", "manual baserunning should stop a first-base runner at second even on extra-base hits");
 assert(runnerDecisionState.manualRunSecondTarget === "third", "manual baserunning should stop a second-base runner at third until instructed");
 assert(runnerDecisionState.manualSpecificBaseRunnerTarget === "third", "manual third-base commands should send an eligible base runner from second to third");

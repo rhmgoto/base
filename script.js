@@ -170,23 +170,23 @@ const batters = [
   { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 5, arm: 7, cost: 5 },
   { id: "trout", name: "トラウト", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 3, outfieldDefense: 6, arm: 5, cost: 6 },
   { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 8, run: 5, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 9 },
-  { id: "ruth", name: "ルース", bats: "R", power: 42, meet: 20, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
+  { id: "ruth", name: "ルース", bats: "R", power: 32, meet: 20, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
   { id: "kimhyesong", name: "キムヘソン", bats: "L", power: 4, meet: 4, run: 5, infieldDefense: 5, outfieldDefense: 5, arm: 5, cost: 3 },
   { id: "betts", name: "ベッツ", bats: "R", power: 5, meet: 6, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 5 },
   { id: "okamoto", name: "オカモト", bats: "R", power: 5, meet: 5, run: 6, infieldDefense: 6, outfieldDefense: 5, arm: 7, cost: 5 },
   { id: "murakami", name: "ムラカミ", bats: "L", power: 7, meet: 4, run: 3, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 5 },
-  { id: "nagashima", name: "ナガシマ", bats: "R", power: 33, meet: 18, run: 8, infieldDefense: 15, outfieldDefense: 2, arm: 14, cost: 25 },
+  { id: "nagashima", name: "ナガシマ", bats: "R", power: 23, meet: 18, run: 8, infieldDefense: 15, outfieldDefense: 2, arm: 14, cost: 25 },
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 8, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
   { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 8, cost: 8 },
   { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
   { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
   { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
-  { id: "bonds", name: "ボンズ", bats: "L", power: 41, meet: 19, run: 8, infieldDefense: 3, outfieldDefense: 18, arm: 10, cost: 28 },
+  { id: "bonds", name: "ボンズ", bats: "L", power: 31, meet: 19, run: 8, infieldDefense: 3, outfieldDefense: 18, arm: 10, cost: 28 },
   { id: "outman", name: "アウトマン", bats: "L", power: 6, meet: 2, run: 5, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 4 },
   { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 2 },
   { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
-  { id: "sadaharu", name: "サダハル", bats: "L", power: 43, meet: 16, run: 5, infieldDefense: 14, outfieldDefense: 2, arm: 10, cost: 25 },
+  { id: "sadaharu", name: "サダハル", bats: "L", power: 33, meet: 16, run: 5, infieldDefense: 14, outfieldDefense: 2, arm: 10, cost: 25 },
   { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
   { id: "tucker", name: "タッカー", bats: "L", power: 6, meet: 5, run: 7, infieldDefense: 2, outfieldDefense: 6, arm: 7, cost: 5 },
   { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 5 },
@@ -201,11 +201,11 @@ const batters = [
 const catchers = [
   { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 8, cost: 6 },
   { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 7, cost: 5 },
-  { id: "nomura", name: "ノムラ", bats: "R", power: 34, meet: 16, run: 5, arm: 21, cost: 27 },
+  { id: "nomura", name: "ノムラ", bats: "R", power: 24, meet: 16, run: 5, arm: 21, cost: 27 },
   { id: "kaicannon", name: "カイキャノン", bats: "R", power: 3, meet: 4, run: 4, arm: 10, cost: 4 },
   { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 8, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 3 },
-  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 36, meet: 17, run: 5, arm: 24, cost: 29 },
+  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 26, meet: 17, run: 5, arm: 24, cost: 29 },
   { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 6, cost: 4 },
   { id: "wakatsuki", name: "ワカツキ", bats: "R", power: 3, meet: 3, run: 3, arm: 5, cost: 2 }
 ];
@@ -219,7 +219,7 @@ const pitchers = [
   { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 5 },
   { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
   { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 6 },
-  { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 27, leftBreak: 26, slowChange: 24, fastChange: 27, control: 25, stuff: 32, fielding: 24, stamina: 21, cost: 30 },
+  { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 17, leftBreak: 16, slowChange: 24, fastChange: 17, control: 25, stuff: 32, fielding: 14, stamina: 16, cost: 30 },
   { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 6, stuff: 14, fielding: 6, stamina: 3, cost: 4 },
   { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
   { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 7, leftBreak: 4, slowChange: 5, fastChange: 9, control: 5, stuff: 9, fielding: 4, stamina: 7, cost: 8 },
@@ -232,8 +232,8 @@ const pitchers = [
   { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 8 },
   { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
-  { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 28, leftBreak: 27, slowChange: 27, fastChange: 28, control: 27, stuff: 33, fielding: 24, stamina: 21, cost: 32 },
-  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 32, leftBreak: 30, slowChange: 29, fastChange: 28, control: 29, stuff: 32, fielding: 23, stamina: 20, cost: 32 },
+  { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 18, leftBreak: 17, slowChange: 27, fastChange: 17, control: 27, stuff: 33, fielding: 14, stamina: 16, cost: 32 },
+  { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 22, leftBreak: 20, slowChange: 29, fastChange: 18, control: 29, stuff: 32, fielding: 13, stamina: 15, cost: 32 },
   { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 2, cost: 3 },
   { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 8, fastChange: 8, control: 8, stuff: 8, fielding: 6, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 6, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
@@ -245,8 +245,8 @@ const pitchers = [
   { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
   { id: "wheeler", name: "ウィーラー", throws: "R", fastKmh: 159, rightBreak: 8, leftBreak: 8, slowChange: 5, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 7 },
   { id: "valdes", name: "バルデス", throws: "L", fastKmh: 158, rightBreak: 9, leftBreak: 7, slowChange: 7, fastChange: 6, control: 5, stuff: 7, fielding: 4, stamina: 7, cost: 7 },
-  { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 28, leftBreak: 23, slowChange: 32, fastChange: 24, control: 30, stuff: 31, fielding: 23, stamina: 21, cost: 30 },
-  { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 27, control: 27, stuff: 33, fielding: 23, stamina: 20, cost: 29 }
+  { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 18, leftBreak: 13, slowChange: 32, fastChange: 14, control: 30, stuff: 31, fielding: 13, stamina: 16, cost: 30 },
+  { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 17, control: 27, stuff: 33, fielding: 13, stamina: 15, cost: 29 }
 ];
 
 const pitchTypes = {
@@ -481,7 +481,8 @@ const defaultPitchers = pitchers.map((player) => ({ ...player }));
 const originalMenuBatterIds = { away: "original-away-batter", home: "original-home-batter" };
 const originalMenuBatters = Object.fromEntries(teamIds.map((team) => [team, createDefaultOriginalMenuBatter(team)]));
 const practiceOnlyPitchers = [
-  { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: -64, fielding: 5, stamina: 99, cost: 0, practiceOnly: true }
+  { id: "battingpractice", name: "打撃投手", throws: "L", fastKmh: 120, rightBreak: 0, leftBreak: 0, slowChange: 0, fastChange: 0, control: 18, stuff: -64, fielding: 5, stamina: 99, cost: 0, practiceOnly: true },
+  { id: "testpitchera", name: "試験用投手A", throws: "R", fastKmh: 150, rightBreak: 5, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 4096, fielding: 5, stamina: 5, cost: 5, practiceOnly: true }
 ];
 let playerEditorState = { kind: "batter", playerId: batters[0]?.id ?? "", isNew: false };
 let chooserSortState = { team: "", role: "", kind: "", key: "" };
@@ -5144,7 +5145,7 @@ function startSwing(now = performance.now(), type = "strong") {
   swingState.didSwingThisPitch = true;
   swingState.madeContact = false;
   swingState.lastCheckProgress = 0;
-  swingState.type = type === "weak" || type === "bunt" ? type : "strong";
+  swingState.type = type === "weak" || type === "bunt" || type === "grounder" ? type : "strong";
   if (swingState.type !== "bunt") {
     swingState.isBuntStance = false;
     swingState.buntAimX = 0;
@@ -5855,6 +5856,8 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
     if (justPressed(gamepadButtons.Y)) {
       if (directions.size > 0) {
         tryStartSteal(getGamepadThrowTarget(directions));
+      } else {
+        swingBat("grounder");
       }
     }
   }
@@ -6242,11 +6245,19 @@ function resolveSteal(isOut) {
 
 function getHitAndRunLeadState() {
   if (!stealState.active || stealState.resolved || !stealState.startBase || !stealState.targetBase) return null;
+  const elapsedSeconds = Math.max(0, (performance.now() - stealState.startTime) / 1000);
+  const progress = stealState.arrivalTime > 0 ? clamp(elapsedSeconds / stealState.arrivalTime, 0, 1) : 1;
+  const routeDistance = getRunnerRouteDistance(stealState.route);
+  const point = getRunnerRoutePoint(stealState.route, progress);
   return {
     active: true,
     startBase: stealState.startBase,
     targetBase: stealState.targetBase,
-    runnerId: stealState.runner?.id || stealState.runner?.name || null
+    runnerId: stealState.runner?.id || stealState.runner?.name || null,
+    elapsedSeconds,
+    progress,
+    leadDistance: routeDistance * progress,
+    point
   };
 }
 
@@ -7156,6 +7167,7 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
 
   const launchAngle = profile.launchAngle ?? 10;
   const trajectoryRoll = Math.random();
+  const grounderSwing = profile.swingType === "grounder";
   let trajectory = launchAngle < 8 ? "grounder" : launchAngle < 18 ? "liner" : "fly";
   if (quality < 0.38 && trajectoryRoll < 0.28) trajectory = "popup";
   else if (quality < 0.5 && trajectoryRoll < 0.46) trajectory = "fly";
@@ -7163,10 +7175,15 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
   else if (trajectory === "grounder" && trajectoryRoll > 0.86) trajectory = "liner";
   else if (trajectory === "liner" && trajectoryRoll > 0.82) trajectory = "fly";
   else if (trajectory === "fly" && trajectoryRoll < 0.1) trajectory = "liner";
+  if (grounderSwing) {
+    if (trajectory === "popup" && quality >= 0.48 && trajectoryRoll > 0.18) trajectory = "grounder";
+    else if (trajectory === "fly") trajectory = trajectoryRoll < 0.84 ? "grounder" : "liner";
+    else if (trajectory === "liner" && trajectoryRoll < 0.72) trajectory = "grounder";
+  }
 
   const displayedOverall = clamp(feedbackScore, 0, 1);
   const liftGrade = clamp(Math.max(quality, displayedOverall * 0.96), 0, 1);
-  if (liftGrade >= 0.6 && (zoneBand === "center" || zoneBand === "middle") && trajectory !== "fly") {
+  if (!grounderSwing && liftGrade >= 0.6 && (zoneBand === "center" || zoneBand === "middle") && trajectory !== "fly") {
     const powerDrive = clamp(getPowerDriveScore(), 0, 1);
     const liftChance = clamp(
       0.18 + ((liftGrade - 0.6) / 0.4) * 0.55 + powerDrive * 0.14,
@@ -7538,6 +7555,8 @@ function buildBattedBallProfile(contact) {
     buntAimY = 0,
     buntAimMagnitude = 0
   } = contact;
+  const swingType = getCurrentSwingType();
+  const grounderSwing = swingType === "grounder";
   const abs = Math.abs(timeDiff);
   const power = getEffectiveBatterPower(activeBatter);
   const meet = getEffectiveBatterMeet(activeBatter);
@@ -7553,7 +7572,7 @@ function buildBattedBallProfile(contact) {
   const meetBoost = (meet - 5) * 0.018;
   const handednessContactMultiplier = getHandednessBattingContactMultiplier(activeBatter, activePitcher);
   const handednessContactBoost = handednessContactMultiplier - 1;
-  const practicePitcherContactBoost = (gameMode === "practice" || isHomeRunDerbyMode()) && activePitcher?.practiceOnly && getCurrentSwingType() !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
+  const practicePitcherContactBoost = (gameMode === "practice" || isHomeRunDerbyMode()) && activePitcher?.practiceOnly && swingType !== "bunt" ? 0.16 * battingPracticeHomerBoostMultiplier : 0;
   const zoneCenterBoost = inGoodContactZone ? Math.pow(clamp(zoneScore, 0, 1), 5.1) * 0.88 : 0;
   const zoneEdgeDrag = inGoodContactZone ? (Math.pow(1 - clamp(zoneScore, 0, 1), 0.72) * 0.95 + clamp((0.5 - clamp(zoneScore, 0, 1)) / 0.5, 0, 1) * 0.22) * 0.08 : 0;
   const centerSweetSpotDriveBoost = inGoodContactZone ? zoneCenterBoost * clamp((sweetSpotScore - 0.42) / 0.48, 0, 1) : 0;
@@ -7609,13 +7628,14 @@ function buildBattedBallProfile(contact) {
       - timingLiftPenalty
       - Math.max(0, plateDistance - 44) * 0.08
       - weakGrounderBias * 4.8
+      - (grounderSwing ? 62 : 0)
       + liftBoost
       + mishitLift,
     -10,
-    68
+    grounderSwing ? 11 : 68
   );
   const spin = clamp((1 - sweetSpotScore) * 0.58 + Math.abs(timingPull) * 0.3 + (!inGoodContactZone ? 0.18 : 0), 0, 1.35);
-  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.01 + Math.pow(zoneScore, 4.2) * 0.12 + centerDriveScore * (0.3 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.86) + centerMistakeDrive * (0.16 + powerDriveScore * 0.28) + zoneCenterBoost * 0.72 + centerSweetSpotDriveBoost * 0.24 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.08 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.56 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 0.35 - goodZoneMissDrag * 0.52 - weakGrounderBias * 0.045, 0.08, 1.85);
+  const carry = clamp(exitVelocity * (1 - spin * 0.18) + (launchAngle > 14 && launchAngle < 44 ? 0.34 : 0) + (power - 5) * 0.05 + practicePitcherContactBoost * 0.78 + lowStuffProfileBoost * 0.28 + handednessContactBoost * 0.18 + sweetSpotCenterBoost * 0.12 + lowPowerMastery * 0.28 + (inGoodContactZone ? 0.01 + Math.pow(zoneScore, 4.2) * 0.12 + centerDriveScore * (0.3 + Math.max(powerDriveScore, lowPowerMastery * 0.36) * 0.86) + centerMistakeDrive * (0.16 + powerDriveScore * 0.28) + zoneCenterBoost * 0.72 + centerSweetSpotDriveBoost * 0.24 : 0) + hardLiftScore * 0.2 + yellowZoneBoost * 0.08 + yellowDriveScore * yellowZoneHitTuning.carryBoost * 0.56 - outsideZoneDrag * 1.02 - zoneEdgeDrag * 0.35 - goodZoneMissDrag * 0.52 - weakGrounderBias * 0.045 - (grounderSwing ? 0.18 : 0), 0.08, 1.85);
   const direction = getPhysicsHitDirection(timingPull, spin, launchAngle);
   const gapScore = clamp(exitVelocity * 0.46 + sweetSpotScore * 0.3 + zoneScore * 0.22 - spin * 0.18 + Math.abs(direction.x) * 0.14, 0, 1);
   const lineContact = clamp((Math.abs(timingPull) - 0.28) / 0.58, 0, 1);
@@ -7719,7 +7739,7 @@ function buildBattedBallProfile(contact) {
       launchAngle
     })
   });
-  if (getCurrentSwingType() === "bunt") {
+  if (swingType === "bunt") {
     const buntMeetSkill = clamp((meet - 3) / 9, 0, 1);
     const hasAim = Math.abs(buntAimX) > 0 || Math.abs(buntAimY) > 0;
     const aimedSide = Math.abs(buntAimX) > 0 ? Math.sign(buntAimX) : 0;
@@ -7873,6 +7893,7 @@ function buildBattedBallProfile(contact) {
       solidBuntContact,
       pitcherBuntPopup,
       buntPitcherFrontGrounder: pitcherFrontGrounder,
+      swingType,
       isBunt: true
     };
   }
@@ -7903,6 +7924,8 @@ function buildBattedBallProfile(contact) {
     yellowZoneBoost,
     plateDistance,
     zoneMissUnits,
+    swingType,
+    grounderSwing,
     isFoul
   };
 }
@@ -7916,7 +7939,7 @@ function getHandednessBattingContactMultiplier(batterInfo = activeBatter, pitche
 }
 
 function getCurrentSwingType() {
-  return swingState?.type === "weak" || swingState?.type === "bunt" ? swingState.type : "strong";
+  return swingState?.type === "weak" || swingState?.type === "bunt" || swingState?.type === "grounder" ? swingState.type : "strong";
 }
 
 function isActiveBatterObject(batter) {
@@ -8870,7 +8893,8 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const route = createBaseRunnerRoute(startBase, nextBase);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
   const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase);
-  const ledRoute = applyRunnerLeadToRoute(route, startLeadDistance);
+  const leadMaxRatio = isHitAndRunRunnerForBase(baseName, runnerInfo, hitAndRunState) ? 0.995 : 0.82;
+  const ledRoute = applyRunnerLeadToRoute(route, startLeadDistance, leadMaxRatio);
   const routeStartTime = tagUp ? Math.max(0, outcome.fieldingTime ?? battedBall?.ballTime ?? 0) : 0;
   const distance = getRunnerRouteDistance(ledRoute);
   return {
@@ -8968,25 +8992,40 @@ function shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall) {
 }
 
 function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null) {
-  if (!baseName || !runnerInfo || !battedBall || !battedBall.isGrounder) return 0;
+  if (!baseName || !runnerInfo || !battedBall) return 0;
   const startBase = baseIndexByName[baseName];
   if (startBase < 1 || startBase > 3) return 0;
   if (!nextBase || nextBase <= startBase) return 0;
   const run = getOpenEndedAbilityRating(runnerInfo.run ?? 5);
-  const normalLead = 26 + run * 7.2;
+  const normalLead = battedBall.isGrounder ? 26 + run * 7.2 : 0;
   const isHitAndRunRunner = hitAndRunState?.active
     && hitAndRunState.startBase === baseName
     && (!hitAndRunState.runnerId || hitAndRunState.runnerId === runnerInfo.id || hitAndRunState.runnerId === runnerInfo.name);
-  const hitAndRunLead = isHitAndRunRunner ? 130 + run * 12 : 0;
-  const maxSegment = getRunnerRouteDistance(createBaseRunnerRoute(startBase, startBase + 1)) * (isHitAndRunRunner ? 0.68 : 0.5);
+  const baseSegmentDistance = getRunnerRouteDistance(createBaseRunnerRoute(startBase, startBase + 1));
+  const actualRunningLead = Number.isFinite(hitAndRunState?.leadDistance)
+    ? hitAndRunState.leadDistance
+    : 0;
+  const fallbackHitAndRunLead = 130 + run * 12;
+  const hitAndRunLead = isHitAndRunRunner
+    ? actualRunningLead > 0 ? actualRunningLead : fallbackHitAndRunLead
+    : 0;
+  const maxSegment = baseSegmentDistance * (isHitAndRunRunner ? 0.995 : 0.5);
   return clamp(Math.max(normalLead, hitAndRunLead), 0, maxSegment);
 }
 
-function applyRunnerLeadToRoute(route, leadDistance = 0) {
+function isHitAndRunRunnerForBase(baseName, runnerInfo, hitAndRunState = null) {
+  return Boolean(
+    hitAndRunState?.active
+      && hitAndRunState.startBase === baseName
+      && (!hitAndRunState.runnerId || hitAndRunState.runnerId === runnerInfo?.id || hitAndRunState.runnerId === runnerInfo?.name)
+  );
+}
+
+function applyRunnerLeadToRoute(route, leadDistance = 0, maxRatio = 0.82) {
   if (!route?.length || route.length < 2 || leadDistance <= 0) return route;
   const totalDistance = getRunnerRouteDistance(route);
   if (totalDistance <= 0) return route;
-  const startPoint = getRunnerRoutePoint(route, clamp(leadDistance / totalDistance, 0, 0.82));
+  const startPoint = getRunnerRoutePoint(route, clamp(leadDistance / totalDistance, 0, maxRatio));
   return [{ ...startPoint }, ...route.slice(1)];
 }
 
@@ -13520,7 +13559,13 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   if (outcome.needsThrow) {
     defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
       manualWait: isManualThrowControl(),
-      targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner),
+      targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner, {
+        fielder: chosenFielder,
+        fieldingTarget: fieldingPoint,
+        baseRunners: defenseState.baseRunners,
+        minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder),
+        autoFallback: !isManualThrowControl()
+      }),
       baseRunners: defenseState.baseRunners,
       minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder)
     });
@@ -13614,7 +13659,13 @@ function completeLivePostLandingPickup(fielder, fieldingPoint, elapsedSeconds) {
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
     manualWait: isManualThrowControl(),
-    targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner),
+    targetBase: getInitialDefenseThrowTargetBase(outcome, battedBall, defenseState.runner, {
+      fielder: chosenFielder,
+      fieldingTarget: fieldingPoint,
+      baseRunners: defenseState.baseRunners,
+      minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder),
+      autoFallback: !isManualThrowControl()
+    }),
     baseRunners: defenseState.baseRunners,
     minStartTime: getFieldingTimeForThrowDecision(outcome, battedBall, fieldingPoint, chosenFielder)
   });
