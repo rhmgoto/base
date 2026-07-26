@@ -289,6 +289,18 @@ canvas {
   font-size: 24px;
 }
 
+.last-updated {
+  margin-bottom: 4px;
+  color: rgba(35, 48, 71, 0.68);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.last-updated time {
+  font-variant-numeric: tabular-nums;
+}
+
 .menu-card label {
   display: grid;
   grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
