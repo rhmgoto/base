@@ -2217,6 +2217,7 @@ function ensurePitcherGameRecord(team, pitcherInfo = getTeamActivePitcher(team))
     strikeouts: 0,
     hitsAllowed: 0,
     runsAllowed: 0,
+    earnedRunsAllowed: 0,
     walksAllowed: 0,
     pitchCount: pitcherInfo.pitchCount ?? 0,
     save: false,
@@ -2348,18 +2349,24 @@ function recordPitcherDecisionEvent(team, runs, beforeScores, afterScores, respo
   }
 }
 
-function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherIds = [], staminaPenaltyPerRun = staminaTuning.runPenalty) {
+function recordResponsiblePitcherRunsAllowed(fielding, runs, responsiblePitcherIds = [], staminaPenaltyPerRun = staminaTuning.runPenalty, earnedRunFlags = []) {
   if (isAnyPracticeMode() || !runs || runs <= 0) return;
   const fallbackPitcher = getTeamActivePitcher(fielding);
   const totals = new Map();
+  const earnedTotals = new Map();
   for (let index = 0; index < runs; index += 1) {
     const pitcherId = responsiblePitcherIds[index] || fallbackPitcher?.id;
     if (!pitcherId) continue;
     totals.set(pitcherId, (totals.get(pitcherId) || 0) + 1);
+    if (earnedRunFlags[index] !== false) {
+      earnedTotals.set(pitcherId, (earnedTotals.get(pitcherId) || 0) + 1);
+    }
   }
   totals.forEach((amount, pitcherId) => {
     const pitcherInfo = selected?.[fielding]?.pitchers?.find((entry) => entry.id === pitcherId) || fallbackPitcher;
     recordPitcherStat(fielding, pitcherInfo, "runsAllowed", amount);
+    const earnedAmount = earnedTotals.get(pitcherId) || 0;
+    if (earnedAmount > 0) recordPitcherStat(fielding, pitcherInfo, "earnedRunsAllowed", earnedAmount);
     applyPitcherEventStaminaPenalty(pitcherInfo, staminaPenaltyPerRun * amount);
   });
 }
@@ -2548,6 +2555,7 @@ function substituteRunner(team, baseName, benchPlayer) {
   const nextRunner = makeBaseRunner(benchPlayer);
   nextRunner.responsiblePitcherId = oldRunner.responsiblePitcherId;
   nextRunner.responsibleTeam = oldRunner.responsibleTeam;
+  nextRunner.unearnedRun = oldRunner.unearnedRun;
   bases[baseName] = nextRunner;
   const ok = substituteLineupPlayer(team, lineupEntry, benchPlayer, "pinchRun");
   if (ok) message = `${teamLabel(team)} PR: ${benchPlayer.name}`;
@@ -3782,7 +3790,7 @@ function applyExtraInningTiebreakRunner() {
   if (isAnyPracticeMode() || inning <= maxInnings) return;
   const runner = getTiebreakRunner(battingTeam);
   bases = createEmptyBases();
-  if (runner) bases.second = makeBaseRunner(runner);
+  if (runner) bases.second = makeBaseRunner({ ...runner, unearnedRun: true });
 }
 
 function resetPracticePlateAppearance() {
@@ -8704,20 +8712,23 @@ function normalizeAutoHitAdvanceType(type) {
 function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
   let runs = 0;
   const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   const scoringRunners = [];
   const groundRuleDouble = Boolean(battedBall?.groundRuleDouble);
+  const runScoredOnError = Boolean(outcome?.fieldingError);
+  const batterRunnerInfo = runScoredOnError ? { ...batterInfo, unearnedRun: true } : batterInfo;
   type = groundRuleDouble ? "double" : normalizeAutoHitAdvanceType(type);
   if (type === "walk") {
     if (bases.first && bases.second && bases.third) {
       runs += 1;
-      scoringResponsiblePitcherIds.push(bases.third.responsiblePitcherId);
+      trackScoringRunner(bases.third, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
       scoringRunners.push(bases.third);
     }
     if (bases.first && bases.second) bases.third = bases.second;
     if (bases.first) bases.second = bases.first;
-    bases.first = makeBaseRunner(batterInfo);
+    bases.first = makeBaseRunner(batterRunnerInfo);
     recordScoringRunners(battingTeam, scoringRunners);
-    addRunsToBattingTeam(runs, scoringResponsiblePitcherIds);
+    addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
     playScoringCheer(runs);
     return runs;
   }
@@ -8727,7 +8738,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
     { base: 3, runner: bases.third },
     { base: 2, runner: bases.second },
     { base: 1, runner: bases.first },
-    { base: 0, runner: makeBaseRunner(batterInfo) }
+    { base: 0, runner: makeBaseRunner(batterRunnerInfo) }
   ].filter((entry) => entry.runner);
   bases = createEmptyBases();
   runners.forEach(({ base, runner }) => {
@@ -8735,7 +8746,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
     const nextBase = base + steps + extraAdvance;
     if (nextBase >= 4) {
       runs += 1;
-      scoringResponsiblePitcherIds.push(runner.responsiblePitcherId);
+      trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags, { forceUnearned: runScoredOnError });
       scoringRunners.push(runner);
     } else if (nextBase === 3) {
       bases.third = runner;
@@ -8746,7 +8757,7 @@ function advanceRunners(type, batterInfo, battedBall = null, outcome = null) {
     }
   });
   recordScoringRunners(battingTeam, scoringRunners);
-  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { homer: type === "homer" });
+  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { homer: type === "homer", earnedRunFlags: scoringEarnedRunFlags });
   playScoringCheer(runs);
   return runs;
 }
@@ -8765,6 +8776,41 @@ function isFinalBottomSecondBatTeamLeading() {
     && scores[secondHalfTeam] > scores[firstHalfTeam];
 }
 
+function getMercyRuleThreshold() {
+  if (inning >= 7) return 7;
+  if (inning >= 5) return 10;
+  return null;
+}
+
+function getMercyRuleWinner() {
+  const threshold = getMercyRuleThreshold();
+  if (!threshold || isAnyPracticeMode() || scores.away === scores.home) return null;
+  const winner = scores.away > scores.home ? "away" : "home";
+  return scores[winner] - scores[fieldingOpponentTeam(winner)] >= threshold ? winner : null;
+}
+
+function fieldingOpponentTeam(team) {
+  return team === "away" ? "home" : "away";
+}
+
+function shouldEndByMercyRuleAfterScore() {
+  const winner = getMercyRuleWinner();
+  return Boolean(
+    winner
+    && half === "bottom"
+    && battingTeam === getSecondBatTeam()
+    && winner === battingTeam
+  );
+}
+
+function shouldEndByMercyRuleAfterCompletedHalf() {
+  const winner = getMercyRuleWinner();
+  if (!winner) return false;
+  if (half === "bottom" && battingTeam === getSecondBatTeam()) return true;
+  if (half === "top" && battingTeam === firstBatTeam && winner === getSecondBatTeam()) return true;
+  return false;
+}
+
 function addRunsToBattingTeam(runs, responsiblePitcherIds = [], options = {}) {
   const beforeScores = { away: scores.away, home: scores.home };
   recordLineScoreRuns(battingTeam, runs);
@@ -8773,14 +8819,20 @@ function addRunsToBattingTeam(runs, responsiblePitcherIds = [], options = {}) {
   if (runs > 0) {
     recordPitcherDecisionEvent(battingTeam, runs, beforeScores, afterScores, responsiblePitcherIds);
     const penaltyPerRun = options.homer ? staminaTuning.homerRunPenalty : staminaTuning.runPenalty;
-    recordResponsiblePitcherRunsAllowed(fieldingTeam(), runs, responsiblePitcherIds, penaltyPerRun);
-    endGameIfFinalBottomSecondBatTeamLeads();
+    recordResponsiblePitcherRunsAllowed(fieldingTeam(), runs, responsiblePitcherIds, penaltyPerRun, options.earnedRunFlags || []);
+    endGameIfMercyRuleReached() || endGameIfFinalBottomSecondBatTeamLeads();
   }
 }
 
 function endGameIfFinalBottomSecondBatTeamLeads() {
   if (!isFinalBottomSecondBatTeamLeading()) return false;
   endGame();
+  return true;
+}
+
+function endGameIfMercyRuleReached() {
+  if (!shouldEndByMercyRuleAfterScore()) return false;
+  endGame("コールドゲーム");
   return true;
 }
 
@@ -9046,9 +9098,19 @@ function makeBaseRunner(player) {
     id: player.id,
     name: player.name,
     run: player.run ?? 5,
+    unearnedRun: Boolean(player.unearnedRun),
     responsiblePitcherId: player.responsiblePitcherId ?? (!isAnyPracticeMode() ? getTeamActivePitcher(fieldingTeam())?.id : null),
     responsibleTeam: player.responsibleTeam ?? (!isAnyPracticeMode() ? fieldingTeam() : null)
   };
+}
+
+function getRunnerResponsiblePitcherId(runner) {
+  return runner?.responsiblePitcherId ?? (!isAnyPracticeMode() ? getTeamActivePitcher(fieldingTeam())?.id : null);
+}
+
+function trackScoringRunner(runner, responsiblePitcherIds, earnedRunFlags, options = {}) {
+  responsiblePitcherIds.push(getRunnerResponsiblePitcherId(runner));
+  earnedRunFlags.push(!(options.forceUnearned || runner?.unearnedRun));
 }
 
 function formatRuns(runs) {
@@ -9909,6 +9971,7 @@ function getInitialDefenseThrowTargetBase(outcome, battedBall, runner, options =
   if (options.autoFallback) {
     const autoTarget = getAutomaticForceThrowTargetBase(outcome, battedBall, runner, options);
     if (autoTarget) return autoTarget;
+    return runner?.targetBase || outcome.targetBase || "first";
   }
   const forceTargetBase = getLeadForceThrowTargetBase(outcome, battedBall);
   if (forceTargetBase) return forceTargetBase;
@@ -9922,14 +9985,35 @@ function getAutomaticForceThrowTargetBase(outcome, battedBall, runner, options =
   const activeTargets = forceTargets
     .filter((entry) => isForceTargetEntryActive(entry, forceTargets, []))
     .sort((a, b) => getForceTargetBaseIndex(b.targetBase) - getForceTargetBaseIndex(a.targetBase));
-  for (const target of activeTargets) {
+  const evaluations = activeTargets.map((target) => {
     const runnerArrival = getForceTargetRunnerArrival(target, runner, options.baseRunners);
     const throwArrival = estimateAutoThrowArrivalToBase(target.targetBase, outcome, options);
-    if (Number.isFinite(runnerArrival) && Number.isFinite(throwArrival) && throwArrival <= runnerArrival + 0.001) {
-      return target.targetBase;
-    }
+    const margin = Number.isFinite(runnerArrival) && Number.isFinite(throwArrival)
+      ? runnerArrival - throwArrival
+      : Number.NEGATIVE_INFINITY;
+    return { target, runnerArrival, throwArrival, margin };
+  });
+  const firstTarget = evaluations.find((entry) => entry.target.targetBase === "first");
+  if (firstTarget && firstTarget.margin >= -0.04) return "first";
+
+  const leadTarget = evaluations
+    .filter((entry) => entry.target.targetBase !== "first")
+    .find((entry) => entry.margin >= getCpuLeadForceThrowRequiredMargin(entry.target.targetBase));
+  if (leadTarget) return leadTarget.target.targetBase;
+
+  if (firstTarget) return "first";
+  const anySafeTarget = evaluations.find((entry) => entry.margin >= 0.08);
+  if (anySafeTarget) {
+    return anySafeTarget.target.targetBase;
   }
   return null;
+}
+
+function getCpuLeadForceThrowRequiredMargin(targetBase) {
+  if (targetBase === "home") return 0.2;
+  if (targetBase === "third") return 0.18;
+  if (targetBase === "second") return 0.14;
+  return 0.06;
 }
 
 function getForceTargetRunnerArrival(forceTarget, batterRunner = null, baseRunners = null) {
@@ -14679,6 +14763,8 @@ function applyCompletedForceOutBaseState(targetBases, batterInfo, useDefenseAnim
   );
   const nextBases = createEmptyBases();
   const animatedStartBases = new Set();
+  const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   let runs = 0;
   if (useDefenseAnimations) {
     (defenseState.baseRunners || []).forEach((runner) => {
@@ -14688,6 +14774,7 @@ function applyCompletedForceOutBaseState(targetBases, batterInfo, useDefenseAnim
       const targetBase = runner.targetBase || runner.manualTargetBase || runner.startBase;
       if (targetBase === "home" || runner.scored) {
         runs += 1;
+        trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
         return;
       }
       if (baseIndexByName[targetBase]) nextBases[targetBase] = makeBaseRunner(runner);
@@ -14703,7 +14790,7 @@ function applyCompletedForceOutBaseState(targetBases, batterInfo, useDefenseAnim
   if (!batterOut && batterInfo) nextBases.first = makeBaseRunner(batterInfo);
   bases = nextBases;
   if (runs > 0) {
-    addRunsToBattingTeam(runs);
+    addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
     playScoringCheer(runs);
   }
   return runs;
@@ -14713,6 +14800,8 @@ function applyTagOutBaseState(outRunner, batterInfo) {
   if (!outRunner || count.outs >= 3) return;
   const outStartBase = outRunner === defenseState.runner ? "batter" : outRunner.startBase;
   const nextBases = createEmptyBases();
+  const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   let runs = 0;
 
   (defenseState.baseRunners || []).forEach((runner) => {
@@ -14720,6 +14809,7 @@ function applyTagOutBaseState(outRunner, batterInfo) {
     const targetBase = runner.targetBase || runner.manualTargetBase || runner.startBase;
     if (targetBase === "home" || runner.scored) {
       runs += 1;
+      trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
       return;
     }
     if (baseIndexByName[targetBase]) nextBases[targetBase] = makeBaseRunner(runner);
@@ -14729,6 +14819,7 @@ function applyTagOutBaseState(outRunner, batterInfo) {
     const batterTarget = defenseState.runner?.targetBase || "first";
     if (batterTarget === "home") {
       runs += 1;
+      trackScoringRunner(makeBaseRunner(batterInfo), scoringResponsiblePitcherIds, scoringEarnedRunFlags);
     } else if (baseIndexByName[batterTarget]) {
       nextBases[batterTarget] = makeBaseRunner(batterInfo);
     }
@@ -14736,7 +14827,7 @@ function applyTagOutBaseState(outRunner, batterInfo) {
 
   bases = nextBases;
   if (runs > 0) {
-    addRunsToBattingTeam(runs);
+    addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
     playScoringCheer(runs);
   }
 }
@@ -14744,12 +14835,15 @@ function applyTagOutBaseState(outRunner, batterInfo) {
 function applySafeDefenseThrowBaseState(batterInfo) {
   if (count.outs >= 3) return 0;
   const nextBases = createEmptyBases();
+  const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   let runs = 0;
   (defenseState.baseRunners || []).forEach((runner) => {
     if (!runner?.startBase) return;
     const targetBase = runner.targetBase || runner.manualTargetBase || runner.startBase;
     if (targetBase === "home" || runner.scored) {
       runs += 1;
+      trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
       return;
     }
     if (baseIndexByName[targetBase]) nextBases[targetBase] = makeBaseRunner(runner);
@@ -14757,11 +14851,12 @@ function applySafeDefenseThrowBaseState(batterInfo) {
   const batterTarget = defenseState.runner?.targetBase || "first";
   if (batterTarget === "home") {
     runs += 1;
+    trackScoringRunner(makeBaseRunner(batterInfo), scoringResponsiblePitcherIds, scoringEarnedRunFlags);
   } else if (baseIndexByName[batterTarget] && batterInfo) {
     nextBases[batterTarget] = makeBaseRunner(batterInfo);
   }
   bases = nextBases;
-  addRunsToBattingTeam(runs);
+  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
   playScoringCheer(runs);
   return runs;
 }
@@ -14776,12 +14871,15 @@ function getForcedRunnerStartBaseForTarget(targetBase) {
 function applyManualDefenseAdvancement(batterInfo) {
   if (count.outs >= 3) return 0;
   let runs = 0;
+  const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   const nextBases = { ...bases };
   defenseState.baseRunners?.forEach((runner) => {
     if (!runner.manualTargetBase) return;
     nextBases[runner.startBase] = null;
     if (runner.manualTargetBase === "home") {
       runs += 1;
+      trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
     } else {
       nextBases[runner.manualTargetBase] = makeBaseRunner(runner);
     }
@@ -14789,11 +14887,12 @@ function applyManualDefenseAdvancement(batterInfo) {
   const batterTarget = defenseState.runner?.targetBase ?? "first";
   if (batterTarget === "home") {
     runs += 1;
+    trackScoringRunner(makeBaseRunner(batterInfo), scoringResponsiblePitcherIds, scoringEarnedRunFlags);
   } else {
     nextBases[batterTarget] = makeBaseRunner(batterInfo);
   }
   bases = nextBases;
-  addRunsToBattingTeam(runs);
+  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
   playScoringCheer(runs);
   return runs;
 }
@@ -14815,6 +14914,8 @@ function applyDefenseOutAdvancements() {
   const advancingRunners = defenseState.baseRunners?.filter((runner) => runner.tagUp || runner.groundOutAdvance) || [];
   if (!advancingRunners.length) return 0;
   const nextBases = { ...bases };
+  const scoringResponsiblePitcherIds = [];
+  const scoringEarnedRunFlags = [];
   let runs = 0;
   let tagUpOuts = 0;
   [...advancingRunners]
@@ -14832,6 +14933,7 @@ function applyDefenseOutAdvancements() {
     if (targetBase === "home" || runner.scored) {
       nextBases[runner.startBase] = null;
       runs += 1;
+      trackScoringRunner(runner, scoringResponsiblePitcherIds, scoringEarnedRunFlags);
     } else if (baseIndexByName[targetBase]) {
       if (targetBase !== runner.startBase && nextBases[targetBase]) return;
       nextBases[runner.startBase] = null;
@@ -14847,7 +14949,7 @@ function applyDefenseOutAdvancements() {
     defenseState.tagUpOutsAdded = (defenseState.tagUpOutsAdded || 0) + outsToAdd;
     if (count.outs >= 3) runs = 0;
   }
-  addRunsToBattingTeam(runs);
+  addRunsToBattingTeam(runs, scoringResponsiblePitcherIds, { earnedRunFlags: scoringEarnedRunFlags });
   playScoringCheer(runs);
   return runs;
 }
@@ -14902,6 +15004,10 @@ function changeSide() {
   resetSwing();
   const firstHalfTeam = firstBatTeam;
   const secondHalfTeam = firstBatTeam === "away" ? "home" : "away";
+  if (shouldEndByMercyRuleAfterCompletedHalf()) {
+    endGame("コールドゲーム");
+    return;
+  }
   if (battingTeam === firstHalfTeam) {
     battingTeam = secondHalfTeam;
     half = "bottom";
@@ -14934,14 +15040,14 @@ function changeSide() {
   scheduleNextPitch(0);
 }
 
-function endGame() {
+function endGame(reasonLabel = "") {
   ensurePitcherGameRecord("away", getTeamActivePitcher("away"));
   ensurePitcherGameRecord("home", getTeamActivePitcher("home"));
   markPitcherSaveIfEligible();
   markPitcherWinLossAndHolds();
   gamePhase = "gameover";
   const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "チームA勝利" : "チームB勝利";
-  message = `試合終了 ${scores.away}-${scores.home} ${result}`;
+  message = `${reasonLabel ? `${reasonLabel} ` : ""}試合終了 ${scores.away}-${scores.home} ${result}`;
   showEffect(result, "#ff6f61");
 }
 
@@ -20457,7 +20563,7 @@ function formatBattingAverage(record) {
 
 function formatPitcherEra(record) {
   if (!record.outs) return "--";
-  return ((record.runsAllowed || 0) * 27 / record.outs).toFixed(2);
+  return ((record.earnedRunsAllowed || 0) * 27 / record.outs).toFixed(2);
 }
 
 function drawGameResultTableCell(text, x, y, width, height, options = {}) {
@@ -20570,7 +20676,7 @@ function drawGameResultPitchingTable(team, x, y, width, height) {
       record.strikeouts || 0,
       record.walksAllowed || 0,
       record.runsAllowed || 0,
-      record.runsAllowed || 0
+      record.earnedRunsAllowed || 0
     ];
     drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
   });

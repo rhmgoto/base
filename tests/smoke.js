@@ -10358,6 +10358,75 @@ assert(finalBottomMercyState.takesLeadDuringBottom.gamePhase === "gameover", "fi
 assert(finalBottomMercyState.takesLeadDuringBottom.message.includes("3-4"), "final bottom early finish should keep the final score");
 assert(finalBottomMercyState.notFinalBottom.gamePhase === "playing", "non-final bottom lead should not trigger the early finish");
 
+const mercyRuleState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    firstBatTeam = "away";
+    battingTeam = "home";
+    inning = 5;
+    half = "bottom";
+    scores = { away: 2, home: 11 };
+    gamePhase = "playing";
+    addRunsToBattingTeam(1);
+    const bottomFifthTenRunLead = { gamePhase, message, scores: { ...scores } };
+
+    startGame();
+    firstBatTeam = "away";
+    battingTeam = "home";
+    inning = 7;
+    half = "bottom";
+    scores = { away: 4, home: 10 };
+    gamePhase = "playing";
+    addRunsToBattingTeam(1);
+    const bottomSeventhSevenRunLead = { gamePhase, message, scores: { ...scores } };
+
+    startGame();
+    firstBatTeam = "away";
+    battingTeam = "away";
+    inning = 5;
+    half = "top";
+    scores = { away: 12, home: 2 };
+    gamePhase = "playing";
+    changeSide();
+    const awayLeadAfterTopFifth = { gamePhase, inning, half, battingTeam };
+
+    startGame();
+    firstBatTeam = "away";
+    battingTeam = "home";
+    inning = 5;
+    half = "bottom";
+    scores = { away: 12, home: 2 };
+    gamePhase = "playing";
+    changeSide();
+    const awayLeadAfterBottomFifth = { gamePhase, message };
+
+    startGame();
+    firstBatTeam = "away";
+    battingTeam = "away";
+    inning = 7;
+    half = "top";
+    scores = { away: 3, home: 10 };
+    gamePhase = "playing";
+    changeSide();
+    const homeLeadAfterTopSeventh = { gamePhase, message };
+
+    return JSON.stringify({
+      bottomFifthTenRunLead,
+      bottomSeventhSevenRunLead,
+      awayLeadAfterTopFifth,
+      awayLeadAfterBottomFifth,
+      homeLeadAfterTopSeventh
+    });
+  })()`
+));
+
+assert(mercyRuleState.bottomFifthTenRunLead.gamePhase === "gameover" && mercyRuleState.bottomFifthTenRunLead.message.includes("コールドゲーム"), "a ten-run lead from the fifth inning onward should end the game when the second batting team leads");
+assert(mercyRuleState.bottomSeventhSevenRunLead.gamePhase === "gameover" && mercyRuleState.bottomSeventhSevenRunLead.message.includes("コールドゲーム"), "a seven-run lead from the seventh inning onward should end the game when the second batting team leads");
+assert(mercyRuleState.awayLeadAfterTopFifth.gamePhase === "playing" && mercyRuleState.awayLeadAfterTopFifth.half === "bottom", "the first batting team should not win by mercy rule until the second batting team gets its bottom-half chance");
+assert(mercyRuleState.awayLeadAfterBottomFifth.gamePhase === "gameover" && mercyRuleState.awayLeadAfterBottomFifth.message.includes("コールドゲーム"), "a ten-run lead should end after the fifth inning is complete");
+assert(mercyRuleState.homeLeadAfterTopSeventh.gamePhase === "gameover" && mercyRuleState.homeLeadAfterTopSeventh.message.includes("コールドゲーム"), "the second batting team should not need to bat when already leading by seven after the top of the seventh");
+
 const extraInningTiebreakState = JSON.parse(runInGame(
   context,
   `(() => {
@@ -10406,6 +10475,42 @@ assert(extraInningTiebreakState.extraTop.gamePhase === "playing" && extraInningT
 assert(extraInningTiebreakState.extraTop.outs === 0 && extraInningTiebreakState.extraTop.second === "otani", "extra innings should start with no outs and the previous last-out batter on second");
 assert(extraInningTiebreakState.extraBottom.gamePhase === "playing" && extraInningTiebreakState.extraBottom.half === "bottom" && extraInningTiebreakState.extraBottom.second === "ichiro", "the bottom half of extras should also use the team's last-out batter on second");
 assert(extraInningTiebreakState.extraFinished.gamePhase === "gameover" && extraInningTiebreakState.extraFinished.message.includes("チームA勝利"), "extra innings should end after a full extra inning when a team leads");
+
+const earnedRunScoringState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    battingTeam = "away";
+    setMatchup();
+    const pitcher = getTeamActivePitcher("home");
+    ensurePitcherGameRecord("home", pitcher);
+
+    bases = createEmptyBases();
+    bases.second = makeBaseRunner({ ...findById(batters, "otani"), unearnedRun: true, responsiblePitcherId: pitcher.id });
+    advanceRunners("double", findById(batters, "betts"));
+    const tiebreakRecord = { ...getPitcherRecordById("home", pitcher.id) };
+
+    pitcherGameRecords = createPitcherGameRecords();
+    ensurePitcherGameRecord("home", pitcher);
+    bases = createEmptyBases();
+    bases.third = makeBaseRunner({ ...findById(batters, "otani"), responsiblePitcherId: pitcher.id });
+    advanceRunners("single", findById(batters, "betts"), null, { fieldingError: true });
+    const errorScoreRecord = { ...getPitcherRecordById("home", pitcher.id) };
+
+    pitcherGameRecords = createPitcherGameRecords();
+    ensurePitcherGameRecord("home", pitcher);
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner({ ...findById(batters, "betts"), unearnedRun: true, responsiblePitcherId: pitcher.id });
+    advanceRunners("homer", findById(batters, "freeman"));
+    const errorReachLaterRecord = { ...getPitcherRecordById("home", pitcher.id) };
+
+    return JSON.stringify({ tiebreakRecord, errorScoreRecord, errorReachLaterRecord });
+  })()`
+));
+
+assert(earnedRunScoringState.tiebreakRecord.runsAllowed === 1 && (earnedRunScoringState.tiebreakRecord.earnedRunsAllowed || 0) === 0, "tiebreak runners should count as runs but not earned runs");
+assert(earnedRunScoringState.errorScoreRecord.runsAllowed === 1 && (earnedRunScoringState.errorScoreRecord.earnedRunsAllowed || 0) === 0, "runners scoring on errors should not be earned runs");
+assert(earnedRunScoringState.errorReachLaterRecord.runsAllowed === 2 && earnedRunScoringState.errorReachLaterRecord.earnedRunsAllowed === 1, "runners who reached on errors should remain unearned when they later score");
 
 const pitcherGameRecordState = JSON.parse(runInGame(
   context,
