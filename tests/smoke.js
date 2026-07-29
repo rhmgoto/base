@@ -8364,6 +8364,45 @@ assert(baseRunnerAdvanceState.fastBatterOnSecond === false, "auto batter-runners
 assert(baseRunnerAdvanceState.slowFirstRuns === 0, "slow runners on first should not score on short doubles");
 assert(baseRunnerAdvanceState.slowFirstOnThird === false, "auto runners from first should stop at second on short doubles");
 
+const manualHitRecordUpgradeState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    battingTeam = "away";
+    activeBatter = findById(batters, "suzuki");
+    initializeBatterGameRecords();
+    function recordForTarget(targetBase) {
+      initializeBatterGameRecords();
+      defenseState = {
+        ...createDefenseState(),
+        runner: { targetBase }
+      };
+      const recordType = getBatterFinalHitRecordType("single");
+      recordBatterPlateAppearance(recordType, { runs: targetBase === "home" ? 1 : 0 });
+      const record = ensureBatterGameRecord("away", activeBatter, getCurrentBatterRole("away"));
+      return {
+        recordType,
+        hits: record.hits,
+        doubles: record.doubles,
+        triples: record.triples,
+        homeRuns: record.homeRuns,
+        rbi: record.rbi
+      };
+    }
+    return JSON.stringify({
+      second: recordForTarget("second"),
+      third: recordForTarget("third"),
+      home: recordForTarget("home"),
+      first: recordForTarget("first")
+    });
+  })()`
+));
+
+assert(manualHitRecordUpgradeState.second.recordType === "double" && manualHitRecordUpgradeState.second.doubles === 1, "manual batter-runner advance to second should be recorded as a double");
+assert(manualHitRecordUpgradeState.third.recordType === "triple" && manualHitRecordUpgradeState.third.triples === 1, "manual batter-runner advance to third should be recorded as a triple");
+assert(manualHitRecordUpgradeState.home.recordType === "homer" && manualHitRecordUpgradeState.home.homeRuns === 1 && manualHitRecordUpgradeState.home.rbi === 1, "manual batter-runner advance home should be recorded as a running home run");
+assert(manualHitRecordUpgradeState.first.recordType === "single" && manualHitRecordUpgradeState.first.hits === 1, "ordinary first-base hits should remain singles");
+
 const defenseOutAdvancementState = JSON.parse(runInGame(
   context,
   `(() => {

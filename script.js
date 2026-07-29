@@ -14733,15 +14733,17 @@ function finishDefensePlay() {
       showEffect(runs > 0 ? `進塁 +${runs}` : outsToAdd >= 2 ? "ゲッツー" : "アウト", "#ffcf70");
     } else {
       const advanceType = getBatterRunnerAdvanceTypeFromThrow(defenseState.throw);
+      const hitRecordType = getBatterFinalHitRecordType(advanceType);
       if (!outcome.fieldingError && outcome.kind === "force") {
         recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
+        if (hitRecordType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
       }
       const runs = outcome.kind === "force" && defenseState.baseRunners?.length
         ? applySafeDefenseThrowBaseState(activeBatter)
         : defenseState.runner?.manualControlled && defenseState.runner.targetBase !== "first"
         ? applyManualDefenseAdvancement(activeBatter)
         : advanceRunners(advanceType, activeBatter, defenseState.battedBall, outcome);
-      recordBatterPlateAppearance(!outcome.fieldingError && outcome.kind === "force" ? "single" : "fielderChoice", { runs });
+      recordBatterPlateAppearance(!outcome.fieldingError && outcome.kind === "force" ? hitRecordType : "fielderChoice", { runs });
       const baseLabel = defenseState.throw?.baseLabel || "一塁";
       const baseMessage = `${baseLabel}セーフ: ${formatRuns(runs)}`;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -14777,17 +14779,18 @@ function finishDefensePlay() {
     showEffect(runs > 0 ? `エラー +${runs}` : "エラー", "#ff6f61");
   } else {
     const scoreType = getScoringHitType(outcome);
-    if (scoringHitTypes.has(scoreType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
-    if (scoreType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
+    const hitRecordType = getBatterFinalHitRecordType(scoreType);
+    if (scoringHitTypes.has(hitRecordType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
+    if (hitRecordType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
     const runs = advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
-    recordBatterPlateAppearance(scoreType, { runs });
-    const label = getHitLabelByScoreType(scoreType);
+    recordBatterPlateAppearance(hitRecordType, { runs });
+    const label = getHitLabelByScoreType(hitRecordType);
     const baseMessage = `${label}: ${formatRuns(runs)}`;
     message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
-    const effectText = scoreType === "homer" && metricText
+    const effectText = hitRecordType === "homer" && metricText
       ? `${label} ${metricText.replace("飛距離 ", "")}`
       : runs > 0 ? `${label} +${runs}` : label;
-    showEffect(effectText, scoreType === "homer" ? "#ff6f61" : "#fff2a8");
+    showEffect(effectText, hitRecordType === "homer" ? "#ff6f61" : "#fff2a8");
   }
 
   appendHomeRunVisionAdviceToMessage(defenseState.battedBall);
@@ -14954,6 +14957,20 @@ function getBatterRunnerAdvanceTypeFromThrow(throwState) {
   if (batterTarget === "third") return "triple";
   if (batterTarget === "second") return "double";
   return "single";
+}
+
+function getBatterFinalHitRecordType(baseHitType = "single") {
+  const normalizedBase = scoringHitTypes.has(baseHitType) ? baseHitType : "single";
+  const batterTarget = defenseState.runner?.targetBase || "first";
+  const finalType = batterTarget === "home"
+    ? "homer"
+    : batterTarget === "third"
+      ? "triple"
+      : batterTarget === "second"
+        ? "double"
+        : normalizedBase;
+  const baseRank = { single: 1, double: 2, triple: 3, homer: 4 };
+  return (baseRank[finalType] || 1) > (baseRank[normalizedBase] || 1) ? finalType : normalizedBase;
 }
 
 function hasDefenseOutAdvancements() {
