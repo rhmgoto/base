@@ -95,6 +95,18 @@ assertIncludesAll(
 assertIncludesAll(
   script,
   [
+    "function updatePlayerChooserGamepadScroll",
+    "playerChooser.classList.contains(\"hidden\")",
+    "pane.scrollHeight <= pane.clientHeight",
+    "pane.scrollTop + y * 26",
+    "updatePlayerChooserGamepadScroll(gamepad, team, y)"
+  ],
+  "player chooser gamepad scrolling"
+);
+
+assertIncludesAll(
+  script,
+  [
     "function drawDefenseCatchEffect()",
     "outcome?.caught || outcome.fieldingError",
     "const edgeCatch = (catchVisual?.edgeCatchRatio ?? 0) >= 0.78",
@@ -317,7 +329,7 @@ assertIncludesAll(
 );
 
 assertIncludesAll(
-  script,
+  script.replace(/\r\n/g, "\n"),
   [
     "popupReductionRate: 0.3",
     "function resolveBuntPopupOutcome",

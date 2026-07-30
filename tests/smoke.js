@@ -984,6 +984,21 @@ const weakSwingState = JSON.parse(runInGame(
       convertedBuntResult.label,
       convertedBuntResult.battedProfile
     );
+    const visualPopupBuntProfile = {
+      ...buntProfile,
+      launchAngle: 15,
+      pitcherBuntPopup: false,
+      popupConvertedToPitcherFront: false,
+      buntPitcherFrontGrounder: false,
+      power: 0.18
+    };
+    const visualPopupBuntBall = buildBattedBall(
+      visualPopupBuntProfile.power,
+      visualPopupBuntProfile.direction,
+      hitLabels.grounder,
+      visualPopupBuntProfile
+    );
+    const convertedGrounderMidHeight = getGrounderFlightHeight(0.3, convertedBuntBall);
     count = { strikes: 2, balls: 0, outs: 0 };
     finishPitch(hitLabels.foul, "foul", 0.2, 0, badBuntProfile.direction, badBuntProfile);
     const twoStrikeBuntFoul = {
@@ -1117,7 +1132,7 @@ const weakSwingState = JSON.parse(runInGame(
     updateBuntStance();
     const batterButton3BuntHeld = isBuntButtonHeld();
     const batterButton3BuntType = swingState.type;
-    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
+    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, visualPopupBuntBall, convertedGrounderMidHeight, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1160,6 +1175,8 @@ assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups shou
 assert(weakSwingState.badBuntOutcome.kind === "out" && weakSwingState.badBuntOutcome.caught === true && weakSwingState.badBuntOutcome.needsThrow === false, `pitcher-area bunt popups should be caught in the air instead of bouncing into a bunt throw play (${JSON.stringify(weakSwingState.badBuntOutcome)})`);
 assert(weakSwingState.convertedBuntResult.battedProfile.launchAngle <= 2, "bunt popups converted to pitcher-front balls should keep a low visual launch angle");
 assert(weakSwingState.convertedBuntBall.isGrounder === true && weakSwingState.convertedBuntBall.isPopupFly === false && weakSwingState.convertedBuntBall.trajectory === "grounder", "bunt popups converted to pitcher-front balls should render and resolve as bouncing grounders");
+assert(weakSwingState.convertedGrounderMidHeight <= 3.3, "bunt grounders should use a low bouncing visual instead of looking like popup flies");
+assert(weakSwingState.visualPopupBuntBall.isGrounder === false && weakSwingState.visualPopupBuntBall.isPopupFly === true && weakSwingState.visualPopupBuntBall.trajectory === "fly", "bunts that visually lift like popup flies should resolve as fly balls");
 assert(weakSwingState.twoStrikeBuntFoul.outs === 1 && weakSwingState.twoStrikeBuntFoul.strikes === 0 && weakSwingState.twoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls should count as strikeouts");
 assert(weakSwingState.directTwoStrikeBuntFoul.profileHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.resultHasBunt === true && weakSwingState.directTwoStrikeBuntFoul.outs === 1 && weakSwingState.directTwoStrikeBuntFoul.strikes === 0 && weakSwingState.directTwoStrikeBuntFoul.message.includes("三振"), "two-strike bunt fouls from the normal batted-ball result path should display strikeout and add an out");
 assert(weakSwingState.button1Type === "weak", "gamepad button 1 should start a weak swing when pressed alone");
@@ -2207,15 +2224,15 @@ assert(rosterAndPointState.trout.arm === 5, "Trout arm should match the roster t
 assert(rosterAndPointState.trout.cost === 6, "Trout cost should match the roster table");
 assert(rosterAndPointState.freeman.bats === "L", "Freeman should be a left-handed batter");
 assert(rosterAndPointState.freeman.power === 6, "Freeman power should match the roster table");
-assert(rosterAndPointState.freeman.meet === 7, "Freeman meet should match the roster table");
-assert(rosterAndPointState.freeman.run === 4, "Freeman run should match the roster table");
+assert(rosterAndPointState.freeman.meet === 9, "Freeman meet should match the roster table");
+assert(rosterAndPointState.freeman.run === 6, "Freeman run should match the roster table");
 assert(rosterAndPointState.freeman.infieldDefense === 7, "Freeman infield defense should match the roster table");
 assert(rosterAndPointState.freeman.outfieldDefense === 2, "Freeman outfield defense should match the roster table");
 assert(rosterAndPointState.freeman.arm === 7, "Freeman arm should match the roster table");
 assert(rosterAndPointState.freeman.cost === 6, "Freeman cost should match the roster table");
 assert(rosterAndPointState.leejunghoo.bats === "L", "Lee Jung-hoo should be a left-handed batter");
 assert(rosterAndPointState.leejunghoo.power === 4, "Lee Jung-hoo power should match the roster table");
-assert(rosterAndPointState.leejunghoo.meet === 8, "Lee Jung-hoo meet should match the roster table");
+assert(rosterAndPointState.leejunghoo.meet === 7, "Lee Jung-hoo meet should match the roster table");
 assert(rosterAndPointState.leejunghoo.run === 5, "Lee Jung-hoo run should match the roster table");
 assert(rosterAndPointState.leejunghoo.infieldDefense === 2, "Lee Jung-hoo infield defense should match the roster table");
 assert(rosterAndPointState.leejunghoo.outfieldDefense === 6, "Lee Jung-hoo outfield defense should match the roster table");
@@ -2293,7 +2310,7 @@ assert(rosterAndPointState.acunajr.arm === 8, "Acuna Jr. arm should match the ro
 assert(rosterAndPointState.acunajr.cost === 7, "Acuna Jr. cost should match the roster table");
 assert(rosterAndPointState.ydiaz.bats === "R", "Y. Diaz should be a right-handed batter");
 assert(rosterAndPointState.ydiaz.power === 5, "Y. Diaz power should match the roster table");
-assert(rosterAndPointState.ydiaz.meet === 9, "Y. Diaz meet should match the roster table");
+assert(rosterAndPointState.ydiaz.meet === 7, "Y. Diaz meet should match the roster table");
 assert(rosterAndPointState.ydiaz.run === 4, "Y. Diaz run should match the roster table");
 assert(rosterAndPointState.ydiaz.infieldDefense === 1, "Y. Diaz infield defense should match the roster table");
 assert(rosterAndPointState.ydiaz.outfieldDefense === 2, "Y. Diaz outfield defense should match the roster table");
@@ -10001,6 +10018,7 @@ const keyboardBattingControlState = JSON.parse(runInGame(
       movedRight: after.x > before.x,
       movedUp: after.y < before.y,
       insideBox: after.x >= box.left && after.x <= box.right && after.y >= box.top && after.y <= box.bottom,
+      bottomReachesScreenEdge: box.bottom + 58 === canvas.height,
       rightHomeReachAdded: rightBoxWithExtra.right - rightBoxWithoutExtra.right,
       rightAwaySideUnchanged: rightBoxWithExtra.left === rightBoxWithoutExtra.left,
       leftHomeReachAdded: leftBoxWithoutExtra.left - leftBoxWithExtra.left,
@@ -10012,6 +10030,7 @@ const keyboardBattingControlState = JSON.parse(runInGame(
 assert(keyboardBattingControlState.movedRight === true, "right arrow should move the batter inside the box");
 assert(keyboardBattingControlState.movedUp === true, "up arrow should move the batter toward the pitcher inside the box");
 assert(keyboardBattingControlState.insideBox === true, "keyboard batter movement should stay inside the batter box");
+assert(keyboardBattingControlState.bottomReachesScreenEdge === true, "batter movement should allow the sprite feet to reach the bottom of the screen");
 assert(keyboardBattingControlState.rightHomeReachAdded === 18, "right-handed batters should be able to move a fist closer to home plate");
 assert(keyboardBattingControlState.rightAwaySideUnchanged === true, "right-handed batter movement should only expand on the home-plate side");
 assert(keyboardBattingControlState.leftHomeReachAdded === 18, "left-handed batters should be able to move a fist closer to home plate");

@@ -139,8 +139,8 @@ const field = {
   strikeZoneTop: 702,
   strikeZoneBottom: 756,
   strikeZoneWidth: 72,
-  rightBox: { left: 452, right: 585, top: 649, bottom: 780 },
-  leftBox: { left: 695, right: 828, top: 649, bottom: 780 }
+  rightBox: { left: 452, right: 585, top: 649, bottom: 802 },
+  leftBox: { left: 695, right: 828, top: 649, bottom: 802 }
 };
 
 const batterMoveTuning = {
@@ -163,7 +163,7 @@ const batters = [
   { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
   { id: "ichiro", name: "イチロー", bats: "L", power: 4, meet: 25, run: 10, infieldDefense: 3, outfieldDefense: 16, arm: 11, cost: 28 },
   { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 6, cost: 5 },
-  { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 7, run: 4, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
+  { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 9, run: 6, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
   { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
   { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 4, run: 10, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 5 },
   { id: "shinjo", name: "シンジョウ", bats: "R", power: 4, meet: 3, run: 6, infieldDefense: 3, outfieldDefense: 10, arm: 10, cost: 4 },
@@ -172,11 +172,11 @@ const batters = [
   { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 8, run: 5, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 9 },
   { id: "ruth", name: "ルース", bats: "R", power: 32, meet: 20, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
   { id: "kimhyesong", name: "キムヘソン", bats: "L", power: 4, meet: 4, run: 5, infieldDefense: 5, outfieldDefense: 5, arm: 5, cost: 3 },
-  { id: "betts", name: "ベッツ", bats: "R", power: 5, meet: 6, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 5 },
+  { id: "betts", name: "ベッツ", bats: "R", power: 7, meet: 5, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 5 },
   { id: "okamoto", name: "オカモト", bats: "R", power: 5, meet: 5, run: 6, infieldDefense: 6, outfieldDefense: 5, arm: 7, cost: 5 },
   { id: "murakami", name: "ムラカミ", bats: "L", power: 7, meet: 4, run: 3, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 5 },
   { id: "nagashima", name: "ナガシマ", bats: "R", power: 23, meet: 18, run: 8, infieldDefense: 15, outfieldDefense: 2, arm: 14, cost: 25 },
-  { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 8, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
+  { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 7, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
   { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 8, cost: 8 },
   { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
@@ -192,7 +192,7 @@ const batters = [
   { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 5 },
   { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 },
   { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
-  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 9, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
+  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 26, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
   { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 22, run: 20, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 },
   { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 }
@@ -5494,8 +5494,39 @@ function updateMenuGamepadCursor(gamepad, team) {
     cursor.x = clamp(cursor.x + x * speed, 8, Math.max(8, window.innerWidth - 8));
     cursor.y = clamp(cursor.y + y * speed, 8, Math.max(8, window.innerHeight - 8));
   }
+  updatePlayerChooserGamepadScroll(gamepad, team, y);
   setMenuGamepadCursorVisible(team, true);
   renderMenuGamepadCursor(team);
+}
+
+function updatePlayerChooserGamepadScroll(gamepad, team, verticalInput = 0) {
+  if (gamePhase !== "menu" || !playerChooser || playerChooser.classList.contains("hidden")) return;
+  const elements = getChooserElements(team);
+  const pane = elements.pane;
+  if (!pane || pane.classList.contains("hidden") || pane.scrollHeight <= pane.clientHeight) return;
+  const cursor = gamepadState.menuCursors[team];
+  if (!cursor) return;
+  const rect = pane.getBoundingClientRect();
+  const isInOwnPane = cursor.x >= rect.left && cursor.x <= rect.right && cursor.y >= rect.top && cursor.y <= rect.bottom;
+  if (!isInOwnPane) return;
+  const stickY = gamepad.axes?.[1] ?? 0;
+  const y = Math.abs(stickY) >= 0.16
+    ? stickY
+    : verticalInput;
+  if (Math.abs(y) < 0.16) return;
+  const edgeMargin = Math.min(120, Math.max(52, rect.height * 0.16));
+  const nearTop = cursor.y <= rect.top + edgeMargin;
+  const nearBottom = cursor.y >= rect.bottom - edgeMargin;
+  if ((y < 0 && !nearTop) || (y > 0 && !nearBottom)) return;
+  const before = pane.scrollTop;
+  pane.scrollTop = clamp(
+    pane.scrollTop + y * 26,
+    0,
+    Math.max(0, pane.scrollHeight - pane.clientHeight)
+  );
+  if (pane.scrollTop !== before) {
+    cursor.y = clamp(cursor.y, rect.top + 12, rect.bottom - 12);
+  }
 }
 
 function updateMenuGamepadCursorVisibility() {
@@ -7083,12 +7114,13 @@ function decideHitResult(contact) {
   return decideHitResultFromBattedProfile(contact);
 }
 
-
-
-
-
-
-
+function shouldResolveBuntProfileAsPopupFly(profile) {
+  return Boolean(profile?.isBunt
+    && !profile.pitcherBuntPopup
+    && !profile.popupConvertedToPitcherFront
+    && !profile.buntPitcherFrontGrounder
+    && (profile.launchAngle ?? 0) >= 12);
+}
 
 function decideHitResultFromBattedProfile(contact) {
   const profile = buildBattedBallProfile(contact);
@@ -7098,8 +7130,11 @@ function decideHitResultFromBattedProfile(contact) {
   if (profile.isFoul) {
     return { label: hitLabels.foul, kind: "foul", power: profile.power, direction: profile.direction, battedProfile: profile };
   }
-  if (profile.isBunt && profile.pitcherBuntPopup) {
-    return makePopupFlyResultFromProfile(profile);
+  if (profile.isBunt && (profile.pitcherBuntPopup || shouldResolveBuntProfileAsPopupFly(profile))) {
+    return makePopupFlyResultFromProfile({
+      ...profile,
+      pitcherBuntPopup: true
+    });
   }
   if (profile.isBunt) {
     return makeBuntGrounderResultFromProfile(profile);
@@ -11543,7 +11578,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     battedProfile?.batterPowerRating ?? getSwingAdjustedBatterPowerRating(activeBatter)
   );
   const isBunt = Boolean(battedProfile?.isBunt);
-  const isPopupFly = label === hitLabels.popup;
+  const isPopupFly = label === hitLabels.popup || shouldResolveBuntProfileAsPopupFly(battedProfile);
   const isRoutineFly = label === hitLabels.routineFly || label === hitLabels.fly;
   const isLineLiner = label === hitLabels.lineLiner;
   const isLineDrop = label === hitLabels.lineDrop;
@@ -20063,6 +20098,9 @@ function isHardInfieldFirstBounceGrounder(battedBall) {
 
 function getGrounderFlightHeight(progress, battedBall) {
   const t = clamp(progress, 0, 1);
+  if (battedBall?.isBunt) {
+    return Math.abs(Math.sin(t * Math.PI * 5)) * 3.2;
+  }
   if (isHardInfieldFirstBounceGrounder(battedBall)) {
     const hopHeight = battedBall?.isLineEdgeGrounder ? 11 : 9;
     const skim = Math.sin(t * Math.PI) * hopHeight;
