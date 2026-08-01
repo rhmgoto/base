@@ -6948,6 +6948,31 @@ const runnerDecisionState = JSON.parse(runInGame(
     handleBatterRunnerBaseCommand("second", "return");
     const manualSpecificReturnBaseRunnerTarget = defenseState.baseRunners[0]?.targetBase;
     const manualSpecificReturnBatterRunnerTarget = defenseState.runner?.targetBase;
+    const runningAdvanceIgnoredRunner = defenseState.baseRunners[0];
+    if (runningAdvanceIgnoredRunner) {
+      runningAdvanceIgnoredRunner.x = (defenseField.bases.second.x + defenseField.bases.third.x) / 2;
+      runningAdvanceIgnoredRunner.y = (defenseField.bases.second.y + defenseField.bases.third.y) / 2;
+      runningAdvanceIgnoredRunner.startBase = "second";
+      runningAdvanceIgnoredRunner.targetBase = "third";
+      runningAdvanceIgnoredRunner.arrived = false;
+      runningAdvanceIgnoredRunner.routeStartTime = 1.0;
+      runningAdvanceIgnoredRunner.arrivalTime = 4.0;
+    }
+    handleBatterRunnerBaseCommand("third", "advance");
+    const runningAdvanceIgnored = runningAdvanceIgnoredRunner?.targetBase === "third"
+      && runningAdvanceIgnoredRunner?.arrivalTime === 4.0;
+    if (runningAdvanceIgnoredRunner) {
+      runningAdvanceIgnoredRunner.x = defenseField.bases.second.x;
+      runningAdvanceIgnoredRunner.y = defenseField.bases.second.y;
+      runningAdvanceIgnoredRunner.startBase = "second";
+      runningAdvanceIgnoredRunner.targetBase = "second";
+      runningAdvanceIgnoredRunner.arrived = true;
+    }
+    handleBatterRunnerBaseCommand("second", "return");
+    const stoppedReturnIgnored = runningAdvanceIgnoredRunner?.targetBase === "second";
+    handleBatterRunnerBaseCommand("third", "advance");
+    const stoppedAdvanceAccepted = runningAdvanceIgnoredRunner?.targetBase === "third"
+      && runningAdvanceIgnoredRunner?.arrived === false;
     defenseControlMode = { away: "auto", home: "auto" };
     defenseState = { ...createDefenseState(), completedForceOutBases: ["first"] };
     const thirdForceAfterBatterOutActive = isForceTargetActive("third");
@@ -7096,11 +7121,15 @@ const runnerDecisionState = JSON.parse(runInGame(
     const keyedLateRunnerToHeldSecondSafe = defenseState.throw.safe;
     const keyedLateRunnerThrowStillSecond = defenseState.throw.targetBase === "second";
     const keyedLateRunnerHeldBase = defenseState.heldBallBase;
-    const inFlightSecondRunner = createBatterRunner(findById(batters, "ichiro"));
+    const inFlightSecondRunner = createBatterRunner({ ...findById(batters, "ichiro"), run: 1 });
     inFlightSecondRunner.x = defenseField.bases.first.x;
     inFlightSecondRunner.y = defenseField.bases.first.y;
     inFlightSecondRunner.currentBase = "first";
     inFlightSecondRunner.targetBase = "first";
+    inFlightSecondRunner.route = [{ ...defenseField.bases.first }];
+    inFlightSecondRunner.routeDuration = 0;
+    inFlightSecondRunner.routeStartTime = 0;
+    inFlightSecondRunner.arrivalTime = 0;
     inFlightSecondRunner.arrived = true;
     gameMode = "versus";
     gamePhase = "defense";
@@ -7115,10 +7144,10 @@ const runnerDecisionState = JSON.parse(runInGame(
       target: fielder,
       battedBall: longBall,
       outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 0.6 },
-      throw: { startTime: 1, endTime: 2.4, holdDeadline: 4.4, safe: true, targetBase: "second", baseLabel: "second" }
+      throw: { startTime: 1, endTime: 2.001, tagTime: 2.001, holdDeadline: 4.4, safe: true, targetBase: "second", baseLabel: "second", playType: "tag" }
     };
     handleBatterRunnerBaseCommand("second");
-    const inFlightSecondThrowKept = defenseState.throw.targetBase === "second" && defenseState.throw.endTime === 2.4;
+    const inFlightSecondThrowKept = defenseState.throw.targetBase === "second" && defenseState.throw.endTime === 2.001;
     const inFlightSecondSafe = defenseState.throw.safe;
     const lateFirstThrowRunner = createBatterRunner(findById(batters, "ichiro"));
     lateFirstThrowRunner.x = defenseField.bases.first.x + 90;
@@ -7633,6 +7662,9 @@ const runnerDecisionState = JSON.parse(runInGame(
       manualSpecificBatterRunnerTarget,
       manualSpecificReturnBaseRunnerTarget,
       manualSpecificReturnBatterRunnerTarget,
+      runningAdvanceIgnored,
+      stoppedReturnIgnored,
+      stoppedAdvanceAccepted,
       thirdForceAfterBatterOutActive,
       manualTargetBase: manualThrowState.targetBase,
       returnTargetBase,
@@ -7740,6 +7772,9 @@ assert(runnerDecisionState.manualSpecificBaseRunnerTarget === "third", "manual t
 assert(runnerDecisionState.manualSpecificBatterRunnerTarget === "first", "manual third-base commands should not move a batter-runner stopped at first");
 assert(runnerDecisionState.manualSpecificReturnBaseRunnerTarget === "second", "manual second-base return commands should send an eligible base runner back to second");
 assert(runnerDecisionState.manualSpecificReturnBatterRunnerTarget === "first", "manual return commands for base runners should not move a batter-runner stopped at first");
+assert(runnerDecisionState.runningAdvanceIgnored === true, "manual advance commands should ignore runners already between the requested previous base and target base");
+assert(runnerDecisionState.stoppedReturnIgnored === true, "manual return commands should ignore runners stopped on the requested return base");
+assert(runnerDecisionState.stoppedAdvanceAccepted === true, "manual advance commands should move only runners stopped on the previous base");
 assert(runnerDecisionState.thirdForceAfterBatterOutActive === false, "a force on advanced runners should be removed after the batter-runner is out");
 assert(runnerDecisionState.manualTargetBase === "second", "up input should send the batter-runner from first to second");
 assert(runnerDecisionState.returnTargetBase === "first", "right input should send the batter-runner back to first");
@@ -8613,6 +8648,10 @@ const manualRunningCpuDefenseState = JSON.parse(runInGame(
     relayRunner.y = defenseField.bases.first.y;
     relayRunner.currentBase = "first";
     relayRunner.targetBase = "first";
+    relayRunner.route = [{ ...defenseField.bases.first }];
+    relayRunner.routeDuration = 0;
+    relayRunner.routeStartTime = 0;
+    relayRunner.arrivalTime = 0;
     relayRunner.arrived = true;
     const relayBall = {
       ...flyBall,
@@ -10019,6 +10058,7 @@ const keyboardBattingControlState = JSON.parse(runInGame(
       movedUp: after.y < before.y,
       insideBox: after.x >= box.left && after.x <= box.right && after.y >= box.top && after.y <= box.bottom,
       bottomReachesScreenEdge: box.bottom + 58 === canvas.height,
+      expectedHomeReachAdded: originalExtraReach - ball.radius,
       rightHomeReachAdded: rightBoxWithExtra.right - rightBoxWithoutExtra.right,
       rightAwaySideUnchanged: rightBoxWithExtra.left === rightBoxWithoutExtra.left,
       leftHomeReachAdded: leftBoxWithoutExtra.left - leftBoxWithExtra.left,
@@ -10031,9 +10071,9 @@ assert(keyboardBattingControlState.movedRight === true, "right arrow should move
 assert(keyboardBattingControlState.movedUp === true, "up arrow should move the batter toward the pitcher inside the box");
 assert(keyboardBattingControlState.insideBox === true, "keyboard batter movement should stay inside the batter box");
 assert(keyboardBattingControlState.bottomReachesScreenEdge === true, "batter movement should allow the sprite feet to reach the bottom of the screen");
-assert(keyboardBattingControlState.rightHomeReachAdded === 18, "right-handed batters should be able to move a fist closer to home plate");
+assert(Math.abs(keyboardBattingControlState.rightHomeReachAdded - keyboardBattingControlState.expectedHomeReachAdded) < 0.001, "right-handed batters should keep a one-ball safety margin from home plate");
 assert(keyboardBattingControlState.rightAwaySideUnchanged === true, "right-handed batter movement should only expand on the home-plate side");
-assert(keyboardBattingControlState.leftHomeReachAdded === 18, "left-handed batters should be able to move a fist closer to home plate");
+assert(Math.abs(keyboardBattingControlState.leftHomeReachAdded - keyboardBattingControlState.expectedHomeReachAdded) < 0.001, "left-handed batters should keep a one-ball safety margin from home plate");
 assert(keyboardBattingControlState.leftAwaySideUnchanged === true, "left-handed batter movement should only expand on the home-plate side");
 
 const computerPitchAndSwingState = JSON.parse(runInGame(

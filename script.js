@@ -153,6 +153,7 @@ const batterMoveTuning = {
   cpuSlowPitchMoveBonus: 0.24,
   cpuPitchSideMoveSpeed: 3.8,
   plateSideExtraReach: 18,
+  plateSideSafetyBallRadiusScale: 1,
   shoeLimitOffsetY: -12,
   keyboardMoveSpeed: 5.2
 };
@@ -6449,9 +6450,13 @@ function getBatterMoveBox() {
   const plateTop = field.plateY - 12 * field.plateScale;
   const left = center - halfWidth;
   const right = center + halfWidth;
+  const plateSideReach = Math.max(
+    0,
+    batterMoveTuning.plateSideExtraReach - (ball?.radius ?? 9) * batterMoveTuning.plateSideSafetyBallRadiusScale
+  );
   return {
-    left: activeBatterSide === "L" ? left - batterMoveTuning.plateSideExtraReach : left,
-    right: activeBatterSide === "R" ? right + batterMoveTuning.plateSideExtraReach : right,
+    left: activeBatterSide === "L" ? left - plateSideReach : left,
+    right: activeBatterSide === "R" ? right + plateSideReach : right,
     top: Math.max(baseBox.top + batterMoveTuning.moundSideShrink, plateTop + batterMoveTuning.shoeLimitOffsetY),
     bottom: baseBox.bottom
   };
@@ -10259,7 +10264,7 @@ function canBatterRunnerTargetBase(runner, targetBase, mode = "advance") {
       && returnIndex === currentIndex
       && getBatterRunnerTargetIndex(runner.targetBase) === currentIndex + 1;
   }
-  return targetIndex === currentIndex + 1;
+  return runner.arrived && targetIndex === currentIndex + 1;
 }
 
 function getSequentialBatterRunnerTargetBase(runner, requestedBase, mode = "advance") {
@@ -10314,19 +10319,12 @@ function handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds)
 function getManualBaseRunnerForTarget(targetIndex, mode, elapsedSeconds) {
   if (!defenseState.baseRunners?.length) return null;
   const startIndex = mode === "return" ? targetIndex : targetIndex - 1;
-  const baseName = baseNameByIndex[startIndex];
   return defenseState.baseRunners.find((runner) => {
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
     if (mode === "return") {
-      const currentIndex = getDefenseBaseRunnerCurrentIndex(runner);
-      const headingIndex = getRunnerBaseIndex(runner.targetBase);
-      return !runner.arrived
-        && currentIndex === targetIndex
-        && headingIndex === targetIndex + 1;
+      return isDefenseBaseRunnerReturningToBase(runner, targetIndex);
     }
-    return runner.arrived
-      && getRunnerBaseIndex(runner.targetBase ?? runner.startBase) === startIndex
-      && (runner.targetBase === baseName || runner.startBase === baseName);
+    return isDefenseBaseRunnerStoppedOnBase(runner, startIndex);
   }) || null;
 }
 
@@ -10426,10 +10424,8 @@ function returnAllBaseRunnersOneBase(elapsedSeconds) {
 }
 
 function getBaseRunnerAtOrHeadingFromBase(baseIndex) {
-  const baseName = baseNameByIndex[baseIndex];
   return defenseState.baseRunners?.find((runner) => {
-    const currentIndex = getDefenseBaseRunnerCurrentIndex(runner);
-    return runner.startBase === baseName || currentIndex === baseIndex;
+    return isDefenseBaseRunnerStoppedOnBase(runner, baseIndex);
   }) || null;
 }
 
@@ -10440,10 +10436,24 @@ function getDefenseBaseRunnerCurrentIndex(runner) {
 }
 
 function canDefenseBaseRunnerAdvance(runner, currentIndex) {
-  if (!runner || !runner.arrived) return false;
+  if (!isDefenseBaseRunnerStoppedOnBase(runner, currentIndex)) return false;
   const targetIndex = currentIndex + 1;
   if (targetIndex > 4) return false;
   return getRunnerBaseIndex(runner.targetBase ?? runner.startBase) === currentIndex;
+}
+
+function isDefenseBaseRunnerStoppedOnBase(runner, baseIndex) {
+  if (!runner || !runner.arrived || baseIndex < 1 || baseIndex > 3) return false;
+  const legalBaseIndex = getRunnerBaseIndex(runner.startBase ?? runner.targetBase);
+  const occupiedBaseIndex = getRunnerBaseIndex(runner.targetBase ?? runner.startBase);
+  return legalBaseIndex === baseIndex && occupiedBaseIndex === baseIndex;
+}
+
+function isDefenseBaseRunnerReturningToBase(runner, returnBaseIndex) {
+  if (!runner || runner.arrived || returnBaseIndex < 1 || returnBaseIndex > 3) return false;
+  const lastLegalBaseIndex = getRunnerBaseIndex(runner.startBase);
+  const headingIndex = getRunnerBaseIndex(runner.targetBase);
+  return lastLegalBaseIndex === returnBaseIndex && headingIndex === returnBaseIndex + 1;
 }
 
 function updateDefenseBaseRunnerPosition(runner, elapsedSeconds) {
