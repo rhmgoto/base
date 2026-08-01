@@ -2317,11 +2317,11 @@ assert(rosterAndPointState.ydiaz.outfieldDefense === 2, "Y. Diaz outfield defens
 assert(rosterAndPointState.ydiaz.arm === 3, "Y. Diaz arm should match the roster table");
 assert(rosterAndPointState.ydiaz.cost === 5, "Y. Diaz cost should match the roster table");
 assert(rosterAndPointState.tairaRemoved === true, "Taira should be removed from the batter roster");
-assert(rosterAndPointState.ichiro.meet === 25 && rosterAndPointState.ichiro.outfieldDefense === 16 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 28, "Ichiro should match the updated roster table");
-assert(rosterAndPointState.ruth.power === 32 && rosterAndPointState.ruth.meet === 20 && rosterAndPointState.ruth.outfieldDefense === 4 && rosterAndPointState.ruth.cost === 30, "Ruth should match the updated roster table");
-assert(rosterAndPointState.nagashima.power === 23 && rosterAndPointState.nagashima.meet === 18 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 15 && rosterAndPointState.nagashima.cost === 25, "Nagashima should match the updated roster table");
-assert(rosterAndPointState.bonds.power === 31 && rosterAndPointState.bonds.meet === 19 && rosterAndPointState.bonds.outfieldDefense === 18 && rosterAndPointState.bonds.arm === 10 && rosterAndPointState.bonds.cost === 28, "Bonds should be available as a new elite outfielder");
-assert(rosterAndPointState.sadaharu.power === 33 && rosterAndPointState.sadaharu.infieldDefense === 14 && rosterAndPointState.sadaharu.arm === 10 && rosterAndPointState.sadaharu.cost === 25, "Sadaharu should be available as a new elite infielder");
+assert(rosterAndPointState.ichiro.meet === 20 && rosterAndPointState.ichiro.outfieldDefense === 14 && rosterAndPointState.ichiro.arm === 11 && rosterAndPointState.ichiro.cost === 28, "Ichiro should match the updated roster table");
+assert(rosterAndPointState.ruth.power === 20 && rosterAndPointState.ruth.meet === 15 && rosterAndPointState.ruth.outfieldDefense === 4 && rosterAndPointState.ruth.cost === 30, "Ruth should match the updated roster table");
+assert(rosterAndPointState.nagashima.power === 15 && rosterAndPointState.nagashima.meet === 13 && rosterAndPointState.nagashima.run === 8 && rosterAndPointState.nagashima.infieldDefense === 15 && rosterAndPointState.nagashima.cost === 25, "Nagashima should match the updated roster table");
+assert(rosterAndPointState.bonds.power === 19 && rosterAndPointState.bonds.meet === 14 && rosterAndPointState.bonds.outfieldDefense === 13 && rosterAndPointState.bonds.arm === 10 && rosterAndPointState.bonds.cost === 28, "Bonds should be available as a new elite outfielder");
+assert(rosterAndPointState.sadaharu.power === 20 && rosterAndPointState.sadaharu.meet === 11 && rosterAndPointState.sadaharu.infieldDefense === 14 && rosterAndPointState.sadaharu.arm === 10 && rosterAndPointState.sadaharu.cost === 25, "Sadaharu should be available as a new elite infielder");
 assert(rosterAndPointState.shohei.fastKmh === 165, "Shohei fastball should match the pitcher roster table");
 assert(rosterAndPointState.shohei.stuff === 8, "Shohei stuff should match the pitcher roster table");
 assert(rosterAndPointState.shohei.stamina === 6, "Shohei stamina should match the pitcher roster table");
@@ -2389,7 +2389,7 @@ assert(rosterAndPointState.hanifee.fastChange === 2, "Hanifee fast change should
 assert(rosterAndPointState.hanifee.control === 5, "Hanifee control should match the pitcher roster table");
 assert(rosterAndPointState.hanifee.stuff === 2, "Hanifee stuff should match the pitcher roster table");
 assert(rosterAndPointState.hanifee.fielding === 5, "Hanifee fielding should match the pitcher roster table");
-assert(rosterAndPointState.hanifee.stamina === 2, "Hanifee stamina should match the pitcher roster table");
+assert(rosterAndPointState.hanifee.stamina === 3, "Hanifee stamina should match the pitcher roster table");
 assert(rosterAndPointState.hanifee.cost === 1, "Hanifee pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.throws === "R", "Sugiyama should be a right-handed pitcher");
 assert(rosterAndPointState.sugiyama.fastKmh === 158, "Sugiyama fastball should match the pitcher roster table");
@@ -2400,7 +2400,7 @@ assert(rosterAndPointState.sugiyama.fastChange === 7, "Sugiyama fast change shou
 assert(rosterAndPointState.sugiyama.control === 3, "Sugiyama control should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.stuff === 9, "Sugiyama stuff should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.fielding === 3, "Sugiyama fielding should match the pitcher roster table");
-assert(rosterAndPointState.sugiyama.stamina === 2, "Sugiyama stamina should match the pitcher roster table");
+assert(rosterAndPointState.sugiyama.stamina === 3, "Sugiyama stamina should match the pitcher roster table");
 assert(rosterAndPointState.sugiyama.cost === 3, "Sugiyama pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.sasaki.throws === "R", "Sasaki should be a right-handed pitcher");
 assert(rosterAndPointState.sasaki.fastKmh === 165, "Sasaki fastball should match the pitcher roster table");
@@ -2422,7 +2422,7 @@ assert(rosterAndPointState.matsui.fastChange === 5, "Matsui fast change should m
 assert(rosterAndPointState.matsui.control === 5, "Matsui control should match the pitcher roster table");
 assert(rosterAndPointState.matsui.stuff === 5, "Matsui stuff should match the pitcher roster table");
 assert(rosterAndPointState.matsui.fielding === 5, "Matsui fielding should match the pitcher roster table");
-assert(rosterAndPointState.matsui.stamina === 2, "Matsui stamina should match the pitcher roster table");
+assert(rosterAndPointState.matsui.stamina === 3, "Matsui stamina should match the pitcher roster table");
 assert(rosterAndPointState.matsui.cost === 3, "Matsui pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.rodgers.throws === "R", "Rodgers should be a right-handed pitcher");
 assert(rosterAndPointState.rodgers.fastKmh === 125, "Rodgers fastball should match the pitcher roster table");
@@ -2433,7 +2433,7 @@ assert(rosterAndPointState.rodgers.fastChange === 1, "Rodgers fast change should
 assert(rosterAndPointState.rodgers.control === 3, "Rodgers control should match the pitcher roster table");
 assert(rosterAndPointState.rodgers.stuff === 3, "Rodgers stuff should match the pitcher roster table");
 assert(rosterAndPointState.rodgers.fielding === 3, "Rodgers fielding should match the pitcher roster table");
-assert(rosterAndPointState.rodgers.stamina === 2, "Rodgers stamina should match the pitcher roster table");
+assert(rosterAndPointState.rodgers.stamina === 3, "Rodgers stamina should match the pitcher roster table");
 assert(rosterAndPointState.rodgers.cost === 3, "Rodgers pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.fujinami.throws === "R", "Fujinami should be a right-handed pitcher");
 assert(rosterAndPointState.fujinami.fastKmh === 159, "Fujinami fastball should match the pitcher roster table");
@@ -2529,7 +2529,7 @@ assert(rosterAndPointState.enriquez.fastChange === 4, "Enriquez fast change shou
 assert(rosterAndPointState.enriquez.control === 3, "Enriquez control should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.stuff === 6, "Enriquez stuff should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.fielding === 3, "Enriquez fielding should match the pitcher roster table");
-assert(rosterAndPointState.enriquez.stamina === 2, "Enriquez stamina should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.stamina === 3, "Enriquez stamina should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.wheeler.fastKmh === 159 && rosterAndPointState.wheeler.rightBreak === 8 && rosterAndPointState.wheeler.leftBreak === 8 && rosterAndPointState.wheeler.cost === 7, "Wheeler pitcher should match the pitcher roster table");
 assert(rosterAndPointState.valdes.throws === "L" && rosterAndPointState.valdes.fastKmh === 158 && rosterAndPointState.valdes.rightBreak === 9 && rosterAndPointState.valdes.leftBreak === 7 && rosterAndPointState.valdes.cost === 7, "Valdes pitcher should match the pitcher roster table");
