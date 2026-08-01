@@ -6973,6 +6973,53 @@ const runnerDecisionState = JSON.parse(runInGame(
     handleBatterRunnerBaseCommand("third", "advance");
     const stoppedAdvanceAccepted = runningAdvanceIgnoredRunner?.targetBase === "third"
       && runningAdvanceIgnoredRunner?.arrived === false;
+    const splitCommandLeadRunner = defenseState.baseRunners[0];
+    if (splitCommandLeadRunner) {
+      splitCommandLeadRunner.x = (defenseField.bases.second.x + defenseField.bases.third.x) / 2;
+      splitCommandLeadRunner.y = (defenseField.bases.second.y + defenseField.bases.third.y) / 2;
+      splitCommandLeadRunner.startBase = "second";
+      splitCommandLeadRunner.targetBase = "third";
+      splitCommandLeadRunner.arrived = false;
+      splitCommandLeadRunner.routeStartTime = 1.0;
+      splitCommandLeadRunner.arrivalTime = 5.0;
+    }
+    defenseState.runner.x = defenseField.bases.first.x;
+    defenseState.runner.y = defenseField.bases.first.y;
+    defenseState.runner.currentBase = "first";
+    defenseState.runner.targetBase = "first";
+    defenseState.runner.route = [{ ...defenseField.bases.first }];
+    defenseState.runner.routeDuration = 0;
+    defenseState.runner.routeStartTime = 0;
+    defenseState.runner.arrivalTime = 0;
+    defenseState.runner.arrived = true;
+    handleBatterRunnerBaseCommand("second", "advance");
+    const splitAdvanceMovesBatterRunner = defenseState.runner.targetBase === "second"
+      && defenseState.runner.arrived === false;
+    const splitAdvanceDoesNotReturnLeadRunner = splitCommandLeadRunner?.targetBase === "third"
+      && splitCommandLeadRunner?.arrivalTime === 5.0;
+    if (splitCommandLeadRunner) {
+      splitCommandLeadRunner.x = (defenseField.bases.second.x + defenseField.bases.third.x) / 2;
+      splitCommandLeadRunner.y = (defenseField.bases.second.y + defenseField.bases.third.y) / 2;
+      splitCommandLeadRunner.startBase = "second";
+      splitCommandLeadRunner.targetBase = "third";
+      splitCommandLeadRunner.arrived = false;
+      splitCommandLeadRunner.routeStartTime = 1.0;
+      splitCommandLeadRunner.arrivalTime = 5.0;
+    }
+    defenseState.runner.x = defenseField.bases.first.x;
+    defenseState.runner.y = defenseField.bases.first.y;
+    defenseState.runner.currentBase = "first";
+    defenseState.runner.targetBase = "first";
+    defenseState.runner.route = [{ ...defenseField.bases.first }];
+    defenseState.runner.routeDuration = 0;
+    defenseState.runner.routeStartTime = 0;
+    defenseState.runner.arrivalTime = 0;
+    defenseState.runner.arrived = true;
+    handleBatterRunnerBaseCommand("second", "return");
+    const splitReturnMovesLeadRunner = splitCommandLeadRunner?.targetBase === "second"
+      && splitCommandLeadRunner?.arrived === false;
+    const splitReturnDoesNotAdvanceBatterRunner = defenseState.runner.targetBase === "first"
+      && defenseState.runner.arrived === true;
     defenseControlMode = { away: "auto", home: "auto" };
     defenseState = { ...createDefenseState(), completedForceOutBases: ["first"] };
     const thirdForceAfterBatterOutActive = isForceTargetActive("third");
@@ -7665,6 +7712,10 @@ const runnerDecisionState = JSON.parse(runInGame(
       runningAdvanceIgnored,
       stoppedReturnIgnored,
       stoppedAdvanceAccepted,
+      splitAdvanceMovesBatterRunner,
+      splitAdvanceDoesNotReturnLeadRunner,
+      splitReturnMovesLeadRunner,
+      splitReturnDoesNotAdvanceBatterRunner,
       thirdForceAfterBatterOutActive,
       manualTargetBase: manualThrowState.targetBase,
       returnTargetBase,
@@ -7775,6 +7826,10 @@ assert(runnerDecisionState.manualSpecificReturnBatterRunnerTarget === "first", "
 assert(runnerDecisionState.runningAdvanceIgnored === true, "manual advance commands should ignore runners already between the requested previous base and target base");
 assert(runnerDecisionState.stoppedReturnIgnored === true, "manual return commands should ignore runners stopped on the requested return base");
 assert(runnerDecisionState.stoppedAdvanceAccepted === true, "manual advance commands should move only runners stopped on the previous base");
+assert(runnerDecisionState.splitAdvanceMovesBatterRunner === true, "second-base advance should move only the runner stopped on first");
+assert(runnerDecisionState.splitAdvanceDoesNotReturnLeadRunner === true, "second-base advance should never return a runner already between second and third");
+assert(runnerDecisionState.splitReturnMovesLeadRunner === true, "second-base return should move only the runner between second and third");
+assert(runnerDecisionState.splitReturnDoesNotAdvanceBatterRunner === true, "second-base return should never advance a runner stopped on first");
 assert(runnerDecisionState.thirdForceAfterBatterOutActive === false, "a force on advanced runners should be removed after the batter-runner is out");
 assert(runnerDecisionState.manualTargetBase === "second", "up input should send the batter-runner from first to second");
 assert(runnerDecisionState.returnTargetBase === "first", "right input should send the batter-runner back to first");

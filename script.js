@@ -10283,6 +10283,8 @@ function getSequentialBatterRunnerTargetBase(runner, requestedBase, mode = "adva
 }
 
 function handleBatterRunnerBaseCommand(targetBase, mode = "advance") {
+  mode = normalizeManualRunnerCommandMode(mode);
+  if (!mode) return;
   if (!canControlBatterRunner()) return;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   updateBatterRunner(elapsedSeconds);
@@ -10303,6 +10305,8 @@ function handleBatterRunnerBaseCommand(targetBase, mode = "advance") {
 }
 
 function handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds) {
+  mode = normalizeManualRunnerCommandMode(mode);
+  if (!mode) return false;
   const targetIndex = getBatterRunnerTargetIndex(targetBase);
   if (targetIndex < 1 || targetIndex > 4) return false;
   const runner = getManualBaseRunnerForTarget(targetIndex, mode, elapsedSeconds);
@@ -10317,15 +10321,22 @@ function handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds)
 }
 
 function getManualBaseRunnerForTarget(targetIndex, mode, elapsedSeconds) {
+  mode = normalizeManualRunnerCommandMode(mode);
+  if (!mode) return null;
   if (!defenseState.baseRunners?.length) return null;
   const startIndex = mode === "return" ? targetIndex : targetIndex - 1;
-  return defenseState.baseRunners.find((runner) => {
+  const candidates = defenseState.baseRunners.filter((runner) => {
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
     if (mode === "return") {
       return isDefenseBaseRunnerReturningToBase(runner, targetIndex);
     }
     return isDefenseBaseRunnerStoppedOnBase(runner, startIndex);
-  }) || null;
+  });
+  return candidates[0] || null;
+}
+
+function normalizeManualRunnerCommandMode(mode) {
+  return mode === "return" || mode === "advance" ? mode : null;
 }
 
 function getBatterRunnerNoPassTargetBase(targetBase, elapsedSeconds) {
@@ -10353,8 +10364,7 @@ function advanceForcedBaseRunnersForBatterTarget(targetBase, elapsedSeconds) {
   const targetIndex = getBatterRunnerTargetIndex(targetBase);
   if (targetIndex < 2) return;
   for (let base = 3; base >= targetIndex; base -= 1) {
-    const baseName = baseNameByIndex[base];
-    const runner = defenseState.baseRunners.find((entry) => entry.startBase === baseName || entry.targetBase === baseName);
+    const runner = defenseState.baseRunners.find((entry) => isDefenseBaseRunnerStoppedOnBase(entry, base));
     if (!runner) continue;
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
     setDefenseBaseRunnerManualDestination(runner, Math.min(4, base + 1), elapsedSeconds);
