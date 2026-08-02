@@ -477,6 +477,71 @@ assert(
   `手動走塁: 進塁指示のあと帰塁指示で元の塁に戻せるべき (${manualRunnerSteps.steps.join(",")})`
 );
 
+// 塁上の走者を、打者走者と独立に動かせること。
+// 到達しても startBase は動かないので、停止判定は currentBase を見る必要がある。
+const baseRunnerSteps = JSON.parse(run(`
+  startGame();
+  gameMode = "versus";
+  battingTeam = "away";
+  defenseControlMode = { away: "manual", home: "manual" };
+  gamePhase = "defense";
+  bases = createEmptyBases();
+  bases.first = makeBaseRunner(findById(batters, "ichiro"));
+  activeBatter = findById(batters, "suzuki");
+  const target = { x: field.plateX + 200, y: field.plateY - 700 };
+  const single = {
+    target, direction: normalize({ x: 0.3, y: -1 }), flightDistance: 700, landingDistance: 700,
+    ballTime: 1.4, isGrounder: false, isLiner: true, isDeep: false, power: 0.6, trajectory: "liner",
+    fenceOver: false, wallHit: false, groundRuleDouble: false
+  };
+  const outcome = { kind: "single", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 1.8 };
+  const fielder = { role: "C", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+  const runners = createDefenseBaseRunnerAnimations(outcome, single, null, fielder, target);
+  const runnerA = runners[0];
+  defenseState = {
+    ...createDefenseState(),
+    active: true, resolved: false,
+    startTime: performance.now() - 9000,
+    outcome, battedBall: single,
+    runner: createBatterRunner(activeBatter),
+    baseRunners: runners,
+    chosenFielder: fielder, target
+  };
+  updateDefenseBaseRunners(9);
+  updateBatterRunner(9);
+  const afterArrival = {
+    currentBase: runnerA.currentBase,
+    startBase: runnerA.startBase,
+    stoppedOnSecond: isDefenseBaseRunnerStoppedOnBase(runnerA, 2)
+  };
+  handleBatterRunnerBaseCommand("third", "advance");
+  const afterAdvance = { runnerA: runnerA.targetBase, batter: defenseState.runner.targetBase };
+  handleBatterRunnerBaseCommand("second", "return");
+  const afterReturn = { runnerA: runnerA.targetBase };
+  return JSON.stringify({ afterArrival, afterAdvance, afterReturn });
+`));
+
+assert(
+  baseRunnerSteps.afterArrival.stoppedOnSecond === true,
+  `二塁に到達した走者は停止中と判定されるべき (${JSON.stringify(baseRunnerSteps.afterArrival)})`
+);
+assert(
+  baseRunnerSteps.afterArrival.startBase === "first",
+  "startBase はプレー開始時の塁のまま保たれるべき (封殺や走者の同定に使うため)"
+);
+assert(
+  baseRunnerSteps.afterAdvance.runnerA === "third",
+  `二塁の走者に三塁への進塁を指示できるべき (${baseRunnerSteps.afterAdvance.runnerA})`
+);
+assert(
+  baseRunnerSteps.afterAdvance.batter === "first",
+  "塁上走者への指示で打者走者が動いてはいけない"
+);
+assert(
+  baseRunnerSteps.afterReturn.runnerA === "second",
+  `走り出した塁上走者を二塁へ帰塁させられるべき (${baseRunnerSteps.afterReturn.runnerA})`
+);
+
 // ---------------------------------------------------------------------------
 // 現仕様として維持する挙動 (意図的な簡略化なので変更しない)
 // ---------------------------------------------------------------------------

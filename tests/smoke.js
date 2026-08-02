@@ -6951,6 +6951,8 @@ const runnerDecisionState = JSON.parse(runInGame(
       manualAdvanceBaseRunner.y = defenseField.bases.second.y;
       manualAdvanceBaseRunner.startBase = "second";
       manualAdvanceBaseRunner.targetBase = "second";
+      // 実際のゲームループは到達時に currentBase を更新する
+      manualAdvanceBaseRunner.currentBase = "second";
       manualAdvanceBaseRunner.arrived = true;
     }
     defenseState = {
@@ -6992,6 +6994,7 @@ const runnerDecisionState = JSON.parse(runInGame(
       runningAdvanceIgnoredRunner.y = (defenseField.bases.second.y + defenseField.bases.third.y) / 2;
       runningAdvanceIgnoredRunner.startBase = "second";
       runningAdvanceIgnoredRunner.targetBase = "third";
+      runningAdvanceIgnoredRunner.currentBase = "second";
       runningAdvanceIgnoredRunner.arrived = false;
       runningAdvanceIgnoredRunner.routeStartTime = 1.0;
       runningAdvanceIgnoredRunner.arrivalTime = 4.0;
@@ -7004,6 +7007,7 @@ const runnerDecisionState = JSON.parse(runInGame(
       runningAdvanceIgnoredRunner.y = defenseField.bases.second.y;
       runningAdvanceIgnoredRunner.startBase = "second";
       runningAdvanceIgnoredRunner.targetBase = "second";
+      runningAdvanceIgnoredRunner.currentBase = "second";
       runningAdvanceIgnoredRunner.arrived = true;
     }
     handleBatterRunnerBaseCommand("second", "return");

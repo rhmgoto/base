@@ -808,6 +808,9 @@ const defenseThrowResultHoldSeconds = 2.0;
 const runnerSpeedScale = 0.85;
 const runnerSpeedBaseRun = 3.5;
 const runnerSpeedUnit = 27.84375;
+// 手動守備で、捕球や送球到達のあと次の送球指示を待つ時間 (秒)。
+// これを過ぎて指示がなければ次のプレーへ進む。
+const manualThrowIdleSeconds = 2;
 const abilitySpeedBaseRating = 3.5;
 const lowAbilityActualBoost = 1.2;
 const fielderSpeedUnit = 21.176470588235293;
@@ -2020,6 +2023,7 @@ function createDefenseState() {
     throw: null,
     heldBallBase: null,
     heldBallSince: null,
+    lastManualThrowCommandTime: null,
     homeRunFireworks: null,
     homeRunFireworksSoundPlayed: false,
     resolved: false,
@@ -10520,10 +10524,11 @@ function getBaseRunnerAtOrHeadingFromBase(baseIndex) {
   }) || null;
 }
 
+// startBase はプレー開始時の塁 (封殺や走者の同定に使う) なので動かさない。
+// いま踏んでいる塁は currentBase が持つ。手動指示の判定はこちらを見る。
 function getDefenseBaseRunnerCurrentIndex(runner) {
   if (!runner) return -1;
-  if (runner.arrived) return getRunnerBaseIndex(runner.targetBase ?? runner.startBase);
-  return getRunnerBaseIndex(runner.startBase);
+  return getRunnerBaseIndex(runner.currentBase ?? runner.startBase);
 }
 
 function canDefenseBaseRunnerAdvance(runner, currentIndex) {
@@ -10535,16 +10540,13 @@ function canDefenseBaseRunnerAdvance(runner, currentIndex) {
 
 function isDefenseBaseRunnerStoppedOnBase(runner, baseIndex) {
   if (!runner || !runner.arrived || baseIndex < 1 || baseIndex > 3) return false;
-  const legalBaseIndex = getRunnerBaseIndex(runner.startBase ?? runner.targetBase);
-  const occupiedBaseIndex = getRunnerBaseIndex(runner.targetBase ?? runner.startBase);
-  return legalBaseIndex === baseIndex && occupiedBaseIndex === baseIndex;
+  return getDefenseBaseRunnerCurrentIndex(runner) === baseIndex;
 }
 
 function isDefenseBaseRunnerReturningToBase(runner, returnBaseIndex) {
   if (!runner || runner.arrived || returnBaseIndex < 1 || returnBaseIndex > 3) return false;
-  const lastLegalBaseIndex = getRunnerBaseIndex(runner.startBase);
   const headingIndex = getRunnerBaseIndex(runner.targetBase);
-  return lastLegalBaseIndex === returnBaseIndex && headingIndex === returnBaseIndex + 1;
+  return getDefenseBaseRunnerCurrentIndex(runner) === returnBaseIndex && headingIndex === returnBaseIndex + 1;
 }
 
 function updateDefenseBaseRunnerPosition(runner, elapsedSeconds) {
@@ -10557,14 +10559,13 @@ function updateDefenseBaseRunnerPosition(runner, elapsedSeconds) {
   runner.x = point.x;
   runner.y = point.y;
   runner.arrived = progress >= 1;
-  if (runner.arrived && runner.targetBase && runner.targetBase !== "home") {
-    runner.startBase = runner.targetBase;
+  if (runner.arrived) {
+    runner.currentBase = runner.targetBase || runner.currentBase || runner.startBase;
   }
 }
 
 function setDefenseBaseRunnerManualDestination(runner, nextBase, elapsedSeconds) {
   const targetBase = nextBase >= 4 ? "home" : baseNameByIndex[nextBase];
-  if (runner.arrived) runner.startBase = runner.targetBase || runner.startBase;
   runner.routeStartTime = elapsedSeconds;
   runner.route = [{ x: runner.x, y: runner.y }, { ...getDefenseBasePoint(nextBase) }];
   runner.targetBase = targetBase;
@@ -10703,9 +10704,8 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   const thrower = isBaseRelay
     ? { ...(defenseState.chosenFielder || {}), arm: 5, fielding: 5 }
     : defenseState.chosenFielder;
-  const throwOutcome = isTagUpThrow
-    ? { ...(defenseState.outcome || {}), caught: true, needsThrow: true }
-    : defenseState.outcome;
+  // 捕球アウト後など needsThrow が立たない場面でも送球状態を作れるようにする
+  const throwOutcome = { ...(defenseState.outcome || {}), caught: true, needsThrow: true };
   const throwRunner = isTagUpThrow
     ? getLeadTagUpRunnerForTarget(targetBase) || defenseState.runner
     : defenseState.runner;
@@ -10732,6 +10732,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   }
   defenseState.heldBallBase = null;
   defenseState.heldBallSince = null;
+  defenseState.lastManualThrowCommandTime = elapsedSeconds;
   defenseState.duration = getDefenseDuration(defenseState.battedBall, defenseState.outcome, defenseState.runner, defenseState.throw, defenseState.target);
   if (elapsedSeconds * 1000 > defenseState.duration - 400) {
     defenseState.duration = elapsedSeconds * 1000 + 1200;
@@ -10744,22 +10745,52 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   }
 }
 
+// 野手がボールを保持していれば、攻撃側が進塁していなくても任意の塁へ投げられる。
+// 送球が飛んでいる間だけは受け付けない (多重送球の防止)。
 function canManualDefenseThrow(targetBase) {
   if (gamePhase !== "defense" || !isManualThrowControl() || !defenseState.active || defenseState.resolved) return false;
+  if (!targetBase) return false;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
-  const tagUpThrow = isManualTagUpThrowOpportunity(targetBase, elapsedSeconds);
-  if (!targetBase || (!defenseState.throw && !tagUpThrow)) return false;
-  if (!defenseState.outcome?.needsThrow && !tagUpThrow) return false;
-  if (!defenseState.throw && tagUpThrow) return true;
-  if (!Number.isFinite(defenseState.throw.startTime)) {
-    return defenseState.throw.manualWait || elapsedSeconds < defenseState.throw.holdDeadline || !isBatterRunnerSettledForResolution();
-  }
-  if (elapsedSeconds < defenseState.throw.startTime) {
-    return targetBase === defenseState.throw.targetBase
-      ? defenseState.throw.manualWait || !defenseState.throw.active
-      : true;
-  }
-  return elapsedSeconds >= defenseState.throw.endTime && elapsedSeconds < defenseState.throw.holdDeadline;
+  // 捕球前でも、捕球の瞬間に投げる指示は先出しできる
+  if (defenseState.throw?.manualWait) return true;
+  if (!hasFielderSecuredBall(elapsedSeconds)) return false;
+  return !isManualThrowInFlight(elapsedSeconds);
+}
+
+function hasFielderSecuredBall(elapsedSeconds) {
+  const outcome = defenseState.outcome;
+  if (!outcome || outcome.pendingManualFielding) return false;
+  if (!defenseState.chosenFielder || !defenseState.target) return false;
+  const secureTime = outcome.fieldingTime ?? defenseState.battedBall?.ballTime;
+  return Number.isFinite(secureTime) && elapsedSeconds >= secureTime;
+}
+
+function isManualThrowInFlight(elapsedSeconds) {
+  const throwState = defenseState.throw;
+  if (!throwState || throwState.visualOnly) return false;
+  if (!Number.isFinite(throwState.startTime) || !Number.isFinite(throwState.endTime)) return false;
+  return elapsedSeconds >= throwState.startTime && elapsedSeconds < throwState.endTime;
+}
+
+// 送球中、または次の送球指示を待っている間は true。
+// この間はプレーを終わらせない。
+function isManualThrowDecisionPending(elapsedSeconds) {
+  if (!isManualThrowControl()) return false;
+  if (isManualThrowInFlight(elapsedSeconds)) return true;
+  const idleDeadline = getManualThrowIdleDeadline();
+  return Number.isFinite(idleDeadline) && elapsedSeconds < idleDeadline;
+}
+
+// 捕球や送球到達から一定時間なにも指示がなければ、次のプレーへ進む。
+function getManualThrowIdleDeadline() {
+  if (!isManualThrowControl()) return null;
+  const outcome = defenseState.outcome;
+  if (!outcome) return null;
+  const secureTime = outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 0;
+  const marks = [secureTime];
+  if (Number.isFinite(defenseState.throw?.endTime)) marks.push(defenseState.throw.endTime);
+  if (Number.isFinite(defenseState.lastManualThrowCommandTime)) marks.push(defenseState.lastManualThrowCommandTime);
+  return Math.max(...marks) + manualThrowIdleSeconds;
 }
 
 function getRunnerRouteDistance(route) {
@@ -13438,10 +13469,16 @@ function updateDefensePlay(now) {
     return;
   }
 
-  // 進塁中の走者が残っているうちは、時間切れでの打ち切りもしない
+  // 進塁中の走者や手動送球の指示待ちが残っているうちは、時間切れでの打ち切りもしない
   const advancingHold = getAdvancingRunnerHoldDeadline();
   const advancingRunnersSettled = !Number.isFinite(advancingHold) || elapsedSeconds >= advancingHold;
-  if (progress >= 1 && !defenseState.resolved && isBatterRunnerSettledForResolution() && advancingRunnersSettled) {
+  if (
+    progress >= 1
+    && !defenseState.resolved
+    && isBatterRunnerSettledForResolution()
+    && advancingRunnersSettled
+    && !isManualThrowDecisionPending(elapsedSeconds)
+  ) {
     finishDefensePlay();
   }
 }
@@ -14263,6 +14300,9 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
     );
   }
 
+  // 手動送球では、投げるかどうかを決める時間を待つ
+  if (isManualThrowDecisionPending(elapsedSeconds)) return false;
+
   if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) {
     if (!defenseState.unifiedCircleCatchComplete) return false;
     const tagUpThrowHold = Number.isFinite(defenseState.throw?.holdDeadline)
@@ -14973,7 +15013,9 @@ function getDefensePlayElapsedSeconds() {
 // 走路上のどこまで塁を踏み終えたか。到達前に判定が下りた走者を、実際には
 // 踏んでいない塁へ進めてしまわないために使う。
 function getDefenseRunnerCompletedBaseIndex(runner) {
-  const startIndex = runner?.startBase === "batter" ? 0 : baseIndexByName[runner?.startBase] ?? 0;
+  // 走路の起点は「いま踏んでいる塁」。手動指示で走路を引き直した場合もこれに合う。
+  const originBase = runner?.currentBase ?? runner?.startBase;
+  const startIndex = originBase === "batter" ? 0 : baseIndexByName[originBase] ?? 0;
   const route = runner?.route;
   if (!route || route.length < 2) return startIndex;
   let completed = startIndex;
