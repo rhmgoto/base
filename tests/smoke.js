@@ -3676,7 +3676,9 @@ const stealStateCheck = JSON.parse(runInGame(
     bases.first = makeBaseRunner(runner);
     isPitching = true;
     const cpuAutoBaseNow = performance.now();
-    pendingPitch = { releaseTime: cpuAutoBaseNow, typeKey: "normal" };
+    // 投球動作の開始と同時に走り出す (好スタート) 前提で見る。
+    // releaseTime をそのまま now にすると動作終わり際の最も遅いスタートになる。
+    pendingPitch = { releaseTime: cpuAutoBaseNow + pitchWindupDuration, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
     const normalStarted = tryStartSteal("second", cpuAutoBaseNow);
@@ -3751,7 +3753,8 @@ const stealStateCheck = JSON.parse(runInGame(
     bases.first = makeBaseRunner(runner);
     stealState = createStealState();
     isPitching = true;
-    pendingPitch = { releaseTime: 2000, typeKey: "slow" };
+    // 球種の比較なので、スタートの巧拙は normal と揃える
+    pendingPitch = { releaseTime: 2000 + pitchWindupDuration, typeKey: "slow" };
     ball.crossedPlate = false;
     currentPitchType = "slow";
     tryStartSteal("second", 2000);
@@ -3764,7 +3767,7 @@ const stealStateCheck = JSON.parse(runInGame(
     bases.first = makeBaseRunner(runner);
     stealState = createStealState();
     isPitching = true;
-    pendingPitch = { releaseTime: 3000, typeKey: "fast" };
+    pendingPitch = { releaseTime: 3000 + pitchWindupDuration, typeKey: "fast" };
     ball.crossedPlate = false;
     currentPitchType = "fast";
     tryStartSteal("second", 3000);

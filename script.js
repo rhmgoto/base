@@ -317,9 +317,18 @@ const stealTuning = {
     special: 0.46
   },
   runSpeedScale: 1.03,
+  // 盗塁の到達時間だけ走力差を圧縮する。1 で圧縮なし、小さいほど走力差が縮む。
+  // 0.44 で走力1と走力10の二塁到達差が約1.80秒から約1.00秒になる。
+  // getRunnerSpeed 自体は変えないので、内野安打や進塁の速さには影響しない。
+  runSpeedSpreadScale: 0.44,
   quickJumpLead: 0.24,
   lateJumpPenalty: 0.22,
-  earlyJumpPenalty: 0.42
+  // フライングは早ければ早いほど重くする。
+  // earlyJumpPenalty が最低保証、そこに早すぎた秒数 × earlyJumpPenaltyPerSecond を足し、
+  // maxEarlyJumpPenalty で頭打ちにする。
+  earlyJumpPenalty: 0.6,
+  earlyJumpPenaltyPerSecond: 0.6,
+  maxEarlyJumpPenalty: 1.4
 };
 const battingFeedbackDisplayPenalty = 0.1;
 const battingPracticeHomerBoostMultiplier = 4.2;
@@ -5968,7 +5977,9 @@ const quickDefenseThrowTimingWindowMs = 450;
 const catcherStealThrowTiming = {
   perfectWindowMs: 140,
   goodWindowMs: 360,
-  strongThrowArrivalBonusSeconds: 0.2,
+  strongThrowArrivalBonusSeconds: 0.3,
+  // タイミングを外した送球は到達が遅れる
+  missedThrowArrivalPenaltySeconds: 0.3,
   perfectSpeedScale: 1.18,
   goodSpeedScale: 1.0,
   badSpeedScale: 0.8,
@@ -6060,10 +6071,14 @@ function beginStealAttempt(candidate, now = performance.now(), options = {}) {
   if (!candidate) return false;
   const route = [{ ...getDefenseBasePointByName(candidate.startBase) }, { ...getDefenseBasePointByName(candidate.targetBase) }];
   const routeDistance = getRunnerRouteDistance(route);
-  const runnerSpeed = getRunnerSpeed(candidate.runner) * stealTuning.runSpeedScale;
+  const runnerSpeed = getStealRunnerSpeed(candidate.runner);
   const lead = stealTuning.pitcherTypeLead[pendingPitch?.typeKey || currentPitchType || candidate.pitchType] ?? 0.18;
   const motionElapsedSeconds = getPitchMotionElapsedSeconds(now);
-  const jumpLead = getStealJumpLead(motionElapsedSeconds, options.earlyRequest);
+  // フライングは「仕掛けた時点」が投球動作からどれだけ前だったかで重さを決める
+  const jumpMotionElapsed = options.earlyRequest && Number.isFinite(options.requestTime)
+    ? getPitchMotionElapsedSeconds(options.requestTime)
+    : motionElapsedSeconds;
+  const jumpLead = getStealJumpLead(jumpMotionElapsed, options.earlyRequest);
   stealState = {
     ...createStealState(),
     active: true,
@@ -6087,6 +6102,15 @@ function beginStealAttempt(candidate, now = performance.now(), options = {}) {
   return true;
 }
 
+// 盗塁のときだけ走力差を圧縮した速度を使う。
+// 走力の低い走者を基準に、上位の伸びだけを鈍らせる。
+function getStealRunnerSpeed(runnerInfo) {
+  const baseSpeed = getRunnerSpeed(runnerInfo) * stealTuning.runSpeedScale;
+  const slowestSpeed = getRunnerSpeed({ run: 1 }) * stealTuning.runSpeedScale;
+  const spreadScale = clamp(stealTuning.runSpeedSpreadScale ?? 1, 0, 1);
+  return slowestSpeed + (baseSpeed - slowestSpeed) * spreadScale;
+}
+
 function getPitchMotionElapsedSeconds(now = performance.now()) {
   const motionStart = Number.isFinite(pendingPitch?.releaseTime)
     ? pendingPitch.releaseTime - pitchWindupDuration
@@ -6096,8 +6120,14 @@ function getPitchMotionElapsedSeconds(now = performance.now()) {
   return (now - motionStart) / 1000;
 }
 
+// 盗塁のスタート補正。投球動作の開始直後が最良で、遅れるほど小さくなる。
+// フライングは、投球動作の何秒前に仕掛けたかに応じてペナルティを重くする。
 function getStealJumpLead(motionElapsedSeconds = 0, earlyRequest = false) {
-  if (earlyRequest || motionElapsedSeconds < 0) return -stealTuning.earlyJumpPenalty;
+  if (earlyRequest || motionElapsedSeconds < 0) {
+    const earlySeconds = Math.max(0, -(motionElapsedSeconds || 0));
+    const penalty = stealTuning.earlyJumpPenalty + earlySeconds * stealTuning.earlyJumpPenaltyPerSecond;
+    return -Math.min(penalty, stealTuning.maxEarlyJumpPenalty);
+  }
   if (motionElapsedSeconds <= 0.18) return stealTuning.quickJumpLead;
   if (motionElapsedSeconds <= 0.45) {
     const t = (motionElapsedSeconds - 0.18) / 0.27;
@@ -6220,10 +6250,16 @@ function handleStealDefenseThrow(targetBase, now = performance.now(), options = 
   const throwSpeedScale = options.throwSpeedScale ?? (stealTuning.manualQuickThrowSpeedScale ?? 1.18);
   const throwSpeed = (stealTuning.catcherThrowBaseSpeed + getTeamCatcherArm(fieldingTeam()) * 22) * throwSpeedScale;
   const rawThrowTime = stealTuning.catcherExchangeSeconds + distance / throwSpeed;
-  const strongThrowArrivalBonus = targetBase === "second" && ["perfect", "good"].includes(options.timingRank)
-    ? catcherStealThrowTiming.strongThrowArrivalBonusSeconds
-    : 0;
-  const throwTime = Math.max(0.1, rawThrowTime - strongThrowArrivalBonus);
+  // 好送球は到達を早め、タイミングを外した送球は到達が遅れる
+  const timingRank = options.timingRank || (options.manual ? "bad" : "auto");
+  const timingAdjust = targetBase !== "second"
+    ? 0
+    : ["perfect", "good"].includes(timingRank)
+      ? -catcherStealThrowTiming.strongThrowArrivalBonusSeconds
+      : timingRank === "bad"
+        ? catcherStealThrowTiming.missedThrowArrivalPenaltySeconds
+        : 0;
+  const throwTime = Math.max(0.1, rawThrowTime + timingAdjust);
   const swingMissDelay = stealState.swingMissDelaySeconds ?? 0;
   const startTime = elapsedSeconds + (stealTuning.catcherReleaseDelaySeconds ?? 0.3) + swingMissDelay;
   const endTime = startTime + throwTime;
@@ -6239,7 +6275,7 @@ function handleStealDefenseThrow(targetBase, now = performance.now(), options = 
     arcMultiplier,
     throwSpeedScale,
     manual: Boolean(options.manual),
-    timingRank: options.timingRank || (options.manual ? "bad" : "auto"),
+    timingRank,
     throwTimingLabel: options.throwTimingLabel || "",
     safe: targetBase !== stealState.targetBase || stealState.arrivalTime <= endTime,
     completed: false,
@@ -11065,7 +11101,10 @@ function judgeOutPlay(runner, targetBase, throwState, options = {}) {
     };
   }
   const tagTime = throwState.tagTime ?? ballSecureTime;
-  const tagAttempt = throwState.playType === "tag" && isRunnerHeadingToDefenseBase(runner, targetBase);
+  // 封じられていない走者でも、塁と塁の間にいるうちに向かっている塁へボールが先着すればアウト (挟殺)。
+  // 送球の playType は「その塁が封殺の対象か」を表すだけなので、ここでは走者の状況で判断する。
+  // 塁上で止まっている走者は arrivalTime が過去なので、この時刻比較で自然にセーフになる。
+  const tagAttempt = isRunnerDestinedForBase(runner, targetBase);
   const out = tagAttempt && tagTime + SAFE_TOLERANCE < runnerArrivalTime;
   return {
     result: out ? "TAG_OUT" : "SAFE",
@@ -11133,6 +11172,13 @@ function isForceThrowTargetBase(targetBase, outcome = defenseState.outcome, batt
   if (!targetBase) return false;
   if (!isForceEligibleBattedBall(battedBall, outcome)) return false;
   return isForceTargetActive(targetBase);
+}
+
+// タッチの対象になるのは、その塁を目的地にしている走者だけ。
+// 通り抜けるだけの塁ではタッチアウトにならない。
+function isRunnerDestinedForBase(runner, targetBase) {
+  if (!runner || !targetBase) return false;
+  return runner.manualTargetBase === targetBase || runner.targetBase === targetBase;
 }
 
 function isRunnerHeadingToDefenseBase(runner, targetBase) {

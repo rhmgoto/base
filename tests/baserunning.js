@@ -543,6 +543,91 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
+// 挟殺: 走者が塁と塁の間にいるとき、向かっている塁にボールが先着したらアウト
+// ---------------------------------------------------------------------------
+const rundown = JSON.parse(run(`
+  function setup(withFirstRunner) {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "manual" };
+    gamePhase = "defense";
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner(findById(batters, "ichiro"));
+    if (withFirstRunner) bases.second = makeBaseRunner(findById(batters, "shuto"));
+    activeBatter = findById(batters, "suzuki");
+    const target = { x: field.plateX + 150, y: field.plateY - 500 };
+    const ball = {
+      target, direction: normalize({ x: 0.3, y: -1 }), flightDistance: 500, landingDistance: 500,
+      ballTime: 1.2, isGrounder: true, isLiner: false, isDeep: false, power: 0.5, trajectory: "grounder",
+      fenceOver: false, wallHit: false, groundRuleDouble: false
+    };
+    const outcome = { kind: "single", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 1.5 };
+    const fielder = { role: "SS", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+    const runners = createDefenseBaseRunnerAnimations(outcome, ball, null, fielder, target);
+    defenseState = {
+      ...createDefenseState(),
+      active: true, resolved: false,
+      startTime: performance.now() - 9000,
+      outcome, battedBall: ball,
+      runner: createBatterRunner(activeBatter),
+      baseRunners: runners,
+      chosenFielder: fielder, target
+    };
+    updateDefenseBaseRunners(9);
+    updateBatterRunner(9);
+    return runners.find((entry) => entry.startBase === "first");
+  }
+
+  function throwTo(base, arrivalTime, playType) {
+    return {
+      targetBase: base, baseLabel: getBaseLabel(base),
+      startTime: 9.05, endTime: arrivalTime, holdDeadline: arrivalTime + 1, safe: true,
+      playType, tagTime: playType === "tag" ? arrivalTime : null, baseTouchTime: arrivalTime
+    };
+  }
+
+  // 二塁に到達した走者が三塁へ暴走した状態を作る
+  const advancing = setup(false);
+  handleBatterRunnerBaseCommand("third", "advance");
+  const advanceOut = judgeOutPlay(advancing, "third", throwTo("third", advancing.arrivalTime - 0.5, "tag")).result;
+  const advanceSafe = judgeOutPlay(advancing, "third", throwTo("third", advancing.arrivalTime + 1.0, "tag")).result;
+
+  // 三塁へ走り出したあと二塁へ帰塁する状態
+  const retreating = setup(false);
+  handleBatterRunnerBaseCommand("third", "advance");
+  handleBatterRunnerBaseCommand("second", "return");
+  const retreatTarget = retreating.targetBase;
+  const retreatOut = judgeOutPlay(retreating, "second", throwTo("second", retreating.arrivalTime - 0.5, "force")).result;
+
+  // 塁上で止まっている走者はアウトにならない
+  const standing = setup(false);
+  const standingResult = judgeOutPlay(standing, "second", throwTo("second", 11.0, "tag")).result;
+
+  // 通過するだけの塁ではタッチアウトにならない
+  const passing = setup(false);
+  const passingDestined = isRunnerDestinedForBase(passing, "third");
+
+  return JSON.stringify({
+    advanceOut, advanceSafe, retreatTarget, retreatOut,
+    standingStopped: isDefenseBaseRunnerStoppedOnBase(standing, 2),
+    standingResult,
+    passingDestined
+  });
+`));
+
+assert(rundown.advanceOut === "TAG_OUT", `挟殺: 進行方向の塁にボールが先着したらアウトになるべき (${rundown.advanceOut})`);
+assert(rundown.advanceSafe === "SAFE", `挟殺: 走者が先に到達すればセーフであるべき (${rundown.advanceSafe})`);
+assert(rundown.retreatTarget === "second", `帰塁指示で走者の目標が二塁になるべき (${rundown.retreatTarget})`);
+assert(
+  rundown.retreatOut === "TAG_OUT" || rundown.retreatOut === "FORCE_OUT",
+  `挟殺: 帰塁方向でもボールが先着したらアウトになるべき (${rundown.retreatOut})`
+);
+assert(rundown.standingStopped === true, "塁上で止まっている走者の前提が崩れている");
+assert(rundown.standingResult === "SAFE", `塁上で止まっている走者をアウトにしてはいけない (${rundown.standingResult})`);
+assert(rundown.passingDestined === false, "通過するだけの塁をタッチ対象にしてはいけない");
+
+// ---------------------------------------------------------------------------
 // 現仕様として維持する挙動 (意図的な簡略化なので変更しない)
 // ---------------------------------------------------------------------------
 assert(
