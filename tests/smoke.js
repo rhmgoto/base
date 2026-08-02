@@ -4648,7 +4648,14 @@ const toweringFlyAndTagUpState = JSON.parse(runInGame(
     bases.third = thirdRunner;
     const twoOutThird = createDefenseBaseRunnerAnimations(outcome, flyBall, null, deepFielder, deepTarget)[0];
     count.outs = 0;
-    defenseState = { ...createDefenseState(), baseRunners: deepAnimations };
+    bases = createEmptyBases();
+    bases.third = thirdRunner;
+    // タッチアップは捕球後に走り出すので、走り切れる時間まで進めた状態で判定する
+    defenseState = {
+      ...createDefenseState(),
+      startTime: performance.now() - 12000,
+      baseRunners: deepAnimations
+    };
     const tagUpRuns = applyDefenseOutAdvancements();
     return JSON.stringify({
       toweringFlag: towering.isToweringFly,
@@ -4795,7 +4802,14 @@ const outAdvancementState = JSON.parse(runInGame(
     const groundOutcome = { kind: "out", label: "内野ゴロ", caught: true, needsThrow: false, fieldingTime: 1.1 };
     const groundFielder = { role: "SS", x: groundTarget.x, y: groundTarget.y, speed: 5, fielding: 5, arm: 5 };
     const groundRunners = createDefenseBaseRunnerAnimations(groundOutcome, groundBall, null, groundFielder, groundTarget);
-    defenseState = { ...createDefenseState(), outcome: groundOutcome, battedBall: groundBall, baseRunners: groundRunners };
+    defenseState = {
+      ...createDefenseState(),
+      // 走者が走り終えるまでプレーは解決しないので、経過時間もそれに合わせる
+      startTime: performance.now() - 12000,
+      outcome: groundOutcome,
+      battedBall: groundBall,
+      baseRunners: groundRunners
+    };
     finishDefensePlay();
     const groundResult = {
       runnerAdvanced: bases.third?.id === secondRunner.id,
@@ -4817,6 +4831,8 @@ const outAdvancementState = JSON.parse(runInGame(
     const batterRunner = createBatterRunner(activeBatter);
     defenseState = {
       ...createDefenseState(),
+      // 実際のプレーは走者が走り終えるまで解決しないので、経過時間もそれに合わせる
+      startTime: performance.now() - 6000,
       outcome: forceGroundOutcome,
       battedBall: groundBall,
       runner: batterRunner,
@@ -4863,7 +4879,14 @@ const outAdvancementState = JSON.parse(runInGame(
     const flyOutcome = { kind: "out", label: "外野フライ", caught: true, needsThrow: false, fieldingTime: 2.6 };
     const flyFielder = { role: "C", x: deepTarget.x, y: deepTarget.y, speed: 5, fielding: 5, arm: 5 };
     const flyRunners = createDefenseBaseRunnerAnimations(flyOutcome, flyBall, null, flyFielder, deepTarget);
-    defenseState = { ...createDefenseState(), outcome: flyOutcome, battedBall: flyBall, baseRunners: flyRunners };
+    defenseState = {
+      ...createDefenseState(),
+      // タッチアップ走者が本塁まで走り切れる時間まで進めた状態で判定する
+      startTime: performance.now() - 12000,
+      outcome: flyOutcome,
+      battedBall: flyBall,
+      baseRunners: flyRunners
+    };
     finishDefensePlay();
     return JSON.stringify({
       groundResult,
@@ -6747,7 +6770,12 @@ const runnerDecisionState = JSON.parse(runInGame(
     count = { strikes: 0, balls: 0, outs: 0 };
     bases = createEmptyBases();
     bases.first = makeBaseRunner(findById(batters, "shuto"));
-    applyForceOutBaseState("second", activeBatter);
+    defenseState = {
+      ...createDefenseState(),
+      runner: { startBase: "batter", targetBase: "first", arrived: true, arrivalTime: 0 },
+      baseRunners: []
+    };
+    resolveDefensePlayBaseState({ batterInfo: activeBatter, forceOutBases: ["second"] });
     const secondForceClearsFirstRunner = bases.first?.id === activeBatter.id;
     bases = createEmptyBases();
     const forcedFirstRunner = makeBaseRunner(findById(batters, "shuto"));
@@ -6819,12 +6847,22 @@ const runnerDecisionState = JSON.parse(runInGame(
     bases = createEmptyBases();
     bases.first = forcedFirstRunner;
     bases.second = forcedSecondRunnerInfo;
-    applyForceOutBaseState("third", activeBatter);
+    defenseState = {
+      ...createDefenseState(),
+      runner: { startBase: "batter", targetBase: "first", arrived: true, arrivalTime: 0 },
+      baseRunners: []
+    };
+    resolveDefensePlayBaseState({ batterInfo: activeBatter, forceOutBases: ["third"] });
     const thirdForceClearsSecondRunner = bases.first?.id === activeBatter.id && bases.second?.id === forcedFirstRunner.id && !bases.third;
     count = { strikes: 0, balls: 0, outs: 0 };
     bases = createEmptyBases();
     bases.first = makeBaseRunner(findById(batters, "shuto"));
-    applyCompletedForceOutBaseState(["second", "first"], activeBatter);
+    defenseState = {
+      ...createDefenseState(),
+      runner: { startBase: "batter", targetBase: "first", arrived: true, arrivalTime: 0 },
+      baseRunners: []
+    };
+    resolveDefensePlayBaseState({ batterInfo: activeBatter, forceOutBases: ["second", "first"] });
     const doublePlayClearsBases = !bases.first && !bases.second && !bases.third;
     bases = createEmptyBases();
     bases.second = makeBaseRunner(findById(batters, "ichiro"));
@@ -8187,6 +8225,14 @@ const linkedRunningState = JSON.parse(runInGame(
   `(() => {
     battingTeam = "away";
     bases = createEmptyBases();
+    // 手動指示のあと、判定が下りる時点では走者は指示先に到達している状態を作る
+    function settleDefenseRunnersAtDestination() {
+      [defenseState.runner, ...(defenseState.baseRunners || [])].forEach((runner) => {
+        if (!runner) return;
+        runner.arrived = true;
+        runner.arrivalTime = 0;
+      });
+    }
     const batter = findById(batters, "suzuki");
     const secondRunner = makeBaseRunner(findById(batters, "ichiro"));
     bases.second = secondRunner;
@@ -8214,7 +8260,9 @@ const linkedRunningState = JSON.parse(runInGame(
     setBatterRunnerManualDestination(batterRunner, "second", 0);
     advanceForcedBaseRunnersForBatterTarget("second", 0);
     const secondRunnerTarget = defenseState.baseRunners[0].targetBase;
-    const runsAfterSecond = applyManualDefenseAdvancement(batter);
+    // 判定が下りる時点では走者は指示先に到達している
+    settleDefenseRunnersAtDestination();
+    const runsAfterSecond = resolveDefensePlayBaseState({ batterInfo: batter });
     const batterOnSecond = bases.second?.id === batter.id;
     const runnerOnThird = bases.third?.id === secondRunner.id;
 
@@ -8273,7 +8321,8 @@ const linkedRunningState = JSON.parse(runInGame(
     setBatterRunnerManualDestination(batterRunnerToThird, "third", 0);
     advanceForcedBaseRunnersForBatterTarget("third", 0);
     const thirdRunnerTarget = defenseState.baseRunners[0].targetBase;
-    const runsAfterThird = applyManualDefenseAdvancement(batter);
+    settleDefenseRunnersAtDestination();
+    const runsAfterThird = resolveDefensePlayBaseState({ batterInfo: batter });
     return JSON.stringify({
       secondRunnerTarget,
       batterOnSecond,
@@ -8527,9 +8576,10 @@ const defenseOutAdvancementState = JSON.parse(runInGame(
     defenseState = {
       ...createDefenseState(),
       baseRunners: [
-        { ...firstRunner, startBase: "first", targetBase: "second", tagUp: true },
-        { ...secondRunner, startBase: "second", targetBase: "third", tagUp: true },
-        { ...thirdRunner, startBase: "third", targetBase: "home", tagUp: true, scored: true }
+        // 判定が下りる時点では走者は走り切っている
+        { ...firstRunner, startBase: "first", targetBase: "second", tagUp: true, arrived: true, arrivalTime: 0 },
+        { ...secondRunner, startBase: "second", targetBase: "third", tagUp: true, arrived: true, arrivalTime: 0 },
+        { ...thirdRunner, startBase: "third", targetBase: "home", tagUp: true, scored: true, arrived: true, arrivalTime: 0 }
       ]
     };
     const loadedTagRuns = applyDefenseOutAdvancements();
@@ -8547,8 +8597,8 @@ const defenseOutAdvancementState = JSON.parse(runInGame(
     defenseState = {
       ...createDefenseState(),
       baseRunners: [
-        { ...firstRunner, startBase: "first", targetBase: "second", tagUp: true },
-        { ...secondRunner, startBase: "second", targetBase: "second", tagUp: false }
+        { ...firstRunner, startBase: "first", targetBase: "second", tagUp: true, arrived: true, arrivalTime: 0 },
+        { ...secondRunner, startBase: "second", targetBase: "second", tagUp: false, arrived: true, arrivalTime: 0 }
       ]
     };
     const blockedRuns = applyDefenseOutAdvancements();
@@ -8687,6 +8737,8 @@ const manualRunningCpuDefenseState = JSON.parse(runInGame(
     const cpuThrowsHome = defenseState.throw?.targetBase === "home";
     const tagRunnerAfterCommand = defenseState.baseRunners[0];
     tagRunnerAfterCommand.arrivalTime = defenseState.throw.endTime - 0.2;
+    // 実際のプレーは送球と走者が決着するまで解決しないので、その時点まで進める
+    __advanceTime(5000);
     finishDefensePlay();
     const safeTagResult = {
       outs: count.outs,

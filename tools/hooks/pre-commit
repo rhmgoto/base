@@ -1,0 +1,28 @@
+#!/bin/sh
+# index.html の「最終修正日時」をコミット時に自動更新する。
+# tools/install-hooks.ps1 で .git/hooks/ へ配置する。
+
+# ゲーム本体に変更がないコミット (README だけなど) では更新しない
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+case "$staged" in
+  *index.html*|*script.js*|*style.css*) ;;
+  *) exit 0 ;;
+esac
+
+# node が PATH にない環境では Codex 同梱の Node.js を探す
+NODE=$(command -v node 2>/dev/null)
+if [ -z "$NODE" ]; then
+  BUNDLED="$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe"
+  if [ -x "$BUNDLED" ]; then
+    NODE="$BUNDLED"
+  fi
+fi
+if [ -z "$NODE" ]; then
+  echo "pre-commit: Node.js が見つからないため最終修正日時を更新できません。" >&2
+  echo "            この更新を省いてコミットする場合は git commit --no-verify を使ってください。" >&2
+  exit 1
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+"$NODE" "$repo_root/tools/stamp-updated.js" || exit 1
+git add "$repo_root/index.html"

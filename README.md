@@ -18,10 +18,27 @@ Node.jsが使える環境では直接実行しても構いません。
 
 ```bash
 node tests/smoke.js
+node tests/baserunning.js
 node tests/static-checks.js
 ```
 
 通常の `node` が見つからない場合、`tests/run-smoke.ps1` はCodex同梱のNode.jsも探します。
+
+## 最終修正日時の自動更新
+
+メニューに表示される「最終修正日時」は、コミット時にgitのフックが自動で書き換えます。
+gitのフックはリポジトリに含まれないので、環境ごとに一度だけセットアップしてください。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/install-hooks.ps1
+```
+
+以降、`index.html` / `script.js` / `style.css` のいずれかを含むコミットで日時が更新されます。
+それ以外のコミット（READMEのみなど）では更新しません。手動で書き換えることもできます。
+
+```bash
+node tools/stamp-updated.js
+```
 
 ## 主なファイル
 
@@ -29,7 +46,10 @@ node tests/static-checks.js
 - `style.css`: 画面レイアウトとメニューの見た目
 - `script.js`: ゲーム進行、投球、打撃、守備、走塁、音声処理
 - `tests/smoke.js`: 最低限の自動チェック
+- `tests/baserunning.js`: 走塁の塁状態・得点・アウトのチェック
 - `tests/static-checks.js`: HTMLとJavaScriptの接続、文字化け、構文チェック
+- `tools/stamp-updated.js`: メニューの最終修正日時を書き換える
+- `tools/hooks/`: gitのフック本体（`tools/install-hooks.ps1` で配置する）
 - `assets/`: 選手スプライト画像
 - `audio/`: 効果音とBGM
 
@@ -41,6 +61,17 @@ node tests/static-checks.js
 - 投球後の速度: `1` / `3` で減速 / 加速
 - 打者: マウス移動、左クリックでスイング
 - 共通: `Enter` 次の投球 / `R` メニューへ / `O` 1人用 / `T` 2人用
+
+### 走塁（守備画面、手動走塁のとき）
+
+打球が飛んだあと、走者の進塁先を自分で決められます。走りすぎた走者は帰塁させられます。
+
+- 進塁: `→` 一塁 / `↑` 二塁 / `←` 三塁 / `↓` 本塁
+- 帰塁: `Shift` + 同じ矢印
+- ゲームパッド: `A` 進塁 / `B` 帰塁 / `X` 全員進塁 / `Y` 全員帰塁（方向で塁を指定）
+
+CPU攻撃（自動走塁）では、打者走者は長打性の当たりでも一塁で止まります。
+どこまで進むかの自動判断は行わず、進塁の判断はプレイヤー操作に委ねる方針です。
 
 ## 5人守備ルール
 
@@ -68,4 +99,12 @@ node tests/static-checks.js
 - まず `tests/run-smoke.ps1` を実行して、既存の動きが壊れていないか確認します。
 - 表示文言を変更したあとは、`tests/static-checks.js` が文字化けと壊れたタグを検出します。
 - `script.js` は大きいので、調整値は上部の `*Tuning` 定数群を優先して触ると影響範囲を追いやすいです。
+- 走塁の塁状態は `applyRunnerResults` に一本化しています。塁の割り当てや得点を変えるときは、
+  個別の処理を増やさずこの関数を経由させてください。走者が消える・二重に得点する不具合を防いでいます。
+- 自動走塁で長打を単打として扱っているのは `normalizeAutoHitAdvanceType` です。
+  打者走者の目標塁を決める `getBatterRunnerTargetBase` と対になっているので、片方だけ変えると
+  記録と塁状態が食い違います。
+- 進塁先が与えられるのは、プレー終了までに走り切れた走者だけです (`getSettledRunnerBase`)。
+  これは走者が走り終わるまでプレーを終わらせない `getAdvancingRunnerHoldDeadline` と対になっています。
+  待ち時間を縮めると、タッチアップなどが到達前に打ち切られて成立しなくなります。
 - 日本語テキストはUTF-8で保存してください。文字コードがずれると、表示文言だけでなくHTMLタグやJavaScript文字列も壊れることがあります。
