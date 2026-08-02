@@ -543,6 +543,279 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
+// ノーバウンド捕球の判定: 見た目 (接触時の高さ) と結果を一致させる
+// ---------------------------------------------------------------------------
+const liner = { isLiner: true, ballTime: 0.6 };
+const popup = { isPopupFly: true, ballTime: 2.0 };
+const grounder = { isGrounder: true, ballTime: 0.4 };
+
+// 落下時刻を過ぎていても、まだ浮いているなら空中で捕ったとみなす
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(liner)}, 1.5, 36);`) === true,
+  "落下時刻を過ぎていても、高さが残っていればノーバウンド捕球とすべき"
+);
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(liner)}, 1.5, 0);`) === false,
+  "地面に着いた打球はノーバウンド捕球にしないべき"
+);
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(popup)}, 2.4, 20);`) === true,
+  "内野ポップフライも高さが残っていればノーバウンド捕球とすべき"
+);
+// ゴロは高さがあっても地面の打球として扱う
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(grounder)}, 0.2, 40);`) === false,
+  "ゴロはノーバウンド捕球の対象にしないべき"
+);
+// 高さが分からない場合は従来どおり時刻で判定する
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(liner)}, 0.5, null);`) === true,
+  "高さが不明なら落下前は空中扱いのままにすべき"
+);
+assert(
+  run(`return isCaughtAirBattedBallAtTime(${JSON.stringify(liner)}, 1.5, null);`) === false,
+  "高さが不明なら落下後は地面扱いのままにすべき"
+);
+
+// ライナーの落球は一律10%、ゴロやフライは対象外
+assert(
+  run(`return JSON.stringify([linerDropTuning.chance, linerDropTuning.freezeSeconds]);`) === "[0.1,0.9]",
+  "ライナーの落球率と硬直時間の設定"
+);
+assert(
+  run(`
+    const previousRandom = Math.random;
+    Math.random = () => 0.05;
+    const dropped = shouldDropLinerOnCatch({ isLiner: true });
+    const grounderDropped = shouldDropLinerOnCatch({ isGrounder: true });
+    const flyDropped = shouldDropLinerOnCatch({ isRoutineFly: true });
+    Math.random = () => 0.5;
+    const safeCatch = shouldDropLinerOnCatch({ isLiner: true });
+    Math.random = previousRandom;
+    return JSON.stringify({ dropped, grounderDropped, flyDropped, safeCatch });
+  `) === '{"dropped":true,"grounderDropped":false,"flyDropped":false,"safeCatch":false}',
+  "落球はライナーだけが対象で、確率どおりに起きるべき"
+);
+
+// ---------------------------------------------------------------------------
+// フェンス直撃は結果表示に残す (安打成立時は文言から分からなくなるため)
+// ---------------------------------------------------------------------------
+assert(
+  run(`return getBattedBallHighlightLabel({ wallHit: true });`) === "フェンス直撃",
+  "フェンス直撃の打球は結果表示に残すべき"
+);
+assert(
+  run(`return getBattedBallHighlightLabel({ groundRuleDouble: true });`) === "エンタイトルツーベース",
+  "エンタイトルツーベースも結果表示に残すべき"
+);
+assert(
+  run(`return getBattedBallHighlightLabel({ wallHit: true, fenceOver: true });`) === "",
+  "柵越えはホームランとして表示されるので、直撃の文言は付けないべき"
+);
+assert(
+  run(`return getBattedBallHighlightLabel({ isLiner: true });`) === "",
+  "通常の打球には余分な文言を付けないべき"
+);
+assert(
+  run(`return withBattedBallHighlight("一塁セーフ: 得点なし", { wallHit: true });`) === "フェンス直撃 / 一塁セーフ: 得点なし",
+  "フェンス直撃は結果文言の先頭に付くべき"
+);
+assert(
+  run(`return withBattedBallHighlight("ヒット: 1点", { isGrounder: true });`) === "ヒット: 1点",
+  "通常の打球では文言を変えないべき"
+);
+
+// ---------------------------------------------------------------------------
+// CPU守備の送球先: 本塁 → 三塁 → 二塁 → 一塁 の順に、間に合う一番先の塁へ投げる
+// ---------------------------------------------------------------------------
+const cpuThrow = JSON.parse(run(`
+  function scenario(build) {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "manual" };
+    gamePhase = "defense";
+    bases = createEmptyBases();
+    activeBatter = findById(batters, "suzuki");
+    const target = { x: field.plateX + 120, y: field.plateY - 420 };
+    const ball = {
+      target, direction: normalize({ x: 0.3, y: -1 }), flightDistance: 420, landingDistance: 420,
+      ballTime: 1.1, isGrounder: true, isLiner: false, isDeep: false, power: 0.5, trajectory: "grounder",
+      fenceOver: false, wallHit: false, groundRuleDouble: false
+    };
+    const outcome = { kind: "force", caught: true, needsThrow: true, fieldingTime: 1.4 };
+    const fielder = { role: "SS", x: target.x, y: target.y, speed: 5, fielding: 6, arm: 6 };
+    build(ball, outcome, fielder, target);
+    return getAutomaticForceThrowTargetBase(outcome, ball, defenseState.runner, {
+      fielder, fieldingTarget: target, baseRunners: defenseState.baseRunners, minStartTime: 1.4
+    });
+  }
+
+  // 打者は一塁に到達済み、一塁走者が三塁へ向かっている
+  const advancingRunner = scenario((ball, outcome, fielder, target) => {
+    bases.first = makeBaseRunner(findById(batters, "ichiro"));
+    defenseState = {
+      ...createDefenseState(), active: true, resolved: false,
+      startTime: performance.now() - 10000,
+      outcome, battedBall: ball, runner: createBatterRunner(activeBatter),
+      baseRunners: createDefenseBaseRunnerAnimations(outcome, ball, null, fielder, target),
+      chosenFielder: fielder, target
+    };
+    updateBatterRunner(9);
+    updateDefenseBaseRunners(9);
+    handleBatterRunnerBaseCommand("third", "advance");
+    updateDefenseBaseRunners(9.1);
+  });
+
+  // 通常のゴロ (一塁に走者)
+  const ordinaryGrounder = scenario((ball, outcome, fielder, target) => {
+    bases.first = makeBaseRunner(findById(batters, "ichiro"));
+    defenseState = {
+      ...createDefenseState(), active: true, resolved: false,
+      startTime: performance.now() - 1500,
+      outcome, battedBall: ball, runner: createBatterRunner(activeBatter),
+      baseRunners: createDefenseBaseRunnerAnimations(outcome, ball, null, fielder, target),
+      chosenFielder: fielder, target
+    };
+    updateBatterRunner(1.4);
+    updateDefenseBaseRunners(1.4);
+  });
+
+  // 走者なし
+  const emptyBases = scenario((ball, outcome, fielder, target) => {
+    defenseState = {
+      ...createDefenseState(), active: true, resolved: false,
+      startTime: performance.now() - 1500,
+      outcome, battedBall: ball, runner: createBatterRunner(activeBatter),
+      baseRunners: [], chosenFielder: fielder, target
+    };
+    updateBatterRunner(1.4);
+  });
+
+  return JSON.stringify({ advancingRunner, ordinaryGrounder, emptyBases });
+`));
+
+assert(
+  cpuThrow.advancingRunner === "third",
+  `三塁へ向かう走者がいるなら三塁へ投げるべき (${cpuThrow.advancingRunner})`
+);
+assert(
+  cpuThrow.ordinaryGrounder === "second",
+  `通常のゴロでは間に合う一番先の塁 (二塁) へ投げるべき (${cpuThrow.ordinaryGrounder})`
+);
+assert(
+  cpuThrow.emptyBases === "first",
+  `走者がいなければ一塁へ投げるべき (${cpuThrow.emptyBases})`
+);
+assert(
+  run(`return JSON.stringify([
+    getCpuLeadForceThrowRequiredMargin("home"),
+    getCpuLeadForceThrowRequiredMargin("third"),
+    getCpuLeadForceThrowRequiredMargin("second"),
+    getCpuLeadForceThrowRequiredMargin("first")
+  ]);`) === "[0.1,0.08,0.06,0.02]",
+  "先の塁ほど必要な余裕を大きくしておくべき"
+);
+
+// ---------------------------------------------------------------------------
+// 踏み終えて先へ進んだ塁では、もう封殺されない
+// (打者走者が三塁にいるのに一塁への送球でアウトになる不具合の再発防止)
+// ---------------------------------------------------------------------------
+const forceRelease = JSON.parse(run(`
+  function setup() {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "manual" };
+    gamePhase = "defense";
+    bases = createEmptyBases();
+    activeBatter = findById(batters, "suzuki");
+    const target = { x: field.plateX + 250, y: field.plateY - 900 };
+    const hit = {
+      target, direction: normalize({ x: 0.3, y: -1 }), flightDistance: 900, landingDistance: 900,
+      ballTime: 2.0, isGrounder: false, isLiner: true, isDeep: true, power: 0.8, trajectory: "liner",
+      fenceOver: false, wallHit: false, groundRuleDouble: false
+    };
+    const outcome = { kind: "force", caught: true, needsThrow: true, fieldingTime: 3.0 };
+    const fielder = { role: "C", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+    defenseState = {
+      ...createDefenseState(),
+      active: true, resolved: false,
+      startTime: performance.now() - 20000,
+      outcome, battedBall: hit,
+      runner: createBatterRunner(activeBatter),
+      baseRunners: [],
+      chosenFielder: fielder, target
+    };
+    return defenseState.runner;
+  }
+  function throwToFirst(endTime) {
+    return {
+      targetBase: "first", baseLabel: "一塁",
+      startTime: endTime - 0.9, endTime, holdDeadline: endTime + 1, safe: true,
+      playType: "force", tagTime: null, baseTouchTime: endTime
+    };
+  }
+
+  // 一塁を踏んで先の塁へ進んだあと、一塁へ送球された
+  const advanced = setup();
+  updateBatterRunner(4.2);
+  handleBatterRunnerBaseCommand("second", "advance");
+  updateBatterRunner(9.0);
+  const advancedThrow = throwToFirst(15.0);
+  defenseState.throw = advancedThrow;
+  const advancedResult = {
+    forceActive: isForceTargetActive("first"),
+    judged: judgeOutPlay(advanced, "first", advancedThrow).result,
+    thrownOut: Boolean(getThrowOutRunner(advancedThrow)),
+    cpuTarget: getAutomaticForceThrowTargetBase(defenseState.outcome, defenseState.battedBall, advanced, { baseRunners: [] })
+  };
+
+  // 通常のゴロアウト: 一塁へ走行中に送球が先着
+  const grounder = setup();
+  updateBatterRunner(2.0);
+  const grounderResult = {
+    forceActive: isForceTargetActive("first"),
+    judged: judgeOutPlay(grounder, "first", throwToFirst(3.0)).result
+  };
+
+  // 一塁に到達済みでも、送球のほうが先に着いていればアウトのまま
+  const settled = setup();
+  updateBatterRunner(6.0);
+  const settledResult = {
+    forceActive: isForceTargetActive("first"),
+    judged: judgeOutPlay(settled, "first", throwToFirst(3.0)).result
+  };
+
+  return JSON.stringify({ advancedResult, grounderResult, settledResult });
+`));
+
+assert(
+  forceRelease.advancedResult.forceActive === false,
+  "一塁を踏んで先へ進んだ走者は、一塁の封殺対象から外れるべき"
+);
+assert(
+  forceRelease.advancedResult.judged === "SAFE",
+  `先の塁にいる走者が一塁への送球でアウトになってはいけない (${forceRelease.advancedResult.judged})`
+);
+assert(
+  forceRelease.advancedResult.thrownOut === false,
+  "先の塁にいる走者が一塁への送球でアウトになってはいけない"
+);
+assert(
+  forceRelease.advancedResult.cpuTarget !== "first",
+  `打者走者が一塁を通過済みならCPUは一塁へ投げないべき (${forceRelease.advancedResult.cpuTarget})`
+);
+assert(
+  forceRelease.grounderResult.judged === "FORCE_OUT",
+  `通常のゴロアウトは成立し続けるべき (${forceRelease.grounderResult.judged})`
+);
+assert(
+  forceRelease.settledResult.judged === "FORCE_OUT",
+  `一塁到達済みでも送球が先着していればアウトのままであるべき (${forceRelease.settledResult.judged})`
+);
+
+// ---------------------------------------------------------------------------
 // 挟殺: 走者が塁と塁の間にいるとき、向かっている塁にボールが先着したらアウト
 // ---------------------------------------------------------------------------
 const rundown = JSON.parse(run(`

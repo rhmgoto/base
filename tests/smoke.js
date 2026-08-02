@@ -798,8 +798,8 @@ assert(lineupState.awayRoles.join(",") === "R,L,2B,CA,C,SS,DH", "away lineup sho
 assert(lineupState.homeRoles.join(",") === "R,L,2B,CA,C,SS,DH", "home lineup should use the requested batting order");
 assert(lineupState.awayPitchers.length === 5 && lineupState.homePitchers.length === 5, "each team should carry five pitchers");
 assert(lineupState.awayActivePitcher === lineupState.awayPitchers[0], "the first pitcher slot should be the starter");
-assert(lineupState.awayPitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,glasnow", "away default pitchers should match the requested regular roster");
-assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,sasaki,glasnow", "home default pitchers should match the requested regular roster");
+assert(lineupState.awayPitchers.join(",") === "shohei,yamamoto,ediaz,skubal,enriquez", "away default pitchers should match the requested regular roster");
+assert(lineupState.homePitchers.join(",") === "shohei,yamamoto,ediaz,skubal,enriquez", "home default pitchers should match the requested regular roster");
 assert(lineupState.awayBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "away default fielders should match the requested regular batting order");
 assert(lineupState.homeBatters.join(",") === "otani,betts,freeman,willsmith,tucker,kimhyesong,rushing", "home default fielders should match the requested regular batting order");
 
@@ -929,11 +929,51 @@ const weakSwingState = JSON.parse(runInGame(
       outsideStrikeZone: false,
       sweetSpotScore: 0.95,
       inGoodContactZone: true,
-      yellowZoneBoost: 0
+      yellowZoneBoost: 0,
+      // 方向入力のないバントはポップフライになる仕様なので、狙いを入れて評価する
+      buntAimX: 1
     });
     const buntBall = buildBattedBall(buntProfile.power, buntProfile.direction, hitLabels.grounder, buntProfile);
     const buntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), buntBall);
     const buntOutcome = resolveDefenseOutcome(buntFielder, buntBall, createBatterRunner(activeBatter));
+    // 方向入力なしのバントはポップフライになる
+    const noAimBuntRandom = Math.random;
+    Math.random = () => 0.5;
+    const buntNoAimProfile = buildBattedBallProfile({
+      timeDiff: 0,
+      quality: 0.9,
+      timingScore: 0.9,
+      barrelScore: 0.9,
+      zoneScore: 1,
+      plateDistance: 0,
+      outsideStrikeZone: false,
+      sweetSpotScore: 0.95,
+      inGoodContactZone: true,
+      yellowZoneBoost: 0
+    });
+    Math.random = noAimBuntRandom;
+    // 下入力は勢いを殺し、上入力はプッシュ気味に強く出す
+    function buildAimedBuntProfile(aimX, aimY) {
+      resetSwing();
+      startSwing(performance.now(), "bunt");
+      return buildBattedBallProfile({
+        timeDiff: 0,
+        quality: 0.7,
+        timingScore: 0.7,
+        barrelScore: 0.7,
+        zoneScore: 0.8,
+        plateDistance: 0,
+        outsideStrikeZone: false,
+        sweetSpotScore: 0.7,
+        inGoodContactZone: true,
+        yellowZoneBoost: 0,
+        buntAimX: aimX,
+        buntAimY: aimY
+      });
+    }
+    const buntDeadenProfile = buildAimedBuntProfile(0, 1);
+    const buntPushProfile = buildAimedBuntProfile(0, -1);
+    const buntSideProfile = buildAimedBuntProfile(1, 0);
     const solidBuntRandom = Math.random;
     const solidBuntRolls = [0.5, 0.5, 0.5, 0.18, 0.01, 0.5, 0.5];
     Math.random = () => solidBuntRolls.length ? solidBuntRolls.shift() : 0.5;
@@ -947,7 +987,9 @@ const weakSwingState = JSON.parse(runInGame(
       outsideStrikeZone: false,
       sweetSpotScore: 0.36,
       inGoodContactZone: true,
-      yellowZoneBoost: 0
+      yellowZoneBoost: 0,
+      // ポップフライからの保護は方向入力ありのバントに掛かる
+      buntAimX: 1
     });
     Math.random = solidBuntRandom;
     const badBuntRandom = Math.random;
@@ -1132,7 +1174,7 @@ const weakSwingState = JSON.parse(runInGame(
     updateBuntStance();
     const batterButton3BuntHeld = isBuntButtonHeld();
     const batterButton3BuntType = swingState.type;
-    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, visualPopupBuntBall, convertedGrounderMidHeight, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
+    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntNoAimProfile, buntDeadenProfile, buntPushProfile, buntSideProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, visualPopupBuntBall, convertedGrounderMidHeight, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1148,7 +1190,8 @@ assert(weakSwingState.bunt.type === "bunt", "button-3/bunt swing should mark the
 assert(weakSwingState.bunt.meet === 15, "bunt swing should add five meet points and allow values over 10");
 assert(weakSwingState.bunt.power === 1, "bunt swing should sharply reduce power with a floor of one");
 assert(weakSwingState.buntProfile.isBunt === true && weakSwingState.buntProfile.power <= 0.34 && weakSwingState.buntProfile.launchAngle <= 3, "good bunt contact should become a weak ground-ball profile instead of an outfield drive");
-assert(weakSwingState.buntProfile.buntLineChance === 0 && weakSwingState.buntProfile.buntPitcherFrontChance === 1, "a bunt without stick input should report its actual pitcher-front direction");
+assert(weakSwingState.buntNoAimProfile.buntLineChance === 0 && weakSwingState.buntNoAimProfile.buntPitcherFrontChance === 0, "a bunt without stick input should become a popup instead of rolling");
+assert(weakSwingState.buntNoAimProfile.launchAngle >= 30, `a bunt without stick input should pop the ball up (${weakSwingState.buntNoAimProfile.launchAngle})`);
 assert(
   weakSwingState.buntBall.isBunt === true
     && weakSwingState.buntBall.isGrounder === true
@@ -1158,17 +1201,37 @@ assert(
     && weakSwingState.buntBall.distance < 400,
   "good bunt contact should stay close to the plate as a bouncing grounder inside the infield"
 );
-assert(Math.abs(weakSwingState.buntProfile.direction.x) <= 0.16 && Math.abs(weakSwingState.buntBall.direction.x) <= 0.16, "a bunt without stick input should stay near the pitcher");
+assert(Math.abs(weakSwingState.buntNoAimProfile.direction.x) <= 0.16, "a bunt without stick input should stay near the pitcher");
+// 横へ狙ったバントはフェアゾーンに収まる角度で転がる
+assert(
+  Math.abs(weakSwingState.buntProfile.direction.x)
+    <= Math.tan(55 * Math.PI / 180) * Math.abs(weakSwingState.buntProfile.direction.y) + 0.0001,
+  `an aimed bunt should stay inside the foul lines (${weakSwingState.buntProfile.direction.x} / ${weakSwingState.buntProfile.direction.y})`
+);
 assert(["P", "1B", "2B", "SS", "3B"].includes(weakSwingState.buntFielderRole), "bunts should be assigned to the pitcher or an infielder");
 assert(
   weakSwingState.buntOutcome.kind === "single"
     || (weakSwingState.buntOutcome.kind === "force" && weakSwingState.buntOutcome.needsThrow === true && weakSwingState.buntOutcome.targetBase === "first"),
   "bunts should become either an infield single or a fielded throw play to first"
 );
-assert(weakSwingState.buntProfile.buntFoulChance >= 0.075 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
+// 狙ったバントのファウル下限は aimedFoulMin (0.03)。狙わないバントより低く抑える。
+assert(weakSwingState.buntProfile.buntFoulChance >= 0.03 && weakSwingState.badBuntProfile.buntFoulChance > weakSwingState.buntProfile.buntFoulChance, "bunt foul chance should exist and rise on poor bunt contact");
 assert(weakSwingState.solidBuntProfile.solidBuntContact === true && weakSwingState.solidBuntProfile.pitcherBuntPopup === false, "solid bunt contact should be protected from becoming pitcher popup flies too often");
 assert(weakSwingState.solidBuntProfile.protectedPopupChance < weakSwingState.solidBuntProfile.pitcherBuntPopupChance, "solid bunt contact should lower the popup-fly chance");
-assert(weakSwingState.solidBuntProfile.buntLineChance === 0 && weakSwingState.solidBuntProfile.buntPitcherFrontChance === 1, "30-50 point bunts without stick input should report their actual pitcher-front direction");
+assert(weakSwingState.solidBuntProfile.buntLineChance > 0 && weakSwingState.solidBuntProfile.buntPitcherFrontChance < 1, "aimed bunts with solid contact should roll instead of being forced in front of the pitcher");
+// 下入力は勢いを殺し、上入力はプッシュ気味に強く出す
+assert(
+  weakSwingState.buntPushProfile.power > weakSwingState.buntDeadenProfile.power * 2,
+  `up-stick bunts should push much harder than down-stick bunts (${weakSwingState.buntDeadenProfile.power} -> ${weakSwingState.buntPushProfile.power})`
+);
+assert(
+  Math.abs(weakSwingState.buntPushProfile.direction.x) < 0.3,
+  "up-stick bunts should push back toward the pitcher"
+);
+assert(
+  Math.abs(weakSwingState.buntSideProfile.direction.x) > Math.abs(weakSwingState.buntPushProfile.direction.x),
+  "side-aimed bunts should roll more laterally than push bunts"
+);
 assert(weakSwingState.badBuntProfile.buntLineChance === 0 && weakSwingState.badBuntProfile.buntPitcherFrontChance === 0, "popup bunts should not report an unused ground-ball direction");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
 assert(weakSwingState.badBuntFielderRole === "P", "pitcher-area bunt popups should favor the pitcher as the defender");
@@ -1395,7 +1458,7 @@ assert(teamResetState.autoPitcher === "shohei", "auto fill should restore the de
 assert(teamResetState.autoShortstop === "kimhyesong", "auto fill should restore the default fielder selections");
 assert(teamResetState.autoLineup === "R,L,2B,CA,C,SS,DH", "auto fill should restore the default batting order");
 assert(teamResetState.autoComplete === true, "auto fill should make the team complete");
-assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 70, "auto fill should restore a valid point total");
+assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 67, "auto fill should restore a valid point total");
 
 const rosterAndPointState = JSON.parse(runInGame(
   context,
@@ -2171,6 +2234,7 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
     sato: findById(batters, "sato"),
     harper: findById(batters, "harper"),
     carpenter: findById(batters, "carpenter"),
+    zaiahope: findById(batters, "zaiahope"),
     mcgonigle: findById(batters, "mcgonigle"),
     darvish: findById(pitchers, "darvish"),
     yamamoto: findById(pitchers, "yamamoto"),
@@ -2186,6 +2250,7 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
 assert(latestSpreadsheetRosterState.sato.arm === 6, "Sato arm should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.harper.arm === 8, "Harper arm should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.carpenter.arm === 4, "Carpenter arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.zaiahope.bats === "L" && latestSpreadsheetRosterState.zaiahope.power === 4 && latestSpreadsheetRosterState.zaiahope.meet === 3 && latestSpreadsheetRosterState.zaiahope.run === 7 && latestSpreadsheetRosterState.zaiahope.infieldDefense === 3 && latestSpreadsheetRosterState.zaiahope.outfieldDefense === 6 && latestSpreadsheetRosterState.zaiahope.arm === 6 && latestSpreadsheetRosterState.zaiahope.cost === 4, "Zaia Hope should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.mcgonigle.arm === 6, "McGonigle arm should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.rightBreak === 9, "Darvish right break should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break should match the latest spreadsheet");
@@ -2534,13 +2599,13 @@ assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should ma
 assert(rosterAndPointState.wheeler.fastKmh === 159 && rosterAndPointState.wheeler.rightBreak === 8 && rosterAndPointState.wheeler.leftBreak === 8 && rosterAndPointState.wheeler.cost === 7, "Wheeler pitcher should match the pitcher roster table");
 assert(rosterAndPointState.valdes.throws === "L" && rosterAndPointState.valdes.fastKmh === 158 && rosterAndPointState.valdes.rightBreak === 9 && rosterAndPointState.valdes.leftBreak === 7 && rosterAndPointState.valdes.cost === 7, "Valdes pitcher should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");
-assert(rosterAndPointState.teamPointLimit === 70, "combined point limit should be 70 per team");
-assert(rosterAndPointState.defaultAwayPitcherCost === 33, "default away pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.defaultHomePitcherCost === 33, "default home pitcher cost should remain visible in the point breakdown");
-assert(rosterAndPointState.overLimitDisabled === true, "teams over 70 combined points should not be startable");
-assert(rosterAndPointState.overLimitText.includes("/70"), "menu should show the 70-point combined limit");
-assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 70 combined points should not be startable");
-assert(rosterAndPointState.pitcherOverLimitText.includes("/70"), "menu should show the combined pitcher point total");
+assert(rosterAndPointState.teamPointLimit === 67, "combined point limit should be 67 per team");
+assert(rosterAndPointState.defaultAwayPitcherCost === 30, "default away pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.defaultHomePitcherCost === 30, "default home pitcher cost should remain visible in the point breakdown");
+assert(rosterAndPointState.overLimitDisabled === true, "teams over 67 combined points should not be startable");
+assert(rosterAndPointState.overLimitText.includes("/67"), "menu should show the 67-point combined limit");
+assert(rosterAndPointState.pitcherOverLimitDisabled === true, "pitcher-heavy teams over 67 combined points should not be startable");
+assert(rosterAndPointState.pitcherOverLimitText.includes("/67"), "menu should show the combined pitcher point total");
 assert(rosterAndPointState.awayFielderPointText.includes("Bench"), "menu should show the separate bench point total");
 assert(rosterAndPointState.overLimitBatterDisabled === true, "chooser should disable players that would exceed the team point limit");
 assert(rosterAndPointState.overLimitPickBlocked === true, "selecting an over-limit player should be ignored");
@@ -2660,7 +2725,7 @@ const singlePlayerOpponentState = JSON.parse(runInGame(
 ));
 
 assert(singlePlayerOpponentState.preStartHomeCost > 59, "Dendos should be allowed to exceed the normal point limit as a CPU opponent");
-assert(singlePlayerOpponentState.preStartAwayCost <= 70, "single-player Dendos mode should keep the player roster under the normal point limit");
+assert(singlePlayerOpponentState.preStartAwayCost <= 67, "single-player Dendos mode should keep the player roster under the normal point limit");
 assert(singlePlayerOpponentState.preStartDisabled === false, "single-player mode should remain startable with Dendos as the over-limit CPU opponent");
 assert(singlePlayerOpponentState.preStartHomeLabel === "デンドーズ", "single-player mode should label the home team as Dendos when selected");
 assert(singlePlayerOpponentState.preStartPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos should use the requested elite pitching staff");
@@ -2805,6 +2870,7 @@ const teamPresetSelectionState = JSON.parse(runInGame(
       startDisabled: startButton.disabled,
       awayPitchers: selected.away.pitchers.map((pitcherInfo) => pitcherInfo.id),
       homePitchers: selected.home.pitchers.map((pitcherInfo) => pitcherInfo.id),
+      homeBatters: Object.fromEntries(selected.home.batters.map((entry) => [entry.role, entry.player.id])),
       awayOtaniAllowed
     };
     awayPresetSelect.value = "tigers";
@@ -2821,11 +2887,12 @@ assert(teamPresetSelectionState.awayLabel === "デンドーズ", "Team A label s
 assert(teamPresetSelectionState.homeLabel === "タイガース", "Team B label should follow the selected preset");
 assert(teamPresetSelectionState.awayCost > 59, "Dendos should exceed the normal point limit");
 assert(teamPresetSelectionState.awayPointText.includes("制限なし"), "Dendos point status should show no limit");
-assert(!teamPresetSelectionState.awayPointText.includes("/70"), "Dendos point status should not show the normal limit");
-assert(teamPresetSelectionState.homePointText.includes("/70"), "non-Dendos teams should keep the normal point limit");
+assert(!teamPresetSelectionState.awayPointText.includes("/67"), "Dendos point status should not show the normal limit");
+assert(teamPresetSelectionState.homePointText.includes("/67"), "non-Dendos teams should keep the normal point limit");
 assert(teamPresetSelectionState.startDisabled === false, "Dendos as Team A should remain startable despite exceeding the limit");
 assert(teamPresetSelectionState.awayPitchers.join(",") === "cyyoung,sawamura,clemens,johnson,maddux", "Dendos preset should apply the elite pitching staff to Team A");
-assert(teamPresetSelectionState.homePitchers.join(",") === "skubal,melton,jansen,valdes,summers", "Tigers preset should apply to Team B");
+assert(teamPresetSelectionState.homePitchers.join(",") === "melton,valdes,jansen,summers,hanifee", "Tigers preset should apply to Team B");
+assert(teamPresetSelectionState.homeBatters.R === "zaiahope" && teamPresetSelectionState.homeBatters.DH === "carpenter", "Tigers preset should use Zaia Hope in the outfield and Carpenter at DH");
 assert(teamPresetSelectionState.awayOtaniAllowed === true, "Dendos teams should still allow player swaps without point-limit blocking");
 assert(!rosterAndPointState.escapedChooserHtml.includes("<img src=x"), "player chooser should not render saved player names as HTML");
 
@@ -7861,7 +7928,7 @@ assert(runnerDecisionState.batterOutRemovesSecondForce === false, "putting out t
 assert(runnerDecisionState.loadedForceTarget === "home", "loaded bases should create a force play at home");
 assert(runnerDecisionState.fallbackLeadForceTarget === "third", "first-and-second grounders should first consider the lead force at third");
 assert(runnerDecisionState.autoFallbackForceTarget === "second", "auto throws should fall back to the trailing force base when the lead force is too late");
-assert(runnerDecisionState.liveAutoFallbackThrowTarget === "first", "CPU live grounder pickups should throw to first when the batter-runner can still be retired instead of forcing a risky lead-runner fielder's choice");
+assert(runnerDecisionState.liveAutoFallbackThrowTarget === "second", "CPU grounder pickups should take the most advanced base the throw can still beat the runner to");
 assert(runnerDecisionState.manualRunFirstTarget === "second", "manual baserunning should stop a first-base runner at second even on extra-base hits");
 assert(runnerDecisionState.manualRunSecondTarget === "third", "manual baserunning should stop a second-base runner at third until instructed");
 assert(runnerDecisionState.manualSpecificBaseRunnerTarget === "third", "manual third-base commands should send an eligible base runner from second to third");

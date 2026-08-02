@@ -196,7 +196,8 @@ const batters = [
   { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 20, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
   { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 18, run: 20, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 },
-  { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 }
+  { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
+  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 6, arm: 6, cost: 4 }
 ];
 
 const catchers = [
@@ -335,6 +336,10 @@ const battingPracticeHomerBoostMultiplier = 4.2;
 const oppositeHandedBattingAdvantageMultiplier = 1.2;
 const battingGoodContactZoneScale = 0.9;
 const buntTuning = {
+  // バントの評価はバットとボールの接触で決める。
+  // contactBase は当たりさえすれば得られる下限、contactScale は芯で捉えたときの上積み。
+  contactBase: 0.3,
+  contactScale: 0.5,
   goodFeedback: 0.45,
   greatFeedback: 0.5,
   solidFeedback: 0.3,
@@ -367,12 +372,27 @@ const buntTuning = {
   solidContactQuality: 0.48,
   solidContactTiming: 0.46,
   solidContactSweetSpot: 0.44,
-  solidContactPopupReduction: 0.98
+  solidContactPopupReduction: 0.98,
+  // 方向入力がないバントはほぼポップフライにする
+  noAimPopupChance: 0.92,
+  // 下入力で勢いを殺し、上入力でプッシュ気味に強く出す
+  deadenPowerDrop: 0.035,
+  pushPowerBonus: 0.075,
+  // 狙ったバントがファウルになりにくいようにする
+  aimedFoulMin: 0.03,
+  // 打球方向がファウルラインを越えないように角度を抑える割合 (1 でライン上)
+  fairAngleMargin: 0.86,
+  // バントの転がる距離の倍率。大きくするほど守備が追いつきやすくなる。
+  rollDistanceBoost: 1.5
 };
 
-function resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance) {
-  const popupCandidate = !goodBunt && (forcePopup || Math.random() < protectedPopupChance);
+// forcedRegardlessOfContact は方向入力なしのバント用。
+// 当たりの良し悪しに関係なくポップフライにし、ゴロへの救済も行わない。
+function resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance, forcedRegardlessOfContact = false) {
+  const popupCandidate = forcedRegardlessOfContact
+    || (!goodBunt && (forcePopup || Math.random() < protectedPopupChance));
   const popupConvertedToPitcherFront = popupCandidate
+    && !forcedRegardlessOfContact
     && Math.random() < buntTuning.popupReductionRate;
   return {
     popupCandidate,
@@ -449,17 +469,17 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 70;
+const teamPointLimit = 67;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
   tigers: {
     label: "タイガース",
-    selection: { pitcher: "skubal", pitcher2: "melton", pitcher3: "jansen", pitcher4: "valdes", pitcher5: "summers", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "carpenter", CA: "dingler", DH: "jones", bench1: "", bench2: "", bench3: "", lineupOrder: [...awayRegularLineupOrder] }
+    selection: { pitcher: "melton", pitcher2: "valdes", pitcher3: "jansen", pitcher4: "summers", pitcher5: "hanifee", SS: "torkelson", "2B": "mcgonigle", L: "greene", C: "outman", R: "zaiahope", CA: "dingler", DH: "carpenter", bench1: "", bench2: "", bench3: "", lineupOrder: [...awayRegularLineupOrder] }
   },
   dodgers: {
     label: "ドジャース",
-    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "sasaki", pitcher5: "glasnow", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", bench1: "", bench2: "", bench3: "", lineupOrder: [...homeRegularLineupOrder] }
+    selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "ediaz", pitcher4: "skubal", pitcher5: "enriquez", SS: "kimhyesong", "2B": "freeman", L: "betts", C: "tucker", R: "otani", CA: "willsmith", DH: "rushing", bench1: "", bench2: "", bench3: "", lineupOrder: [...homeRegularLineupOrder] }
   },
   dendos: {
     label: "デンドーズ",
@@ -836,6 +856,15 @@ const fielderCatchRangeDebugStyle = {
   fill: "rgba(255, 104, 180, 0.07)",
   stroke: "rgba(255, 104, 180, 0.2)"
 };
+// 接触時にこの高さ以上あれば、ノーバウンド捕球とみなす。
+const airCatchMinHeight = 12;
+
+// 直接捕球を狙ったライナーを弾く確率と、弾いてから拾い直すまでの硬直時間 (秒)。
+const linerDropTuning = {
+  chance: 0.1,
+  freezeSeconds: 0.9
+};
+
 const wallReboundTuning = {
   minDistance: 96,
   maxDistance: 230,
@@ -914,10 +943,14 @@ function getFieldUnitsForMeters(meters, direction = { x: 0, y: -1 }) {
   return meters / Math.max(0.001, metersPerUnit);
 }
 
+// 打球が発生して守備画面に切り替わったとき、投手がどれだけ本塁側へ出た位置から
+// 守備を始めるか (メートル)。大きくするほどバントや投手前のゴロに強くなる。
+const pitcherDefenseStartAdvanceMeters = 5;
+
 function getPitcherDefenseStartPoint(baseFielder) {
   return {
     ...baseFielder,
-    y: baseFielder.y + getFieldUnitsForMeters(3, { x: 0, y: -1 })
+    y: baseFielder.y + getFieldUnitsForMeters(pitcherDefenseStartAdvanceMeters, { x: 0, y: -1 })
   };
 }
 
@@ -6394,8 +6427,11 @@ function updateBatter(delta = 1000 / 60) {
     batter.x = mouseAim.x;
     batter.y = mouseAim.y;
   }
-  const keyboardMove = getBatterKeyboardMove();
-  const gamepadMove = getBatterGamepadMove();
+  // バント姿勢中はスティックと矢印キーを打球方向の指示に使うので、打者は動かさない。
+  // 動かしてしまうとバットがボールから離れ、狙うほど当たらなくなる。
+  const aimOnlyInput = isBuntStanceActive();
+  const keyboardMove = aimOnlyInput ? { x: 0, y: 0 } : getBatterKeyboardMove();
+  const gamepadMove = aimOnlyInput ? { x: 0, y: 0 } : getBatterGamepadMove();
   const move = {
     x: gamepadMove.x || keyboardMove.x,
     y: gamepadMove.y || keyboardMove.y
@@ -6673,14 +6709,13 @@ function buildBattingFeedbackLines(contact, result = {}) {
   const practicalSweetSpotScore = getPracticalSweetSpotScore(contact);
   const zoneText = getFeedbackZoneText(contact);
   const balancedScore = isBunt
-    ? getBuntFeedbackScore({ zoneScore })
+    ? getBuntFeedbackScore({ barrelScore })
     : getBattingFeedbackBalancedScore(getBattingFeedbackScoreInput(contact, result.battedProfile));
   if (isBunt) {
     const buntAimText = (contact.buntAimMagnitude ?? result.battedProfile?.buntAimControl ?? 0) > 0 ? "あり" : "なし";
     return [
       getBattingFeedbackResultText(result),
-      `バント評価: ゾーン到達率 ${Math.round(getFeedbackZoneRate(contact))}% / 方向入力 ${buntAimText}`,
-      zoneText,
+      `バント評価: バットの当たり ${Math.round(barrelScore * 100)}% / 方向入力 ${buntAimText}`,
       `総合: ${Math.round(balancedScore * 100)}%`
     ];
   }
@@ -6744,9 +6779,11 @@ function getBattingFeedbackScoreInput(contact = {}, profile = null) {
   };
 }
 
+// バントはゾーンではなく、バットにボールが当たったかどうかで評価する。
+// 当たっていれば基本的に成立し、芯を外すほど質が落ちる。
 function getBuntFeedbackScore(scores = {}) {
-  const zone = clamp(scores.zoneScore ?? 0, 0, 1);
-  return zone;
+  const contact = clamp(scores.barrelScore ?? scores.contactScore ?? 0, 0, 1);
+  return clamp(buntTuning.contactBase + contact * buntTuning.contactScale, 0, 1);
 }
 
 function getBattedBallProfileScore(profile = null) {
@@ -7827,9 +7864,7 @@ function buildBattedBallProfile(contact) {
     const aimedSide = Math.abs(buntAimX) > 0 ? Math.sign(buntAimX) : 0;
     const aimControlScore = hasAim ? 1 : 0;
     const noAimPenalty = hasAim ? 0 : 0.3;
-    const buntCoreScore = getBuntFeedbackScore({
-      zoneScore: clamp(zoneScore ?? (inGoodContactZone ? 1 : 0), 0, 1)
-    });
+    const buntCoreScore = getBuntFeedbackScore({ barrelScore });
     const buntQuality = clamp(buntCoreScore + buntMeetSkill * 0.1 + aimControlScore * 0.12 - noAimPenalty, 0, 1);
     const buntContactScore = clamp(buntCoreScore + buntMeetSkill * 0.05 + aimControlScore * 0.08 - noAimPenalty * 0.65, 0, 1);
     const goodBunt = buntContactScore >= buntTuning.goodFeedback;
@@ -7871,7 +7906,7 @@ function buildBattedBallProfile(contact) {
         + (1 - buntQuality) * buntTuning.foulQualityScale
         + badBuntScore * (buntTuning.foulBadContactScale + 0.22)
         - aimedFoulRelief,
-      buntTuning.foulMin,
+      aimedSide ? buntTuning.aimedFoulMin : buntTuning.foulMin,
       Math.min(0.82, buntTuning.foulMax + 0.12)
     ) + (hasAim ? 0 : 0.06);
     const buntIsFoul = Math.random() < buntFoulChance;
@@ -7891,24 +7926,26 @@ function buildBattedBallProfile(contact) {
     const forcePopup = buntContactScore <= buntTuning.forcePopupFeedback
       && (buntContactScore <= 0.3 || badBuntScore >= buntTuning.forcePopupBadScore)
       && !solidBuntContact;
+    // 方向入力なしのバントは当たりの良し悪しに関係なくポップフライにする
+    const noAimForcedPopup = !hasAim && Math.random() < buntTuning.noAimPopupChance;
     const {
       popupCandidate,
       popupConvertedToPitcherFront,
       pitcherBuntPopup
-    } = resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance);
+    } = resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance, noAimForcedPopup);
     const finalBuntIsFoul = buntIsFoul
       && !pitcherBuntPopup
       && !popupConvertedToPitcherFront;
     const pitcherFrontGrounder = popupConvertedToPitcherFront
       || (!hasAim && !pitcherBuntPopup);
-    const directionFromAim = hasAim
-      ? buntAimY > 0.4
-        ? normalize({ x: side * randomBetween(0.05, 0.28), y: -randomBetween(0.2, 0.42) })
-        : buntAimY < -0.4
-          ? normalize({ x: side * randomBetween(0.04, 0.18), y: -1 })
-          : null
-      : null;
-    const buntDirection = pitcherBuntPopup
+    const aimDown = hasAim && buntAimY > 0.4;
+    const aimUp = hasAim && buntAimY < -0.4;
+    const directionFromAim = aimDown
+      ? normalize({ x: side * randomBetween(0.05, 0.28), y: -randomBetween(0.2, 0.42) })
+      : aimUp
+        ? normalize({ x: side * randomBetween(0.04, 0.18), y: -1 })
+        : null;
+    const rawBuntDirection = pitcherBuntPopup
       ? normalize({ x: randomBetween(-0.1, 0.1), y: -1 })
       : pitcherFrontGrounder
       ? normalize({ x: randomBetween(-0.14, 0.14), y: -1 })
@@ -7921,12 +7958,21 @@ function buildBattedBallProfile(contact) {
       : roll < lineChance + pitcherFrontChance
         ? normalize({ x: randomBetween(-0.16, 0.16), y: -1 })
         : normalize({ x: side * randomBetween(0.92 + aimAssist, 1.18 + aimAssist), y: -randomBetween(0.38, 0.68) });
+    // 横へ狙ったバントはそのままだとファウルラインの外を向いてしまうので、
+    // フェアゾーンに収まる角度まで戻す。ファウルにするかは buntIsFoul 側で決める。
+    const buntDirection = finalBuntIsFoul
+      ? rawBuntDirection
+      : clampBuntDirectionInsideFairLines(rawBuntDirection);
     const noAimPowerBoost = hasAim ? 0 : 0.1;
-    const deadenBonus = (hasAim ? 0.045 : 0) + (hasAim && buntAimY > 0.4 ? 0.025 : 0);
-    const buntPower = clamp(0.05 + buntQuality * 0.07 + noAimPowerBoost - deadenBonus, 0.045, 0.23);
+    // 下入力は勢いを殺し、上入力はプッシュ気味に強く出す
+    const deadenBonus = (hasAim ? 0.045 : 0) + (aimDown ? buntTuning.deadenPowerDrop : 0);
+    const pushBonus = aimUp ? buntTuning.pushPowerBonus : 0;
+    const buntPower = clamp(0.05 + buntQuality * 0.07 + noAimPowerBoost + pushBonus - deadenBonus, 0.045, 0.3);
     const badBuntLift = goodBunt ? 0 : clamp((0.62 - buntQuality) / 0.62, 0, 1) * randomBetween(0, 16);
     return {
-      exitVelocity: pitcherBuntPopup ? clamp(0.1 + buntQuality * 0.08, 0.1, 0.22) : clamp(0.08 + buntQuality * 0.1 + noAimPowerBoost - deadenBonus, 0.07, 0.28),
+      exitVelocity: pitcherBuntPopup
+        ? clamp(0.1 + buntQuality * 0.08, 0.1, 0.22)
+        : clamp(0.08 + buntQuality * 0.1 + noAimPowerBoost + pushBonus - deadenBonus, 0.07, 0.36),
       launchAngle: pitcherBuntPopup
         ? randomBetween(30, 58)
         : popupConvertedToPitcherFront
@@ -9317,6 +9363,21 @@ function formatRuns(runs) {
   return runs > 0 ? `${runs}点` : "得点なし";
 }
 
+// フェンス直撃は打席結果の文言からは分からないので、結果表示に残す。
+// (安打として成立した場合、表示は「○塁セーフ」や「ヒット」になり、
+//  outcome.label の「フェンス直撃」がどこにも出ないため)
+function getBattedBallHighlightLabel(battedBall = defenseState.battedBall) {
+  if (!battedBall || battedBall.fenceOver) return "";
+  if (battedBall.groundRuleDouble) return "エンタイトルツーベース";
+  if (battedBall.wallHit) return "フェンス直撃";
+  return "";
+}
+
+function withBattedBallHighlight(baseMessage, battedBall = defenseState.battedBall) {
+  const highlight = getBattedBallHighlightLabel(battedBall);
+  return highlight ? `${highlight} / ${baseMessage}` : baseMessage;
+}
+
 function createHomeRunFireworks(battedBall) {
   if (!battedBall?.fenceOver) return null;
   const homerRuns = getPendingHomeRunRuns();
@@ -9870,16 +9931,19 @@ function createFoulBattedBall(power, direction, label, battedProfile = null) {
     x: battedBall.origin.x + finalDirection.x * flightDistance,
     y: battedBall.origin.y + finalDirection.y * flightDistance
   };
+  // 距離を伸縮させると本塁から見た角度が変わり、補正済みの落下点が
+  // フェアゾーンへ戻ってしまう。最終的な落下点をもう一度ファウル側へ押し出す。
+  const foulLanding = ensureFoulLandingPoint(battedBall.origin, rawTarget, finalDirection);
   return {
     ...battedBall,
     isFoulBall: true,
     fenceOver: false,
     wallHit: false,
     groundRuleDouble: false,
-    flightDistance,
-    landingDistance: flightDistance,
-    target: rawTarget,
-    direction: finalDirection,
+    flightDistance: foulLanding.distance,
+    landingDistance: foulLanding.distance,
+    target: foulLanding.target,
+    direction: foulLanding.direction,
     maxHeight: battedBall.isGrounder ? Math.min(battedBall.maxHeight || 12, 18) : Math.max(battedBall.maxHeight || 120, 120),
     ballTime: Math.max(0.42, battedBall.ballTime ?? 0.8)
   };
@@ -10180,42 +10244,67 @@ function getInitialDefenseThrowTargetBase(outcome, battedBall, runner, options =
   return runner?.targetBase || outcome.targetBase || "first";
 }
 
+// CPUが狙える塁の候補。封殺の対象だけでなく、封じられていない進塁中の走者も含める。
+// 封殺だけを見ていると、余分な塁を狙う走者を無視して一塁へ投げてしまう。
+function getCpuThrowTargetCandidates(outcome, battedBall, batterRunner, baseRunners) {
+  const candidates = new Map();
+  const forceTargets = createForceTargetsForPlay(battedBall, outcome);
+  forceTargets
+    .filter((entry) => isForceTargetEntryActive(entry, forceTargets, []))
+    .forEach((entry) => {
+      const runnerArrival = getForceTargetRunnerArrival(entry, batterRunner, baseRunners);
+      if (!Number.isFinite(runnerArrival)) return;
+      candidates.set(entry.targetBase, { targetBase: entry.targetBase, runnerArrival });
+    });
+
+  [...(baseRunners || []), batterRunner].forEach((entry) => {
+    if (!entry || entry.isOut || entry.arrived) return;
+    const targetBase = entry.manualTargetBase || entry.targetBase;
+    const targetIndex = getBatterRunnerTargetIndex(targetBase);
+    if (targetIndex < 1 || targetIndex > 4 || !Number.isFinite(entry.arrivalTime)) return;
+    const existing = candidates.get(targetBase);
+    // 同じ塁を複数が狙うなら、先に着く走者に間に合わせる必要がある
+    if (!existing || entry.arrivalTime < existing.runnerArrival) {
+      candidates.set(targetBase, { targetBase, runnerArrival: entry.arrivalTime });
+    }
+  });
+
+  return [...candidates.values()]
+    .sort((a, b) => getForceTargetBaseIndex(b.targetBase) - getForceTargetBaseIndex(a.targetBase));
+}
+
+// 本塁 → 三塁 → 二塁 → 一塁 の順に見て、送球が間に合う一番先の塁へ投げる。
+// どこも間に合わなければ一塁で確実なアウトを取り、それも無理なら
+// 一番先の塁へ投げて進塁を止める。
 function getAutomaticForceThrowTargetBase(outcome, battedBall, runner, options = {}) {
   if (!outcome?.needsThrow || outcome.kind !== "force") return null;
   if (!isForceEligibleBattedBall(battedBall, outcome)) return null;
-  const forceTargets = createForceTargetsForPlay(battedBall, outcome);
-  const activeTargets = forceTargets
-    .filter((entry) => isForceTargetEntryActive(entry, forceTargets, []))
-    .sort((a, b) => getForceTargetBaseIndex(b.targetBase) - getForceTargetBaseIndex(a.targetBase));
-  const evaluations = activeTargets.map((target) => {
-    const runnerArrival = getForceTargetRunnerArrival(target, runner, options.baseRunners);
-    const throwArrival = estimateAutoThrowArrivalToBase(target.targetBase, outcome, options);
-    const margin = Number.isFinite(runnerArrival) && Number.isFinite(throwArrival)
-      ? runnerArrival - throwArrival
-      : Number.NEGATIVE_INFINITY;
-    return { target, runnerArrival, throwArrival, margin };
-  });
-  const firstTarget = evaluations.find((entry) => entry.target.targetBase === "first");
-  if (firstTarget && firstTarget.margin >= -0.04) return "first";
+  const evaluations = getCpuThrowTargetCandidates(outcome, battedBall, runner, options.baseRunners)
+    .map((candidate) => {
+      const throwArrival = estimateAutoThrowArrivalToBase(candidate.targetBase, outcome, options);
+      const margin = Number.isFinite(throwArrival)
+        ? candidate.runnerArrival - throwArrival
+        : Number.NEGATIVE_INFINITY;
+      return { ...candidate, throwArrival, margin };
+    });
+  if (!evaluations.length) return null;
 
-  const leadTarget = evaluations
-    .filter((entry) => entry.target.targetBase !== "first")
-    .find((entry) => entry.margin >= getCpuLeadForceThrowRequiredMargin(entry.target.targetBase));
-  if (leadTarget) return leadTarget.target.targetBase;
+  const reachable = evaluations.find((entry) => entry.margin >= getCpuLeadForceThrowRequiredMargin(entry.targetBase));
+  if (reachable) return reachable.targetBase;
 
-  if (firstTarget) return "first";
-  const anySafeTarget = evaluations.find((entry) => entry.margin >= 0.08);
-  if (anySafeTarget) {
-    return anySafeTarget.target.targetBase;
-  }
-  return null;
+  // 余裕はなくても一塁で打者をアウトにできるなら、確実な1つを取る
+  const firstTarget = evaluations.find((entry) => entry.targetBase === "first");
+  if (firstTarget && firstTarget.margin >= 0) return "first";
+
+  return evaluations[0].targetBase;
 }
 
+// 送球先ごとに必要な余裕 (秒)。先の塁ほど失敗したときの損が大きいので少しだけ厳しくする。
 function getCpuLeadForceThrowRequiredMargin(targetBase) {
-  if (targetBase === "home") return 0.2;
-  if (targetBase === "third") return 0.18;
-  if (targetBase === "second") return 0.14;
-  return 0.06;
+  if (targetBase === "home") return 0.1;
+  if (targetBase === "third") return 0.08;
+  if (targetBase === "second") return 0.06;
+  return 0.02;
 }
 
 function getForceTargetRunnerArrival(forceTarget, batterRunner = null, baseRunners = null) {
@@ -11273,8 +11362,35 @@ function createForceTargetsForPlay(battedBall, outcome, baseState = bases) {
   return targets;
 }
 
+// 封殺の義務を負っている走者。打者走者は startBase が "batter"。
+function getForceTargetRunner(target) {
+  if (!target?.startBase) return null;
+  if (target.startBase === "batter") return defenseState.runner || null;
+  return (defenseState.baseRunners || []).find((runner) => runner.startBase === target.startBase) || null;
+}
+
+// 走者が踏み終えた一番先の塁。
+function getRunnerTouchedBaseIndex(runner) {
+  if (!runner) return -1;
+  if (runner === defenseState.runner) return getBatterRunnerTouchedBaseIndex(runner);
+  return getRunnerBaseIndex(runner.currentBase ?? runner.startBase);
+}
+
+// その塁を踏み終えて、さらに先へ向かった走者は、もうそこでは封殺できない。
+// 「踏んだだけ」で解除すると、判定時点で一塁に到達している通常のゴロアウトまで
+// セーフになってしまうので、その塁を目指している間は封殺の対象のままにする。
+function isForceTargetSatisfied(target) {
+  const targetIndex = getForceTargetBaseIndex(target?.targetBase);
+  if (!target || targetIndex < 1) return false;
+  const runner = getForceTargetRunner(target);
+  if (!runner) return false;
+  if (getRunnerTouchedBaseIndex(runner) < targetIndex) return false;
+  return !isRunnerDestinedForBase(runner, target.targetBase);
+}
+
 function isForceTargetEntryActive(target, forceTargets = getForceTargetsForCurrentPlay(), completedForceOutBases = defenseState.completedForceOutBases || []) {
   if (!target) return false;
+  if (isForceTargetSatisfied(target)) return false;
   const outStartBases = new Set(completedForceOutBases.map(getForcedRunnerStartBaseForTarget).filter(Boolean));
   if (outStartBases.has(target.startBase) || outStartBases.has("batter")) return false;
   const targetIndex = getForceTargetBaseIndex(target.targetBase);
@@ -11482,7 +11598,9 @@ function getDefenseFieldingTarget(battedBall, outcome) {
 function getBuntRollTarget(battedBall) {
   const quality = clamp(battedBall.battedProfile?.buntQuality ?? 0.45, 0, 1);
   const rollDistanceScale = getBuntRollDistanceScale(quality);
-  const rollDistance = (randomBetween(24, 64) + (1 - quality) * randomBetween(20, 85)) * rollDistanceScale;
+  const rollDistance = (randomBetween(24, 64) + (1 - quality) * randomBetween(20, 85))
+    * rollDistanceScale
+    * buntTuning.rollDistanceBoost;
   const projectedTarget = {
     x: battedBall.target.x + (battedBall.direction?.x ?? 0) * rollDistance,
     y: battedBall.target.y + (battedBall.direction?.y ?? -1) * rollDistance
@@ -13566,7 +13684,7 @@ function resolveLiveInfielderContactCatch(elapsedSeconds) {
     .sort((a, b) => a.distance - b.distance);
   const best = candidates[0];
   if (!best) return false;
-  completeLiveInfielderContactCatch(best.fielder, best.current, elapsedSeconds);
+  completeLiveInfielderContactCatch(best.fielder, best.current, elapsedSeconds, null, height);
   return true;
 }
 
@@ -13599,7 +13717,11 @@ function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
 
 function completeUnifiedCircleCatch(fielder, fieldingPoint, elapsedSeconds) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
+  const contactHeight = getDefenseBallHeightAtPoint(
+    clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1),
+    elapsedSeconds
+  );
+  const caughtInAir = isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight);
 
   startDefenseCatchVisual(fielder, fieldingPoint, elapsedSeconds, caughtInAir);
   defenseState.unifiedCircleCatchComplete = true;
@@ -13750,10 +13872,23 @@ function getLiveCircleCatchRadius(fielder, battedBall) {
   return base + ballRadius + 8;
 }
 
-function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null) {
+function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null, contactHeight = null) {
   const battedBall = defenseState.battedBall;
-  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
-  const outcome = {
+  const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight);
+  // ライナーを弾いた場合はアウトにならず、拾い直すまで動けない
+  const droppedLiner = caughtInAir && shouldDropLinerOnCatch(battedBall);
+  const outcome = droppedLiner
+    ? {
+      kind: "force",
+      label: `${fielder.role} 落球`,
+      caught: true,
+      needsThrow: true,
+      targetBase: "first",
+      fieldingTime: elapsedSeconds + linerDropTuning.freezeSeconds,
+      fieldingPoint,
+      linerDrop: true
+    }
+    : {
       kind: caughtInAir ? "out" : "force",
       label: `${fielder.role} 捕球処理`,
       caught: true,
@@ -13809,10 +13944,21 @@ function isCaughtAirBattedBall(battedBall) {
   return Boolean(battedBall && !battedBall.isGrounder);
 }
 
-function isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds) {
+// 落下時刻だけで判定すると、描画上まだ浮いているボールが地面扱いになり、
+// 「ノーバウンド捕球に見えるのにゴロ処理」という食い違いが出る。
+// 接触時の高さが分かる場合はそちらを優先する。
+function isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight = null) {
   if (!isCaughtAirBattedBall(battedBall)) return false;
+  if (Number.isFinite(contactHeight) && contactHeight >= airCatchMinHeight) return true;
   const firstLandingTime = Math.max(0, battedBall.ballTime ?? 0);
   return elapsedSeconds <= firstLandingTime + 0.08;
+}
+
+// 直接捕球を狙ったライナーは一定確率で弾く。
+function shouldDropLinerOnCatch(battedBall) {
+  if (!battedBall) return false;
+  if (!battedBall.isLiner && !battedBall.isLineLiner && !battedBall.isLineDrop && !battedBall.isFenceLiner) return false;
+  return Math.random() < linerDropTuning.chance;
 }
 
 function resolveLivePostLandingPickup(elapsedSeconds) {
@@ -14143,14 +14289,17 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
   const battedBall = defenseState.battedBall;
   const fieldingPoint = fieldingPointOverride || { x: fielder.currentX ?? fielder.x, y: fielder.currentY ?? fielder.y };
   const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
-  const label = caughtInAir ? `${fielder.role} 捕球` : `${fielder.role} 捕球処理`;
+  const droppedLiner = caughtInAir && shouldDropLinerOnCatch(battedBall);
+  const label = droppedLiner
+    ? `${fielder.role} 落球`
+    : caughtInAir ? `${fielder.role} 捕球` : `${fielder.role} 捕球処理`;
   defenseState.manualFieldingComplete = true;
   defenseState.target = fieldingPoint;
   defenseState.chosenFielder = { ...fielder, x: fieldingPoint.x, y: fieldingPoint.y, currentX: fieldingPoint.x, currentY: fieldingPoint.y };
   defenseState.fielders = defenseState.fielders.map((entry) => entry.role === fielder.role
     ? { ...entry, currentX: fieldingPoint.x, currentY: fieldingPoint.y }
     : entry);
-  defenseState.outcome = caughtInAir
+  defenseState.outcome = caughtInAir && !droppedLiner
     ? {
       kind: "out",
       label,
@@ -14165,9 +14314,11 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
       label,
       caught: true,
       needsThrow: true,
-      fieldingTime: elapsedSeconds,
+      // 弾いた場合は拾い直すまで動けない
+      fieldingTime: elapsedSeconds + (droppedLiner ? linerDropTuning.freezeSeconds : 0),
       fieldingPoint,
-      manualFielding: true
+      manualFielding: true,
+      linerDrop: droppedLiner
     };
   defenseState.baseRunners = createDefenseBaseRunnerAnimations(
     defenseState.outcome,
@@ -14989,7 +15140,7 @@ function finishDefensePlay() {
         : advanceRunners(advanceType, activeBatter, defenseState.battedBall, outcome);
       recordBatterPlateAppearance(!outcome.fieldingError && outcome.kind === "force" ? hitRecordType : "fielderChoice", { runs });
       const baseLabel = defenseState.throw?.baseLabel || "一塁";
-      const baseMessage = `${baseLabel}セーフ: ${formatRuns(runs)}`;
+      const baseMessage = withBattedBallHighlight(`${baseLabel}セーフ: ${formatRuns(runs)}`);
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
       showEffect(runs > 0 ? `セーフ +${runs}` : "セーフ", "#fff2a8");
     }
@@ -15029,7 +15180,7 @@ function finishDefensePlay() {
     const runs = advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
     recordBatterPlateAppearance(hitRecordType, { runs });
     const label = getHitLabelByScoreType(hitRecordType);
-    const baseMessage = `${label}: ${formatRuns(runs)}`;
+    const baseMessage = withBattedBallHighlight(`${label}: ${formatRuns(runs)}`);
     message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
     const effectText = hitRecordType === "homer" && metricText
       ? `${label} ${metricText.replace("飛距離 ", "")}`
@@ -15445,6 +15596,37 @@ function getFoulLineCrossingBeforeOutfield(start, end) {
     y: start.y + (end.y - start.y) * high
   };
   return getFenceDistance(crossing) <= defenseField.fenceDistance * 0.42 ? crossing : null;
+}
+
+// バントの打球方向をフェアゾーンに収まる角度まで戻す。
+// 横へ狙ったバントの方向がそのままだとファウルラインの外を向いてしまう。
+function clampBuntDirectionInsideFairLines(direction) {
+  if (!direction) return direction;
+  const depth = Math.abs(direction.y);
+  if (depth <= 0.0001) return direction;
+  const limit = Math.tan(degreesToRadians(realFieldMetrics.fairLineAngleDegrees))
+    * depth
+    * buntTuning.fairAngleMargin;
+  if (Math.abs(direction.x) <= limit) return direction;
+  return normalize({ x: clamp(direction.x, -limit, limit), y: direction.y });
+}
+
+// 落下点がフェアゾーンに入っていたら、深さを保ったままファウル側へ押し出す。
+function ensureFoulLandingPoint(origin, target, direction) {
+  const from = origin || { x: field.plateX, y: field.plateY };
+  if (!target || !isPointInFairTerritory(target, 0)) {
+    return {
+      target,
+      direction,
+      distance: target ? Math.hypot(target.x - from.x, target.y - from.y) : 0
+    };
+  }
+  const adjustedTarget = getFoulVisualTarget(target, direction);
+  return {
+    target: adjustedTarget,
+    direction: normalize({ x: adjustedTarget.x - from.x, y: adjustedTarget.y - from.y }),
+    distance: Math.hypot(adjustedTarget.x - from.x, adjustedTarget.y - from.y)
+  };
 }
 
 function getFoulVisualTarget(point, direction = null) {
