@@ -154,11 +154,13 @@ const batterMoveTuning = {
   cpuPitchSideMoveSpeed: 3.8,
   plateSideExtraReach: 18,
   plateSideSafetyBallRadiusScale: 1,
+  // ボール1個分 (直径 = 半径×2) だけ、これまでよりベース寄りに立てるようにする追加分。
+  plateSideExtraBallReach: 2,
   shoeLimitOffsetY: -12,
   keyboardMoveSpeed: 5.2
 };
 
-const showHbpHitBox = false;
+const showHbpHitBox = true; // TODO: 内角デッドボール調査用の一時表示。調査が終わったら false に戻す。
 
 const batters = [
   { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
@@ -5335,6 +5337,25 @@ function getProjectedPitchPlatePosition() {
   };
 }
 
+// CPU打者が構え直す (バッターボックス内で位置を調整する) ためだけの到達点予測。
+// getProjectedPitchPlatePosition は変化球の曲がりをあえて0.58倍に減衰させて
+// 「スイングするかどうかの判断を見誤る」選球眼の甘さを表現しているが、
+// 同じ甘い予測を立ち位置の調整にも使ってしまうと、スイングを振る判断自体は
+// 正しくても実際の到達点まで体が寄り切れず、変化球や外角球で空振りが増えすぎる。
+// 選球眼はそのままに、体の寄りだけ正確な曲がり量で追わせる。
+function getComputerBatterTrackingPosition() {
+  if (!ball.inPitch || !Number.isFinite(ball.vy) || Math.abs(ball.vy) < 0.001) {
+    return { x: ball.x, y: ball.y };
+  }
+  const framesToPlate = clamp((field.plateY - ball.y) / ball.vy, 0, 90);
+  const progress = getPitchProgress();
+  const curveDrift = ball.curvePower * Math.max(0, progress - 0.28) * 0.31 * framesToPlate;
+  return {
+    x: ball.x + ball.vx * framesToPlate + curveDrift,
+    y: field.plateY
+  };
+}
+
 function getComputerSwingStrikeConfidence() {
   const projected = getProjectedPitchPlatePosition();
   const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
@@ -6449,7 +6470,7 @@ function updateBatter(delta = 1000 / 60) {
 function updateComputerBatterPosition(delta = 1000 / 60) {
   if (!shouldMoveComputerBatter()) return;
   const box = getBatterMoveBox();
-  const projected = getProjectedPitchPlatePosition();
+  const projected = getComputerBatterTrackingPosition();
   const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
   const zoneRead = clamp(1 - projectedDistance / 132, 0, 1);
   if (zoneRead <= 0) return;
@@ -6529,7 +6550,7 @@ function getBatterMoveBox() {
   const plateSideReach = Math.max(
     0,
     batterMoveTuning.plateSideExtraReach - (ball?.radius ?? 9) * batterMoveTuning.plateSideSafetyBallRadiusScale
-  );
+  ) + (ball?.radius ?? 9) * batterMoveTuning.plateSideExtraBallReach;
   return {
     left: activeBatterSide === "L" ? left - plateSideReach : left,
     right: activeBatterSide === "R" ? right + plateSideReach : right,
@@ -7003,7 +7024,12 @@ function buildContactProfile(bestHit) {
   const outsideStrikeZone = strikeZoneDistance > 0;
   const outsideContactPoint = isOutsideContactPoint(bestHit.x);
   const outsideReachBonus = outsideStrikeZone && outsideContactPoint ? ball.radius * 2 : 0;
-  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 : outsideStrikeZone ? ball.radius + 22 : ball.radius + 36) + meetBonus) * batThicknessMultiplier * meetContactScale;
+  // 黄色ゾーン外でも実際にはストライクの球 (際どいコース) は、ミートが低い打者でも
+  // 最低限バットには当てられるようにしたい。ここに meetBonus をフルで掛けると、
+  // 低ミート打者にとって「際どいストライク」が「明らかなボール球」とほぼ同じ難易度になり、
+  // 空振り確定に近くなってしまうため、この帯だけ meet の影響を弱める。
+  const edgeStrikeMeetBonus = meetBonus * 0.4;
+  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 + meetBonus : outsideStrikeZone ? ball.radius + 22 + meetBonus : ball.radius + 36 + edgeStrikeMeetBonus)) * batThicknessMultiplier * meetContactScale;
   const preExtensionContactRange = rawPreExtensionContactRange * meetZoneWidthScale;
   const baseContactRange = preExtensionContactRange + outsideReachBonus * batThicknessMultiplier * meetZoneWidthScale;
 
@@ -7021,7 +7047,7 @@ function buildContactProfile(bestHit) {
   const contactSweetSpotForRange = isBuntStanceActive() ? 1 : sweetSpotScore;
   const naturalContactRange = baseContactRange
     * getInsideMishitContactMultiplier(bestHit, contactSweetSpotForRange, outsideStrikeZone)
-    * getGoodContactZoneMissContactMultiplier(zoneMissUnits);
+    * getGoodContactZoneMissContactMultiplier(zoneMissUnits, outsideStrikeZone);
   const contactRescueExtension = ball.radius * 2;
   const contactRange = naturalContactRange + contactRescueExtension;
   const contactRescueUse = nearPlate
@@ -7129,12 +7155,16 @@ function getGoodContactZoneMissUnits(distance = 0, radius = ball.radius) {
   return Math.max(0, distance) / Math.max(1, radius * 2);
 }
 
-function getGoodContactZoneMissContactMultiplier(missUnits = 0) {
+// outsideStrikeZone (実際にストライクゾーンの外＝チェイス球) はこれまで通り厳しいまま。
+// 逆に「黄色ゾーンからは外れているが実際にはストライク」の際どいコースは、
+// 大きく外れていても最低限バットに当たる可能性を残すため、床を高くする。
+function getGoodContactZoneMissContactMultiplier(missUnits = 0, outsideStrikeZone = false) {
   const units = clamp(missUnits, 0, 3);
+  const floor = outsideStrikeZone ? 0.24 : 0.55;
   if (units <= 0) return 1;
-  if (units <= 1) return 1 - units * 0.38;
-  if (units <= 2) return 0.62 - (units - 1) * 0.26;
-  return 0.24;
+  if (units <= 1) return Math.max(floor, 1 - units * 0.38);
+  if (units <= 2) return Math.max(floor, 0.62 - (units - 1) * 0.26);
+  return floor;
 }
 
 function getGoodContactZoneMissPenalty(missUnits = 0) {
@@ -10636,7 +10666,7 @@ function returnAllBaseRunnersOneBase(elapsedSeconds) {
   defenseState.baseRunners.forEach((runner) => {
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
     const currentIndex = getDefenseBaseRunnerCurrentIndex(runner);
-    const targetIndex = getRunnerBaseIndex(runner.targetBase);
+    const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
     if (currentIndex <= 0) return;
     if (runner.arrived || targetIndex !== currentIndex + 1) return;
     setDefenseBaseRunnerReturnDestination(runner, currentIndex, elapsedSeconds);
@@ -10670,7 +10700,7 @@ function isDefenseBaseRunnerStoppedOnBase(runner, baseIndex) {
 
 function isDefenseBaseRunnerReturningToBase(runner, returnBaseIndex) {
   if (!runner || runner.arrived || returnBaseIndex < 1 || returnBaseIndex > 3) return false;
-  const headingIndex = getRunnerBaseIndex(runner.targetBase);
+  const headingIndex = getBatterRunnerTargetIndex(runner.targetBase);
   return getDefenseBaseRunnerCurrentIndex(runner) === returnBaseIndex && headingIndex === returnBaseIndex + 1;
 }
 
@@ -11161,6 +11191,28 @@ function recordDefenseOutEvent({ runner = null, base = null, outType = "unknown"
   return event;
 }
 
+// runner.arrivalTime は「いま向かっている最終目的地」への到達時刻でしかない。
+// 1塁→本塁のように複数塁を一気に進む走者を二塁で封殺できるか判定するときに
+// runner.arrivalTime (本塁到達時刻) をそのまま使うと、実際には二塁を先に safe に
+// 通過していても「本塁着はまだ先だから間に合った」として誤ってアウトになってしまう。
+// ルート上で対象塁の座標を実際に通過する時刻を距離から逆算する。
+function getRunnerArrivalTimeAtBaseIndex(runner, baseIndex) {
+  if (!runner) return null;
+  if (!runner.route || runner.route.length < 2 || !Number.isFinite(baseIndex)) return runner?.arrivalTime ?? null;
+  const targetPoint = getDefenseBasePoint(baseIndex);
+  let cumulative = 0;
+  for (let i = 1; i < runner.route.length; i += 1) {
+    const previous = runner.route[i - 1];
+    const current = runner.route[i];
+    cumulative += Math.hypot(current.x - previous.x, current.y - previous.y);
+    if (Math.hypot(current.x - targetPoint.x, current.y - targetPoint.y) < 2) {
+      const routeStartTime = runner.routeStartTime ?? 0;
+      return runner.speed > 0 ? routeStartTime + cumulative / runner.speed : routeStartTime;
+    }
+  }
+  return runner.arrivalTime ?? null;
+}
+
 function judgeOutPlay(runner, targetBase, throwState, options = {}) {
   if (!runner || !targetBase || !throwState || throwState.visualOnly) {
     return { result: "NO_PLAY", out: false, reason: "Missing runner, base, or live throw" };
@@ -11175,7 +11227,8 @@ function judgeOutPlay(runner, targetBase, throwState, options = {}) {
   const forced = canRunnerBeForceOutAtBase(runner, targetBase, forceMap);
   if (forced) {
     const baseTouchTime = throwState.baseTouchTime ?? ballSecureTime;
-    const out = baseTouchTime + SAFE_TOLERANCE < runnerArrivalTime;
+    const forcedArrivalTime = getRunnerArrivalTimeAtBaseIndex(runner, getForceTargetBaseIndex(targetBase)) ?? runnerArrivalTime;
+    const out = baseTouchTime + SAFE_TOLERANCE < forcedArrivalTime;
     return {
       result: out ? "FORCE_OUT" : "SAFE",
       out,
@@ -11186,7 +11239,7 @@ function judgeOutPlay(runner, targetBase, throwState, options = {}) {
         : "Forced runner reached base before or with the throw",
       ballSecureTime,
       baseTouchTime,
-      runnerArrivalTime
+      runnerArrivalTime: forcedArrivalTime
     };
   }
   const tagTime = throwState.tagTime ?? ballSecureTime;
@@ -11312,7 +11365,7 @@ function createForcedRunnerFromBaseState(startBase, targetBase) {
 
 function createForcedRunnerFromInfo(runnerInfo, startBase, targetBase) {
   const startIndex = baseIndexByName[startBase];
-  const targetIndex = getRunnerBaseIndex(targetBase);
+  const targetIndex = getBatterRunnerTargetIndex(targetBase);
   if (startIndex < 1 || targetIndex <= startIndex) return null;
   const route = createBaseRunnerRoute(startIndex, targetIndex);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
@@ -11370,10 +11423,14 @@ function getForceTargetRunner(target) {
 }
 
 // 走者が踏み終えた一番先の塁。
+// getRunnerBaseIndex は打者走者の「ホーム=出発点」を前提に home を 0 として返すため、
+// 生還した塁上走者にそのまま使うと「まだ一塁にも達していない」扱いになってしまう。
+// 塁上走者にとっての home はゴール (4) なので、ここで別扱いする。
 function getRunnerTouchedBaseIndex(runner) {
   if (!runner) return -1;
   if (runner === defenseState.runner) return getBatterRunnerTouchedBaseIndex(runner);
-  return getRunnerBaseIndex(runner.currentBase ?? runner.startBase);
+  const baseName = runner.currentBase ?? runner.startBase;
+  return baseName === "home" ? 4 : getRunnerBaseIndex(baseName);
 }
 
 // その塁を踏み終えて、さらに先へ向かった走者は、もうそこでは封殺できない。
@@ -14684,6 +14741,39 @@ function getDefenseBaseIndexForPoint(point) {
   return -1;
 }
 
+// 打者走者と違い、塁上走者は最終到達 (arrived) までルート途中の currentBase を更新していなかった。
+// そのため「1塁→本塁」のように複数塁を一気に進む走者は、完全に生還するまで
+// ずっと currentBase が "first" のままとなり、二塁への封殺義務がいつまでも解けなかった。
+// ルート上の通過点 (各塁) を踏むたびに currentBase を進めることで、途中経過を正しく反映する。
+function updateDefenseBaseRunnerTouchedBase(runner, runnerProgress) {
+  if (!runner?.route || runner.route.length < 2) return;
+  const currentBaseName = runner.currentBase ?? runner.startBase;
+  const currentIndex = currentBaseName === "home" ? 4 : (baseIndexByName[currentBaseName] ?? 0);
+  const totalDistance = getRunnerRouteDistance(runner.route);
+  const traveledDistance = totalDistance * clamp(runnerProgress, 0, 1);
+  let distanceToPoint = 0;
+  for (let i = 1; i < runner.route.length; i += 1) {
+    const previous = runner.route[i - 1];
+    const current = runner.route[i];
+    distanceToPoint += Math.hypot(current.x - previous.x, current.y - previous.y);
+    if (traveledDistance + 0.1 < distanceToPoint) continue;
+    const baseIndex = getDefenseRunnerBaseIndexForPoint(current);
+    if (baseIndex > currentIndex && baseIndex >= 1 && baseIndex <= 4) {
+      runner.currentBase = baseIndex >= 4 ? "home" : baseNameByIndex[baseIndex];
+    }
+  }
+}
+
+// getDefenseBaseIndexForPoint は base 0(ホーム側の起点) までしか見ないため、
+// 塁上走者の最終目的地としてのホーム (base 4、座標は base 0 と同じ) を判定できない。
+function getDefenseRunnerBaseIndexForPoint(point) {
+  for (let base = 1; base <= 4; base += 1) {
+    const basePoint = getDefenseBasePoint(base);
+    if (Math.hypot(point.x - basePoint.x, point.y - basePoint.y) < 1) return base;
+  }
+  return -1;
+}
+
 function updateDefenseBaseRunners(elapsedSeconds) {
   if (!defenseState.baseRunners?.length) return;
   defenseState.baseRunners.forEach((runner) => {
@@ -14700,6 +14790,7 @@ function updateDefenseBaseRunners(elapsedSeconds) {
     const point = getRunnerRoutePoint(runner.route, runnerProgress);
     runner.x = point.x;
     runner.y = point.y;
+    updateDefenseBaseRunnerTouchedBase(runner, runnerProgress);
     runner.arrived = runnerProgress >= 1;
     if (runner.arrived) {
       runner.currentBase = runner.targetBase || runner.startBase;
@@ -15961,7 +16052,13 @@ function getBatSwingArc(progress) {
   if (progress <= windupHold) return { angle: startAngle, phase: "ready" };
   if (progress <= impactAt) {
     const t = (progress - windupHold) / (impactAt - windupHold);
-    const eased = t * t * (3 - 2 * t);
+    // 以前は smoothstep (t*t*(3-2t)) で impactAt 直前に角速度がほぼ0まで落ちていた。
+    // 直後の follow フェーズは 1-(1-t)^2 で開始直後が最速のため、impactAt の瞬間に
+    // 角速度が0→最大へ不連続に跳ね上がり、ちょうどストライクゾーンを通過する
+    // 区間 (実測で progress 0.64〜0.67 相当) の実時間当たり判定窓が極端に狭くなっていた。
+    // ease-in (t*t) にして impactAt 到達時点である程度の角速度を残し、follow の
+    // 立ち上がりとの速度差を縮めることで、ゾーン通過区間の実時間を広げる。
+    const eased = t * t;
     return { angle: startAngle + (impactAngle - startAngle) * eased, phase: "swing" };
   }
   const t = (progress - impactAt) / (1 - impactAt);
