@@ -385,7 +385,8 @@ const buntTuning = {
   // 打球方向がファウルラインを越えないように角度を抑える割合 (1 でライン上)
   fairAngleMargin: 0.86,
   // バントの転がる距離の倍率。大きくするほど守備が追いつきやすくなる。
-  rollDistanceBoost: 1.5
+  // 2.1 = 従来値 1.5 の40%増し。
+  rollDistanceBoost: 2.1
 };
 
 // forcedRegardlessOfContact は方向入力なしのバント用。
@@ -947,7 +948,8 @@ function getFieldUnitsForMeters(meters, direction = { x: 0, y: -1 }) {
 
 // 打球が発生して守備画面に切り替わったとき、投手がどれだけ本塁側へ出た位置から
 // 守備を始めるか (メートル)。大きくするほどバントや投手前のゴロに強くなる。
-const pitcherDefenseStartAdvanceMeters = 5;
+// +1.5m ≒ 選手スプライトの頭一つ分 (画面上で約24px) をホーム方向に前進。
+const pitcherDefenseStartAdvanceMeters = 6.5;
 
 function getPitcherDefenseStartPoint(baseFielder) {
   return {
@@ -9234,7 +9236,8 @@ function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, out
   if (startBase < 1 || startBase > 3) return 0;
   if (!nextBase || nextBase <= startBase) return 0;
   const run = getOpenEndedAbilityRating(runnerInfo.run ?? 5);
-  const normalLead = battedBall.isGrounder ? 26 + run * 7.2 : 0;
+  // run=5 (平均) で塁間の約10%のリードになるよう係数を調整 (26 + 5*12.2 ≒ 87px ≒ 塁間868pxの10%)。
+  const normalLead = battedBall.isGrounder ? 26 + run * 12.2 : 0;
   const isHitAndRunRunner = hitAndRunState?.active
     && hitAndRunState.startBase === baseName
     && (!hitAndRunState.runnerId || hitAndRunState.runnerId === runnerInfo.id || hitAndRunState.runnerId === runnerInfo.name);
@@ -14608,7 +14611,14 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
   if (!threatenedRunner || !defenseState.chosenFielder || !defenseState.target) return false;
 
   const previousThrow = defenseState.throw;
-  if (previousThrow && Number.isFinite(previousThrow.endTime) && elapsedSeconds < previousThrow.endTime) {
+  // endTime (ボール到着) ではなく startTime (野手が実際に投げた瞬間) を基準に、
+  // まだ捕球・送球準備中で「投げてすらいない」送球先は差し替えられるようにする。
+  // 以前は endTime 基準だったため、一塁への送球先を決めた直後、
+  // 野手がまだボールにすら触れていない段階でも「もう一塁へ投げる予定だから」と
+  // 差し替えを拒否し、打者走者が二塁・三塁へ向かっているのに無駄な一塁送球が
+  // 確定してしまっていた。
+  const previousThrowReleased = previousThrow && Number.isFinite(previousThrow.startTime) && elapsedSeconds >= previousThrow.startTime;
+  if (previousThrowReleased && Number.isFinite(previousThrow.endTime) && elapsedSeconds < previousThrow.endTime) {
     return previousThrow.targetBase === threatenedRunner.targetBase;
   }
   if (
@@ -15733,20 +15743,45 @@ function getFoulVisualTarget(point, direction = null) {
 
 function isBallHittingBatter() {
   if (!ball.inPitch || ball.crossedPlate || ball.y < field.strikeZoneTop - 60) return false;
-  const box = getHbpHitBox();
-  return ball.x + ball.radius > box.left
-    && ball.x - ball.radius < box.right
-    && ball.y + ball.radius > box.top
-    && ball.y - ball.radius < box.bottom;
+  const polygon = getHbpHitPolygon();
+  if (isPointInPolygon(ball.x, ball.y, polygon)) return true;
+  return polygon.some((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length];
+    return distancePointToSegment(ball.x, ball.y, point.x, point.y, nextPoint.x, nextPoint.y) <= ball.radius;
+  });
 }
 
-function getHbpHitBox() {
-  return {
-    left: batter.x - 22,
-    right: batter.x + 22,
-    top: batter.y - 118,
-    bottom: batter.y + 42
-  };
+// デッドボール判定の輪郭。ヘルメットのツバとバットは含まず、頭〜肩〜腰〜脚の概形だけをたどる。
+// dy は batter.y からの縦オフセット、halfWidth は中心線 (batter.x) からの片側幅。
+const hbpBodySilhouetteProfile = [
+  { dy: -140, halfWidth: 5 },   // 頭頂
+  { dy: -130, halfWidth: 17 },
+  { dy: -120, halfWidth: 22 },  // ヘルメットの一番張り出した高さ (ツバは含めない)
+  { dy: -108, halfWidth: 20 },
+  { dy: -96, halfWidth: 17 },   // ヘルメット下端・首
+  { dy: -82, halfWidth: 25 },   // 肩
+  { dy: -58, halfWidth: 22 },
+  { dy: -32, halfWidth: 18 },   // ウエスト
+  { dy: -12, halfWidth: 22 },   // 腰
+  { dy: 14, halfWidth: 26 },    // 太もも・スタンスの開き
+  { dy: 40, halfWidth: 31 }     // 足首 (スタンスが一番広い高さ)
+];
+// シルエットに対してどれだけ内側に判定を絞るか (0.9 = 10%小さく)。
+const hbpHitboxSilhouetteScale = 0.9;
+
+function getHbpHitPolygon() {
+  const profile = hbpBodySilhouetteProfile;
+  const minDy = profile[0].dy;
+  const maxDy = profile[profile.length - 1].dy;
+  const centerDy = (minDy + maxDy) / 2;
+  const scale = hbpHitboxSilhouetteScale;
+  const scaledPoint = (point, sign) => ({
+    x: batter.x + point.halfWidth * scale * sign,
+    y: batter.y + centerDy + (point.dy - centerDy) * scale
+  });
+  const rightSide = profile.map((point) => scaledPoint(point, 1));
+  const leftSide = [...profile].reverse().map((point) => scaledPoint(point, -1));
+  return [...rightSide, ...leftSide];
 }
 
 function isStrikePitchForHbp() {
@@ -20222,13 +20257,20 @@ function drawBatter() {
 
 function drawHbpHitBox() {
   if (!showHbpHitBox) return;
-  const box = getHbpHitBox();
+  const polygon = getHbpHitPolygon();
+  if (!polygon.length) return;
   ctx.save();
   ctx.fillStyle = "rgba(255, 96, 96, 0.12)";
   ctx.strokeStyle = "rgba(255, 96, 96, 0.52)";
   ctx.lineWidth = 2;
-  ctx.fillRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
-  ctx.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+  ctx.beginPath();
+  polygon.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
