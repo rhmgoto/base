@@ -973,7 +973,17 @@ const weakSwingState = JSON.parse(runInGame(
     }
     const buntDeadenProfile = buildAimedBuntProfile(0, 1);
     const buntPushProfile = buildAimedBuntProfile(0, -1);
-    const buntSideProfile = buildAimedBuntProfile(1, 0);
+    // 打球方向は乱数で投手前に転がることもあるので、平均で比べる
+    function averageBuntLateral(aimX, aimY) {
+      let total = 0;
+      const samples = 400;
+      for (let i = 0; i < samples; i += 1) {
+        total += Math.abs(buildAimedBuntProfile(aimX, aimY).direction.x);
+      }
+      return total / samples;
+    }
+    const buntSideLateral = averageBuntLateral(1, 0);
+    const buntPushLateral = averageBuntLateral(0, -1);
     const solidBuntRandom = Math.random;
     const solidBuntRolls = [0.5, 0.5, 0.5, 0.18, 0.01, 0.5, 0.5];
     Math.random = () => solidBuntRolls.length ? solidBuntRolls.shift() : 0.5;
@@ -1174,7 +1184,7 @@ const weakSwingState = JSON.parse(runInGame(
     updateBuntStance();
     const batterButton3BuntHeld = isBuntButtonHeld();
     const batterButton3BuntType = swingState.type;
-    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntNoAimProfile, buntDeadenProfile, buntPushProfile, buntSideProfile, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, visualPopupBuntBall, convertedGrounderMidHeight, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
+    return JSON.stringify({ weak, strong, grounder, strongProfile, grounderProfile, bunt, buntProfile, buntNoAimProfile, buntDeadenProfile, buntPushProfile, buntSideLateral, buntPushLateral, buntBall, buntFielderRole: buntFielder.role, buntOutcome, solidBuntProfile, badBuntProfile, badBuntBall, badBuntFielderRole: badBuntFielder.role, badBuntOutcome, convertedBuntResult, convertedBuntBall, visualPopupBuntBall, convertedGrounderMidHeight, twoStrikeBuntFoul, directTwoStrikeBuntFoul, button1Type, button1WithStickType, button1WithStickStealActive, button2Type, button3Type, button0GrounderType, button0StealActive, button0StealTarget, sharedButton1PitchType, sharedButton1BatterSwung, pitcherButton1VirtualKeyBuntHeld, batterButton3BuntHeld, batterButton3BuntType });
   })()`
 ));
 
@@ -1229,8 +1239,8 @@ assert(
   "up-stick bunts should push back toward the pitcher"
 );
 assert(
-  Math.abs(weakSwingState.buntSideProfile.direction.x) > Math.abs(weakSwingState.buntPushProfile.direction.x),
-  "side-aimed bunts should roll more laterally than push bunts"
+  weakSwingState.buntSideLateral > weakSwingState.buntPushLateral * 2,
+  `side-aimed bunts should roll more laterally than push bunts (${weakSwingState.buntSideLateral} vs ${weakSwingState.buntPushLateral})`
 );
 assert(weakSwingState.badBuntProfile.buntLineChance === 0 && weakSwingState.badBuntProfile.buntPitcherFrontChance === 0, "popup bunts should not report an unused ground-ball direction");
 assert(weakSwingState.badBuntProfile.pitcherBuntPopup === true && weakSwingState.badBuntBall.isPopupFly === true, "clearly bad bunt contact should still be able to become a pitcher-area popup fly");
@@ -3260,12 +3270,25 @@ const battingTighteningState = JSON.parse(runInGame(
       y: field.plateY,
       batContact: { t: 0.98 }
     });
-    const outsidePlateDistance = distanceToGoodContactZone(field.plateX + field.strikeZoneWidth, field.plateY, ball.radius);
-    const outsideMissUnits = getGoodContactZoneMissUnits(outsidePlateDistance, ball.radius);
-    const naturalOutsideRange = (((ball.radius + 22) + ball.radius * 2) * batThicknessMultiplier * meetZoneWidthScale)
-      * getGoodContactZoneMissContactMultiplier(outsideMissUnits);
+    // 届く範囲は本体が計算した値をそのまま使う。テスト側で式を組み直すと
+    // 本体を変えたときに気付かず食い違う (実際に一度そうなった)。
+    const outsideRangeProbe = buildContactProfile({
+      distanceToBat: 0,
+      x: field.plateX + field.strikeZoneWidth,
+      y: field.plateY,
+      batContact: { t: 0.98 }
+    });
+    const naturalOutsideRange = outsideRangeProbe.naturalContactRange;
+    const outsideRescueExtension = outsideRangeProbe.contactRescueExtension;
     const rescuedOutsideContact = buildContactProfile({
       distanceToBat: naturalOutsideRange + ball.radius,
+      x: field.plateX + field.strikeZoneWidth,
+      y: field.plateY,
+      batContact: { t: 0.98 }
+    });
+    // 救済分をはっきり超えた位置では当たらない
+    const beyondRescueContact = buildContactProfile({
+      distanceToBat: naturalOutsideRange + outsideRescueExtension + 4,
       x: field.plateX + field.strikeZoneWidth,
       y: field.plateY,
       batContact: { t: 0.98 }
@@ -3351,6 +3374,9 @@ const battingTighteningState = JSON.parse(runInGame(
       outsideReachQuality: outsideReachContact.quality,
       rescuedOutsideContact: rescuedOutsideContact.isContact,
       rescuedOutsideReachUse: rescuedOutsideContact.outsideReachUse,
+      beyondRescueContact: beyondRescueContact.isContact,
+      outsideRescueExtension,
+      outsideBallRadius: ball.radius,
       rescuedOutsideContactRescueUse: rescuedOutsideContact.contactRescueUse,
       rescuedOutsideQuality: rescuedOutsideContact.quality,
       outsideCleanerQuality: outsideCleanerContact.quality,
@@ -3388,6 +3414,11 @@ assert(battingTighteningState.outsideReachContact === false, "ordinary contact r
 assert(battingTighteningState.outsideReachUse > 0, "extended outside reach should be tracked as tip contact");
 assert(battingTighteningState.outsideReachQuality <= 0.28, "outside tip contact should usually become a foul or weak out-quality ball");
 assert(battingTighteningState.rescuedOutsideContact === true, "contact-only rescue should add about two ball radii outside the natural bat range");
+assert(
+  Math.abs(battingTighteningState.outsideRescueExtension - battingTighteningState.outsideBallRadius * 2) < 0.001,
+  `the contact rescue should be exactly two ball radii (${battingTighteningState.outsideRescueExtension})`
+);
+assert(battingTighteningState.beyondRescueContact === false, "contact should stop beyond the rescued range");
 assert(battingTighteningState.rescuedOutsideContactRescueUse > 0.4, "rescued contact should be tracked separately from natural contact");
 assert(battingTighteningState.rescuedOutsideReachUse >= battingTighteningState.rescuedOutsideContactRescueUse, "rescued contact should also count as reaching for the pitch");
 assert(battingTighteningState.rescuedOutsideQuality <= battingTighteningState.outsideCleanerQuality, "rescued contact should not improve hit quality over cleaner outside contact");

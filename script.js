@@ -574,6 +574,8 @@ const stadiumPresets = {
     id: "fireworks",
     name: "大花火スタジアム",
     surface: "grass",
+    // 芝の刈り込み、内野の土、ベースパス、ウォーニングトラックを描く
+    realisticField: true,
     centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
     lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
     fenceHeight: baseDefenseField.fenceHeight,
@@ -7107,6 +7109,11 @@ function buildContactProfile(bestHit) {
   const buntAim = isBuntStanceActive() ? getBuntAimForContact() : { x: 0, y: 0, magnitude: 0 };
   return {
     isContact: nearPlate && distanceToBat <= contactRange,
+    // 届く範囲は式が入り組んでいるので、判定に使った値をそのまま返す。
+    // テスト側で式を組み直すと、本体を変えたときに気付かず食い違う。
+    naturalContactRange,
+    contactRescueExtension,
+    contactRange,
     x: bestHit.x,
     y: bestHit.y,
     timeDiff,
@@ -16344,6 +16351,102 @@ function drawXStadiumPromptButton(rect, label, fill, textColor) {
   ctx.restore();
 }
 
+// 大花火スタジアムのグラウンド表現。距離はすべてフィールド座標のユニット。
+// 1メートル ≒ 17.8 ユニット、塁間 ≒ 869 ユニット。
+const realisticFieldTuning = {
+  mowCellSize: 186,            // 芝の刈り込み市松の1マス
+  mowLightAlpha: 0.055,
+  mowDarkAlpha: 0.05,
+  warningTrackWidth: 132,      // フェンス手前の土の輪
+  infieldArcRadius: 1180,      // 内野の土の扇形の半径
+  basePathWidth: 104,          // ベースパスの幅
+  moundRadius: 176,
+  homeCircleRadius: 208,
+  dirtColor: "#c58845",
+  trackColor: "#b0763c",
+  infieldGrassColor: "#5aa356"
+};
+
+// 芝の上に市松の刈り込みを敷き、内野の土・ベースパス・マウンド・
+// ウォーニングトラックを重ねてMLB風のグラウンドにする。
+function drawRealisticFieldDetails(stadium, centerX, centerY) {
+  if (!stadium?.realisticField) return;
+  const tuning = realisticFieldTuning;
+  const grassRadius = defenseField.grassRadius;
+
+  // 芝の刈り込み (市松)。芝の内側だけに乗せる。
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, grassRadius, Math.PI, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  const cell = tuning.mowCellSize;
+  const startX = centerX - grassRadius;
+  const startY = centerY - grassRadius;
+  for (let row = 0; row * cell < grassRadius; row += 1) {
+    for (let column = 0; column * cell < grassRadius * 2; column += 1) {
+      if ((row + column) % 2 !== 0) continue;
+      ctx.fillStyle = row % 2 === 0
+        ? `rgba(255, 255, 255, ${tuning.mowLightAlpha})`
+        : `rgba(0, 0, 0, ${tuning.mowDarkAlpha})`;
+      ctx.fillRect(startX + column * cell, startY + row * cell, cell, cell);
+    }
+  }
+  ctx.restore();
+
+  // ウォーニングトラック (外側の縁をフェンスに合わせる)
+  ctx.save();
+  ctx.strokeStyle = tuning.trackColor;
+  ctx.lineWidth = tuning.warningTrackWidth;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, defenseField.fenceDistance - tuning.warningTrackWidth / 2, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // 内野の土 (扇形)
+  ctx.fillStyle = tuning.dirtColor;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, tuning.infieldArcRadius, Math.PI, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // 内野の芝ダイヤ。各塁をベースパス幅の半分だけ内側へ寄せた四角形。
+  const diamondCenter = {
+    x: (centerX + defenseField.bases.second.x) / 2,
+    y: (centerY + defenseField.bases.second.y) / 2
+  };
+  const inset = tuning.basePathWidth / 2;
+  const insetPoint = (point) => {
+    const dx = diamondCenter.x - point.x;
+    const dy = diamondCenter.y - point.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return { x: point.x + (dx / length) * inset, y: point.y + (dy / length) * inset };
+  };
+  const corners = [
+    { x: centerX, y: centerY },
+    defenseField.bases.first,
+    defenseField.bases.second,
+    defenseField.bases.third
+  ].map(insetPoint);
+  ctx.fillStyle = tuning.infieldGrassColor;
+  ctx.beginPath();
+  corners.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.closePath();
+  ctx.fill();
+
+  // マウンドと本塁の土の円
+  ctx.fillStyle = tuning.dirtColor;
+  ctx.beginPath();
+  ctx.arc(diamondCenter.x, diamondCenter.y, tuning.moundRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, tuning.homeCircleRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
   if (stadium.surface === "obsidian") {
     const base = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -18279,6 +18382,7 @@ function drawDefenseView() {
   ctx.beginPath();
   ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
   ctx.fill();
+  drawRealisticFieldDetails(stadium, field.plateX, field.plateY + 42);
   drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
   drawSpaceStadiumFieldLights(field.plateX, field.plateY + 42, defenseField.grassRadius);
   drawAmericanRoyalBeyondOutfield();
