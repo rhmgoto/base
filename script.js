@@ -154,13 +154,17 @@ const batterMoveTuning = {
   cpuPitchSideMoveSpeed: 3.8,
   plateSideExtraReach: 18,
   plateSideSafetyBallRadiusScale: 1,
-  // ボール1個分 (直径 = 半径×2) だけ、これまでよりベース寄りに立てるようにする追加分。
-  plateSideExtraBallReach: 2,
+  // ボール1個分 (直径 = 半径×2) ごとに2を足す。これまでよりベース寄りに立てるようにする追加分。
+  // 4 (ボール2個分) からボール2個分 (4) 減らして 0 (追加分なし、元の基準に戻す)。
+  plateSideExtraBallReach: 0,
+  // ベースと反対側 (外側) に立てる幅の追加分。単位は plateSideExtraBallReach と同じ (ボール半径の倍数)。
+  // 4 = ボール2個分。
+  awaySideExtraBallReach: 4,
   shoeLimitOffsetY: -12,
   keyboardMoveSpeed: 5.2
 };
 
-const showHbpHitBox = true; // TODO: 内角デッドボール調査用の一時表示。調査が終わったら false に戻す。
+const showHbpHitBox = false;
 
 const batters = [
   { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
@@ -275,7 +279,10 @@ const pitcherAbilityTuning = {
   insideMishitPenalty: 0.64,
   insideChasePenalty: 0.8,
   insideMishitFloor: 0.36,
-  insideChaseFloor: 0.28
+  insideChaseFloor: 0.28,
+  // 加速する変化球 (fastChange 側) が強すぎるので、加速方向だけ効果を70%に落とす。
+  // 減速方向 (slowChange) には掛からない。
+  accelerateSpeedChangeScale: 0.7
 };
 const staminaTuning = {
   pointsPerRating: 18.2,
@@ -377,6 +384,8 @@ const buntTuning = {
   solidContactPopupReduction: 0.98,
   // 方向入力がないバントはほぼポップフライにする
   noAimPopupChance: 0.92,
+  // 方向入力 (スティック) があっても一定確率でポップフライになるようにする追加分。
+  aimedPopupBonus: 0.1,
   // 下入力で勢いを殺し、上入力でプッシュ気味に強く出す
   deadenPowerDrop: 0.035,
   pushPowerBonus: 0.075,
@@ -385,8 +394,8 @@ const buntTuning = {
   // 打球方向がファウルラインを越えないように角度を抑える割合 (1 でライン上)
   fairAngleMargin: 0.86,
   // バントの転がる距離の倍率。大きくするほど守備が追いつきやすくなる。
-  // 2.1 = 従来値 1.5 の40%増し。
-  rollDistanceBoost: 2.1
+  // 1.5 (元) → 2.1 (40%増し) → 3.15 (さらに1.5倍) → 4.0。
+  rollDistanceBoost: 4.0
 };
 
 // forcedRegardlessOfContact は方向入力なしのバント用。
@@ -6553,9 +6562,10 @@ function getBatterMoveBox() {
     0,
     batterMoveTuning.plateSideExtraReach - (ball?.radius ?? 9) * batterMoveTuning.plateSideSafetyBallRadiusScale
   ) + (ball?.radius ?? 9) * batterMoveTuning.plateSideExtraBallReach;
+  const awaySideReach = (ball?.radius ?? 9) * batterMoveTuning.awaySideExtraBallReach;
   return {
-    left: activeBatterSide === "L" ? left - plateSideReach : left,
-    right: activeBatterSide === "R" ? right + plateSideReach : right,
+    left: activeBatterSide === "L" ? left - plateSideReach : left - awaySideReach,
+    right: activeBatterSide === "R" ? right + plateSideReach : right + awaySideReach,
     top: Math.max(baseBox.top + batterMoveTuning.moundSideShrink, plateTop + batterMoveTuning.shoeLimitOffsetY),
     bottom: baseBox.bottom
   };
@@ -6620,7 +6630,8 @@ function applyPitchSpeedChange(direction, frameScale = 1) {
   const rating = (direction < 0 ? activePitcher.slowChange : activePitcher.fastChange) * (ball.pitchAbilityMultiplier ?? 1) * pitcherAbilityTuning.globalMultiplier;
   const ratingEffect = Math.pow(Math.max(1, rating) / 10, 2);
   const staminaMultiplier = getStaminaChangeMultiplier(activePitcher, staminaTuning.speedChangeExhaustedMultiplier);
-  const changeAmount = maxPitchSpeedChangeAmount * ratingEffect * staminaMultiplier * frameScale;
+  const accelerateScale = direction > 0 ? pitcherAbilityTuning.accelerateSpeedChangeScale : 1;
+  const changeAmount = maxPitchSpeedChangeAmount * ratingEffect * staminaMultiplier * frameScale * accelerateScale;
   const nextScale = clamp(ball.speedScale + direction * changeAmount, 1 - pitchSpeedChangeLimit, 1 + pitchSpeedChangeLimit);
   if (nextScale === ball.speedScale) return;
 
@@ -7943,7 +7954,8 @@ function buildBattedBallProfile(contact) {
     ) + (hasAim ? 0 : 0.06);
     const buntIsFoul = Math.random() < buntFoulChance;
     const pitcherBuntPopupChance = clamp(
-      buntTuning.popupBase + 0.08 + badBuntScore * (buntTuning.popupBadContactScale + 0.22) + (hasAim ? 0 : 0.16),
+      buntTuning.popupBase + 0.08 + badBuntScore * (buntTuning.popupBadContactScale + 0.22)
+        + (hasAim ? buntTuning.aimedPopupBonus : 0.16),
       buntTuning.popupMin,
       Math.min(0.82, buntTuning.popupMax + 0.18)
     );
@@ -15753,21 +15765,26 @@ function isBallHittingBatter() {
 
 // デッドボール判定の輪郭。ヘルメットのツバとバットは含まず、頭〜肩〜腰〜脚の概形だけをたどる。
 // dy は batter.y からの縦オフセット、halfWidth は中心線 (batter.x) からの片側幅。
+// region は実物とのズレを補正するための横方向シフト先 ("head" はホーム寄り、"body" は外側)。
 const hbpBodySilhouetteProfile = [
-  { dy: -140, halfWidth: 5 },   // 頭頂
-  { dy: -130, halfWidth: 17 },
-  { dy: -120, halfWidth: 22 },  // ヘルメットの一番張り出した高さ (ツバは含めない)
-  { dy: -108, halfWidth: 20 },
-  { dy: -96, halfWidth: 17 },   // ヘルメット下端・首
-  { dy: -82, halfWidth: 25 },   // 肩
-  { dy: -58, halfWidth: 22 },
-  { dy: -32, halfWidth: 18 },   // ウエスト
-  { dy: -12, halfWidth: 22 },   // 腰
-  { dy: 14, halfWidth: 26 },    // 太もも・スタンスの開き
-  { dy: 40, halfWidth: 31 }     // 足首 (スタンスが一番広い高さ)
+  { dy: -140, halfWidth: 5, region: "head" },   // 頭頂
+  { dy: -130, halfWidth: 17, region: "head" },
+  { dy: -120, halfWidth: 22, region: "head" },  // ヘルメットの一番張り出した高さ (ツバは含めない)
+  { dy: -108, halfWidth: 20, region: "head" },
+  { dy: -96, halfWidth: 17, region: "head" },   // ヘルメット下端・首
+  { dy: -82, halfWidth: 25, region: "body" },   // 肩
+  { dy: -58, halfWidth: 22, region: "body" },
+  { dy: -32, halfWidth: 18, region: "body" },   // ウエスト
+  { dy: -12, halfWidth: 22, region: "body" },   // 腰
+  { dy: 14, halfWidth: 26, region: "body" },    // 太もも・スタンスの開き
+  { dy: 40, halfWidth: 31, region: "body" }     // 足首 (スタンスが一番広い高さ)
 ];
 // シルエットに対してどれだけ内側に判定を絞るか (0.9 = 10%小さく)。
 const hbpHitboxSilhouetteScale = 0.9;
+// 頭部と胴体・脚部を実物のズレに合わせて横にずらす量 (ボール1個分 = 半径×2)。
+// 頭部: ホーム方向に1個分 → 外側へ半個分戻して0.5個分に。
+const hbpHeadRegionShiftBallWidths = 0.5;
+const hbpBodyRegionShiftBallWidths = 1;
 
 function getHbpHitPolygon() {
   const profile = hbpBodySilhouetteProfile;
@@ -15775,8 +15792,16 @@ function getHbpHitPolygon() {
   const maxDy = profile[profile.length - 1].dy;
   const centerDy = (minDy + maxDy) / 2;
   const scale = hbpHitboxSilhouetteScale;
+  const ballWidth = (ball?.radius ?? 9) * 2;
+  // ホーム方向が画面のどちら向きかは、打者が左右どちらの打席に立っているかで変わるので、
+  // プレート位置と打者位置の大小関係から都度求める。
+  const towardHomeSign = Math.sign(field.plateX - batter.x) || 1;
+  const regionShiftX = (region) => {
+    if (region === "head") return towardHomeSign * hbpHeadRegionShiftBallWidths * ballWidth;
+    return -towardHomeSign * hbpBodyRegionShiftBallWidths * ballWidth;
+  };
   const scaledPoint = (point, sign) => ({
-    x: batter.x + point.halfWidth * scale * sign,
+    x: batter.x + point.halfWidth * scale * sign + regionShiftX(point.region),
     y: batter.y + centerDy + (point.dy - centerDy) * scale
   });
   const rightSide = profile.map((point) => scaledPoint(point, 1));
