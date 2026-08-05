@@ -499,7 +499,9 @@ const teamPresets = {
   },
   allstar: {
     label: "オールスター",
-    locked: true,
+    // 選手は自由に入れ替えられる。合計ポイントの上限はないが、
+    // 1人あたり maxPlayerCost まで (デンドーズ級の選手は選べない)。
+    maxPlayerCost: 10,
     selection: { pitcher: "shohei", pitcher2: "yamamoto", pitcher3: "misiorowski", pitcher4: "skubal", pitcher5: "wheeler", SS: "wittjr", "2B": "harper", L: "acunajr", C: "judge", R: "otani", CA: "calraleigh", DH: "freeman", bench1: "trout", bench2: "goldschmidt", bench3: "schwarber", lineupOrder: ["R", "C", "2B", "SS", "L", "DH", "CA"] }
   },
   samurai: {
@@ -1925,6 +1927,18 @@ function isMenuPlayerAllowedByPreset(team, playerId) {
   return !allowed || allowed.includes(playerId);
 }
 
+// 1人あたりの獲得ポイント上限。合計の上限とは別で、上限を超える選手は選べない。
+function getMenuPresetMaxPlayerCost(team) {
+  const max = getSelectedTeamPreset(team)?.maxPlayerCost;
+  return Number.isFinite(max) ? max : null;
+}
+
+function isMenuPlayerOverPresetCost(team, kind, playerId) {
+  const max = getMenuPresetMaxPlayerCost(team);
+  if (max === null || !playerId) return false;
+  return getMenuPlayerCost(getPlayerListForKind(kind), playerId) > max;
+}
+
 function doesMenuPointLimitApply(team) {
   return !isAnyPracticeMode() && !isUnlimitedCostTeam(team);
 }
@@ -3328,6 +3342,7 @@ function isMenuPlayerUnavailable(team, role, kind, playerId) {
   if (playerId === selection[role]) return false;
   if (kind !== "pitcher" && kind !== "batter" && kind !== "catcher" && kind !== "hitter") return false;
   if (!isMenuPlayerAllowedByPreset(team, playerId)) return true;
+  if (isMenuPlayerOverPresetCost(team, kind, playerId)) return true;
   const duplicateRoles = kind === "pitcher" ? pitcherRoles : [...batterRoles, ...benchRoles];
   if (duplicateRoles.some((otherRole) => otherRole !== role && selection[otherRole] === playerId)) return true;
   if (benchRoles.includes(role)) {

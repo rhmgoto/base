@@ -1256,12 +1256,22 @@ const hbpAfterSwingState = JSON.parse(runInGame(
   context,
   `(() => {
     navigator.getGamepads = () => [];
+    // デッドボール判定は矩形から体の輪郭 (getHbpHitPolygon) に変わっているので、
+    // 輪郭の重心にボールを置く。
+    function getHbpHitCenter() {
+      const polygon = getHbpHitPolygon();
+      const total = polygon.reduce(
+        (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+        { x: 0, y: 0 }
+      );
+      return { x: total.x / polygon.length, y: total.y / polygon.length };
+    }
     function putPitchInHbpBox(didSwing) {
       resetBall();
       resetSwing();
-      const box = getHbpHitBox();
-      ball.x = (box.left + box.right) / 2;
-      ball.y = (box.top + box.bottom) / 2;
+      const center = getHbpHitCenter();
+      ball.x = center.x;
+      ball.y = center.y;
       ball.prevX = ball.x;
       ball.prevY = ball.y;
       ball.radius = 8;
@@ -2907,9 +2917,15 @@ const allstarPresetState = JSON.parse(runInGame(
     const beforeSelection = { ...menuSelection.away, lineupOrder: [...menuSelection.away.lineupOrder] };
     const beforeOrder = getMenuLineupOrder("away").join(",");
     openPlayerChooser({ dataset: { team: "away", role: "R", kind: "batter" } });
-    const chooserStayedClosed = playerChooser.classList.contains("hidden") || chooserOptions.innerHTML === "";
+    const chooserOpened = !playerChooser.classList.contains("hidden") && chooserOptions.innerHTML !== "";
+    // 11P以上 (デンドーズ級) は選べない
+    const ruthUnavailable = isMenuPlayerUnavailable("away", "R", "batter", "ruth");
     selectMenuPlayer({ dataset: { team: "away", role: "R", kind: "batter", playerId: "ruth" } });
     const afterSelectRight = menuSelection.away.R;
+    // 10P以下なら合計ポイントに関係なく選べる
+    const shutoUnavailable = isMenuPlayerUnavailable("away", "R", "batter", "shuto");
+    selectMenuPlayer({ dataset: { team: "away", role: "R", kind: "batter", playerId: "shuto" } });
+    const afterSelectAffordable = menuSelection.away.R;
     const moved = moveMenuLineupRoleToSlot("away", "R", 6);
     const swapped = swapMenuLineupPlayers("away", "R", "C");
     resetMenuTeam("away");
@@ -2928,10 +2944,13 @@ const allstarPresetState = JSON.parse(runInGame(
       label,
       cost,
       pointText,
-      chooserStayedClosed,
+      chooserOpened,
+      ruthUnavailable,
+      shutoUnavailable,
       beforeSelection,
       beforeOrder,
       afterSelectRight,
+      afterSelectAffordable,
       moved,
       swapped,
       afterReset
@@ -2942,16 +2961,21 @@ const allstarPresetState = JSON.parse(runInGame(
 assert(allstarPresetState.preset === "allstar", "All-Star preset should be selectable");
 assert(allstarPresetState.label === "オールスター", "All-Star label should be shown");
 assert(allstarPresetState.pointText.includes("制限なし"), "All-Star should have no point limit");
-assert(allstarPresetState.chooserStayedClosed === true, "All-Star members should not be swappable through the chooser");
-assert(allstarPresetState.afterSelectRight === "otani", "All-Star right fielder should remain Otani after a blocked selection");
-assert(allstarPresetState.moved === false && allstarPresetState.swapped === false, "All-Star lineup should be locked");
+assert(allstarPresetState.chooserOpened === true, "All-Star members should be swappable through the chooser");
+assert(allstarPresetState.ruthUnavailable === true, "All-Star should not allow players costing more than 10 points");
+assert(allstarPresetState.afterSelectRight === "otani", "All-Star right fielder should remain Otani after a blocked over-cost selection");
+assert(allstarPresetState.shutoUnavailable === false, "All-Star should allow any player within the 10-point cap");
+assert(allstarPresetState.afterSelectAffordable === "shuto", "All-Star right fielder should change when the player is within the cap");
+assert(allstarPresetState.moved === true && allstarPresetState.swapped === true, "All-Star lineup order should be editable");
 assert(allstarPresetState.beforeOrder === "R,C,2B,SS,L,DH,CA", "All-Star batting order should match the requested order");
-assert(allstarPresetState.afterReset.pitcher === "shohei" && allstarPresetState.afterReset.pitcher2 === "yamamoto", "All-Star pitchers should stay fixed after reset");
-assert(allstarPresetState.afterReset.pitcher3 === "misiorowski" && allstarPresetState.afterReset.pitcher4 === "skubal" && allstarPresetState.afterReset.pitcher5 === "wheeler", "All-Star reserve pitchers should stay fixed");
-assert(allstarPresetState.afterReset.R === "otani" && allstarPresetState.afterReset.C === "judge" && allstarPresetState.afterReset.L === "acunajr", "All-Star outfield should match the requested members");
-assert(allstarPresetState.afterReset.CA === "calraleigh" && allstarPresetState.afterReset.SS === "wittjr" && allstarPresetState.afterReset["2B"] === "harper" && allstarPresetState.afterReset.DH === "freeman", "All-Star infield, catcher, and DH should match the requested members");
-assert(allstarPresetState.afterReset.bench1 === "trout" && allstarPresetState.afterReset.bench2 === "goldschmidt" && allstarPresetState.afterReset.bench3 === "schwarber", "All-Star bench fielders should match the requested members");
-assert(allstarPresetState.afterReset.lineupOrder.join(",") === "R,C,2B,SS,L,DH,CA", "All-Star reset should preserve the requested batting order");
+assert(allstarPresetState.beforeSelection.pitcher === "shohei" && allstarPresetState.beforeSelection.pitcher2 === "yamamoto", "All-Star pitchers should stay fixed after reset");
+assert(allstarPresetState.beforeSelection.pitcher3 === "misiorowski" && allstarPresetState.beforeSelection.pitcher4 === "skubal" && allstarPresetState.beforeSelection.pitcher5 === "wheeler", "All-Star reserve pitchers should stay fixed");
+assert(allstarPresetState.beforeSelection.R === "otani" && allstarPresetState.beforeSelection.C === "judge" && allstarPresetState.beforeSelection.L === "acunajr", "All-Star outfield should match the requested members");
+assert(allstarPresetState.beforeSelection.CA === "calraleigh" && allstarPresetState.beforeSelection.SS === "wittjr" && allstarPresetState.beforeSelection["2B"] === "harper" && allstarPresetState.beforeSelection.DH === "freeman", "All-Star infield, catcher, and DH should match the requested members");
+assert(allstarPresetState.beforeSelection.bench1 === "trout" && allstarPresetState.beforeSelection.bench2 === "goldschmidt" && allstarPresetState.beforeSelection.bench3 === "schwarber", "All-Star bench fielders should match the requested members");
+assert(allstarPresetState.beforeSelection.lineupOrder.join(",") === "R,C,2B,SS,L,DH,CA", "All-Star preset should use the requested batting order");
+// 選手を入れ替えられるようになったので、リセットは他チームと同じく全消去になる
+assert(allstarPresetState.afterReset.pitcher === "" && allstarPresetState.afterReset.R === "", "All-Star reset should clear the roster like any editable team");
 
 const pitcherChangeState = JSON.parse(runInGame(
   context,
