@@ -164,6 +164,68 @@ const batterMoveTuning = {
   keyboardMoveSpeed: 5.2
 };
 
+// CPU打者の「球の見極め」と「バットの追従」をまとめた調整値。
+// 以前は遅い球かどうか (slowPitchScore) が見極めにも追従にも掛け算で入っていたため、
+// 速球や決め球では見極めが完全に消え、隅を突かれるとほぼ空振りになっていた。
+const computerBatterTuning = {
+  // 球速による読み取りやすさ。readSpeedEasyKmh 以下で 1、readSpeedHardKmh 以上で下限まで落ちる。
+  readSpeedEasyKmh: 118,
+  readSpeedHardKmh: 168,
+  // 速球でも読み取りが 0 にならないようにする下限。0 にすると従来の挙動に戻る。
+  pitchReadFloor: 0.42,
+  // ストライクの確信度が 0 になるまでの、ゾーンからの距離。
+  // 以前は 32 + meet*3.4 (ミート8で約59) と広すぎ、ゾーンから20離れた球でも確信度が
+  // 0.68 になっていた。そのため下の見送りゲートが一度も働かず、CPUは何でも振っていた。
+  strikeConfidenceTolerance: 16,
+  strikeConfidenceMeetScale: 1.4,
+  // 確信度がこれを下回ると原則見送る (それでも chaseChance の分だけは手を出す)。
+  chaseGateConfidence: 0.42,
+  // 見送るべき球につい手を出す割合。0 にすると完璧に見極めてしまい面白くない。
+  chaseChanceScale: 1,
+  // 振ると決めたときに実際に振る確率。確信度が低いほど下がる。
+  swingChanceBase: 0.08,
+  swingChanceConfidenceScale: 0.92,
+  // スイングを始める投球進行度。startSwing からバットが出るまでに時間がかかるので、
+  // 本塁到達 (1.0) より手前で振り始めないと間に合わない。
+  // 以前は 0.92 を中心にしていたが、実測ではその帯の空振り率が82%と最悪だった。
+  swingWindowStart: 0.58,
+  swingWindowEnd: 1.08,
+  swingTimingCenter: 0.7,
+  // 振り始めのばらつき。大きいほど空振りが増える。
+  swingTimingJitter: 0.1,
+  // ミートが高い打者ほどばらつきを抑える。1 でミート最大時にばらつき0。
+  swingTimingJitterMeetScale: 0.6,
+  // ミートが高い打者ほど中心に寄せる (低い打者は遅れて振る)。
+  swingTimingMeetShift: 0.05,
+  // 予測到達点がゾーンからこれだけ外れていれば「ボール」と確信できる。
+  zoneExitFullRead: 26,
+  // ゾーンから逃げていく量。方向は問わない (外角に限らず内角や落ちる球も対象)。
+  escapeFullRead: 26,
+  // 逃げる球でなくても、ゾーンを外れる見込みならある程度は見送る。
+  escapeBaseWeight: 0.55,
+  // バットが左右に追従できる幅。ストライクゾーン幅は 72 なので、隅に届くにはこの程度が要る。
+  horizontalReach: 46,
+  horizontalMeetBonus: 18
+};
+
+// 球速から「どれだけ球種・コースを読めるか」を出す。1 で完全に読める。
+function getComputerPitchReadScore() {
+  const speedRead = Number.isFinite(currentPitchSpeedKmh)
+    ? clamp(
+        (computerBatterTuning.readSpeedHardKmh - currentPitchSpeedKmh)
+          / Math.max(1, computerBatterTuning.readSpeedHardKmh - computerBatterTuning.readSpeedEasyKmh),
+        0,
+        1
+      )
+    : 0;
+  const slowPitchRead = Math.max(currentPitchType === "slow" ? 1 : 0, speedRead);
+  return clamp(
+    computerBatterTuning.pitchReadFloor + slowPitchRead * (1 - computerBatterTuning.pitchReadFloor),
+    0,
+    1
+  );
+}
+
 const showHbpHitBox = false;
 
 const batters = [
@@ -185,8 +247,8 @@ const batters = [
   { id: "nagashima", name: "ナガシマ", bats: "R", power: 15, meet: 13, run: 8, infieldDefense: 15, outfieldDefense: 2, arm: 14, cost: 25 },
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 7, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
-  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 4, arm: 8, cost: 8 },
-  { id: "arraez", name: "アラエス", bats: "L", power: 2, meet: 9, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
+  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 5, arm: 7, cost: 8 },
+  { id: "arraez", name: "アラエス", bats: "L", power: 1, meet: 10, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
   { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
   { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
   { id: "bonds", name: "ボンズ", bats: "L", power: 19, meet: 14, run: 8, infieldDefense: 3, outfieldDefense: 13, arm: 10, cost: 28 },
@@ -203,7 +265,10 @@ const batters = [
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 20, run: 6, infieldDefense: 12, outfieldDefense: 12, arm: 9, cost: 26 },
   { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 18, run: 20, infieldDefense: 3, outfieldDefense: 10, arm: 8, cost: 24 },
   { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
-  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 6, arm: 6, cost: 4 }
+  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 6, arm: 6, cost: 4 },
+  { id: "alvarez", name: "アルバレス", bats: "L", power: 8, meet: 9, run: 3, infieldDefense: 1, outfieldDefense: 1, arm: 2, cost: 6 },
+  { id: "caminero", name: "カミネロ", bats: "R", power: 8, meet: 6, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 7 },
+  { id: "pca", name: "PCA", bats: "L", power: 7, meet: 7, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 8 }
 ];
 
 const catchers = [
@@ -256,7 +321,9 @@ const pitchers = [
   { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 18, leftBreak: 13, slowChange: 32, fastChange: 14, control: 30, stuff: 31, fielding: 13, stamina: 16, cost: 30 },
   { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 17, control: 27, stuff: 33, fielding: 13, stamina: 15, cost: 29 },
   { id: "sabrowski", name: "\u30b5\u30d6\u30ed\u30a6\u30b9\u30ad", throws: "L", fastKmh: 151, rightBreak: 4, leftBreak: 10, slowChange: 10, fastChange: 10, control: 2, stuff: 10, fielding: 4, stamina: 1, cost: 2 },
-  { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 5 }
+  { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 4 },
+  { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 3, stuff: 8, fielding: 4, stamina: 5, cost: 4 },
+  { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 3, stuff: 6, fielding: 4, stamina: 5, cost: 3 }
 ];
 
 const pitchTypes = {
@@ -340,6 +407,24 @@ const stealTuning = {
   earlyJumpPenaltyPerSecond: 0.6,
   maxEarlyJumpPenalty: 1.4
 };
+
+// CPUの盗塁。走力の高い走者だけが仕掛ける。
+const computerStealTuning = {
+  enabled: true,
+  // これ未満の走力では仕掛けない
+  minRunRating: 7,
+  // 走力 minRunRating で baseChance、走力10 で maxChance
+  baseChance: 0.16,
+  maxChance: 0.42,
+  // 三盗は二盗より控えめにする
+  thirdBaseChanceScale: 0.45,
+  // 2アウトでは仕掛けない (打者に任せる)
+  attemptWithTwoOuts: false,
+  // 投球動作開始から何秒後にスタートするか。0.18秒以内なら最良のジャンプ、
+  // 0.45秒を超えると遅れとしてペナルティがつく (getStealJumpLead)。
+  jumpDelayMin: 0.02,
+  jumpDelayMax: 0.52
+};
 const battingFeedbackDisplayPenalty = 0.1;
 const battingPracticeHomerBoostMultiplier = 4.2;
 const oppositeHandedBattingAdvantageMultiplier = 1.2;
@@ -365,8 +450,8 @@ const buntTuning = {
   badLineSweetSpotScale: 0.16,
   badLineMin: 0.08,
   badLineMax: 0.48,
-  foulBase: 0.075,
-  foulQualityScale: 0.24,
+  foulBase: 0.1,
+  foulQualityScale: 0.3,
   foulTimingScale: 0.09,
   foulBadContactScale: 0.12,
   foulMin: 0.075,
@@ -377,20 +462,23 @@ const buntTuning = {
   popupMin: 0.018,
   popupMax: 0.9,
   forcePopupBadScore: 0.72,
-  popupReductionRate: 0.3,
+  popupReductionRate: 0.1,
   solidContactQuality: 0.48,
   solidContactTiming: 0.46,
   solidContactSweetSpot: 0.44,
-  solidContactPopupReduction: 0.98,
+  solidContactPopupReduction: 0.25,
   // 方向入力がないバントはほぼポップフライにする
   noAimPopupChance: 0.92,
   // 方向入力 (スティック) があっても一定確率でポップフライになるようにする追加分。
-  aimedPopupBonus: 0.1,
+  aimedPopupBonus: 0.3,
+  // 良いバントでもポップフライを完全には免除しない。1 で免除なし、0 で完全免除。
+  goodBuntPopupScale: 0.74,
   // 下入力で勢いを殺し、上入力でプッシュ気味に強く出す
   deadenPowerDrop: 0.035,
   pushPowerBonus: 0.075,
-  // 狙ったバントがファウルになりにくいようにする
-  aimedFoulMin: 0.03,
+  // 横に狙ったバントはファウルラインを切りやすいので、ファウル率の下限と上乗せを別に持つ
+  aimedFoulMin: 0.2,
+  lateralFoulBonus: 0.2,
   // 打球方向がファウルラインを越えないように角度を抑える割合 (1 でライン上)
   fairAngleMargin: 0.86,
   // バントの転がる距離の倍率。大きくするほど守備が追いつきやすくなる。
@@ -400,9 +488,13 @@ const buntTuning = {
 
 // forcedRegardlessOfContact は方向入力なしのバント用。
 // 当たりの良し悪しに関係なくポップフライにし、ゴロへの救済も行わない。
+// 良いバントは以前ポップフライを完全に免除していたが、それだと狙ったバントが
+// 100%ゴロになってしまうので、goodBuntPopupScale をかけて確率を残す。
 function resolveBuntPopupOutcome(goodBunt, forcePopup, protectedPopupChance, forcedRegardlessOfContact = false) {
+  const popupChance = protectedPopupChance * (goodBunt ? buntTuning.goodBuntPopupScale : 1);
   const popupCandidate = forcedRegardlessOfContact
-    || (!goodBunt && (forcePopup || Math.random() < protectedPopupChance));
+    || (!goodBunt && forcePopup)
+    || Math.random() < popupChance;
   const popupConvertedToPitcherFront = popupCandidate
     && !forcedRegardlessOfContact
     && Math.random() < buntTuning.popupReductionRate;
@@ -1182,6 +1274,8 @@ const buntAimMemoryDuration = 650;
 
 let defenseState = createDefenseState();
 let stealState = createStealState();
+// CPUが今の投球で盗塁を仕掛ける計画。投球動作の開始時に決めて、狙った間合いで走り出す。
+let computerStealPlan = null;
 
 let hitEffect = { active: false, startTime: 0, text: "", color: "#fff2a8" };
 let battingFeedback = { active: false, startTime: 0, lines: [] };
@@ -2219,6 +2313,8 @@ function ensureBatterGameRecord(team, player = activeBatter, role = getCurrentBa
     strikeouts: 0,
     walks: 0,
     hbp: 0,
+    sacrificeBunts: 0,
+    sacrificeFlies: 0,
     errorsReached: 0
   };
   record.name = player.name;
@@ -2247,6 +2343,14 @@ function recordBatterPlateAppearance(resultType, options = {}) {
   }
   if (resultType === "hbp") {
     record.hbp += 1;
+    return;
+  }
+  if (resultType === "sacrificeBunt") {
+    record.sacrificeBunts += 1;
+    return;
+  }
+  if (resultType === "sacrificeFly") {
+    record.sacrificeFlies += 1;
     return;
   }
   record.atBats += 1;
@@ -4284,6 +4388,7 @@ function resetSwing() {
   swingState.startTime = 0;
   swingState.cooldownUntil = 0;
   swingState.didSwingThisPitch = false;
+  swingState.computerSwingProgress = null;
   swingState.madeContact = false;
   swingState.lastCheckProgress = 0;
   swingState.type = "strong";
@@ -4406,6 +4511,8 @@ function startPitch(typeKey, options = {}) {
   message = `${pitch.label}、モーション開始`;
   if (startEarlyRequestedSteal(now)) {
     message = `${pitch.label}、盗塁スタートが早すぎます`;
+  } else {
+    planComputerSteal(now);
   }
   updateSidebarAbilityPanels();
 }
@@ -5388,38 +5495,36 @@ function getComputerSwingStrikeConfidence() {
   const projected = getProjectedPitchPlatePosition();
   const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
   const currentDistance = distanceToHomePlate(ball.x, ball.y, ball.radius);
-  const projectedStrike = clamp(1 - projectedDistance / (32 + activeBatter.meet * 3.4), 0, 1);
+  const strikeTolerance = computerBatterTuning.strikeConfidenceTolerance
+    + activeBatter.meet * computerBatterTuning.strikeConfidenceMeetScale;
+  const projectedStrike = clamp(1 - projectedDistance / Math.max(1, strikeTolerance), 0, 1);
   const lateCurrentRead = clamp(1 - currentDistance / (86 + activeBatter.meet * 7), 0, 1);
   return clamp(projectedStrike * 0.78 + lateCurrentRead * 0.22, 0, 1);
 }
 
 function getComputerOutsideEscapeTakeAdjustment(strikeConfidence) {
   const projected = getProjectedPitchPlatePosition();
-  const outsideSign = activeBatterSide === "R" ? 1 : -1;
-  const currentOutside = (ball.x - field.plateX) * outsideSign;
-  const projectedOutside = (projected.x - field.plateX) * outsideSign;
-  const escapeAmount = projectedOutside - currentOutside;
   const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
   const currentDistance = distanceToHomePlate(ball.x, ball.y, ball.radius);
   const nearZone = clamp(1 - Math.min(projectedDistance, currentDistance) / 92, 0, 1);
-  const outsideEdge = field.strikeZoneWidth * 0.42;
-  const outsideScore = clamp((projectedOutside - outsideEdge) / 78, 0, 1);
-  const awayEscapeScore = clamp(escapeAmount / 34, 0, 1);
-  const ballZoneScore = clamp(projectedDistance / 70, 0, 1);
-  const slowPitchScore = clamp(
-    Math.max(
-      currentPitchType === "slow" ? 1 : 0,
-      Number.isFinite(currentPitchSpeedKmh) ? (148 - currentPitchSpeedKmh) / 34 : 0
-    ),
+  // 見極めは「外角へ逃げる球」に限らない。ゾーンからどれだけ外れる見込みかで判断する。
+  const zoneExitScore = clamp(projectedDistance / computerBatterTuning.zoneExitFullRead, 0, 1);
+  // 手元でゾーンから離れていく球ほど読みにくいので、逃げる量は割り増しにとどめる。
+  const escapeScore = clamp(
+    (projectedDistance - currentDistance) / computerBatterTuning.escapeFullRead,
     0,
     1
   );
+  const escapeWeight = computerBatterTuning.escapeBaseWeight
+    + escapeScore * (1 - computerBatterTuning.escapeBaseWeight);
+  const ballZoneScore = clamp(projectedDistance / 70, 0, 1);
+  const pitchReadScore = getComputerPitchReadScore();
   const meetReadSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
   const readAccuracy = 0.46 + meetReadSkill * 0.54;
   const takeStrength = nearZone
-    * slowPitchScore
-    * awayEscapeScore
-    * outsideScore
+    * pitchReadScore
+    * zoneExitScore
+    * escapeWeight
     * (0.48 + ballZoneScore * 0.72)
     * readAccuracy;
   return {
@@ -5435,21 +5540,46 @@ function computerSwingBat() {
   if (isPitchingPracticeMode() && pitchingPracticeBatterType !== "B") return;
   if ((gameMode !== "single" && gameMode !== "watch" && !isPitchingPracticeMode() && !isHomeRunDerbyMode()) || isPlayerBatting() || !isPitching || !ball.inPitch || ball.crossedPlate || swingState.didSwingThisPitch) return;
   const progress = getPitchProgress();
-  if (progress < 0.72 || progress > 1.08) return;
+  if (progress < computerBatterTuning.swingWindowStart || progress > computerBatterTuning.swingWindowEnd) return;
+  // 振り始めは投球ごとに決めた1点。ここに達するまでは球を見てから判断する。
+  if (progress < getComputerSwingTargetProgress()) return;
   const strikeConfidence = getComputerSwingStrikeConfidence();
   const outsideEscapeTake = getComputerOutsideEscapeTakeAdjustment(strikeConfidence);
   const adjustedStrikeConfidence = clamp(strikeConfidence - outsideEscapeTake.confidencePenalty, 0, 1);
-  const timingWindow = Math.max(0, 1 - Math.abs(progress - 0.92) / 0.26);
   if (isHomeRunDerbyMode()) {
     if (adjustedStrikeConfidence < 0.18 && Math.random() > 0.18 * outsideEscapeTake.chaseMultiplier) return;
-    const derbySwingChance = timingWindow * clamp(0.42 + adjustedStrikeConfidence * 0.7 + activeBatter.meet * 0.025, 0.18, 0.96) * outsideEscapeTake.swingMultiplier;
+    const derbySwingChance = clamp(0.42 + adjustedStrikeConfidence * 0.7 + activeBatter.meet * 0.025, 0.18, 0.96) * outsideEscapeTake.swingMultiplier;
     if (Math.random() < derbySwingChance) startSwing(performance.now(), "strong");
     return;
   }
-  const chaseChance = timingWindow * clamp((activeBatter.meet - 6) / 220, 0.002, 0.02);
-  if (adjustedStrikeConfidence < 0.36 && Math.random() >= chaseChance * outsideEscapeTake.chaseMultiplier) return;
-  const swingChance = (0.006 + timingWindow * (0.04 + adjustedStrikeConfidence * 0.31 + activeBatter.meet * 0.004)) * outsideEscapeTake.swingMultiplier;
+  const chaseChance = clamp((activeBatter.meet - 6) / 40, 0.02, 0.22) * computerBatterTuning.chaseChanceScale;
+  if (adjustedStrikeConfidence < computerBatterTuning.chaseGateConfidence
+    && Math.random() >= chaseChance * outsideEscapeTake.chaseMultiplier) return;
+  const swingChance = clamp(
+    computerBatterTuning.swingChanceBase + adjustedStrikeConfidence * computerBatterTuning.swingChanceConfidenceScale,
+    0,
+    1
+  ) * outsideEscapeTake.swingMultiplier;
   if (Math.random() < swingChance) startSwing(performance.now(), chooseComputerSwingType());
+}
+
+// 振り始める進行度は投球ごとに1回だけ決める。
+// 以前はフレームごとの抽選だったため、狙った帯より遅いフレームでも先に当たりが出てしまい、
+// 実際の振り始めが 0.85〜1.05 に散らばって空振りが激増していた。
+function getComputerSwingTargetProgress() {
+  if (Number.isFinite(swingState.computerSwingProgress)) return swingState.computerSwingProgress;
+  const meetSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
+  const center = computerBatterTuning.swingTimingCenter
+    + (1 - meetSkill) * computerBatterTuning.swingTimingMeetShift;
+  const jitter = computerBatterTuning.swingTimingJitter
+    * (1 - meetSkill * computerBatterTuning.swingTimingJitterMeetScale);
+  const target = clamp(
+    center + (Math.random() * 2 - 1) * jitter,
+    computerBatterTuning.swingWindowStart,
+    computerBatterTuning.swingWindowEnd
+  );
+  swingState.computerSwingProgress = target;
+  return target;
 }
 
 function chooseComputerSwingType(roll = Math.random()) {
@@ -6222,6 +6352,48 @@ function getStealJumpLead(motionElapsedSeconds = 0, earlyRequest = false) {
   return -stealTuning.lateJumpPenalty;
 }
 
+// 走力に応じた盗塁の仕掛け率。minRunRating 未満は 0。
+function getComputerStealChance(runnerInfo, targetBase) {
+  const run = runnerInfo?.run ?? 5;
+  if (run < computerStealTuning.minRunRating) return 0;
+  const spread = Math.max(1, 10 - computerStealTuning.minRunRating);
+  const growth = clamp((run - computerStealTuning.minRunRating) / spread, 0, 1);
+  const chance = computerStealTuning.baseChance
+    + (computerStealTuning.maxChance - computerStealTuning.baseChance) * growth;
+  return targetBase === "third" ? chance * computerStealTuning.thirdBaseChanceScale : chance;
+}
+
+// 投球動作の開始時に、仕掛けるかどうかとスタートのタイミングを決めておく。
+// プレイヤーと同じ beginStealAttempt を通すので、ジャンプの良し悪しも同じ計算になる。
+function planComputerSteal(now = performance.now()) {
+  computerStealPlan = null;
+  if (!computerStealTuning.enabled || !stealTuning.enabled) return false;
+  if (gamePhase !== "playing" || isPlayerBatting()) return false;
+  if (stealState.active || stealState.earlyRequest) return false;
+  if (!computerStealTuning.attemptWithTwoOuts && count.outs >= 2) return false;
+  const candidate = getStealCandidate("second") || getStealCandidate("third");
+  if (!candidate) return false;
+  if (Math.random() >= getComputerStealChance(candidate.runner, candidate.targetBase)) return false;
+  computerStealPlan = {
+    targetBase: candidate.targetBase,
+    startDelaySeconds: randomBetween(computerStealTuning.jumpDelayMin, computerStealTuning.jumpDelayMax)
+  };
+  return true;
+}
+
+function updateComputerSteal(now = performance.now()) {
+  if (!computerStealPlan) return false;
+  if (stealState.active || isPlayerBatting() || ball.crossedPlate || gamePhase !== "playing") {
+    computerStealPlan = null;
+    return false;
+  }
+  if (getPitchMotionElapsedSeconds(now) < computerStealPlan.startDelaySeconds) return false;
+  const candidate = getStealCandidate(computerStealPlan.targetBase);
+  computerStealPlan = null;
+  if (!candidate) return false;
+  return beginStealAttempt(candidate, now, { earlyRequest: false });
+}
+
 function startEarlyRequestedSteal(now = performance.now()) {
   if (!stealState.earlyRequest || stealState.active) return false;
   const candidate = getStealCandidate(stealState.targetBase);
@@ -6432,7 +6604,10 @@ function update(delta) {
     return;
   }
   if (gamePhase === "playing" && isPlayerBatting()) updateBatter(delta);
-  else if (gamePhase === "playing") updateComputerBatterPosition(delta);
+  else if (gamePhase === "playing") {
+    updateComputerSteal(now);
+    updateComputerBatterPosition(delta);
+  }
   updateBuntStance(now);
   if (shouldAutoScheduleComputerPitch() && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && !stealState.active && !Number.isFinite(autoPitchTimer)) {
     scheduleNextComputerPitchAfterJudgment();
@@ -6504,18 +6679,12 @@ function updateComputerBatterPosition(delta = 1000 / 60) {
   if (zoneRead <= 0) return;
   const outsideSign = activeBatterSide === "R" ? 1 : -1;
   const pitchSide = (projected.x - field.plateX) * outsideSign;
-  const slowPitchScore = clamp(
-    Math.max(
-      currentPitchType === "slow" ? 1 : 0,
-      Number.isFinite(currentPitchSpeedKmh) ? (148 - currentPitchSpeedKmh) / 34 : 0
-    ),
-    0,
-    1
-  );
+  // 速球でも追従が止まらないよう、見極めと同じ読み取りスコアを使う。
+  const pitchReadScore = getComputerPitchReadScore();
   const meetRead = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
   const moveScale = batterMoveTuning.cpuPitchSideMoveScale
-    + slowPitchScore * batterMoveTuning.cpuSlowPitchMoveBonus;
-  const maxMove = 22 + slowPitchScore * 18 + meetRead * 8;
+    + pitchReadScore * batterMoveTuning.cpuSlowPitchMoveBonus;
+  const maxMove = computerBatterTuning.horizontalReach + meetRead * computerBatterTuning.horizontalMeetBonus;
   const initialX = getInitialBatterX(box);
   const targetX = clamp(
     initialX + clamp(pitchSide * moveScale * zoneRead, -maxMove, maxMove) * outsideSign,
@@ -6523,7 +6692,7 @@ function updateComputerBatterPosition(delta = 1000 / 60) {
     box.right
   );
   const frameScale = delta / (1000 / 60);
-  const speed = batterMoveTuning.cpuPitchSideMoveSpeed * (1 + slowPitchScore * 0.9 + meetRead * 0.35);
+  const speed = batterMoveTuning.cpuPitchSideMoveSpeed * (1 + pitchReadScore * 0.9 + meetRead * 0.35);
   const dx = targetX - batter.x;
   batter.x += clamp(dx, -speed * frameScale, speed * frameScale);
   batter.x = clamp(batter.x, box.left, box.right);
@@ -7965,12 +8134,13 @@ function buildBattedBallProfile(contact) {
     const roll = Math.random();
     const side = aimedSide || (Math.random() < 0.5 ? -1 : 1);
     const aimAssist = aimedSide ? 0.16 + buntMeetSkill * 0.08 : 0;
-    const aimedFoulRelief = aimedSide ? 0.14 : 0;
+    // 横に狙ったバントはラインを切りやすいので、ファウル率を上乗せする。
+    const lateralFoulBonus = aimedSide ? buntTuning.lateralFoulBonus : 0;
     const buntFoulChance = clamp(
       buntTuning.foulBase
         + (1 - buntQuality) * buntTuning.foulQualityScale
         + badBuntScore * (buntTuning.foulBadContactScale + 0.22)
-        - aimedFoulRelief,
+        + lateralFoulBonus,
       aimedSide ? buntTuning.aimedFoulMin : buntTuning.foulMin,
       Math.min(0.82, buntTuning.foulMax + 0.12)
     ) + (hasAim ? 0 : 0.06);
@@ -15220,6 +15390,8 @@ function finishDefensePlay() {
       }
       const forceOutBases = defenseState.completedForceOutBases || [];
       const isForceOut = forceOutBases.length > 0;
+      const outsBeforePlay = count.outs;
+      const runnerSnapshot = captureBaseRunnerAdvanceSnapshot();
       if (isForceOut) recordCompletedForceOut(defenseState.throw);
       // clamp は min > max のとき min を返すので、残りアウト数が 0 でも 1 を足してしまう。
       const remainingOuts = Math.max(0, 3 - count.outs);
@@ -15254,9 +15426,17 @@ function finishDefensePlay() {
         outRunners: isForceOut ? [] : [throwOutRunner],
         allowRuns: !(isForceOut && count.outs >= 3)
       });
-      recordBatterPlateAppearance(isForceOut && forceOutBases.includes("first") ? "out" : "fielderChoice", { runs });
+      const batterResultType = getForcePlayBatterResultType({
+        forceOutBases: isForceOut ? forceOutBases : [],
+        outsBeforePlay,
+        outsToAdd,
+        runnerSnapshot,
+        runs
+      });
+      recordBatterPlateAppearance(batterResultType, { runs });
       const outMessage = outsToAdd >= 2 ? "ゲッツー" : `${defenseState.throw.baseLabel}アウト`;
-      const baseMessage = runs > 0 ? `${outMessage} / 進塁 ${runs}点` : outMessage;
+      const playLabel = batterResultType === "sacrificeBunt" ? `犠打 / ${outMessage}` : outMessage;
+      const baseMessage = runs > 0 ? `${playLabel} / 進塁 ${runs}点` : playLabel;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
       showEffect(runs > 0 ? `進塁 +${runs}` : outsToAdd >= 2 ? "ゲッツー" : "アウト", "#ffcf70");
     } else {
@@ -15292,9 +15472,12 @@ function finishDefensePlay() {
     recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
     adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
     const advanceRuns = count.outs < 3 ? applyDefenseOutAdvancements() : 0;
-    recordBatterPlateAppearance("out", { runs: advanceRuns });
+    const batterResultType = getCaughtOutBatterResultType(advanceRuns);
+    recordBatterPlateAppearance(batterResultType, { runs: advanceRuns });
     const advanced = count.outs < 3 && hasDefenseOutAdvancements();
-    const baseMessage = advanceRuns > 0
+    const baseMessage = batterResultType === "sacrificeFly"
+      ? `${outcome.label}、犠牲フライ / 進塁 ${advanceRuns}点`
+      : advanceRuns > 0
       ? `${outcome.label}、アウト / 進塁 ${advanceRuns}点`
       : advanced
       ? `${outcome.label}、アウト / ランナー進塁`
@@ -15466,6 +15649,45 @@ function getBatterFinalHitRecordType(baseHitType = "single") {
         : normalizedBase;
   const baseRank = { single: 1, double: 2, triple: 3, homer: 4 };
   return (baseRank[finalType] || 1) > (baseRank[normalizedBase] || 1) ? finalType : normalizedBase;
+}
+
+function captureBaseRunnerAdvanceSnapshot(baseState = bases) {
+  return baseNames
+    .map((baseName) => ({
+      runnerKey: getBatterRecordKey(baseState?.[baseName]),
+      startBase: baseName
+    }))
+    .filter((entry) => entry.runnerKey !== "unknown");
+}
+
+function didSnapshotRunnerAdvance(snapshot = [], runs = 0, baseState = bases) {
+  if (runs > 0) return true;
+  return snapshot.some((entry) => {
+    const destination = baseNames.find((baseName) => getBatterRecordKey(baseState?.[baseName]) === entry.runnerKey);
+    return destination && baseIndexByName[destination] > baseIndexByName[entry.startBase];
+  });
+}
+
+function getForcePlayBatterResultType(options = {}) {
+  const forceOutBases = options.forceOutBases || [];
+  const batterOutAtFirst = forceOutBases.includes("first");
+  const isSacrificeBunt = batterOutAtFirst
+    && defenseState.battedBall?.isBunt
+    && !defenseState.outcome?.fieldingError
+    && (options.outsBeforePlay ?? 0) < 2
+    && options.outsToAdd === 1
+    && didSnapshotRunnerAdvance(options.runnerSnapshot, options.runs);
+  if (isSacrificeBunt) return "sacrificeBunt";
+  return batterOutAtFirst ? "out" : "fielderChoice";
+}
+
+function getCaughtOutBatterResultType(runs = 0) {
+  const isSacrificeFly = runs > 0
+    && defenseState.outcome?.caught
+    && !defenseState.battedBall?.isBunt
+    && !defenseState.battedBall?.isGrounder
+    && outfielderRoles.includes(defenseState.chosenFielder?.role);
+  return isSacrificeFly ? "sacrificeFly" : "out";
 }
 
 function hasDefenseOutAdvancements() {
@@ -21370,8 +21592,8 @@ function drawGameResultFittedText(text, x, y, maxWidth, startSize = 12, weight =
 
 function drawGameResultBattingTable(team, x, y, width, height) {
   drawGameResultSectionTitle(`${teamLabel(team)} 打撃成績`, x, y - 12, width);
-  const headers = ["守", "選手名", "率", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "失"];
-  const colWidths = [32, 128, 44, 30, 30, 30, 30, 28, 28, 28, 28, 28, 28, 28];
+  const headers = ["守", "選手名", "率", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "犠打", "犠飛", "失"];
+  const colWidths = [32, 128, 44, 30, 30, 30, 30, 28, 28, 28, 28, 28, 28, 34, 34, 28];
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
   const widths = colWidths.map((value) => value * scale);
   const rowHeight = 26;
@@ -21391,6 +21613,8 @@ function drawGameResultBattingTable(team, x, y, width, height) {
       record.strikeouts,
       record.walks,
       record.hbp,
+      record.sacrificeBunts || 0,
+      record.sacrificeFlies || 0,
       record.errorsReached
     ];
     drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });

@@ -919,6 +919,10 @@ const weakSwingState = JSON.parse(runInGame(
       meet: getEffectiveBatterMeet(activeBatter),
       power: getEffectiveBatterPower(activeBatter) / effectiveBatterPowerScale
     };
+    // 良いバントも goodBuntPopupScale の分だけポップフライになりうるので、
+    // 「芯で捉えたバントはゴロになる」ことを見るこの判定では乱数を固定する。
+    const buntProfileRandom = Math.random;
+    Math.random = () => 0.5;
     const buntProfile = buildBattedBallProfile({
       timeDiff: 0,
       quality: 0.9,
@@ -933,6 +937,7 @@ const weakSwingState = JSON.parse(runInGame(
       // 方向入力のないバントはポップフライになる仕様なので、狙いを入れて評価する
       buntAimX: 1
     });
+    Math.random = buntProfileRandom;
     const buntBall = buildBattedBall(buntProfile.power, buntProfile.direction, hitLabels.grounder, buntProfile);
     const buntFielder = chooseBuntDefenseFielder(getDefensiveLineup("away"), buntBall);
     const buntOutcome = resolveDefenseOutcome(buntFielder, buntBall, createBatterRunner(activeBatter));
@@ -2253,8 +2258,12 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
   `JSON.stringify({
     sato: findById(batters, "sato"),
     harper: findById(batters, "harper"),
+    arraez: findById(batters, "arraez"),
     carpenter: findById(batters, "carpenter"),
     zaiahope: findById(batters, "zaiahope"),
+    alvarez: findById(batters, "alvarez"),
+    caminero: findById(batters, "caminero"),
+    pca: findById(batters, "pca"),
     mcgonigle: findById(batters, "mcgonigle"),
     darvish: findById(pitchers, "darvish"),
     yamamoto: findById(pitchers, "yamamoto"),
@@ -2263,14 +2272,21 @@ const latestSpreadsheetRosterState = JSON.parse(runInGame(
     valdes: findById(pitchers, "valdes"),
     rojas: findById(pitchers, "rojas"),
     summers: findById(pitchers, "summers"),
-    enriquez: findById(pitchers, "enriquez")
+    enriquez: findById(pitchers, "enriquez"),
+    kelly: findById(pitchers, "kelly"),
+    riverryan: findById(pitchers, "riverryan"),
+    bsmith: findById(pitchers, "bsmith")
   })`
 ));
 
 assert(latestSpreadsheetRosterState.sato.arm === 6, "Sato arm should match the latest spreadsheet");
-assert(latestSpreadsheetRosterState.harper.arm === 8, "Harper arm should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.harper.outfieldDefense === 5 && latestSpreadsheetRosterState.harper.arm === 7, "Harper should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.arraez.power === 1 && latestSpreadsheetRosterState.arraez.meet === 10, "Arraez should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.carpenter.arm === 4, "Carpenter arm should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.zaiahope.bats === "L" && latestSpreadsheetRosterState.zaiahope.power === 4 && latestSpreadsheetRosterState.zaiahope.meet === 3 && latestSpreadsheetRosterState.zaiahope.run === 7 && latestSpreadsheetRosterState.zaiahope.infieldDefense === 3 && latestSpreadsheetRosterState.zaiahope.outfieldDefense === 6 && latestSpreadsheetRosterState.zaiahope.arm === 6 && latestSpreadsheetRosterState.zaiahope.cost === 4, "Zaia Hope should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.alvarez.bats === "L" && latestSpreadsheetRosterState.alvarez.power === 8 && latestSpreadsheetRosterState.alvarez.meet === 9 && latestSpreadsheetRosterState.alvarez.run === 3 && latestSpreadsheetRosterState.alvarez.infieldDefense === 1 && latestSpreadsheetRosterState.alvarez.outfieldDefense === 1 && latestSpreadsheetRosterState.alvarez.arm === 2 && latestSpreadsheetRosterState.alvarez.cost === 6, "Alvarez should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.caminero.bats === "R" && latestSpreadsheetRosterState.caminero.power === 8 && latestSpreadsheetRosterState.caminero.meet === 6 && latestSpreadsheetRosterState.caminero.run === 4 && latestSpreadsheetRosterState.caminero.infieldDefense === 4 && latestSpreadsheetRosterState.caminero.outfieldDefense === 2 && latestSpreadsheetRosterState.caminero.arm === 6 && latestSpreadsheetRosterState.caminero.cost === 7, "Caminero should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.pca.bats === "L" && latestSpreadsheetRosterState.pca.power === 7 && latestSpreadsheetRosterState.pca.meet === 7 && latestSpreadsheetRosterState.pca.run === 9 && latestSpreadsheetRosterState.pca.infieldDefense === 4 && latestSpreadsheetRosterState.pca.outfieldDefense === 9 && latestSpreadsheetRosterState.pca.arm === 9 && latestSpreadsheetRosterState.pca.cost === 8, "PCA should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.mcgonigle.arm === 6, "McGonigle arm should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.rightBreak === 9, "Darvish right break should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break should match the latest spreadsheet");
@@ -2282,6 +2298,9 @@ assert(latestSpreadsheetRosterState.valdes.throws === "L" && latestSpreadsheetRo
 assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRosterState.rojas.fastKmh === 77 && latestSpreadsheetRosterState.rojas.cost === 1, "Rojas should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.summers.throws === "L" && latestSpreadsheetRosterState.summers.fastKmh === 152 && latestSpreadsheetRosterState.summers.cost === 1, "Summers should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.enriquez.throws === "R" && latestSpreadsheetRosterState.enriquez.fastKmh === 166 && latestSpreadsheetRosterState.enriquez.cost === 1, "Enriquez should be available as a new pitcher");
+assert(latestSpreadsheetRosterState.kelly.stamina === 9 && latestSpreadsheetRosterState.kelly.cost === 4, "Kelly should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.riverryan.throws === "R" && latestSpreadsheetRosterState.riverryan.fastKmh === 162 && latestSpreadsheetRosterState.riverryan.rightBreak === 4 && latestSpreadsheetRosterState.riverryan.leftBreak === 3 && latestSpreadsheetRosterState.riverryan.slowChange === 6 && latestSpreadsheetRosterState.riverryan.fastChange === 6 && latestSpreadsheetRosterState.riverryan.control === 3 && latestSpreadsheetRosterState.riverryan.stuff === 8 && latestSpreadsheetRosterState.riverryan.fielding === 4 && latestSpreadsheetRosterState.riverryan.stamina === 5 && latestSpreadsheetRosterState.riverryan.cost === 4, "River Ryan should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.bsmith.throws === "R" && latestSpreadsheetRosterState.bsmith.fastKmh === 158 && latestSpreadsheetRosterState.bsmith.rightBreak === 3 && latestSpreadsheetRosterState.bsmith.leftBreak === 1 && latestSpreadsheetRosterState.bsmith.slowChange === 8 && latestSpreadsheetRosterState.bsmith.fastChange === 5 && latestSpreadsheetRosterState.bsmith.control === 3 && latestSpreadsheetRosterState.bsmith.stuff === 6 && latestSpreadsheetRosterState.bsmith.fielding === 4 && latestSpreadsheetRosterState.bsmith.stamina === 5 && latestSpreadsheetRosterState.bsmith.cost === 3, "B. Smith should match the latest spreadsheet");
 
 assert(rosterAndPointState.shuto.bats === "L", "Shuto should be a left-handed batter");
 assert(rosterAndPointState.shuto.power === 2, "Shuto power should match the roster table");
@@ -2349,9 +2368,9 @@ assert(rosterAndPointState.rodgersBatter.cost === 3, "Rodgers fielder cost shoul
 assert(rosterAndPointState.harper.bats === "L", "Harper should be a left-handed batter");
 assert(rosterAndPointState.harper.power === 8, "Harper power should match the roster table");
 assert(rosterAndPointState.harper.infieldDefense === 5, "Harper infield defense should match the roster table");
-assert(rosterAndPointState.harper.outfieldDefense === 4, "Harper outfield defense should match the roster table");
+assert(rosterAndPointState.harper.outfieldDefense === 5, "Harper outfield defense should match the roster table");
 assert(rosterAndPointState.harper.run === 6, "Harper run should match the roster table");
-assert(rosterAndPointState.harper.arm === 8, "Harper arm should match the roster table");
+assert(rosterAndPointState.harper.arm === 7, "Harper arm should match the roster table");
 assert(rosterAndPointState.harper.cost === 8, "Harper cost should match the roster table");
 assert(rosterAndPointState.tucker.bats === "L", "Tucker should be a left-handed batter");
 assert(rosterAndPointState.tucker.power === 6, "Tucker power should match the roster table");
@@ -2362,8 +2381,8 @@ assert(rosterAndPointState.tucker.outfieldDefense === 6, "Tucker outfield defens
 assert(rosterAndPointState.tucker.arm === 7, "Tucker arm should match the roster table");
 assert(rosterAndPointState.tucker.cost === 5, "Tucker cost should match the roster table");
 assert(rosterAndPointState.arraez.bats === "L", "Arraez should be a left-handed batter");
-assert(rosterAndPointState.arraez.power === 2, "Arraez power should match the roster table");
-assert(rosterAndPointState.arraez.meet === 9, "Arraez meet should match the roster table");
+assert(rosterAndPointState.arraez.power === 1, "Arraez power should match the roster table");
+assert(rosterAndPointState.arraez.meet === 10, "Arraez meet should match the roster table");
 assert(rosterAndPointState.arraez.run === 5, "Arraez run should match the roster table");
 assert(rosterAndPointState.arraez.infieldDefense === 3, "Arraez infield defense should match the roster table");
 assert(rosterAndPointState.arraez.outfieldDefense === 2, "Arraez outfield defense should match the roster table");
@@ -8688,6 +8707,69 @@ assert(manualHitRecordUpgradeState.third.recordType === "triple" && manualHitRec
 assert(manualHitRecordUpgradeState.home.recordType === "homer" && manualHitRecordUpgradeState.home.homeRuns === 1 && manualHitRecordUpgradeState.home.rbi === 1, "manual batter-runner advance home should be recorded as a running home run");
 assert(manualHitRecordUpgradeState.first.recordType === "single" && manualHitRecordUpgradeState.first.hits === 1, "ordinary first-base hits should remain singles");
 
+const sacrificeBattingRecordState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    battingTeam = "away";
+    activeBatter = findById(batters, "suzuki");
+    initializeBatterGameRecords();
+    recordBatterPlateAppearance("sacrificeBunt");
+    recordBatterPlateAppearance("sacrificeFly", { runs: 1 });
+    const sacrificeRecord = { ...ensureBatterGameRecord("away", activeBatter, getCurrentBatterRole("away")) };
+    recordBatterPlateAppearance("out");
+    const afterOrdinaryOut = { ...ensureBatterGameRecord("away", activeBatter, getCurrentBatterRole("away")) };
+
+    bases = createEmptyBases();
+    const runner = makeBaseRunner(findById(batters, "ichiro"));
+    bases.first = runner;
+    const runnerSnapshot = captureBaseRunnerAdvanceSnapshot();
+    bases.first = null;
+    bases.second = runner;
+    defenseState = {
+      ...createDefenseState(),
+      battedBall: { isBunt: true, isGrounder: true },
+      outcome: { fieldingError: false }
+    };
+    const buntType = getForcePlayBatterResultType({
+      forceOutBases: ["first"],
+      outsBeforePlay: 0,
+      outsToAdd: 1,
+      runnerSnapshot,
+      runs: 0
+    });
+    bases = createEmptyBases();
+    bases.first = runner;
+    const failedBuntType = getForcePlayBatterResultType({
+      forceOutBases: ["first"],
+      outsBeforePlay: 0,
+      outsToAdd: 1,
+      runnerSnapshot,
+      runs: 0
+    });
+    defenseState = {
+      ...createDefenseState(),
+      battedBall: { isBunt: false, isGrounder: false },
+      outcome: { caught: true },
+      chosenFielder: { role: "C" }
+    };
+    const sacrificeFlyType = getCaughtOutBatterResultType(1);
+    defenseState.chosenFielder = { role: "SS" };
+    const infieldFlyType = getCaughtOutBatterResultType(1);
+    return JSON.stringify({ sacrificeRecord, afterOrdinaryOut, buntType, failedBuntType, sacrificeFlyType, infieldFlyType });
+  })()`
+));
+
+assert(sacrificeBattingRecordState.sacrificeRecord.plateAppearances === 2, "sacrifice bunts and flies should count as plate appearances");
+assert(sacrificeBattingRecordState.sacrificeRecord.atBats === 0, "sacrifice bunts and flies should not count as at-bats");
+assert(sacrificeBattingRecordState.sacrificeRecord.sacrificeBunts === 1 && sacrificeBattingRecordState.sacrificeRecord.sacrificeFlies === 1, "sacrifice bunts and flies should have separate batting totals");
+assert(sacrificeBattingRecordState.sacrificeRecord.rbi === 1, "a sacrifice fly run should count as an RBI");
+assert(sacrificeBattingRecordState.afterOrdinaryOut.atBats === 1, "an ordinary out should still count as an at-bat");
+assert(sacrificeBattingRecordState.buntType === "sacrificeBunt", "a bunt that retires the batter and advances another runner should be scored as a sacrifice bunt");
+assert(sacrificeBattingRecordState.failedBuntType === "out", "a bunt without a successful runner advance should remain an ordinary out");
+assert(sacrificeBattingRecordState.sacrificeFlyType === "sacrificeFly", "an outfield catch that scores a runner should be scored as a sacrifice fly");
+assert(sacrificeBattingRecordState.infieldFlyType === "out", "an infield catch should not be scored as a sacrifice fly");
+
 const defenseOutAdvancementState = JSON.parse(runInGame(
   context,
   `(() => {
@@ -11584,27 +11666,30 @@ const buntPopupReductionState = JSON.parse(runInGame(
       popupCount += outcome.pitcherBuntPopup ? 1 : 0;
       pitcherFrontCount += outcome.popupConvertedToPitcherFront ? 1 : 0;
     }
-    const nonCandidate = resolveBuntPopupOutcome(true, true, 1);
+    // 良いバントはポップフライを完全免除せず、goodBuntPopupScale の分だけ残す
+    let goodBuntCandidateCount = 0;
+    for (let index = 0; index < 100000; index += 1) {
+      goodBuntCandidateCount += resolveBuntPopupOutcome(true, false, 1).popupCandidate ? 1 : 0;
+    }
     Math.random = originalRandom;
     return JSON.stringify({
       candidateCount,
       popupCount,
       pitcherFrontCount,
-      nonCandidate
+      goodBuntCandidateCount,
+      popupReductionRate: buntTuning.popupReductionRate,
+      goodBuntPopupScale: buntTuning.goodBuntPopupScale
     });
   })()`
 ));
 
+const expectedPitcherFrontCount = buntPopupReductionState.popupReductionRate * 100000;
+const expectedGoodBuntCandidateCount = buntPopupReductionState.goodBuntPopupScale * 100000;
+
 assert(buntPopupReductionState.candidateCount === 100000, "forced bunt popup simulation should begin with popup candidates");
 assert(
-  buntPopupReductionState.popupCount >= 69000
-    && buntPopupReductionState.popupCount <= 71000,
-  `bunt popup flies should retain about 70% of their former candidates (${buntPopupReductionState.popupCount})`
-);
-assert(
-  buntPopupReductionState.pitcherFrontCount >= 29000
-    && buntPopupReductionState.pitcherFrontCount <= 31000,
-  `about 30% of former bunt popup candidates should become pitcher-front grounders (${buntPopupReductionState.pitcherFrontCount})`
+  Math.abs(buntPopupReductionState.pitcherFrontCount - expectedPitcherFrontCount) <= 1000,
+  `popupReductionRate of bunt popup candidates should become pitcher-front grounders (${buntPopupReductionState.pitcherFrontCount} vs ${expectedPitcherFrontCount})`
 );
 assert(
   buntPopupReductionState.popupCount + buntPopupReductionState.pitcherFrontCount
@@ -11612,10 +11697,92 @@ assert(
   "every removed bunt popup should be reassigned to a pitcher-front grounder"
 );
 assert(
-  buntPopupReductionState.nonCandidate.popupCandidate === false
-    && buntPopupReductionState.nonCandidate.pitcherBuntPopup === false
-    && buntPopupReductionState.nonCandidate.popupConvertedToPitcherFront === false,
-  "good bunts should not enter the popup conversion path"
+  Math.abs(buntPopupReductionState.goodBuntCandidateCount - expectedGoodBuntCandidateCount) <= 1000,
+  `good bunts should keep a reduced popup chance instead of being exempt (${buntPopupReductionState.goodBuntCandidateCount} vs ${expectedGoodBuntCandidateCount})`
 );
+assert(
+  buntPopupReductionState.goodBuntCandidateCount < buntPopupReductionState.candidateCount,
+  "good bunts should still pop up less often than poor bunt contact"
+);
+
+// CPU打者の振り始めは投球ごとに1回だけ決める (フレームごとの抽選だと狙いより遅れる)
+const computerSwingTimingState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    activeBatter = findById(batters, "ichiro");
+    resetSwing();
+    const first = getComputerSwingTargetProgress();
+    const again = getComputerSwingTargetProgress();
+    resetSwing();
+    const samples = [];
+    for (let index = 0; index < 200; index += 1) {
+      resetSwing();
+      samples.push(getComputerSwingTargetProgress());
+    }
+    resetSwing();
+    const afterReset = swingState.computerSwingProgress;
+    return JSON.stringify({
+      first,
+      again,
+      afterReset,
+      min: Math.min(...samples),
+      max: Math.max(...samples),
+      unique: new Set(samples).size,
+      windowStart: computerBatterTuning.swingWindowStart,
+      windowEnd: computerBatterTuning.swingWindowEnd,
+      center: computerBatterTuning.swingTimingCenter
+    });
+  })()`
+));
+
+assert(computerSwingTimingState.first === computerSwingTimingState.again, "CPUの振り始めの狙いは同じ投球中に変わらない");
+assert(computerSwingTimingState.afterReset === null, "投球が変わったら振り始めの狙いを決め直す");
+assert(computerSwingTimingState.unique > 1, "振り始めの狙いは投球ごとにばらつく");
+assert(
+  computerSwingTimingState.min >= computerSwingTimingState.windowStart
+    && computerSwingTimingState.max <= computerSwingTimingState.windowEnd,
+  `振り始めの狙いはスイング可能な範囲に収まる (${computerSwingTimingState.min}〜${computerSwingTimingState.max})`
+);
+assert(computerSwingTimingState.center < 0.85, "振り始めは本塁到達より十分手前でないと間に合わない");
+
+// 速球でも見極めが消えないこと (以前は遅い球以外で見極めが完全に無効だった)
+const computerPitchReadState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    currentPitchType = "fast";
+    currentPitchSpeedKmh = 158;
+    const fast = getComputerPitchReadScore();
+    currentPitchType = "slow";
+    currentPitchSpeedKmh = 112;
+    const slow = getComputerPitchReadScore();
+    return JSON.stringify({ fast, slow, floor: computerBatterTuning.pitchReadFloor });
+  })()`
+));
+
+assert(computerPitchReadState.fast >= computerPitchReadState.floor, "速球でも球の読み取りが0にならない");
+assert(computerPitchReadState.slow > computerPitchReadState.fast, "遅い球のほうが読みやすい");
+
+// CPUの盗塁は走力の高い走者だけが仕掛ける
+const computerStealState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    return JSON.stringify({
+      slow: getComputerStealChance({ run: 5 }, "second"),
+      justUnder: getComputerStealChance({ run: computerStealTuning.minRunRating - 1 }, "second"),
+      threshold: getComputerStealChance({ run: computerStealTuning.minRunRating }, "second"),
+      fast: getComputerStealChance({ run: 10 }, "second"),
+      third: getComputerStealChance({ run: 10 }, "third")
+    });
+  })()`
+));
+
+assert(computerStealState.slow === 0 && computerStealState.justUnder === 0, "走力が基準未満の走者はCPU盗塁を仕掛けない");
+assert(
+  computerStealState.threshold > 0 && computerStealState.fast > computerStealState.threshold,
+  "走力が高いほど盗塁を仕掛けやすい"
+);
+assert(computerStealState.third < computerStealState.fast, "三盗は二盗より控えめに仕掛ける");
 
 console.log("Smoke check passed");

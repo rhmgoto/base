@@ -68,10 +68,22 @@ assertIncludesAll(
     "function shouldMoveComputerBatter",
     "batterMoveTuning.cpuPitchSideMoveScale",
     "batterMoveTuning.cpuSlowPitchMoveBonus",
-    "else if (gamePhase === \"playing\") updateComputerBatterPosition(delta)",
+    "updateComputerBatterPosition(delta);",
+    // CPUの盗塁は打者の更新と同じ経路で毎フレーム進める
+    "function planComputerSteal",
+    "function updateComputerSteal",
+    "function getComputerStealChance",
+    "updateComputerSteal(now);",
+    "planComputerSteal(now);",
     "const outsideSign = activeBatterSide === \"R\" ? 1 : -1",
-    "const awayEscapeScore = clamp(escapeAmount / 34, 0, 1)",
-    "const slowPitchScore = clamp(",
+    // 見極めは外角に逃げる球だけでなく、ゾーンから外れる球全般を対象にする
+    "function getComputerPitchReadScore",
+    "const zoneExitScore = clamp(projectedDistance / computerBatterTuning.zoneExitFullRead, 0, 1)",
+    "const pitchReadScore = getComputerPitchReadScore()",
+    // 振り始めは投球ごとに1点だけ決める
+    "function getComputerSwingTargetProgress",
+    "if (progress < getComputerSwingTargetProgress()) return",
+    "swingState.computerSwingProgress = null",
     "const meetReadSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1)",
     "const adjustedStrikeConfidence = clamp(strikeConfidence - outsideEscapeTake.confidencePenalty, 0, 1)",
     "outsideEscapeTake.chaseMultiplier",
@@ -331,7 +343,8 @@ assertIncludesAll(
 assertIncludesAll(
   script.replace(/\r\n/g, "\n"),
   [
-    "popupReductionRate: 0.3",
+    "popupReductionRate: 0.1",
+    "goodBuntPopupScale: 0.74",
     "function resolveBuntPopupOutcome",
     "&& Math.random() < buntTuning.popupReductionRate",
     "popupConvertedToPitcherFront",
