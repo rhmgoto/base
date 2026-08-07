@@ -522,7 +522,17 @@ const homeRunPowerTuning = {
   maxMishitRescue: 0.28,
   standardCarryBonusMeters: 10,
   superCarryBonusMetersPerPoint: 1.5,
-  cancelledToWallRate: 0.8
+  cancelledToWallRate: 0.8,
+  // 低パワー打者のホームラン候補率を下げるためのペナルティ。
+  // ど真ん中をほぼ完璧に捉えた (homeRunGrade≒0.95) ケースで、
+  // パワー5で候補率50%・パワー3で30%くらいになるように逆算した値。
+  // 旧式 (5-standardPower)/4 は power=5 でペナルティが0になってしまい、
+  // 係数をいくら上げても power=5 の確率を下げられなかったため、
+  // 「パワーが上がるほど直線的にペナルティが減る」形に変更している。
+  lowPowerCandidatePenaltyBase: 0.57,
+  lowPowerCandidatePenaltyPerPoint: 0.05,
+  // ど真ん中以外はさらにペナルティを強める倍率 (旧式の 0.12/0.06 = 2倍と同じ比率)。
+  lowPowerCandidatePenaltyOutsideMultiplier: 2
 };
 const homeRunVarietyTuning = {
   standardDeepDrivePaceMin: 0.88,
@@ -1193,6 +1203,7 @@ let battingOrderIndex = { away: 0, home: 0 };
 let lastOutBatterByTeam = { away: null, home: null };
 let bases = createEmptyBases();
 let reliefBoostState = createReliefBoostState();
+let pendingGameEnd = null;
 
 let activeBatter = selected.away.batters[0].player;
 let activePitcher = getTeamActivePitcher("home");
@@ -3911,6 +3922,7 @@ function startGame(modeOverride = null) {
   battingOrderIndex = { away: 0, home: 0 };
   lastOutBatterByTeam = { away: null, home: null };
   reliefBoostState = createReliefBoostState();
+  clearPendingGameEnd();
   inning = 1;
   half = "top";
   battingTeam = isPitchingPracticeMode() ? "home" : (isBattingPracticeMode() || isHomeRunDerbyMode()) ? "away" : firstBatTeam;
@@ -3942,6 +3954,7 @@ function startGame(modeOverride = null) {
 function showMenu() {
   gamePhase = "menu";
   inputLockedUntil = 0;
+  clearPendingGameEnd();
   shell?.classList.add("menu-open");
   menu.classList.remove("hidden");
   updateMenuAbilityPanels();
@@ -4276,6 +4289,7 @@ function advanceHomeRunDerbyTurn() {
 }
 
 function endHomeRunDerby() {
+  clearPendingGameEnd();
   gamePhase = "gameover";
   ball.active = false;
   pendingPitch = null;
@@ -4345,6 +4359,7 @@ function isManualBaserunningControl(team = battingTeam) {
 
 const computerJudgmentNextPitchDelay = 2000;
 const sideChangeInputDelay = 2000;
+const gameEndResultDelayMs = 1500;
 
 function isInputLocked(now = performance.now()) {
   return now < inputLockedUntil;
@@ -4480,6 +4495,7 @@ function declareIntentionalWalk() {
   resetCountOnly();
   message = runs > 0 ? `申告敬遠: ${runs}点` : "申告敬遠";
   showEffect(runs > 0 ? `申告敬遠 +${runs}` : "申告敬遠", "#aee7ff");
+  if (pendingGameEnd) return;
   if (gamePhase !== "gameover" && !resetPracticePlateAppearance()) {
     advanceBattingOrder();
     setMatchup();
@@ -6659,6 +6675,15 @@ function update(delta) {
   pollGamepadInput();
   updateCurrentBgm();
   if (pauseMenuState.active) return;
+  if (pendingGameEnd) {
+    updatePendingGameEnd(now);
+    if (gamePhase !== "gameover") {
+      if (gamePhase === "defense") updateDefensePlay(now);
+      if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
+      if (hbpPose.active && now - hbpPose.startTime > hbpPose.duration) hbpPose.active = false;
+      return;
+    }
+  }
   if (gamePhase === "defense") {
     updateDefensePlay(now);
     if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
@@ -7736,10 +7761,10 @@ function makeUnifiedFlyResult(profile, quality) {
     });
   }
   const lowPowerCandidatePenalty = clamp(
-    (5 - homeRunPower.standardPower) / 4,
+    homeRunPowerTuning.lowPowerCandidatePenaltyBase - homeRunPower.standardPower * homeRunPowerTuning.lowPowerCandidatePenaltyPerPoint,
     0,
     1
-  ) * (profile.zoneBand === "center" ? 0.06 : 0.12);
+  ) * (profile.zoneBand === "center" ? 1 : homeRunPowerTuning.lowPowerCandidatePenaltyOutsideMultiplier);
   const homeRunCandidateChance = clamp(
     0.12
       + ((homeRunGrade - 0.6) / 0.4) * 0.68
@@ -9093,6 +9118,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
       showEffect("三振", "#f9f871");
       ball.active = false;
       if (!resetPracticePlateAppearance()) {
+        if (count.outs >= 3 && maybeDelayGameEndAfterFinalOut()) return;
         advanceBattingOrder();
         setMatchup();
       }
@@ -9119,6 +9145,7 @@ function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, 
     hbpPose.startTime = performance.now();
     ball.active = false;
     resetCountOnly();
+    if (pendingGameEnd) return;
     if (!resetPracticePlateAppearance()) {
       advanceBattingOrder();
       setMatchup();
@@ -9336,6 +9363,23 @@ function shouldEndByMercyRuleAfterCompletedHalf() {
   if (half === "bottom" && battingTeam === getSecondBatTeam()) return true;
   if (half === "top" && battingTeam === firstBatTeam && winner === getSecondBatTeam()) return true;
   return false;
+}
+
+function shouldEndGameAfterCompletedHalfNow() {
+  if (isAnyPracticeMode() || count.outs < 3) return false;
+  const firstHalfTeam = firstBatTeam;
+  const secondHalfTeam = getSecondBatTeam();
+  if (shouldEndByMercyRuleAfterCompletedHalf()) return true;
+  if (battingTeam === firstHalfTeam) {
+    return inning >= maxInnings && scores[secondHalfTeam] > scores[firstHalfTeam];
+  }
+  return inning >= maxInnings && scores.away !== scores.home;
+}
+
+function maybeDelayGameEndAfterFinalOut(reasonLabel = "") {
+  if (!shouldEndGameAfterCompletedHalfNow()) return false;
+  endGame(reasonLabel);
+  return true;
 }
 
 function addRunsToBattingTeam(runs, responsiblePitcherIds = [], options = {}) {
@@ -13044,19 +13088,15 @@ function getBattedBallRouteArrivalTime(point, battedBall) {
 }
 
 function getEligibleDefenseFielders(fielders, battedBall) {
+  // 「打球の実際の経路が内野手のそばを通るか」を見るチェックは、
+  // 「だいたいどこに落ちるか」で外野手だけに絞ってしまう大まかな分岐より先に見る。
+  // 以前はライナー・低い打球用の反応チェックが isOutfieldFlyLandingBall などの
+  // 外野送り分岐より後ろにあったため、外野着地と判定された低めのライナーは
+  // 経路チェックまで処理が届かず、そばを通っても内野手が全く反応しなかった。
   const routeReactionInfielders = battedBall?.isGrounder
     ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
     : [];
   if (routeReactionInfielders.length) return routeReactionInfielders;
-  if (battedBall?.isPopupFly) {
-    return fielders.filter((fielder) => fielder.role === "P" || isTemporaryInfielderRole(fielder.role));
-  }
-  if (isOutfieldFlyLandingBall(battedBall)) {
-    return fielders.filter((fielder) => !isInfielderRole(fielder.role));
-  }
-  if (isOutfieldFrontLandingBall(battedBall)) {
-    return fielders.filter((fielder) => !isInfielderRole(fielder.role));
-  }
   const lineDropRouteInfielders = battedBall?.isLineDrop
     ? fielders.filter((fielder) => isInfielderLineDropRouteBall(fielder, battedBall))
     : [];
@@ -13068,6 +13108,15 @@ function getEligibleDefenseFielders(fielders, battedBall) {
     ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
     : [];
   if (linerRouteReactionInfielders.length) return linerRouteReactionInfielders;
+  if (battedBall?.isPopupFly) {
+    return fielders.filter((fielder) => fielder.role === "P" || isTemporaryInfielderRole(fielder.role));
+  }
+  if (isOutfieldFlyLandingBall(battedBall)) {
+    return fielders.filter((fielder) => !isInfielderRole(fielder.role));
+  }
+  if (isOutfieldFrontLandingBall(battedBall)) {
+    return fielders.filter((fielder) => !isInfielderRole(fielder.role));
+  }
   if (battedBall?.isGrounder && isHardGrounder(battedBall)) {
     const activeInfielders = fielders.filter((fielder) => isInfielderAttemptRouteBall(fielder, battedBall));
     if (activeInfielders.length) return activeInfielders;
@@ -14799,11 +14848,14 @@ function isOutfieldFlyChaseToLanding(battedBall, elapsedSeconds, ballTime) {
   return elapsedSeconds <= ballTime;
 }
 
-// タッチアップとゴロアウト時の進塁は、走者が走り切るまでプレーを終わらせない。
-// ここで待たないと到達判定が常に不成立になり、進塁も得点もできなくなる。
+// タッチアップ・ゴロアウト進塁に限らず、打者走者以外の走者がまだ次の塁へ
+// 走っている間はプレーを終わらせない。ここで待たないと、送球プレーの猶予時間
+// (throwState.holdDeadline) だけで判定が確定してしまい、例えば1塁走者が
+// 本塁を狙って走っている途中で送球側の処理が先に片付いたときに、
+// 生還が認められないまま直前の塁で足止めされてしまう。
 function getAdvancingRunnerHoldDeadline(baseRunners = defenseState.baseRunners) {
   const arrivals = (baseRunners || [])
-    .filter((runner) => runner && !runner.isOut && (runner.tagUp || runner.groundOutAdvance))
+    .filter((runner) => runner && !runner.isOut && !runner.arrived)
     .map((runner) => runner.arrivalTime)
     .filter(Number.isFinite);
   return arrivals.length ? Math.max(...arrivals) : null;
@@ -14847,11 +14899,15 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
 
   const throwState = defenseState.throw;
   if (throwState) {
+    const advancingHold = getAdvancingRunnerHoldDeadline();
+    const combinedHoldDeadline = Number.isFinite(advancingHold)
+      ? Math.max(throwState.holdDeadline, advancingHold)
+      : throwState.holdDeadline;
     if (!Number.isFinite(throwState.startTime)) {
-      return elapsedSeconds >= throwState.holdDeadline && isBatterRunnerSettledForResolution();
+      return elapsedSeconds >= combinedHoldDeadline && isBatterRunnerSettledForResolution();
     }
     if (Number.isFinite(throwState.endTime)) {
-      return elapsedSeconds >= throwState.holdDeadline
+      return elapsedSeconds >= combinedHoldDeadline
         && isBatterRunnerSettledForResolution();
     }
   }
@@ -15414,6 +15470,12 @@ function finishDefensePlay() {
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
       showEffect("ファールアウト", "#ffcf70");
       if (!resetPracticePlateAppearance()) {
+        if (count.outs >= 3 && maybeDelayGameEndAfterFinalOut()) {
+          appendHomeRunVisionAdviceToMessage(defenseState.battedBall);
+          defenseState.active = true;
+          gamePhase = "defense";
+          return;
+        }
         advanceBattingOrder();
         setMatchup();
       }
@@ -15568,6 +15630,11 @@ function finishDefensePlay() {
   }
 
   appendHomeRunVisionAdviceToMessage(defenseState.battedBall);
+  if (pendingGameEnd || (!isAnyPracticeMode() && count.outs >= 3 && maybeDelayGameEndAfterFinalOut())) {
+    defenseState.active = true;
+    gamePhase = "defense";
+    return;
+  }
   if (!resetPracticePlateAppearance()) {
     advanceBattingOrder();
     setMatchup();
@@ -15818,6 +15885,7 @@ function checkCountEnd() {
     message = "三振";
     showEffect("三振", "#f9f871");
     if (!resetPracticePlateAppearance()) {
+      if (count.outs >= 3 && maybeDelayGameEndAfterFinalOut()) return;
       advanceBattingOrder();
       setMatchup();
     }
@@ -15829,6 +15897,7 @@ function checkCountEnd() {
     resetCountOnly();
     message = runs > 0 ? `四球: ${runs}点` : "四球";
     showEffect(runs > 0 ? `四球 +${runs}` : "四球", "#aee7ff");
+    if (pendingGameEnd) return;
     if (!resetPracticePlateAppearance()) {
       advanceBattingOrder();
       setMatchup();
@@ -15885,7 +15954,27 @@ function changeSide() {
   scheduleNextPitch(0);
 }
 
-function endGame(reasonLabel = "") {
+function clearPendingGameEnd() {
+  pendingGameEnd = null;
+}
+
+function lockGameEndDelay(readyAt) {
+  inputLockedUntil = Math.max(inputLockedUntil || 0, readyAt);
+  autoPitchTimer = Number.POSITIVE_INFINITY;
+  computerPitchPlan = null;
+  pendingPitch = null;
+}
+
+function updatePendingGameEnd(now = performance.now()) {
+  if (!pendingGameEnd) return false;
+  if (now >= pendingGameEnd.readyAt) {
+    finishGameEnd(pendingGameEnd.reasonLabel);
+  }
+  return true;
+}
+
+function finishGameEnd(reasonLabel = "") {
+  clearPendingGameEnd();
   ensurePitcherGameRecord("away", getTeamActivePitcher("away"));
   ensurePitcherGameRecord("home", getTeamActivePitcher("home"));
   markPitcherSaveIfEligible();
@@ -15894,6 +15983,21 @@ function endGame(reasonLabel = "") {
   const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "チームA勝利" : "チームB勝利";
   message = `${reasonLabel ? `${reasonLabel} ` : ""}試合終了 ${scores.away}-${scores.home} ${result}`;
   showEffect(result, "#ff6f61");
+}
+
+function endGame(reasonLabel = "", options = {}) {
+  if (options.delay === false || gamePhase === "gameover") {
+    finishGameEnd(reasonLabel);
+    return;
+  }
+  const delayMs = Number.isFinite(options.delayMs) ? options.delayMs : gameEndResultDelayMs;
+  if (delayMs <= 0) {
+    finishGameEnd(reasonLabel);
+    return;
+  }
+  const readyAt = performance.now() + delayMs;
+  pendingGameEnd = { reasonLabel, readyAt };
+  lockGameEndDelay(readyAt);
 }
 
 
@@ -20570,13 +20674,12 @@ function drawPitcher() {
     drawPitcherSprite(team);
   } else {
     drawPlayer(pitcher.x, pitcher.y, 1, "#286ed6", true);
-  }
-  if (isReliefBoostActive(activePitcher)) {
-    drawTemporaryBoostAura(pitcher.x, pitcher.y - 10, {
-      radiusX: 58,
-      radiusY: 91,
-      label: getReliefPitcherBoostMultiplier(activePitcher) >= 1.2 ? "20%" : "5%"
-    });
+    if (isReliefBoostActive(activePitcher)) {
+      drawTemporaryBoostAura(pitcher.x, pitcher.y - 10, {
+        radiusX: 52,
+        radiusY: 82
+      });
+    }
   }
 }
 
@@ -20682,6 +20785,9 @@ function drawPitcherSprite(team) {
     ctx.translate(pitcher.x * 2, 0);
     ctx.scale(-1, 1);
   }
+  if (isReliefBoostActive(activePitcher)) {
+    drawSpriteBodyAura(spriteSet.image, frame, drawX, footY - drawHeight, drawWidth, drawHeight);
+  }
   ctx.drawImage(spriteSet.image, frame.sx, frame.sy, frame.sw, frame.sh, drawX, footY - drawHeight, drawWidth, drawHeight);
   ctx.restore();
 }
@@ -20694,14 +20800,30 @@ function drawBatter() {
     drawBatterSprite(battingTeam);
   } else {
     drawPlayer(batter.x, batter.y, 1.18, "#e04f42", false);
+    if (isPinchHitBoostActive(activeBatter)) {
+      drawTemporaryBoostAura(batter.x, batter.y - 12, {
+        radiusX: 54,
+        radiusY: 88
+      });
+    }
   }
-  if (isPinchHitBoostActive(activeBatter)) {
-    drawTemporaryBoostAura(batter.x, batter.y - 12, {
-      radiusX: 62,
-      radiusY: 96,
-      label: "+3"
-    });
+}
+
+function drawSpriteBodyAura(image, frame, drawX, drawY, drawWidth, drawHeight, alpha = 1) {
+  const age = performance.now() / 1000;
+  const pulse = 0.5 + Math.sin(age * 4.1) * 0.5;
+  const shadowColor = `rgba(255, 60, 58, ${0.78 + pulse * 0.14})`;
+
+  ctx.save();
+  ctx.globalAlpha = 0.16 * alpha;
+  ctx.shadowColor = shadowColor;
+  ctx.shadowBlur = 36 + pulse * 10;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  for (let i = 0; i < 5; i += 1) {
+    ctx.drawImage(image, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawWidth, drawHeight);
   }
+  ctx.restore();
 }
 
 function drawTemporaryBoostAura(x, y, options = {}) {
@@ -20715,19 +20837,19 @@ function drawTemporaryBoostAura(x, y, options = {}) {
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
   const glow = ctx.createRadialGradient(x, y, Math.max(6, radiusX * 0.12), x, y, radiusY);
-  glow.addColorStop(0, `rgba(${color}, ${0.18 + pulse * 0.035})`);
-  glow.addColorStop(0.55, `rgba(${color}, 0.115)`);
-  glow.addColorStop(0.82, `rgba(${secondaryColor}, 0.055)`);
+  glow.addColorStop(0, `rgba(${color}, ${0.12 + pulse * 0.025})`);
+  glow.addColorStop(0.55, `rgba(${color}, 0.14)`);
+  glow.addColorStop(0.82, `rgba(${secondaryColor}, 0.12)`);
   glow.addColorStop(1, `rgba(${color}, 0)`);
   ctx.fillStyle = glow;
-  ctx.shadowColor = `rgba(${color}, 0.42)`;
-  ctx.shadowBlur = 18;
+  ctx.shadowColor = `rgba(${color}, 0.62)`;
+  ctx.shadowBlur = 26;
   ctx.beginPath();
   ctx.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = `rgba(${secondaryColor}, ${0.16 + pulse * 0.06})`;
+  ctx.strokeStyle = `rgba(${secondaryColor}, ${0.24 + pulse * 0.08})`;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.ellipse(x, y, radiusX * 0.86, radiusY * 0.92, 0, 0, Math.PI * 2);
@@ -20774,7 +20896,19 @@ function drawBatterSprite(team) {
     ctx.translate(batter.x * 2, 0);
     ctx.scale(-1, 1);
   }
-  layers.flatMap(expandBatterPoseLayer).forEach((layer) => {
+  const expandedLayers = layers.flatMap(expandBatterPoseLayer);
+  if (isPinchHitBoostActive(activeBatter)) {
+    expandedLayers.forEach((layer) => {
+      const image = getBatterPoseImage(spriteSet, layer.pose);
+      const frame = frames[layer.pose];
+      const drawHeight = getBatterDrawHeight(layer.pose);
+      const drawWidth = drawHeight * (frame.sw / frame.sh);
+      const drawX = getBatterDrawX(layer.pose, drawWidth);
+      const drawY = batter.y + 58 - drawHeight;
+      drawSpriteBodyAura(image, frame, drawX, drawY, drawWidth, drawHeight, layer.alpha);
+    });
+  }
+  expandedLayers.forEach((layer) => {
     const image = getBatterPoseImage(spriteSet, layer.pose);
     const frame = frames[layer.pose];
     const drawHeight = getBatterDrawHeight(layer.pose);
