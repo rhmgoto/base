@@ -7331,25 +7331,27 @@ const runnerDecisionState = JSON.parse(runInGame(
     const keyedLateSecondRunner = createBatterRunner(findById(batters, "ichiro"));
     keyedLateSecondRunner.x = defenseField.bases.first.x;
     keyedLateSecondRunner.y = defenseField.bases.first.y;
-    keyedLateSecondRunner.currentBase = "first";
-    keyedLateSecondRunner.targetBase = "first";
-    keyedLateSecondRunner.arrived = true;
     gameMode = "versus";
     gamePhase = "defense";
     defenseControlMode = { away: "auto", home: "manual" };
+    // handleBatterRunnerBaseCommand は先頭で updateBatterRunner を回すので、
+    // 経路上でも一塁に到達し終えた時刻でないと「一塁で止まっている走者」にならず、
+    // 進塁指示が届かない。ichiro の一塁到達は約3.2秒なので、その後の時刻で指示する。
+    const keyedCommandElapsed = 3.6;
     defenseState = {
       ...createDefenseState(),
       active: true,
-      startTime: performance.now() - 2000,
+      startTime: performance.now() - keyedCommandElapsed * 1000,
       resolved: false,
       runner: keyedLateSecondRunner,
       chosenFielder: fielder,
       target: fielder,
       battedBall: longBall,
       outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 0.6 },
-      throw: { startTime: 1, endTime: 1.5, holdDeadline: 3.5, safe: true, targetBase: "second", baseLabel: "second" }
+      throw: { startTime: 1, endTime: 1.5, holdDeadline: 6.5, safe: true, targetBase: "second", baseLabel: "second" }
     };
-    updateThrowState(2.0);
+    updateThrowState(keyedCommandElapsed);
+    const keyedLateRunnerReachedFirst = (updateBatterRunner(keyedCommandElapsed), keyedLateSecondRunner.arrived);
     handleBatterRunnerBaseCommand("second");
     const keyedLateRunnerToHeldSecondSafe = defenseState.throw.safe;
     const keyedLateRunnerThrowStillSecond = defenseState.throw.targetBase === "second";
@@ -7927,6 +7929,7 @@ const runnerDecisionState = JSON.parse(runInGame(
       waitsForRunningBatterRunner,
       resolvesAfterBatterRunnerSettles,
       lateRunnerToAlreadyHeldSecondSafe,
+      keyedLateRunnerReachedFirst,
       keyedLateRunnerToHeldSecondSafe,
       keyedLateRunnerThrowStillSecond,
       keyedLateRunnerHeldBase,
@@ -8040,6 +8043,7 @@ assert(runnerDecisionState.backHomeBatterOnFirst === true, "throws to home on or
 assert(runnerDecisionState.waitsForRunningBatterRunner === false, "defense should not resolve while the batter-runner is still between bases");
 assert(runnerDecisionState.resolvesAfterBatterRunnerSettles === true, "defense should resolve once the batter-runner has settled on a base");
 assert(runnerDecisionState.lateRunnerToAlreadyHeldSecondSafe === false, "runners advancing to a base after the throw already arrived should be out");
+assert(runnerDecisionState.keyedLateRunnerReachedFirst === true, "前提: 指示を出す時点で打者走者が一塁に到達し終えていること");
 assert(runnerDecisionState.keyedLateRunnerToHeldSecondSafe === false, "keyed runner advances to a base already holding the ball should be out");
 assert(runnerDecisionState.keyedLateRunnerThrowStillSecond === true, "keyed runner advances should not erase the already-held base throw");
 assert(runnerDecisionState.keyedLateRunnerHeldBase === "second", "throws that reached second should mark second as holding the ball");

@@ -343,6 +343,9 @@ assertIncludesAll(
 assertIncludesAll(
   script.replace(/\r\n/g, "\n"),
   [
+    // プレー途中の走者作り直しは、走り出した走者を残す版を通す
+    "function refreshDefenseBaseRunnerAnimations",
+    "function shouldKeepLiveDefenseBaseRunner",
     "popupReductionRate: 0.1",
     "goodBuntPopupScale: 0.74",
     "function resolveBuntPopupOutcome",

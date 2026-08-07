@@ -667,8 +667,23 @@ const cpuThrow = JSON.parse(run(`
     updateDefenseBaseRunners(9.1);
   });
 
-  // 通常のゴロ (一塁に走者)
+  // 通常のゴロ (一塁に普通の走力の走者)
   const ordinaryGrounder = scenario((ball, outcome, fielder, target) => {
+    bases.first = makeBaseRunner(findById(batters, "sato"));
+    defenseState = {
+      ...createDefenseState(), active: true, resolved: false,
+      startTime: performance.now() - 1500,
+      outcome, battedBall: ball, runner: createBatterRunner(activeBatter),
+      baseRunners: createDefenseBaseRunnerAnimations(outcome, ball, null, fielder, target),
+      chosenFielder: fielder, target
+    };
+    updateBatterRunner(1.4);
+    updateDefenseBaseRunners(1.4);
+  });
+
+  // 足の速い走者だと二塁は間に合わない (走者2.65秒に対し送球2.71秒)。
+  // その場合は先の塁を狙わず、一塁で確実にアウトを取る。
+  const fastRunnerGrounder = scenario((ball, outcome, fielder, target) => {
     bases.first = makeBaseRunner(findById(batters, "ichiro"));
     defenseState = {
       ...createDefenseState(), active: true, resolved: false,
@@ -692,7 +707,7 @@ const cpuThrow = JSON.parse(run(`
     updateBatterRunner(1.4);
   });
 
-  return JSON.stringify({ advancingRunner, ordinaryGrounder, emptyBases });
+  return JSON.stringify({ advancingRunner, ordinaryGrounder, fastRunnerGrounder, emptyBases });
 `));
 
 assert(
@@ -702,6 +717,10 @@ assert(
 assert(
   cpuThrow.ordinaryGrounder === "second",
   `通常のゴロでは間に合う一番先の塁 (二塁) へ投げるべき (${cpuThrow.ordinaryGrounder})`
+);
+assert(
+  cpuThrow.fastRunnerGrounder === "first",
+  `先の塁が間に合わないなら一塁で確実にアウトを取るべき (${cpuThrow.fastRunnerGrounder})`
 );
 assert(
   cpuThrow.emptyBases === "first",
@@ -958,12 +977,25 @@ assert(
   `) === 8.3,
   "進塁中の走者がいる間はプレーの終了を待つべき"
 );
+// 走り終えた走者とアウトになった走者は待たない。
+// (タッチアップやゴロアウトの進塁に限らず、走っている走者はすべて待つ。
+//  待たずに打ち切ると getSettledRunnerBase が踏み終えた塁で止めてしまう)
 assert(
   run(`
-    defenseState.baseRunners = [{ startBase: "first", targetBase: "second", arrivalTime: 5.1 }];
+    defenseState.baseRunners = [
+      { startBase: "first", targetBase: "second", arrivalTime: 5.1, arrived: true },
+      { startBase: "second", targetBase: "third", arrivalTime: 6.2, isOut: true }
+    ];
     return getAdvancingRunnerHoldDeadline() === null;
   `) === true,
-  "進塁する走者がいなければ待ち時間は延ばさないべき"
+  "走り終えた走者とアウトの走者では待ち時間を延ばさないべき"
+);
+assert(
+  run(`
+    defenseState.baseRunners = [{ startBase: "first", targetBase: "second", arrivalTime: 5.1, arrived: false }];
+    return getAdvancingRunnerHoldDeadline();
+  `) === 5.1,
+  "ヒットで進塁中の走者も、走り切るまではプレーを終わらせないべき"
 );
 
 assert(
@@ -978,6 +1010,177 @@ assert(
     ) === false;
   `) === true,
   "現仕様: タッチアップは三塁からのみで、二塁からは発生しない"
+);
+
+// ---------------------------------------------------------------------------
+// プレー途中で走者アニメーションを作り直しても、走り出した走者を巻き戻さないこと。
+// 作り直しは bases (プレー開始時の塁) から再生成するため、以前は手動の進塁指示や
+// すでに走った分が消え、生還済みの走者まで開始塁に戻されて得点が消えていた。
+// ---------------------------------------------------------------------------
+const midPlayRunnerRefresh = JSON.parse(run(`
+  startGame();
+  gameMode = "versus";
+  battingTeam = "away";
+  defenseControlMode = { away: "manual", home: "manual" };
+  gamePhase = "defense";
+  count.outs = 0;
+  bases = createEmptyBases();
+  bases.first = makeBaseRunner(findById(batters, "sato"));
+  bases.second = makeBaseRunner(findById(batters, "shuto"));
+  bases.third = makeBaseRunner(findById(batters, "ichiro"));
+  activeBatter = findById(batters, "suzuki");
+
+  const target = { x: field.plateX + 380, y: field.plateY - 1300 };
+  const hit = {
+    target, direction: normalize({ x: 0.3, y: -1 }), flightDistance: 1300, landingDistance: 1300,
+    ballTime: 2.4, isGrounder: false, isLiner: true, isDeep: true,
+    power: 0.8, trajectory: "liner", fenceOver: false, wallHit: false, groundRuleDouble: false
+  };
+  const outcome = { kind: "single", label: "ヒット", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 4.0 };
+  const fielder = { role: "R", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+  const runners = createDefenseBaseRunnerAnimations(outcome, hit, null, fielder, target);
+  defenseState = {
+    ...createDefenseState(), active: true, resolved: false,
+    startTime: performance.now() - 9000, duration: 40000,
+    outcome, battedBall: hit, runner: createBatterRunner(activeBatter),
+    baseRunners: runners, fielders: [fielder], chosenFielder: fielder, target
+  };
+  // 二塁走者と三塁走者を手動で本塁へ走らせ、生還済みにする
+  runners.forEach((entry) => {
+    if (entry.startBase === "second" || entry.startBase === "third") {
+      entry.manualTargetBase = "home";
+      entry.targetBase = "home";
+      entry.currentBase = "home";
+      entry.arrived = true;
+      entry.running = false;
+      entry.arrivalTime = 6;
+    }
+  });
+  // 打者走者が一塁を飛び出して戻れず、一塁送球でアウトになる
+  defenseState.throw = {
+    targetBase: "first", baseLabel: "一塁", startTime: 5, endTime: 7,
+    holdDeadline: 12, safe: false, playType: "tag", tagTime: 7, baseTouchTime: 7
+  };
+  defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(outcome, hit, defenseState.throw, fielder, target);
+  const settled = {};
+  defenseState.baseRunners.forEach((entry) => {
+    settled[entry.startBase] = getSettledRunnerBase(entry, 9);
+  });
+  const runs = resolveDefensePlayBaseState({
+    batterInfo: activeBatter, forceOutBases: [], outRunners: [], batterOut: true
+  });
+  return JSON.stringify({
+    settled,
+    runs,
+    first: bases.first ? bases.first.name : null,
+    second: bases.second ? bases.second.name : null,
+    third: bases.third ? bases.third.name : null
+  });
+`));
+
+assert(
+  midPlayRunnerRefresh.settled.second === "home" && midPlayRunnerRefresh.settled.third === "home",
+  `作り直しで生還済みの走者を開始塁へ戻してはいけない (${JSON.stringify(midPlayRunnerRefresh.settled)})`
+);
+assert(
+  midPlayRunnerRefresh.runs === 2,
+  `打者走者がアウトになっても、先に生還した2人の得点は消えない (${midPlayRunnerRefresh.runs}点)`
+);
+assert(
+  midPlayRunnerRefresh.first === null && midPlayRunnerRefresh.third === null,
+  `生還した走者が塁に残ってはいけない (一塁 ${midPlayRunnerRefresh.first} / 三塁 ${midPlayRunnerRefresh.third})`
+);
+
+assert(
+  run(`
+    // 塁上で止まったままの走者は、新しい判断 (タッチアップなど) を受け取れる
+    return shouldKeepLiveDefenseBaseRunner({
+      startBase: "third", currentBase: "third", running: false, arrived: true
+    }) === false;
+  `) === true,
+  "塁で止まっている走者は作り直しの対象のままにする"
+);
+assert(
+  run(`
+    return shouldKeepLiveDefenseBaseRunner({
+      startBase: "second", currentBase: "second", targetBase: "home",
+      manualTargetBase: "home", running: true, arrived: false
+    }) === true;
+  `) === true,
+  "手動の進塁指示を受けた走者は作り直しで消さない"
+);
+
+// ---------------------------------------------------------------------------
+// 捕球アウトと送球アウトが同じプレーで重なる場合。
+// 以前は finishDefensePlay が「送球アウトの枝」に入ると捕球アウトの枝に到達せず、
+// 打者のアウトが数えられないうえ、アウトのはずの打者が一塁に置かれていた。
+// ---------------------------------------------------------------------------
+const caughtFlyWithThrowOut = JSON.parse(run(`
+  function playTagUp(tagUpSafe, outsBefore) {
+    startGame();
+    gameMode = "watch";
+    battingTeam = "away";
+    gamePhase = "defense";
+    count.outs = outsBefore;
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner(findById(batters, "sato"));
+    bases.second = makeBaseRunner(findById(batters, "shuto"));
+    bases.third = makeBaseRunner(findById(batters, "ichiro"));
+    activeBatter = findById(batters, "suzuki");
+    const target = { x: field.plateX + 200, y: field.plateY - 1500 };
+    const hit = {
+      target, direction: normalize({ x: 0.15, y: -1 }), flightDistance: 1500, landingDistance: 1500,
+      ballTime: 3.2, isGrounder: false, isLiner: false, isDeep: true, isPopupFly: false,
+      power: 0.7, trajectory: "fly", fenceOver: false, wallHit: false, groundRuleDouble: false
+    };
+    const outcome = { kind: "out", label: "外野フライ", caught: true, needsThrow: false, fieldingTime: 3.2 };
+    const fielder = { role: "C", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+    const runners = createDefenseBaseRunnerAnimations(outcome, hit, null, fielder, target);
+    defenseState = {
+      ...createDefenseState(), active: true, resolved: false,
+      startTime: performance.now() - 12000, duration: 30000,
+      outcome, battedBall: hit, runner: createBatterRunner(activeBatter),
+      baseRunners: runners, fielders: [fielder], chosenFielder: fielder, target
+    };
+    updateDefenseBaseRunners(12);
+    updateBatterRunner(12);
+    const third = runners.find((entry) => entry.startBase === "third");
+    const arrival = third && third.arrivalTime ? third.arrivalTime : 5;
+    const endTime = tagUpSafe ? arrival + 0.6 : arrival - 0.4;
+    defenseState.throw = {
+      targetBase: "home", baseLabel: "本塁", startTime: 3.3, endTime,
+      holdDeadline: 12, safe: tagUpSafe, playType: "tag", tagTime: endTime, baseTouchTime: endTime
+    };
+    finishDefensePlay();
+    return {
+      tagUpPlanned: Boolean(third && third.tagUp),
+      outs: count.outs,
+      runs: scores[battingTeam],
+      first: bases.first ? bases.first.name : null,
+      second: bases.second ? bases.second.name : null,
+      third: bases.third ? bases.third.name : null
+    };
+  }
+  return JSON.stringify({ out: playTagUp(false, 0), safe: playTagUp(true, 0) });
+`));
+
+assert(caughtFlyWithThrowOut.out.tagUpPlanned === true, "前提: 深い外野フライで三塁走者がタッチアップすること");
+assert(
+  caughtFlyWithThrowOut.out.outs === 2,
+  `捕球アウトとタッチアップ死でアウトは2つ増えるべき (${caughtFlyWithThrowOut.out.outs})`
+);
+assert(
+  caughtFlyWithThrowOut.out.third === null,
+  `タッチアップでアウトになった走者は三塁に残らない (${caughtFlyWithThrowOut.out.third})`
+);
+assert(
+  caughtFlyWithThrowOut.out.first === "サトウ" && caughtFlyWithThrowOut.out.second === "シュウトウ",
+  `捕球アウトの打者を一塁に置いて満塁にしてはいけない (${caughtFlyWithThrowOut.out.first}/${caughtFlyWithThrowOut.out.second})`
+);
+assert(caughtFlyWithThrowOut.out.runs === 0, "タッチアップ死では得点しない");
+assert(
+  caughtFlyWithThrowOut.safe.outs === 1 && caughtFlyWithThrowOut.safe.runs === 1,
+  `タッチアップが成功すれば犠飛で1点、アウトは捕球の1つだけ (${caughtFlyWithThrowOut.safe.outs}アウト ${caughtFlyWithThrowOut.safe.runs}点)`
 );
 
 // ---------------------------------------------------------------------------

@@ -9424,6 +9424,35 @@ function createDefenseBaseRunnerAnimations(outcome, battedBall, throwState = nul
   ].filter(Boolean);
 }
 
+// プレー途中で進塁の判断が変わったときに走者を丸ごと作り直すと、
+// createDefenseBaseRunner が bases (プレー開始時の塁) から作り直すため、
+// すでに走った分・踏んだ塁・手動の指示が消え、生還済みの走者まで開始塁に戻ってしまう。
+// 走り出している走者はそのまま生かし、まだ塁で止まっている走者だけ新しい判断に差し替える。
+function refreshDefenseBaseRunnerAnimations(outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
+  const rebuilt = createDefenseBaseRunnerAnimations(outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState);
+  const live = new Map(
+    (defenseState.baseRunners || [])
+      .filter((runner) => runner?.startBase)
+      .map((runner) => [runner.startBase, runner])
+  );
+  return rebuilt.map((runner) => {
+    const current = live.get(runner.startBase);
+    return shouldKeepLiveDefenseBaseRunner(current) ? current : runner;
+  });
+}
+
+// 「もう動き出している走者」は作り直さない。
+// 塁上で止まったままの走者だけが、新しい判断 (タッチアップなど) の対象になる。
+function shouldKeepLiveDefenseBaseRunner(runner) {
+  if (!runner || !runner.startBase) return false;
+  if (runner.manualTargetBase) return true;
+  if (runner.isOut) return true;
+  const startIndex = baseIndexByName[runner.startBase] ?? 0;
+  if (getDefenseRunnerCompletedBaseIndex(runner) > startIndex) return true;
+  if (runner.arrived && runner.currentBase && runner.currentBase !== runner.startBase) return true;
+  return Boolean(runner.running) && !runner.arrived;
+}
+
 function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
   if (!runnerInfo) return null;
   const startBase = baseIndexByName[baseName];
@@ -11519,7 +11548,9 @@ function getRunnerArrivalTimeAtBaseIndex(runner, baseIndex) {
     cumulative += Math.hypot(current.x - previous.x, current.y - previous.y);
     if (Math.hypot(current.x - targetPoint.x, current.y - targetPoint.y) < 2) {
       const routeStartTime = runner.routeStartTime ?? 0;
-      return runner.speed > 0 ? routeStartTime + cumulative / runner.speed : routeStartTime;
+      // speed が欠けている走者で 0 を返すと、封殺の判定が必ずセーフになってしまう。
+      if (!Number.isFinite(runner.speed) || runner.speed <= 0) return runner.arrivalTime ?? routeStartTime;
+      return routeStartTime + cumulative / runner.speed;
     }
   }
   return runner.arrivalTime ?? null;
@@ -11691,6 +11722,9 @@ function createForcedRunnerFromInfo(runnerInfo, startBase, targetBase) {
     routeStartTime: 0,
     routeDuration: distance > 0 ? distance / speed : 0,
     arrivalTime: distance > 0 ? distance / speed : 0,
+    // speed を持たせないと getRunnerArrivalTimeAtBaseIndex が到達時刻を 0 と算出し、
+    // 封殺の判定が必ずセーフになる。
+    speed,
     arrived: false,
     x: route[0].x,
     y: route[0].y
@@ -14216,7 +14250,7 @@ function resolveUnifiedCircleMissAfterArrival(elapsedSeconds) {
       defenseState.runner
     ));
   }
-  defenseState.baseRunners = createDefenseBaseRunnerAnimations(
+  defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(
     missedOutcome,
     battedBall,
     null,
@@ -14287,7 +14321,7 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   defenseState.fielders = defenseState.fielders.map((entry) => entry.role === fielder.role
     ? { ...entry, currentX: fieldingPoint.x, currentY: fieldingPoint.y, fieldingPoint }
     : entry);
-  defenseState.baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
+  defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   if (outcome.needsThrow) {
     defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
@@ -14399,7 +14433,7 @@ function completeLivePostLandingPickup(fielder, fieldingPoint, elapsedSeconds) {
   defenseState.fielders = defenseState.fielders.map((entry) => entry.role === fielder.role
     ? { ...entry, currentX: fieldingPoint.x, currentY: fieldingPoint.y, fieldingPoint }
     : entry);
-  defenseState.baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
+  defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
     manualWait: isManualThrowControl(),
@@ -14694,7 +14728,7 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
       manualFielding: true,
       linerDrop: droppedLiner
     };
-  defenseState.baseRunners = createDefenseBaseRunnerAnimations(
+  defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(
     defenseState.outcome,
     battedBall,
     null,
@@ -15516,6 +15550,23 @@ function finishDefensePlay() {
       const outsBeforePlay = count.outs;
       const runnerSnapshot = captureBaseRunnerAdvanceSnapshot();
       if (isForceOut) recordCompletedForceOut(defenseState.throw);
+      // 捕球アウト (打者) と送球アウトは同じプレーで同時に起こる。
+      // 以前は throwOut が真だと捕球アウトを扱う else if に入れず、打者のアウトが
+      // 数えられないうえ、アウトのはずの打者が一塁に置かれて満塁が維持されていた。
+      const caughtBatterOut = outcome.kind === "out" && outcome.caught && !outcome.needsThrow;
+      if (caughtBatterOut && count.outs < 3) {
+        recordDefenseOutEvent({
+          runner: defenseState.runner || activeBatter,
+          base: null,
+          outType: "fly",
+          time: outcome.fieldingTime ?? defenseState.battedBall?.ballTime,
+          reason: "Batter-runner out on legal catch during a throw play"
+        });
+        count.outs += 1;
+        recordLastOutBatter(battingTeam, activeBatter);
+        recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
+        adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
+      }
       // clamp は min > max のとき min を返すので、残りアウト数が 0 でも 1 を足してしまう。
       const remainingOuts = Math.max(0, 3 - count.outs);
       const outsToAdd = Math.min(isForceOut ? Math.max(1, forceOutBases.length) : 1, remainingOuts);
@@ -15547,17 +15598,23 @@ function finishDefensePlay() {
         batterInfo: activeBatter,
         forceOutBases: isForceOut ? forceOutBases : [],
         outRunners: isForceOut ? [] : [throwOutRunner],
+        batterOut: caughtBatterOut,
         allowRuns: !(isForceOut && count.outs >= 3)
       });
-      const batterResultType = getForcePlayBatterResultType({
-        forceOutBases: isForceOut ? forceOutBases : [],
-        outsBeforePlay,
-        outsToAdd,
-        runnerSnapshot,
-        runs
-      });
+      const batterResultType = caughtBatterOut
+        ? getCaughtOutBatterResultType(runs)
+        : getForcePlayBatterResultType({
+            forceOutBases: isForceOut ? forceOutBases : [],
+            outsBeforePlay,
+            outsToAdd,
+            runnerSnapshot,
+            runs
+          });
       recordBatterPlateAppearance(batterResultType, { runs });
-      const outMessage = outsToAdd >= 2 ? "ゲッツー" : `${defenseState.throw.baseLabel}アウト`;
+      const throwOutMessage = outsToAdd >= 2 ? "ゲッツー" : `${defenseState.throw.baseLabel}アウト`;
+      const outMessage = caughtBatterOut
+        ? `${outcome.label || "フライ"}、アウト / ${throwOutMessage}`
+        : throwOutMessage;
       const playLabel = batterResultType === "sacrificeBunt" ? `犠打 / ${outMessage}` : outMessage;
       const baseMessage = runs > 0 ? `${playLabel} / 進塁 ${runs}点` : playLabel;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -15705,6 +15762,8 @@ function resolveDefensePlayBaseState(options = {}) {
   const forceOutBases = (options.forceOutBases || []).filter(Boolean);
   const outRunners = (options.outRunners || []).filter(Boolean);
   const outStartBases = getDefensePlayOutStartBases(forceOutBases, outRunners);
+  // 捕球アウトの打者は送球の対象走者ではないので、呼び出し側から明示的に受け取る。
+  if (options.batterOut) outStartBases.add("batter");
   const batterOut = outStartBases.has("batter");
   const resolutionTime = getDefensePlayElapsedSeconds();
   const batterBase = getSettledRunnerBase(defenseState.runner, resolutionTime) || "first";
