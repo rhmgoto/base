@@ -1192,6 +1192,7 @@ let menuSelection = cloneMenuSelection(defaultMenuSelection);
 let battingOrderIndex = { away: 0, home: 0 };
 let lastOutBatterByTeam = { away: null, home: null };
 let bases = createEmptyBases();
+let reliefBoostState = createReliefBoostState();
 
 let activeBatter = selected.away.batters[0].player;
 let activePitcher = getTeamActivePitcher("home");
@@ -2282,6 +2283,10 @@ function createInningScores() {
   return { away: [], home: [] };
 }
 
+function createReliefBoostState() {
+  return { away: null, home: null };
+}
+
 function createBatterGameRecords() {
   return { away: {}, home: {} };
 }
@@ -2337,6 +2342,8 @@ function recordBatterPlateAppearance(resultType, options = {}) {
   const runsBattedIn = Math.max(0, options.rbi ?? options.runs ?? 0);
   record.plateAppearances += 1;
   record.rbi += runsBattedIn;
+  markReliefBoostBatterFaced(fieldingTeam(), activePitcher);
+  clearPinchHitBoost(activeBatter);
   if (resultType === "walk") {
     record.walks += 1;
     return;
@@ -2653,6 +2660,44 @@ function getNextUnusedPitcher(team) {
   return teamState.pitchers.find((pitcherInfo) => canUsePitcher(team, pitcherInfo.id)) || null;
 }
 
+function getHalfInningKey() {
+  return `${inning}-${half}`;
+}
+
+function startReliefBoost(team, pitcherInfo) {
+  if (isAnyPracticeMode() || !team || !pitcherInfo || fieldingTeam() !== team) return;
+  reliefBoostState[team] = {
+    pitcherId: pitcherInfo.id,
+    halfInningKey: getHalfInningKey(),
+    battersFaced: 0
+  };
+}
+
+function clearReliefBoostForTeam(team) {
+  if (team && reliefBoostState?.[team]) reliefBoostState[team] = null;
+}
+
+function isReliefBoostActive(player = activePitcher) {
+  if (isAnyPracticeMode() || !player) return false;
+  const team = fieldingTeam();
+  const state = reliefBoostState?.[team];
+  return Boolean(state
+    && state.pitcherId === player.id
+    && state.halfInningKey === getHalfInningKey());
+}
+
+function getReliefPitcherBoostMultiplier(player = activePitcher) {
+  if (!isReliefBoostActive(player)) return 1;
+  const state = reliefBoostState[fieldingTeam()];
+  return (state?.battersFaced ?? 0) <= 0 ? 1.2 : 1.05;
+}
+
+function markReliefBoostBatterFaced(team = fieldingTeam(), pitcherInfo = activePitcher) {
+  const state = reliefBoostState?.[team];
+  if (!state || !pitcherInfo || state.pitcherId !== pitcherInfo.id || state.halfInningKey !== getHalfInningKey()) return;
+  state.battersFaced += 1;
+}
+
 function maybeAutoChangeCpuPitcher(team = fieldingTeam()) {
   if (gamePhase !== "playing" || !isCpuPitcherTeam(team)) return false;
   if (isPitching || pendingPitch || ball.active || (stealState.active && !stealState.resolved)) return false;
@@ -2671,7 +2716,9 @@ function changePitcher(team, pitcherId) {
   finalizePitcherAppearance(team, getTeamActivePitcher(team));
   selected[team].activePitcherId = pitcherId;
   selected[team].usedPitcherIds.push(pitcherId);
-  ensurePitcherGameRecord(team, getTeamActivePitcher(team));
+  const nextPitcher = getTeamActivePitcher(team);
+  ensurePitcherGameRecord(team, nextPitcher);
+  startReliefBoost(team, nextPitcher);
   if (fieldingTeam() === team) {
     setMatchup();
     resetBall();
@@ -2711,6 +2758,7 @@ function substituteLineupPlayer(team, lineupEntry, benchPlayer, reason = "sub") 
     ...benchPlayer,
     fromBench: true,
     substitutionReason: reason,
+    pinchHitBoostActive: reason === "pinchHit",
     benchSourceKind: benchPlayer.benchSourceKind || getBenchSourceKind(benchPlayer)
   };
   ensureBatterGameRecord(team, lineupEntry.player, lineupEntry.role);
@@ -2728,6 +2776,14 @@ function substituteCurrentBatter(team, benchPlayer) {
   const ok = substituteLineupPlayer(team, lineup[index], benchPlayer, "pinchHit");
   if (ok) message = `${teamLabel(team)} PH: ${benchPlayer.name}`;
   return ok;
+}
+
+function isPinchHitBoostActive(batterInfo = activeBatter) {
+  return Boolean(batterInfo?.pinchHitBoostActive && batterInfo === activeBatter && battingTeam && !isAnyPracticeMode());
+}
+
+function clearPinchHitBoost(batterInfo = activeBatter) {
+  if (batterInfo?.pinchHitBoostActive) batterInfo.pinchHitBoostActive = false;
 }
 
 function substituteRunner(team, baseName, benchPlayer) {
@@ -3854,6 +3910,7 @@ function startGame(modeOverride = null) {
   bases = createEmptyBases();
   battingOrderIndex = { away: 0, home: 0 };
   lastOutBatterByTeam = { away: null, home: null };
+  reliefBoostState = createReliefBoostState();
   inning = 1;
   half = "top";
   battingTeam = isPitchingPracticeMode() ? "home" : (isBattingPracticeMode() || isHomeRunDerbyMode()) ? "away" : firstBatTeam;
@@ -4469,7 +4526,7 @@ function startPitch(typeKey, options = {}) {
   const fatigueDrift = lockTarget ? 0 : getStaminaFatigueDrift(activePitcher);
   const targetX = controlMiss.x + (lockTarget ? 0 : randomBetween(-targetSpread, targetSpread)) + fatigueDrift;
   const targetY = getPitchVerticalTarget();
-  const speedKmh = Math.max(40, Math.round((activePitcher.fastKmh - getStaminaSpeedDrop(activePitcher)) * pitch.baseKmhFactor * randomBetween(0.9, 1.1)));
+  const speedKmh = Math.max(40, Math.round((getEffectivePitcherFastKmh(activePitcher) - getStaminaSpeedDrop(activePitcher)) * pitch.baseKmhFactor * randomBetween(0.9, 1.1)));
   const referenceKmh = 150 * pitch.baseKmhFactor;
   const baseGameSpeed = 8.05 * pitch.speedFactor;
   const speedRatio = speedKmh / referenceKmh;
@@ -4600,7 +4657,11 @@ function getCurrentPitchStuffMultiplier() {
 }
 
 function getEffectivePitcherStuff(player = activePitcher) {
-  return ((player.stuff ?? 5) + pitcherAbilityTuning.stuffBoost) * getCurrentPitchStuffMultiplier() * pitcherAbilityTuning.globalMultiplier;
+  return ((player.stuff ?? 5) + pitcherAbilityTuning.stuffBoost) * getCurrentPitchStuffMultiplier() * pitcherAbilityTuning.globalMultiplier * getReliefPitcherBoostMultiplier(player);
+}
+
+function getEffectivePitcherFastKmh(player = activePitcher) {
+  return (player?.fastKmh ?? 150) * getReliefPitcherBoostMultiplier(player);
 }
 
 function getPitcherStuffPressure(player = activePitcher) {
@@ -8311,7 +8372,7 @@ function isActiveBatterObject(batter) {
 }
 
 function getEffectiveBatterMeet(batter = activeBatter) {
-  const meet = batter?.meet ?? 5;
+  const meet = (batter?.meet ?? 5) + (isPinchHitBoostActive(batter) ? 3 : 0);
   if (!isActiveBatterObject(batter)) return meet;
   const swingType = getCurrentSwingType();
   if (swingType === "bunt") return meet + 5;
@@ -8319,7 +8380,7 @@ function getEffectiveBatterMeet(batter = activeBatter) {
 }
 
 function getEffectiveBatterPower(batter = activeBatter) {
-  const power = batter?.power ?? 5;
+  const power = (batter?.power ?? 5) + (isPinchHitBoostActive(batter) ? 3 : 0);
   const swingType = isActiveBatterObject(batter) ? getCurrentSwingType() : "strong";
   const swingAdjustedPower = swingType === "bunt"
     ? Math.max(1, power - 5)
@@ -15777,6 +15838,7 @@ function checkCountEnd() {
 }
 
 function changeSide() {
+  clearReliefBoostForTeam(fieldingTeam());
   adjustPitcherStamina(activePitcher, staminaTuning.sideChangeRecovery);
   inputLockedUntil = performance.now() + sideChangeInputDelay;
   autoPitchTimer = Number.POSITIVE_INFINITY;
@@ -20058,6 +20120,13 @@ function drawBatterRunner() {
   if (isBatterRunnerOutOnCompletedForce()) return;
   const runProgress = clamp((performance.now() - defenseState.startTime) / Math.max(1, runner.arrivalTime * 1000), 0, 1);
   drawMiniRunner(runner.x, runner.y, runProgress, { jersey: "#d84e5f", cap: "#bf4331", facing: getRunnerFacingDirection(runner) });
+  if (isPinchHitBoostActive(activeBatter) && runner.id === activeBatter?.id) {
+    drawTemporaryBoostAura(runner.x, runner.y - 22, {
+      radiusX: 31,
+      radiusY: 58,
+      label: "PH"
+    });
+  }
 }
 
 function drawStealPlay() {
@@ -20499,9 +20568,16 @@ function drawPitcher() {
   const spriteSet = pitcherSpriteSets[team];
   if (spriteSet.image.complete && spriteSet.image.naturalWidth > 0) {
     drawPitcherSprite(team);
-    return;
+  } else {
+    drawPlayer(pitcher.x, pitcher.y, 1, "#286ed6", true);
   }
-  drawPlayer(pitcher.x, pitcher.y, 1, "#286ed6", true);
+  if (isReliefBoostActive(activePitcher)) {
+    drawTemporaryBoostAura(pitcher.x, pitcher.y - 10, {
+      radiusX: 58,
+      radiusY: 91,
+      label: getReliefPitcherBoostMultiplier(activePitcher) >= 1.2 ? "20%" : "5%"
+    });
+  }
 }
 
 function drawReliefCarEntrance() {
@@ -20619,6 +20695,55 @@ function drawBatter() {
   } else {
     drawPlayer(batter.x, batter.y, 1.18, "#e04f42", false);
   }
+  if (isPinchHitBoostActive(activeBatter)) {
+    drawTemporaryBoostAura(batter.x, batter.y - 12, {
+      radiusX: 62,
+      radiusY: 96,
+      label: "+3"
+    });
+  }
+}
+
+function drawTemporaryBoostAura(x, y, options = {}) {
+  const age = performance.now() / 1000;
+  const pulse = 0.5 + Math.sin(age * 4.4) * 0.5;
+  const radiusX = (options.radiusX ?? 58) + pulse * 4;
+  const radiusY = (options.radiusY ?? 88) + pulse * 6;
+  const color = options.color || "255, 92, 84";
+  const secondaryColor = options.secondaryColor || "255, 178, 138";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  const glow = ctx.createRadialGradient(x, y, Math.max(6, radiusX * 0.12), x, y, radiusY);
+  glow.addColorStop(0, `rgba(${color}, ${0.18 + pulse * 0.035})`);
+  glow.addColorStop(0.55, `rgba(${color}, 0.115)`);
+  glow.addColorStop(0.82, `rgba(${secondaryColor}, 0.055)`);
+  glow.addColorStop(1, `rgba(${color}, 0)`);
+  ctx.fillStyle = glow;
+  ctx.shadowColor = `rgba(${color}, 0.42)`;
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  ctx.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = `rgba(${secondaryColor}, ${0.16 + pulse * 0.06})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(x, y, radiusX * 0.86, radiusY * 0.92, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (options.label) {
+    ctx.fillStyle = `rgba(${secondaryColor}, 0.84)`;
+    ctx.strokeStyle = "rgba(40, 12, 18, 0.74)";
+    ctx.lineWidth = 2;
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeText(options.label, x, y - radiusY * 0.64);
+    ctx.fillText(options.label, x, y - radiusY * 0.64);
+  }
+  ctx.restore();
 }
 
 function drawHbpHitBox() {

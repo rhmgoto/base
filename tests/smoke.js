@@ -11785,4 +11785,81 @@ assert(
 );
 assert(computerStealState.third < computerStealState.fast, "三盗は二盗より控えめに仕掛ける");
 
+const temporaryBoostState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    selected = createSelectedTeams({
+      away: cloneTeamSelection(teamPresets.allstar.selection),
+      home: cloneTeamSelection(teamPresets.dodgers.selection)
+    });
+    gameMode = "versus";
+    battingTeam = "away";
+    half = "top";
+    inning = 1;
+    count = { strikes: 0, balls: 0, outs: 0 };
+    reliefBoostState = createReliefBoostState();
+    gamePhase = "playing";
+    setMatchup();
+
+    const benchPlayer = selected.away.bench.find((entry) => entry.player)?.player;
+    const pinchChanged = substituteCurrentBatter("away", benchPlayer);
+    const pinchPowerBoost = getEffectiveBatterPower(activeBatter) / effectiveBatterPowerScale - activeBatter.power;
+    const pinchMeetBoost = getEffectiveBatterMeet(activeBatter) - activeBatter.meet;
+    recordBatterPlateAppearance("out");
+    const pinchStillActiveAfterPa = isPinchHitBoostActive(activeBatter);
+    const nextPowerBoost = getEffectiveBatterPower(activeBatter) / effectiveBatterPowerScale - activeBatter.power;
+    const nextMeetBoost = getEffectiveBatterMeet(activeBatter) - activeBatter.meet;
+
+    selected = createSelectedTeams(defaultMenuSelection);
+    battingTeam = "away";
+    half = "top";
+    inning = 1;
+    count = { strikes: 0, balls: 0, outs: 0 };
+    reliefBoostState = createReliefBoostState();
+    gamePhase = "playing";
+    setMatchup();
+    const relieverId = selected.home.pitchers[1].id;
+    const pitcherChanged = changePitcher("home", relieverId);
+    const reliefPitcher = activePitcher;
+    const firstMultiplier = getReliefPitcherBoostMultiplier(reliefPitcher);
+    const firstSpeed = getEffectivePitcherFastKmh(reliefPitcher);
+    const firstStuff = getEffectivePitcherStuff(reliefPitcher) / getCurrentPitchStuffMultiplier() / pitcherAbilityTuning.globalMultiplier;
+    recordBatterPlateAppearance("out");
+    const secondMultiplier = getReliefPitcherBoostMultiplier(reliefPitcher);
+    const secondSpeed = getEffectivePitcherFastKmh(reliefPitcher);
+    count.outs = 3;
+    changeSide();
+    const afterSideMultiplier = getReliefPitcherBoostMultiplier(reliefPitcher);
+    return JSON.stringify({
+      pinchChanged,
+      pinchPowerBoost,
+      pinchMeetBoost,
+      pinchStillActiveAfterPa,
+      nextPowerBoost,
+      nextMeetBoost,
+      pitcherChanged,
+      firstMultiplier,
+      secondMultiplier,
+      afterSideMultiplier,
+      firstSpeed,
+      secondSpeed,
+      baseSpeed: reliefPitcher.fastKmh,
+      firstStuff,
+      baseStuff: reliefPitcher.stuff,
+      stuffBoost: pitcherAbilityTuning.stuffBoost
+    });
+  })()`
+));
+
+assert(temporaryBoostState.pinchChanged === true, "pinch hitters should be available from the bench");
+assert(temporaryBoostState.pinchPowerBoost === 3 && temporaryBoostState.pinchMeetBoost === 3, "pinch hitters should receive +3 power and +3 meet for that plate appearance");
+assert(temporaryBoostState.pinchStillActiveAfterPa === false && temporaryBoostState.nextPowerBoost === 0 && temporaryBoostState.nextMeetBoost === 0, "pinch-hit boosts should end after one plate appearance");
+assert(temporaryBoostState.pitcherChanged === true, "relief pitcher should enter before checking relief boosts");
+assert(Math.abs(temporaryBoostState.firstMultiplier - 1.2) < 0.001, "relievers should receive a 20 percent boost against their first batter");
+assert(Math.abs(temporaryBoostState.secondMultiplier - 1.05) < 0.001, "relievers should receive a 5 percent boost after their first batter in the same half inning");
+assert(temporaryBoostState.afterSideMultiplier === 1, "relief boosts should end when the half inning changes");
+assert(Math.abs(temporaryBoostState.firstSpeed - temporaryBoostState.baseSpeed * 1.2) < 0.001, "relief speed should use the first-batter boost");
+assert(Math.abs(temporaryBoostState.secondSpeed - temporaryBoostState.baseSpeed * 1.05) < 0.001, "relief speed should use the same-inning boost after the first batter");
+assert(Math.abs(temporaryBoostState.firstStuff - (temporaryBoostState.baseStuff + temporaryBoostState.stuffBoost) * 1.2) < 0.001, "relief stuff should use the first-batter boost");
+
 console.log("Smoke check passed");
