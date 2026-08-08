@@ -1201,6 +1201,7 @@ let selected = createSelectedTeams(defaultMenuSelection);
 let menuSelection = cloneMenuSelection(defaultMenuSelection);
 let battingOrderIndex = { away: 0, home: 0 };
 let lastOutBatterByTeam = { away: null, home: null };
+let automaticTiebreakRunnerUsed = { away: false, home: false };
 let bases = createEmptyBases();
 let reliefBoostState = createReliefBoostState();
 let pendingGameEnd = null;
@@ -2331,7 +2332,8 @@ function ensureBatterGameRecord(team, player = activeBatter, role = getCurrentBa
     hbp: 0,
     sacrificeBunts: 0,
     sacrificeFlies: 0,
-    errorsReached: 0
+    errorsReached: 0,
+    timesReachedBase: 0
   };
   record.name = player.name;
   if (role) record.role = role;
@@ -2357,10 +2359,12 @@ function recordBatterPlateAppearance(resultType, options = {}) {
   clearPinchHitBoost(activeBatter);
   if (resultType === "walk") {
     record.walks += 1;
+    record.timesReachedBase += 1;
     return;
   }
   if (resultType === "hbp") {
     record.hbp += 1;
+    record.timesReachedBase += 1;
     return;
   }
   if (resultType === "sacrificeBunt") {
@@ -2373,9 +2377,14 @@ function recordBatterPlateAppearance(resultType, options = {}) {
   }
   record.atBats += 1;
   if (resultType === "strikeout") record.strikeouts += 1;
-  if (resultType === "error") record.errorsReached += 1;
+  if (resultType === "error") {
+    record.errorsReached += 1;
+    record.timesReachedBase += 1;
+  }
+  if (resultType === "fielderChoice") record.timesReachedBase += 1;
   if (scoringHitTypes.has(resultType)) {
     record.hits += 1;
+    record.timesReachedBase += 1;
     if (resultType === "double") record.doubles += 1;
     if (resultType === "triple") record.triples += 1;
     if (resultType === "homer") record.homeRuns += 1;
@@ -3921,6 +3930,7 @@ function startGame(modeOverride = null) {
   bases = createEmptyBases();
   battingOrderIndex = { away: 0, home: 0 };
   lastOutBatterByTeam = { away: null, home: null };
+  automaticTiebreakRunnerUsed = { away: false, home: false };
   reliefBoostState = createReliefBoostState();
   clearPendingGameEnd();
   inning = 1;
@@ -4044,7 +4054,10 @@ function applyExtraInningTiebreakRunner() {
   if (isAnyPracticeMode() || inning <= maxInnings) return;
   const runner = getTiebreakRunner(battingTeam);
   bases = createEmptyBases();
-  if (runner) bases.second = makeBaseRunner({ ...runner, unearnedRun: true });
+  if (runner) {
+    bases.second = makeBaseRunner({ ...runner, unearnedRun: true });
+    automaticTiebreakRunnerUsed[battingTeam] = true;
+  }
 }
 
 function resetPracticePlateAppearance() {
@@ -21435,8 +21448,43 @@ function drawHud() {
     drawBaseRunnerIndicator(306, 78);
     drawBaseRunnerNames(38, 148);
   }
+  drawPitchingMilestoneStatus();
   drawLastGamepadButton();
   if (gamePhase === "defense") drawDefenseHud();
+}
+
+function drawPitchingMilestoneStatus() {
+  if (["menu", "gameover"].includes(gamePhase) || isAnyPracticeMode()) return;
+  const achievements = teamIds
+    .map((team) => getPitchingAchievement(team, false))
+    .filter(Boolean);
+  achievements.forEach((achievement, index) => {
+    const width = achievement.perfect ? 350 : 420;
+    const height = 30;
+    const x = (canvas.width - width) / 2;
+    const y = 16 + index * 36;
+    ctx.save();
+    if (achievement.perfect) {
+      const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+      gradient.addColorStop(0, "rgba(225, 201, 109, 0.94)");
+      gradient.addColorStop(1, "rgba(143, 196, 223, 0.94)");
+      ctx.fillStyle = gradient;
+      ctx.strokeStyle = "#477f9f";
+    } else {
+      ctx.fillStyle = "rgba(217, 173, 50, 0.94)";
+      ctx.strokeStyle = "#8b6812";
+    }
+    ctx.lineWidth = 2;
+    roundRect(x, y, width, height, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = achievement.perfect ? "#173f5b" : "#3e2d05";
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${teamLabel(achievement.team)} ${achievement.pitcherName} ${achievement.displayLabel}`, x + width / 2, y + height / 2 + 1);
+    ctx.restore();
+  });
 }
 
 function drawLastGamepadButton() {
@@ -21844,6 +21892,65 @@ function formatBattingAverage(record) {
   return (record.hits / record.atBats).toFixed(3).replace(/^0/, "");
 }
 
+function calculateBattingOnBasePercentage(record) {
+  const denominator = (record.atBats || 0)
+    + (record.walks || 0)
+    + (record.hbp || 0)
+    + (record.sacrificeFlies || 0);
+  if (!denominator) return null;
+  return ((record.hits || 0) + (record.walks || 0) + (record.hbp || 0)) / denominator;
+}
+
+function calculateBattingSluggingPercentage(record) {
+  const atBats = record.atBats || 0;
+  if (!atBats) return null;
+  const doubles = record.doubles || 0;
+  const triples = record.triples || 0;
+  const homeRuns = record.homeRuns || 0;
+  const singles = Math.max(0, (record.hits || 0) - doubles - triples - homeRuns);
+  const totalBases = singles + doubles * 2 + triples * 3 + homeRuns * 4;
+  return totalBases / atBats;
+}
+
+function formatBattingOps(record) {
+  const onBasePercentage = calculateBattingOnBasePercentage(record);
+  const sluggingPercentage = calculateBattingSluggingPercentage(record);
+  if (onBasePercentage == null && sluggingPercentage == null) return ".---";
+  return ((onBasePercentage || 0) + (sluggingPercentage || 0)).toFixed(3).replace(/^0/, "");
+}
+
+function getTeamTimesReachedBase(team) {
+  return getBattingGameRecordEntries(team).reduce((total, record) => {
+    if (Number.isFinite(record.timesReachedBase)) return total + record.timesReachedBase;
+    return total
+      + (record.hits || 0)
+      + (record.walks || 0)
+      + (record.hbp || 0)
+      + (record.errorsReached || 0);
+  }, 0);
+}
+
+function getPitchingAchievement(team, final = gamePhase === "gameover") {
+  if (isAnyPracticeMode()) return null;
+  const opponent = team === "away" ? "home" : "away";
+  const entries = getPitcherGameRecordEntries(team);
+  const starter = entries.find((record) => record.started);
+  const minimumOuts = final ? 27 : 18;
+  const completedByStarter = entries.length === 1 && starter && starter.outs >= minimumOuts;
+  if (!completedByStarter || (starter.hitsAllowed || 0) > 0 || (scores[opponent] || 0) > 0) return null;
+  if (final && (scores[team] || 0) <= (scores[opponent] || 0)) return null;
+  if (!final && gamePhase === "gameover") return null;
+  const perfect = getTeamTimesReachedBase(opponent) === 0 && !automaticTiebreakRunnerUsed[opponent];
+  return {
+    team,
+    pitcherId: starter.id,
+    pitcherName: starter.name,
+    perfect,
+    label: perfect ? "完全試合" : "ノーヒットノーラン",
+    displayLabel: `${perfect ? "完全試合" : "ノーヒットノーラン"}${final ? "" : "継続中"}`
+  };
+}
+
 function formatPitcherEra(record) {
   if (!record.outs) return "--";
   return ((record.earnedRunsAllowed || 0) * 27 / record.outs).toFixed(2);
@@ -21910,8 +22017,8 @@ function drawGameResultFittedText(text, x, y, maxWidth, startSize = 12, weight =
 
 function drawGameResultBattingTable(team, x, y, width, height) {
   drawGameResultSectionTitle(`${teamLabel(team)} 打撃成績`, x, y - 12, width);
-  const headers = ["守", "選手名", "率", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "犠打", "犠飛", "失"];
-  const colWidths = [32, 128, 44, 30, 30, 30, 30, 28, 28, 28, 28, 28, 28, 34, 34, 28];
+  const headers = ["守", "選手名", "率", "OPS", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "犠打", "犠飛", "失"];
+  const colWidths = [30, 116, 42, 45, 28, 28, 28, 28, 26, 26, 26, 26, 26, 26, 32, 32, 26];
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
   const widths = colWidths.map((value) => value * scale);
   const rowHeight = 26;
@@ -21921,6 +22028,7 @@ function drawGameResultBattingTable(team, x, y, width, height) {
       getMenuRoleLabel(record.role).slice(0, 2),
       record.name,
       formatBattingAverage(record),
+      formatBattingOps(record),
       record.atBats,
       record.runs,
       record.hits,
@@ -21941,6 +22049,7 @@ function drawGameResultBattingTable(team, x, y, width, height) {
 
 function drawGameResultPitchingTable(team, x, y, width, height) {
   drawGameResultSectionTitle(`${teamLabel(team)} 投手成績`, x, y - 12, width);
+  drawPitchingAchievementBadge(team, x, y - 12, width);
   const headers = ["勝敗", "選手名", "防御率", "回", "球", "打者", "安", "本", "三", "四死", "失", "責"];
   const colWidths = [40, 118, 50, 36, 40, 40, 30, 30, 30, 36, 30, 30];
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
@@ -21965,6 +22074,36 @@ function drawGameResultPitchingTable(team, x, y, width, height) {
     ];
     drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
   });
+}
+
+function drawPitchingAchievementBadge(team, x, y, width) {
+  const achievement = getPitchingAchievement(team, true);
+  if (!achievement) return;
+  const badgeWidth = achievement.perfect ? 112 : 152;
+  const badgeHeight = 24;
+  const badgeX = x + width - badgeWidth;
+  const badgeY = y - badgeHeight / 2;
+  ctx.save();
+  if (achievement.perfect) {
+    const gradient = ctx.createLinearGradient(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight);
+    gradient.addColorStop(0, "#e1c96d");
+    gradient.addColorStop(1, "#8fc4df");
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = "#477f9f";
+  } else {
+    ctx.fillStyle = "#d9ad32";
+    ctx.strokeStyle = "#8b6812";
+  }
+  ctx.lineWidth = 2;
+  roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = achievement.perfect ? "#173f5b" : "#3e2d05";
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(achievement.displayLabel, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 1);
+  ctx.restore();
 }
 
 function formatPitcherDecisionLabelsPlain(record) {

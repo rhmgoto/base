@@ -273,6 +273,85 @@ vm.runInContext(fs.readFileSync(path.join(root, "script.js"), "utf8"), context, 
 
 assert(makeElement("awayBatterLName").textContent.length > 0, "menu cards are not populated");
 
+const pitchingAchievementAndOpsState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const opsRecord = {
+      atBats: 4,
+      hits: 2,
+      doubles: 1,
+      triples: 0,
+      homeRuns: 0,
+      walks: 1,
+      hbp: 1,
+      sacrificeBunts: 3,
+      sacrificeFlies: 1
+    };
+    startGame();
+    gameMode = "versus";
+    gamePhase = "playing";
+    scores = { away: 0, home: 1 };
+    pitcherGameRecords = createPitcherGameRecords();
+    batterGameRecords = createBatterGameRecords();
+    automaticTiebreakRunnerUsed = { away: false, home: false };
+    const starter = getTeamActivePitcher("home");
+    const starterRecord = ensurePitcherGameRecord("home", starter);
+    starterRecord.outs = 27;
+    starterRecord.hitsAllowed = 0;
+    batterGameRecords.away.test = {
+      id: "test",
+      name: "test",
+      order: 0,
+      plateAppearances: 27,
+      atBats: 27,
+      hits: 0,
+      walks: 0,
+      hbp: 0,
+      errorsReached: 0,
+      timesReachedBase: 0
+    };
+    const perfect = getPitchingAchievement("home", true);
+    batterGameRecords.away.test.walks = 1;
+    batterGameRecords.away.test.timesReachedBase = 1;
+    const noHitter = getPitchingAchievement("home", true);
+    automaticTiebreakRunnerUsed.away = true;
+    batterGameRecords.away.test.walks = 0;
+    batterGameRecords.away.test.timesReachedBase = 0;
+    const tiebreakNoHitter = getPitchingAchievement("home", true);
+    automaticTiebreakRunnerUsed.away = false;
+    starterRecord.hitsAllowed = 1;
+    const hitAllowed = getPitchingAchievement("home", true);
+    starterRecord.hitsAllowed = 0;
+    starterRecord.outs = 18;
+    const continuing = getPitchingAchievement("home", false);
+    starterRecord.outs = 27;
+    ensurePitcherGameRecord("home", selected.home.pitchers[1]);
+    const reliefUsed = getPitchingAchievement("home", true);
+    showMenu();
+    return JSON.stringify({
+      obp: calculateBattingOnBasePercentage(opsRecord),
+      slg: calculateBattingSluggingPercentage(opsRecord),
+      ops: formatBattingOps(opsRecord),
+      perfect,
+      noHitter,
+      tiebreakNoHitter,
+      hitAllowed,
+      continuing,
+      reliefUsed
+    });
+  })()`
+));
+
+assert(Math.abs(pitchingAchievementAndOpsState.obp - 4 / 7) < 0.0001, "OBP should use MLB's H+BB+HBP over AB+BB+HBP+SF formula and exclude sacrifice bunts");
+assert(Math.abs(pitchingAchievementAndOpsState.slg - 0.75) < 0.0001, "slugging percentage should use total bases divided by at-bats");
+assert(pitchingAchievementAndOpsState.ops === "1.321", "OPS should be OBP plus slugging percentage to three decimals");
+assert(pitchingAchievementAndOpsState.perfect?.perfect === true, "a winning 27-out complete game with no baserunners should be a perfect game");
+assert(pitchingAchievementAndOpsState.noHitter?.perfect === false && pitchingAchievementAndOpsState.noHitter?.label === "ノーヒットノーラン", "a walk should end a perfect game but preserve a no-hitter");
+assert(pitchingAchievementAndOpsState.tiebreakNoHitter?.perfect === false, "an automatic tiebreak runner should end a perfect game but preserve a scoreless no-hitter");
+assert(pitchingAchievementAndOpsState.hitAllowed === null, "allowing a hit should end no-hit achievements");
+assert(pitchingAchievementAndOpsState.continuing?.displayLabel === "完全試合継続中", "a starter with 18 outs and no baserunners should show the ongoing perfect-game status");
+assert(pitchingAchievementAndOpsState.reliefUsed === null, "a combined no-hitter should not be credited as the starter's complete-game achievement");
+
 const stadiumSelectionState = JSON.parse(runInGame(
   context,
   `(() => {
