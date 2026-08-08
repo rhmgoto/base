@@ -4691,6 +4691,8 @@ const pitchControlState = JSON.parse(runInGame(
     const high = getPitchControlProfile(10);
     const lowEdgeFastball = getPitchControlProfile(1, 0, { pitchType: "fast", courseDirection: 1 });
     const highEdgeFastball = getPitchControlProfile(10, 0, { pitchType: "fast", courseDirection: 1 });
+    const highEdgeNormal = getPitchControlProfile(10, 0, { pitchType: "normal", courseDirection: 1 });
+    const lowEdgeNormal = getPitchControlProfile(1, 0, { pitchType: "normal", courseDirection: 1 });
     const rightEdgeNormalX = getPitchCourseTargetX({ direction: 1, offset: 48 }, getPitchRadius("normal"), "normal");
     const leftEdgeFastX = getPitchCourseTargetX({ direction: -1, offset: -48 }, getPitchRadius("fast"), "fast");
     const rightEdgeSpecialX = getPitchCourseTargetX({ direction: 1, offset: 48 }, getPitchRadius("special"), "special");
@@ -4717,6 +4719,8 @@ const pitchControlState = JSON.parse(runInGame(
       high,
       lowEdgeFastball,
       highEdgeFastball,
+      highEdgeNormal,
+      lowEdgeNormal,
       rightEdgeNormalDistance: distanceToHomePlate(rightEdgeNormalX, field.plateY, getPitchRadius("normal")),
       leftEdgeFastDistance: distanceToHomePlate(leftEdgeFastX, field.plateY, getPitchRadius("fast")),
       rightEdgeSpecialDistance: distanceToHomePlate(rightEdgeSpecialX, field.plateY, getPitchRadius("special")),
@@ -4751,8 +4755,22 @@ assert(pitchControlState.lowMistakeType === "mistake", "low-control middle leaks
 assert(pitchControlState.lowWildType === "wild", "low-control wild misses should be tagged as controllable wild pitches");
 assert(pitchControlState.lowMistakeDistanceFromCenter < pitchControlState.intendedDistanceFromCenter * 0.3, "low-control mistakes should drift strongly toward the middle");
 assert(pitchControlState.highMistakeDistanceFromCenter === pitchControlState.intendedDistanceFromCenter, "high-control pitches should keep the intended target when no miss is applied");
-assert(pitchControlState.highEdgeFastball.spread <= 7.5, "high-control pitchers should spot edge fastballs tightly");
-assert(pitchControlState.lowEdgeFastball.spread > pitchControlState.highEdgeFastball.spread * 8, "low-control pitchers should struggle much more with edge fastballs");
+// 外角の速球が決まりすぎていたので、コーナー狙いの散らばりにだけ球種係数を掛けた。
+// 制球が良い投手の「隅に決める」力そのものは直球で担保する。
+assert(pitchControlState.highEdgeNormal.spread <= 7.5, "high-control pitchers should spot edge pitches tightly");
+assert(
+  pitchControlState.highEdgeFastball.spread > pitchControlState.highEdgeNormal.spread,
+  `速球は直球より隅を突きにくいべき (速球 ${pitchControlState.highEdgeFastball.spread} / 直球 ${pitchControlState.highEdgeNormal.spread})`
+);
+assert(
+  pitchControlState.lowEdgeNormal.spread > pitchControlState.highEdgeNormal.spread * 8,
+  `low-control pitchers should struggle much more with edge pitches (${pitchControlState.lowEdgeNormal.spread} / ${pitchControlState.highEdgeNormal.spread})`
+);
+// 速球側は制球1がすでに散らばりの上限に当たっているので、比は直球より小さくなる。
+assert(
+  pitchControlState.lowEdgeFastball.spread > pitchControlState.highEdgeFastball.spread * 6,
+  `low-control pitchers should struggle much more with edge fastballs (${pitchControlState.lowEdgeFastball.spread} / ${pitchControlState.highEdgeFastball.spread})`
+);
 assert(pitchControlState.lowEdgeWildType === "wild", "low-control edge fastballs should be able to miss off the intended side");
 assert(pitchControlState.lowEdgeWildX > pitchControlState.edgeIntendedX + 45, "low-control outside fastballs should miss farther outside");
 assert(pitchControlState.highEdgeNoMissType === "none" && pitchControlState.highEdgeNoMissX === pitchControlState.edgeIntendedX, "high-control edge fastballs should stay on the intended corner when not forced to miss");

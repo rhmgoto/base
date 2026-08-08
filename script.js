@@ -264,6 +264,13 @@ const edgeStrikeContactTuning = {
   extendedLaunchAngleCap: 10
 };
 
+// 球種ごとのコントロールの難しさ。コーナーを狙ったときの散らばりにだけ掛ける。
+// 以前はコーナー狙いで球種の差がまったく出ず、外角の速球が決まりすぎていた。
+// 真ん中に投げるときのばらつき (pitchTypes の targetSpread) には影響しない。
+const pitchControlTuning = {
+  typeSpreadMultiplier: { slow: 1, normal: 1, fast: 1.3, special: 1 }
+};
+
 const showHbpHitBox = false;
 
 const batters = [
@@ -4667,8 +4674,9 @@ function getPitchControlProfile(control = 5, staminaFatigue = 0, options = {}) {
     edgeDirection: options.courseDirection || 0,
     edgeFastballPressure,
     countPressure,
+    // コーナー狙いのときだけ球種の差を出す。真ん中系の枝は触らない。
     spread: edgeCommandPitch
-      ? clamp(edgeSpread, 3.3, 69)
+      ? clamp(edgeSpread * getPitchTypeControlMultiplier(options.pitchType), 3.3, 69)
       : clamp((0.38 + wildness * 3.35) * fatigueSpread * commandTightening * 1.5, 0.51, 8.78),
     wildMissChance: totalMajorMissChance * 0.5 * wildMissTightening,
     mistakeChance: totalMajorMissChance * 0.5
@@ -4766,6 +4774,12 @@ function getPitchRadius(typeKey) {
 
 function isEdgeCommandPitch(typeKey) {
   return typeKey === "normal" || typeKey === "fast" || typeKey === "special";
+}
+
+// コーナーを狙ったときの散らばりに掛ける球種係数。1 が基準、大きいほど隅を突きにくい。
+function getPitchTypeControlMultiplier(typeKey) {
+  const multiplier = pitchControlTuning.typeSpreadMultiplier[typeKey];
+  return Number.isFinite(multiplier) ? multiplier : 1;
 }
 
 function getPitchCourseTargetX(course, pitchRadius = 8, typeKey = "normal") {

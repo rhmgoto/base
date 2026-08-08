@@ -63,6 +63,10 @@ assertIncludesAll(
   script,
   [
     "function getComputerOutsideEscapeTakeAdjustment",
+    // 外角の速球が決まりすぎないよう、コーナー狙いの散らばりだけ球種で変える
+    "const pitchControlTuning",
+    "function getPitchTypeControlMultiplier",
+    "edgeSpread * getPitchTypeControlMultiplier(options.pitchType)",
     "cpuPlateSideNudge: 13",
     "function updateComputerBatterPosition",
     "function shouldMoveComputerBatter",
