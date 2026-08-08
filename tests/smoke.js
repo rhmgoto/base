@@ -11847,6 +11847,116 @@ const computerPitchReadState = JSON.parse(runInGame(
 assert(computerPitchReadState.fast >= computerPitchReadState.floor, "速球でも球の読み取りが0にならない");
 assert(computerPitchReadState.slow > computerPitchReadState.fast, "遅い球のほうが読みやすい");
 
+// ベースをかすめるストライクは、広げた帯で拾ってもヒットにはせずファウル・詰まった当たりにする
+const edgeStrikeContactState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    activeBatter = findById(batters, "suzuki");
+    ball.radius = 9;
+    // ゾーン内だが黄色ゾーンの外になる打点を探す
+    let edgePoint = null;
+    for (let offset = 0; offset <= 60; offset += 1) {
+      const x = field.plateX + offset;
+      const y = field.plateY;
+      if (distanceToHomePlate(x, y, ball.radius) <= 0 && !isBallInGoodContactZone(x, y, ball.radius)) {
+        edgePoint = { x, y };
+        break;
+      }
+    }
+    if (!edgePoint) return JSON.stringify({ edgePoint: null });
+    const probe = (distanceToBat) => buildContactProfile({
+      distanceToBat, x: edgePoint.x, y: edgePoint.y, batContact: { t: 0.5 }
+    });
+    const reference = edgeStrikeContactTuning.referenceReachBonus;
+    const widened = edgeStrikeContactTuning.reachBonus;
+    const near = probe(4);
+    // 広げる前では届かず、広げた後なら届く距離を探す
+    let extendedProbe = null;
+    for (let d = 4; d <= 200; d += 1) {
+      const profile = probe(d);
+      if (profile.isContact && profile.edgeExtendedUse > 0.5) { extendedProbe = profile; break; }
+    }
+    return JSON.stringify({
+      edgePoint: true,
+      widerThanReference: widened > reference,
+      nearUse: near.edgeExtendedUse,
+      nearContact: near.isContact,
+      extendedFound: Boolean(extendedProbe),
+      extendedUse: extendedProbe ? extendedProbe.edgeExtendedUse : null,
+      foulChance: edgeStrikeContactTuning.extendedFoulChance,
+      powerDrop: edgeStrikeContactTuning.extendedPowerDrop
+    });
+  })()`
+));
+
+assert(edgeStrikeContactState.edgePoint === true, "前提: ゾーン内かつ黄色ゾーン外の打点が存在すること");
+assert(edgeStrikeContactState.widerThanReference === true, "際どいストライクの届く範囲は元の基準より広げてあるべき");
+assert(edgeStrikeContactState.nearContact === true && edgeStrikeContactState.nearUse === 0, "芯で捉えた際どいストライクは広げた帯に頼っていない扱いにすべき");
+assert(edgeStrikeContactState.extendedFound === true, "広げた帯に頼って当たる距離が存在するべき");
+assert(edgeStrikeContactState.foulChance > 0, "広げた帯で拾った打球はファウルになりうるべき");
+assert(edgeStrikeContactState.powerDrop > 0, "広げた帯で拾った打球は詰まった当たりにすべき");
+
+// CPUの選球: 手元での横のズレと変化量を見て、外れる球ほど確信度が下がる
+const computerPlateDisciplineState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    startGame();
+    activeBatter = findById(batters, "suzuki");
+    const probe = (offset, curve) => {
+      ball.inPitch = true;
+      ball.active = true;
+      ball.radius = 9;
+      ball.pitchStartTime = performance.now() - 520;
+      ball.plateTime = performance.now() + 180;
+      ball.curvePower = curve;
+      ball.x = field.plateX + offset;
+      ball.y = field.plateY - 82;
+      ball.vx = 0;
+      ball.vy = 8;
+      return getComputerSwingStrikeConfidence();
+    };
+    // 確信度が中間になるコースを探して、そこで変化量の効果を見る
+    let edgeOffset = null;
+    for (let offset = 0; offset <= 220; offset += 2) {
+      const value = probe(offset, 0);
+      if (value < 0.9 && value > 0.1) { edgeOffset = offset; break; }
+    }
+    const edgeStraight = edgeOffset === null ? null : probe(edgeOffset, 0);
+    const edgeBreaking = edgeOffset === null ? null : probe(edgeOffset, 2.4);
+    activeBatter = findById(batters, "ichiro");
+    const highMeetCurveRead = getComputerCurveReadScale();
+    activeBatter = findById(batters, "schwarber");
+    const lowMeetCurveRead = getComputerCurveReadScale();
+    activeBatter = findById(batters, "suzuki");
+    return JSON.stringify({
+      center: probe(0, 0),
+      wide: probe(178, 0),
+      edgeOffset,
+      edgeStraight,
+      edgeBreaking,
+      highMeetCurveRead,
+      lowMeetCurveRead
+    });
+  })()`
+));
+
+assert(computerPlateDisciplineState.center > 0.9, "ど真ん中の球はストライクだと確信できるべき");
+assert(computerPlateDisciplineState.wide === 0, "ベースから大きく外れた球に確信を持ってはいけない");
+assert(computerPlateDisciplineState.edgeOffset !== null, "確信度が中間になる際どいコースが存在するべき");
+assert(
+  computerPlateDisciplineState.edgeBreaking < computerPlateDisciplineState.edgeStraight,
+  `同じコースでも変化の大きい球のほうが確信度は低いべき (直球 ${computerPlateDisciplineState.edgeStraight} / 変化球 ${computerPlateDisciplineState.edgeBreaking})`
+);
+assert(
+  computerPlateDisciplineState.highMeetCurveRead > computerPlateDisciplineState.lowMeetCurveRead,
+  `ミートが高い打者ほど曲がりを正確に読むべき (${computerPlateDisciplineState.highMeetCurveRead} / ${computerPlateDisciplineState.lowMeetCurveRead})`
+);
+assert(
+  computerPlateDisciplineState.lowMeetCurveRead < 1,
+  "ミートが低い打者は曲がりを小さく見積もって引っかかるべき (完璧に読ませない)"
+);
+
 // CPUの盗塁は走力の高い走者だけが仕掛ける
 const computerStealState = JSON.parse(runInGame(
   context,

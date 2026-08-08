@@ -176,15 +176,33 @@ const computerBatterTuning = {
   // ストライクの確信度が 0 になるまでの、ゾーンからの距離。
   // 以前は 32 + meet*3.4 (ミート8で約59) と広すぎ、ゾーンから20離れた球でも確信度が
   // 0.68 になっていた。そのため下の見送りゲートが一度も働かず、CPUは何でも振っていた。
-  strikeConfidenceTolerance: 16,
-  strikeConfidenceMeetScale: 1.4,
+  strikeConfidenceTolerance: 8,
+  strikeConfidenceMeetScale: 1,
+  // 手元まで引きつけたときの読み。ベースの左右からどれだけ外れて見えるかで評価する。
+  // 以前は本塁までの2D距離を見ていたが、振り始めを早めた結果この距離は「残りの飛行距離」に
+  // 支配されるようになり、常に0になって「引きつけて見極める」判断が死んでいた。
+  lateReadTolerance: 26,
+  lateReadMeetScale: 2.2,
+  lateReadWeight: 0.3,
+  // 変化の大きい球ほど「ストライクだ」と確信できない。許容幅をこの割合まで狭める。
+  breakFullPressure: 2.6,
+  breakToleranceDrop: 0.42,
+  // 変化量をどれだけ正確に読めるか。1 で正確、小さいほど曲がりを小さく見積もって引っかかる。
+  curveReadLow: 0.5,
+  curveReadHigh: 0.92,
   // 確信度がこれを下回ると原則見送る (それでも chaseChance の分だけは手を出す)。
-  chaseGateConfidence: 0.42,
+  chaseGateConfidence: 0.46,
   // 見送るべき球につい手を出す割合。0 にすると完璧に見極めてしまい面白くない。
+  // ゲートに近い球ほど誘われ、明らかなボール球にはほとんど手を出さないようにする。
   chaseChanceScale: 1,
+  chaseChanceBase: 0.08,
+  chaseChanceLowMeetBonus: 0.16,
+  chaseTemptationExponent: 2.6,
   // 振ると決めたときに実際に振る確率。確信度が低いほど下がる。
+  // exponent を大きくすると、確信の低い球 (＝際どいボール) だけが選択的に減る。
   swingChanceBase: 0.08,
   swingChanceConfidenceScale: 0.92,
+  swingChanceExponent: 3.2,
   // スイングを始める投球進行度。startSwing からバットが出るまでに時間がかかるので、
   // 本塁到達 (1.0) より手前で振り始めないと間に合わない。
   // 以前は 0.92 を中心にしていたが、実測ではその帯の空振り率が82%と最悪だった。
@@ -225,6 +243,26 @@ function getComputerPitchReadScore() {
     1
   );
 }
+
+// ストライクだが黄色ゾーンの外 (ベースをかすめる際どいコース) の接触判定。
+// ここだけ届く範囲が狭く、空振りが多くなりすぎていた。
+// reachBonus を大きくすると空振りが減るが、この帯は quality の減点が大きいので
+// 増えた接触はヒットではなくファウルや凡打になる。
+const edgeStrikeContactTuning = {
+  // 36 (元) → 68。ベースをかすめる球の空振りが多すぎたので届く範囲を広げる。
+  reachBonus: 68,
+  meetScale: 0.4,
+  // 広げる前の基準。reachBonus をこれより大きくした分が「広げた帯」になる。
+  referenceReachBonus: 36,
+  // 広げた帯に頼って当てた打球をファウルにする確率。
+  // この帯の quality はもともと0付近まで落ちていて減点しても効かないので、
+  // 「空振りをファウルに変える」ことで安打が増えないようにする。
+  // 1 を超える値にすると、帯の浅いところで当てた打球もほぼ確実にファウルになる。
+  extendedFoulChance: 2,
+  // ファウルにならなかった打球も、詰まった当たりにして安打になりにくくする。
+  extendedPowerDrop: 0.6,
+  extendedLaunchAngleCap: 10
+};
 
 const showHbpHitBox = false;
 
@@ -5555,11 +5593,19 @@ function getProjectedPitchPlatePosition() {
   }
   const framesToPlate = clamp((field.plateY - ball.y) / ball.vy, 0, 90);
   const progress = getPitchProgress();
-  const curveDrift = ball.curvePower * Math.max(0, progress - 0.28) * 0.31 * framesToPlate * 0.58;
+  const curveDrift = ball.curvePower * Math.max(0, progress - 0.28) * 0.31 * framesToPlate * getComputerCurveReadScale();
   return {
     x: ball.x + ball.vx * framesToPlate + curveDrift,
     y: field.plateY
   };
+}
+
+// 曲がり量をどれだけ正確に読めるか。1 で正確、小さいほど曲がりを小さく見積もる。
+// 以前は打者に関係なく一律 0.58 だったので、ミートの高い打者でも外の変化球に引っかかった。
+function getComputerCurveReadScale() {
+  const meetSkill = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
+  return computerBatterTuning.curveReadLow
+    + meetSkill * (computerBatterTuning.curveReadHigh - computerBatterTuning.curveReadLow);
 }
 
 // CPU打者が構え直す (バッターボックス内で位置を調整する) ためだけの到達点予測。
@@ -5584,12 +5630,19 @@ function getComputerBatterTrackingPosition() {
 function getComputerSwingStrikeConfidence() {
   const projected = getProjectedPitchPlatePosition();
   const projectedDistance = distanceToHomePlate(projected.x, projected.y, ball.radius);
-  const currentDistance = distanceToHomePlate(ball.x, ball.y, ball.radius);
-  const strikeTolerance = computerBatterTuning.strikeConfidenceTolerance
-    + activeBatter.meet * computerBatterTuning.strikeConfidenceMeetScale;
+  const meet = activeBatter?.meet ?? 5;
+  // 変化の大きい球ほど「ストライクだ」と確信できる幅を狭める。
+  const breakPressure = clamp(Math.abs(ball.curvePower) / Math.max(0.01, computerBatterTuning.breakFullPressure), 0, 1);
+  const strikeTolerance = (computerBatterTuning.strikeConfidenceTolerance + meet * computerBatterTuning.strikeConfidenceMeetScale)
+    * (1 - breakPressure * computerBatterTuning.breakToleranceDrop);
   const projectedStrike = clamp(1 - projectedDistance / Math.max(1, strikeTolerance), 0, 1);
-  const lateCurrentRead = clamp(1 - currentDistance / (86 + activeBatter.meet * 7), 0, 1);
-  return clamp(projectedStrike * 0.78 + lateCurrentRead * 0.22, 0, 1);
+  // 手元の読みは「いまベースの左右からどれだけ外れているか」で見る。
+  // 本塁までの距離で見ると、判断時点では残りの飛行距離しか表さず常に0になってしまう。
+  const lateralMiss = Math.max(0, Math.abs(ball.x - field.plateX) - field.strikeZoneWidth / 2 - ball.radius);
+  const lateReadTolerance = computerBatterTuning.lateReadTolerance + meet * computerBatterTuning.lateReadMeetScale;
+  const lateCurrentRead = clamp(1 - lateralMiss / Math.max(1, lateReadTolerance), 0, 1);
+  const lateWeight = clamp(computerBatterTuning.lateReadWeight, 0, 1);
+  return clamp(projectedStrike * (1 - lateWeight) + lateCurrentRead * lateWeight, 0, 1);
 }
 
 function getComputerOutsideEscapeTakeAdjustment(strikeConfidence) {
@@ -5642,13 +5695,25 @@ function computerSwingBat() {
     if (Math.random() < derbySwingChance) startSwing(performance.now(), "strong");
     return;
   }
-  const chaseChance = clamp((activeBatter.meet - 6) / 40, 0.02, 0.22) * computerBatterTuning.chaseChanceScale;
-  if (adjustedStrikeConfidence < computerBatterTuning.chaseGateConfidence
-    && Math.random() >= chaseChance * outsideEscapeTake.chaseMultiplier) return;
-  const swingChance = clamp(
-    computerBatterTuning.swingChanceBase + adjustedStrikeConfidence * computerBatterTuning.swingChanceConfidenceScale,
+  // ゲートに近い球ほど誘われる。明らかなボール球では誘い自体がほぼ消える。
+  const meetDiscipline = clamp(((activeBatter?.meet ?? 5) - 3) / 12, 0, 1);
+  const chaseTemptation = clamp(
+    adjustedStrikeConfidence / Math.max(0.01, computerBatterTuning.chaseGateConfidence),
     0,
     1
+  );
+  const chaseChance = computerBatterTuning.chaseChanceScale
+    * (computerBatterTuning.chaseChanceBase + (1 - meetDiscipline) * computerBatterTuning.chaseChanceLowMeetBonus)
+    * Math.pow(chaseTemptation, computerBatterTuning.chaseTemptationExponent);
+  if (adjustedStrikeConfidence < computerBatterTuning.chaseGateConfidence
+    && Math.random() >= chaseChance * outsideEscapeTake.chaseMultiplier) return;
+  const swingChance = Math.pow(
+    clamp(
+      computerBatterTuning.swingChanceBase + adjustedStrikeConfidence * computerBatterTuning.swingChanceConfidenceScale,
+      0,
+      1
+    ),
+    Math.max(0.1, computerBatterTuning.swingChanceExponent)
   ) * outsideEscapeTake.swingMultiplier;
   if (Math.random() < swingChance) startSwing(performance.now(), chooseComputerSwingType());
 }
@@ -7326,10 +7391,24 @@ function buildContactProfile(bestHit) {
   // 最低限バットには当てられるようにしたい。ここに meetBonus をフルで掛けると、
   // 低ミート打者にとって「際どいストライク」が「明らかなボール球」とほぼ同じ難易度になり、
   // 空振り確定に近くなってしまうため、この帯だけ meet の影響を弱める。
-  const edgeStrikeMeetBonus = meetBonus * 0.4;
-  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 + meetBonus : outsideStrikeZone ? ball.radius + 22 + meetBonus : ball.radius + 36 + edgeStrikeMeetBonus)) * batThicknessMultiplier * meetContactScale;
+  const edgeStrikeMeetBonus = meetBonus * edgeStrikeContactTuning.meetScale;
+  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 + meetBonus : outsideStrikeZone ? ball.radius + 22 + meetBonus : ball.radius + edgeStrikeContactTuning.reachBonus + edgeStrikeMeetBonus)) * batThicknessMultiplier * meetContactScale;
   const preExtensionContactRange = rawPreExtensionContactRange * meetZoneWidthScale;
   const baseContactRange = preExtensionContactRange + outsideReachBonus * batThicknessMultiplier * meetZoneWidthScale;
+  // 際どいストライクで「広げた帯」に頼って当てた度合い。
+  // ここに頼った打球は quality を落として、ヒットではなくファウルや凡打に寄せる。
+  const isEdgeStrikeContact = !inGoodContactZone && !outsideStrikeZone;
+  const edgeStrikeReferenceRange = isEdgeStrikeContact
+    ? (ball.radius + edgeStrikeContactTuning.referenceReachBonus + edgeStrikeMeetBonus)
+      * batThicknessMultiplier * meetContactScale * meetZoneWidthScale
+    : 0;
+  const edgeExtendedUse = isEdgeStrikeContact && preExtensionContactRange > edgeStrikeReferenceRange
+    ? clamp(
+        (distanceToBat - edgeStrikeReferenceRange) / Math.max(1, preExtensionContactRange - edgeStrikeReferenceRange),
+        0,
+        1
+      )
+    : 0;
 
   const timeDiff = performance.now() - ball.plateTime;
   const timingScore = Math.max(0, 1 - Math.abs(timeDiff) / ((360 + batterMeet * 7) * 0.7));
@@ -7382,6 +7461,8 @@ function buildContactProfile(bestHit) {
     naturalContactRange,
     contactRescueExtension,
     contactRange,
+    // 際どいストライクで「広げた帯」に頼って当てた度合い (ファウル判定で使う)
+    edgeExtendedUse,
     x: bestHit.x,
     y: bestHit.y,
     timeDiff,
@@ -8005,7 +8086,8 @@ function buildBattedBallProfile(contact) {
     yellowZoneBoost = 0,
     buntAimX = 0,
     buntAimY = 0,
-    buntAimMagnitude = 0
+    buntAimMagnitude = 0,
+    edgeExtendedUse = 0
   } = contact;
   const swingType = getCurrentSwingType();
   const grounderSwing = swingType === "grounder";
@@ -8177,7 +8259,11 @@ function buildBattedBallProfile(contact) {
   ) * (!inGoodContactZone ? 0.26 : 0.9);
   const centerFenceEdgeFlyScore = clamp(fenceEdgeFlyScore + centerDriveScore * powerDriveScore * 0.18, 0, 0.84);
   const yellowFenceEdgeFlyScore = clamp(centerFenceEdgeFlyScore + yellowDriveScore * yellowZoneHitTuning.fenceScoreBoost * 0.72, 0, 0.88);
-  const isFoul = Math.abs(timingPull) > 0.82 && (readableQuality < 0.62 || spin > 0.72);
+  // 際どいストライクを「広げた帯」で拾った打球は、安打にせずファウルへ逃がす。
+  const edgeExtendedFoul = edgeExtendedUse > 0
+    && Math.random() < edgeExtendedUse * edgeStrikeContactTuning.extendedFoulChance;
+  const isFoul = edgeExtendedFoul
+    || (Math.abs(timingPull) > 0.82 && (readableQuality < 0.62 || spin > 0.72));
   const feedbackScore = getRawBattingFeedbackScore({
     timingScore,
     sweetSpotScore,
@@ -8360,12 +8446,14 @@ function buildBattedBallProfile(contact) {
       isBunt: true
     };
   }
+  // 広げた帯で拾った打球は詰まった当たりにする。強い打球にはしない。
+  const edgeExtendedWeaken = 1 - edgeExtendedUse * edgeStrikeContactTuning.extendedPowerDrop;
   return {
-    exitVelocity,
-    launchAngle,
+    exitVelocity: exitVelocity * edgeExtendedWeaken,
+    launchAngle: edgeExtendedUse > 0 ? Math.min(launchAngle, edgeStrikeContactTuning.extendedLaunchAngleCap) : launchAngle,
     direction,
     spin,
-    carry,
+    carry: carry * edgeExtendedWeaken,
     feedbackScore,
     gapScore,
     timingPull,

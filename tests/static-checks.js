@@ -78,6 +78,17 @@ assertIncludesAll(
     "const outsideSign = activeBatterSide === \"R\" ? 1 : -1",
     // 見極めは外角に逃げる球だけでなく、ゾーンから外れる球全般を対象にする
     "function getComputerPitchReadScore",
+    // 選球は「手元での横のズレ」と「変化量の読み」で決める
+    "function getComputerCurveReadScale",
+    // ベースをかすめる球は当たりやすくし、増えた接触はファウル・詰まった当たりに逃がす
+    "const edgeStrikeContactTuning",
+    "const edgeExtendedUse = isEdgeStrikeContact",
+    "const edgeExtendedFoul = edgeExtendedUse > 0",
+    "exitVelocity: exitVelocity * edgeExtendedWeaken",
+    "const lateralMiss = Math.max(0, Math.abs(ball.x - field.plateX) - field.strikeZoneWidth / 2 - ball.radius)",
+    "const breakPressure = clamp(Math.abs(ball.curvePower)",
+    "const chaseTemptation = clamp(",
+    "computerBatterTuning.swingChanceExponent",
     "const zoneExitScore = clamp(projectedDistance / computerBatterTuning.zoneExitFullRead, 0, 1)",
     "const pitchReadScore = getComputerPitchReadScore()",
     // 振り始めは投球ごとに1点だけ決める
