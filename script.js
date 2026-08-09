@@ -432,11 +432,16 @@ const stealTuning = {
   catcherThrowBaseSpeed: 760,
   catcherThrowSpeedScale: 0.95,
   manualQuickThrowSpeedScale: 1.18,
+  // 球種ごとに走者が稼げるリード秒。
+  // 球速の差は「投球が本塁に届くまでの時間」(遅い球0.82秒 / 速球0.41秒) として
+  // すでに判定に効いているので、ここで大きな差をつけると二重に不利になる。
+  // 以前は速球0.58 / 決め球0.46 まで下げていて、走力10が完璧なスタートを切っても
+  // 速球では刺される状態だった。差を薄くして「最高のスタートなら走れる」を残す。
   pitcherTypeLead: {
     slow: 1.1,
-    normal: 0.9,
-    fast: 0.58,
-    special: 0.46
+    normal: 0.95,
+    fast: 0.85,
+    special: 0.8
   },
   runSpeedScale: 1.03,
   // 盗塁の到達時間だけ走力差を圧縮する。1 で圧縮なし、小さいほど走力差が縮む。
@@ -1023,9 +1028,26 @@ const fielderCatchRangeDebugStyle = {
 const airCatchMinHeight = 12;
 
 // 直接捕球を狙ったライナーを弾く確率と、弾いてから拾い直すまでの硬直時間 (秒)。
-const linerDropTuning = {
-  chance: 0.1,
-  freezeSeconds: 0.9
+// 強い打球を捕り損ねて弾く仕組み。
+// 記録上のエラーにはせず、拾い直すまで送球できない「硬直」で表現する。
+// ライナー限定だったものを、強い打球全般に広げた。
+const battedBallDropTuning = {
+  // ライナー系はこの確率 (守備力が平均なら従来どおり10%)
+  linerChance: 0.1,
+  // ライナー以外は、この強さを超えた打球だけが落球の対象になる
+  minPower: 0.72,
+  // この強さで落球確率が最大になる
+  fullPower: 1.25,
+  minChance: 0.04,
+  maxChance: 0.2,
+  // 守備力による増減の幅。守備5が基準で、守備10なら -fieldingSwing/2 される。
+  fieldingSwing: 0.09,
+  chanceFloor: 0.01,
+  chanceCeiling: 0.32,
+  // 弾いたあと動けない時間
+  freezeSeconds: 0.9,
+  // 強い打球ほど長く弾む
+  freezePowerBonus: 0.5
 };
 
 const wallReboundTuning = {
@@ -1064,7 +1086,12 @@ const defenseRangeTuning = {
   difficultCatchFieldingChance: 0.084
 };
 
-function outfielderStartPoint(side, depthRatio = 0.92) {
+// 外野の守備位置の深さ (フェンスまでの割合)。
+// 0.92 だと深すぎて、フェンスの50〜60%地点に落ちる打球まで600〜800ユニット離れており、
+// 物理的に追いつけない帯ができていた。前に出すと浅い打球を拾えるが、深い打球は抜けやすくなる。
+const outfieldStartDepthRatio = 0.84;
+
+function outfielderStartPoint(side, depthRatio = outfieldStartDepthRatio) {
   const center = defenseField.bases.home;
   const angle = side === "L" ? -132 : side === "R" ? -48 : -90;
   const radians = degreesToRadians(angle);
@@ -13236,6 +13263,16 @@ function getBattedBallRouteArrivalTime(point, battedBall) {
   return Math.max(0.08, (battedBall.ballTime ?? 0.6) * progress);
 }
 
+// 外野に落ちる打球では、内野手の経路チェックに当たっても外野手を候補から外さない。
+// 以前は外野前に落ちるライナーが「内野手だけ」に絞られ、担当から外れた外野手が
+// getDefenseFielderMovementTarget で null を返して、その場から一歩も動かなかった。
+// (センター前の落球で外野手がフェンス手前に突っ立って見えるのはこれが原因)
+function withOutfieldersWhenBallLandsOutfield(infielders, fielders, battedBall) {
+  if (!isOutfieldFrontLandingBall(battedBall) && !isOutfieldFlyLandingBall(battedBall)) return infielders;
+  const outfielders = fielders.filter((fielder) => !isInfielderRole(fielder.role));
+  return outfielders.length ? [...infielders, ...outfielders] : infielders;
+}
+
 function getEligibleDefenseFielders(fielders, battedBall) {
   // 「打球の実際の経路が内野手のそばを通るか」を見るチェックは、
   // 「だいたいどこに落ちるか」で外野手だけに絞ってしまう大まかな分岐より先に見る。
@@ -13249,14 +13286,14 @@ function getEligibleDefenseFielders(fielders, battedBall) {
   const lineDropRouteInfielders = battedBall?.isLineDrop
     ? fielders.filter((fielder) => isInfielderLineDropRouteBall(fielder, battedBall))
     : [];
-  if (lineDropRouteInfielders.length) return lineDropRouteInfielders;
+  if (lineDropRouteInfielders.length) return withOutfieldersWhenBallLandsOutfield(lineDropRouteInfielders, fielders, battedBall);
   if (isSlowInfieldDropBall(battedBall)) {
     return fielders.filter((fielder) => isInfielderRole(fielder.role));
   }
   const linerRouteReactionInfielders = battedBall?.isLiner && !battedBall.isLineLiner
     ? fielders.filter((fielder) => isInfielderReactionRouteBall(fielder, battedBall))
     : [];
-  if (linerRouteReactionInfielders.length) return linerRouteReactionInfielders;
+  if (linerRouteReactionInfielders.length) return withOutfieldersWhenBallLandsOutfield(linerRouteReactionInfielders, fielders, battedBall);
   if (battedBall?.isPopupFly) {
     return fielders.filter((fielder) => fielder.role === "P" || isTemporaryInfielderRole(fielder.role));
   }
@@ -14398,8 +14435,8 @@ function getLiveCircleCatchRadius(fielder, battedBall) {
 function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null, contactHeight = null) {
   const battedBall = defenseState.battedBall;
   const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight);
-  // ライナーを弾いた場合はアウトにならず、拾い直すまで動けない
-  const droppedLiner = caughtInAir && shouldDropLinerOnCatch(battedBall);
+  // 強い打球を弾いた場合はアウトにならず、拾い直すまで動けない
+  const droppedLiner = caughtInAir && shouldDropBattedBallOnCatch(battedBall, fielder);
   const outcome = droppedLiner
     ? {
       kind: "force",
@@ -14407,9 +14444,13 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
       caught: true,
       needsThrow: true,
       targetBase: "first",
-      fieldingTime: elapsedSeconds + linerDropTuning.freezeSeconds,
+      fieldingTime: elapsedSeconds + getBattedBallDropFreezeSeconds(battedBall),
       fieldingPoint,
-      linerDrop: true
+      errorPoint: fieldingPoint,
+      // エフェクトは硬直明けではなく「弾いた瞬間」から出す
+      dropTime: elapsedSeconds,
+      linerDrop: true,
+      droppedBall: true
     }
     : {
       kind: caughtInAir ? "out" : "force",
@@ -14429,6 +14470,7 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
     fieldingPoint,
     distanceToTarget: 0
   };
+  if (droppedLiner) showEffect("落球", "#ff6f61");
   defenseState.liveInfielderContactCatchComplete = true;
   defenseState.chosenFielder = chosenFielder;
   defenseState.target = fieldingPoint;
@@ -14478,10 +14520,40 @@ function isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight =
 }
 
 // 直接捕球を狙ったライナーは一定確率で弾く。
-function shouldDropLinerOnCatch(battedBall) {
-  if (!battedBall) return false;
-  if (!battedBall.isLiner && !battedBall.isLineLiner && !battedBall.isLineDrop && !battedBall.isFenceLiner) return false;
-  return Math.random() < linerDropTuning.chance;
+function isLinerTypeBattedBall(battedBall) {
+  return Boolean(battedBall
+    && (battedBall.isLiner || battedBall.isLineLiner || battedBall.isLineDrop || battedBall.isFenceLiner));
+}
+
+// 打球の強さで落球しやすさが決まる。ライナーは従来どおり基準10%。
+function getBattedBallDropPowerScore(battedBall) {
+  const span = Math.max(0.01, battedBallDropTuning.fullPower - battedBallDropTuning.minPower);
+  return clamp(((battedBall?.power ?? 0) - battedBallDropTuning.minPower) / span, 0, 1);
+}
+
+function getBattedBallDropChance(battedBall, fielder) {
+  if (!battedBall || battedBall.isBunt || battedBall.fenceOver || battedBall.wallHit) return 0;
+  const linerType = isLinerTypeBattedBall(battedBall);
+  if (!linerType && (battedBall.power ?? 0) < battedBallDropTuning.minPower) return 0;
+  const powerScore = getBattedBallDropPowerScore(battedBall);
+  const base = linerType
+    ? battedBallDropTuning.linerChance
+    : battedBallDropTuning.minChance
+      + (battedBallDropTuning.maxChance - battedBallDropTuning.minChance) * powerScore;
+  // 守備力5を基準にして増減する (5なら補正なし)
+  const fieldingSkill = clamp((getFielderFieldingRating(fielder) - 5) / 5, -1, 1);
+  const fieldingAdjust = -fieldingSkill * (battedBallDropTuning.fieldingSwing / 2);
+  return clamp(base + fieldingAdjust, battedBallDropTuning.chanceFloor, battedBallDropTuning.chanceCeiling);
+}
+
+function getBattedBallDropFreezeSeconds(battedBall) {
+  return battedBallDropTuning.freezeSeconds
+    + getBattedBallDropPowerScore(battedBall) * battedBallDropTuning.freezePowerBonus;
+}
+
+function shouldDropBattedBallOnCatch(battedBall, fielder) {
+  const chance = getBattedBallDropChance(battedBall, fielder);
+  return chance > 0 && Math.random() < chance;
 }
 
 function resolveLivePostLandingPickup(elapsedSeconds) {
@@ -14812,7 +14884,7 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
   const battedBall = defenseState.battedBall;
   const fieldingPoint = fieldingPointOverride || { x: fielder.currentX ?? fielder.x, y: fielder.currentY ?? fielder.y };
   const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds);
-  const droppedLiner = caughtInAir && shouldDropLinerOnCatch(battedBall);
+  const droppedLiner = caughtInAir && shouldDropBattedBallOnCatch(battedBall, fielder);
   const label = droppedLiner
     ? `${fielder.role} 落球`
     : caughtInAir ? `${fielder.role} 捕球` : `${fielder.role} 捕球処理`;
@@ -14838,10 +14910,13 @@ function completeManualDefenseFielding(fielder, elapsedSeconds, fieldingPointOve
       caught: true,
       needsThrow: true,
       // 弾いた場合は拾い直すまで動けない
-      fieldingTime: elapsedSeconds + (droppedLiner ? linerDropTuning.freezeSeconds : 0),
+      fieldingTime: elapsedSeconds + (droppedLiner ? getBattedBallDropFreezeSeconds(battedBall) : 0),
       fieldingPoint,
+      errorPoint: droppedLiner ? fieldingPoint : undefined,
+      dropTime: droppedLiner ? elapsedSeconds : undefined,
       manualFielding: true,
-      linerDrop: droppedLiner
+      linerDrop: droppedLiner,
+      droppedBall: droppedLiner
     };
   defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(
     defenseState.outcome,
@@ -19422,7 +19497,8 @@ function drawBoatCatchHomeRunEffect(fireworks, elapsedSeconds) {
 
 function drawDefenseCatchEffect() {
   const outcome = defenseState.outcome;
-  if (!defenseState.active || !outcome?.caught || outcome.fieldingError) return;
+  // 落球は捕球エフェクトを出さない (弾いたのに捕った演出が重なると紛らわしい)
+  if (!defenseState.active || !outcome?.caught || outcome.fieldingError || outcome.droppedBall) return;
   const catchVisual = defenseState.catchVisual;
   const fieldingTime = Math.max(
     0.1,
@@ -19604,10 +19680,15 @@ function drawSimpleDefensePickupEffect(point, progress, alpha) {
   ctx.restore();
 }
 
+// 落球でもこのエフェクトを出す。記録上のエラーにはしないが、
+// 「弾いた」ことが見て分かるようにする。
 function drawFieldingErrorEffect() {
   const outcome = defenseState.outcome;
-  if (!defenseState.active || !outcome?.fieldingError) return;
-  const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
+  if (!defenseState.active || (!outcome?.fieldingError && !outcome?.droppedBall)) return;
+  const effectStartTime = outcome.droppedBall && Number.isFinite(outcome.dropTime)
+    ? outcome.dropTime
+    : outcome.fieldingTime;
+  const fieldingTime = Math.max(0.1, effectStartTime ?? defenseState.battedBall?.ballTime ?? 1);
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   const age = elapsedSeconds - fieldingTime;
   const duration = 1.3;

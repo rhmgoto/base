@@ -577,24 +577,52 @@ assert(
   "高さが不明なら落下後は地面扱いのままにすべき"
 );
 
-// ライナーの落球は一律10%、ゴロやフライは対象外
+// 落球はライナーに限らず「強い打球」全般が対象。守備力で増減し、弱い打球では起きない。
 assert(
-  run(`return JSON.stringify([linerDropTuning.chance, linerDropTuning.freezeSeconds]);`) === "[0.1,0.9]",
-  "ライナーの落球率と硬直時間の設定"
+  run(`return JSON.stringify([battedBallDropTuning.linerChance, battedBallDropTuning.freezeSeconds]);`) === "[0.1,0.9]",
+  "ライナーの落球率と硬直時間の基準値"
+);
+
+const dropChances = JSON.parse(run(`
+  const average = { role: "P", fielding: 5 };
+  return JSON.stringify({
+    ライナー: getBattedBallDropChance({ isLiner: true, power: 0.5 }, average),
+    弱いゴロ: getBattedBallDropChance({ isGrounder: true, power: 0.5 }, average),
+    強いゴロ: getBattedBallDropChance({ isGrounder: true, power: 1.1 }, average),
+    強いフライ: getBattedBallDropChance({ isRoutineFly: true, power: 1.1 }, average),
+    バント: getBattedBallDropChance({ isBunt: true, power: 1.1 }, average),
+    "強いゴロ_守備10": getBattedBallDropChance({ isGrounder: true, power: 1.1 }, { role: "P", fielding: 10 }),
+    "強いゴロ_守備1": getBattedBallDropChance({ isGrounder: true, power: 1.1 }, { role: "P", fielding: 1 }),
+    "硬直_弱": getBattedBallDropFreezeSeconds({ power: 0.5 }),
+    "硬直_強": getBattedBallDropFreezeSeconds({ power: 1.3 })
+  });
+`));
+
+assert(Math.abs(dropChances.ライナー - 0.1) < 0.001, `守備力が平均のライナーは従来どおり10% (${dropChances.ライナー})`);
+assert(dropChances.弱いゴロ === 0, `弱い打球では落球しない (${dropChances.弱いゴロ})`);
+assert(dropChances.バント === 0, "バントは落球の対象外");
+assert(dropChances.強いゴロ > 0 && dropChances.強いフライ > 0, "強い打球はライナー以外でも落球しうる");
+assert(
+  dropChances["強いゴロ_守備1"] > dropChances.強いゴロ && dropChances.強いゴロ > dropChances["強いゴロ_守備10"],
+  `守備力が低いほど落球しやすいべき (守備1 ${dropChances["強いゴロ_守備1"]} / 平均 ${dropChances.強いゴロ} / 守備10 ${dropChances["強いゴロ_守備10"]})`
 );
 assert(
+  dropChances["硬直_強"] > dropChances["硬直_弱"],
+  `強い打球ほど硬直が長いべき (${dropChances["硬直_弱"]} / ${dropChances["硬直_強"]})`
+);
+
+// 落球は記録上のエラーにはせず、見た目でわかるようにする
+assert(
   run(`
-    const previousRandom = Math.random;
-    Math.random = () => 0.05;
-    const dropped = shouldDropLinerOnCatch({ isLiner: true });
-    const grounderDropped = shouldDropLinerOnCatch({ isGrounder: true });
-    const flyDropped = shouldDropLinerOnCatch({ isRoutineFly: true });
-    Math.random = () => 0.5;
-    const safeCatch = shouldDropLinerOnCatch({ isLiner: true });
-    Math.random = previousRandom;
-    return JSON.stringify({ dropped, grounderDropped, flyDropped, safeCatch });
-  `) === '{"dropped":true,"grounderDropped":false,"flyDropped":false,"safeCatch":false}',
-  "落球はライナーだけが対象で、確率どおりに起きるべき"
+    const previous = Math.random;
+    Math.random = () => 0.01;
+    const dropped = shouldDropBattedBallOnCatch({ isGrounder: true, power: 1.2 }, { role: "P", fielding: 5 });
+    Math.random = () => 0.99;
+    const safe = shouldDropBattedBallOnCatch({ isGrounder: true, power: 1.2 }, { role: "P", fielding: 5 });
+    Math.random = previous;
+    return JSON.stringify({ dropped, safe });
+  `) === '{"dropped":true,"safe":false}',
+  "落球は確率どおりに起きるべき"
 );
 
 // ---------------------------------------------------------------------------

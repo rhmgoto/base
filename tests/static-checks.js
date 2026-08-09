@@ -64,6 +64,11 @@ assertIncludesAll(
   [
     "function getComputerOutsideEscapeTakeAdjustment",
     // 外角の速球が決まりすぎないよう、コーナー狙いの散らばりだけ球種で変える
+    // 落球はライナー限定から強い打球全般へ広げ、既存のエラー演出を流用する
+    "const battedBallDropTuning",
+    "function getBattedBallDropChance",
+    "function shouldDropBattedBallOnCatch",
+    "!outcome?.fieldingError && !outcome?.droppedBall",
     "const pitchControlTuning",
     "function getPitchTypeControlMultiplier",
     "edgeSpread * getPitchTypeControlMultiplier(options.pitchType)",

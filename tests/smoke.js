@@ -386,7 +386,8 @@ assert(stadiumSelectionState.aozoraFenceMeters === 85, "Aozora Ground fence shou
 assert(Math.abs(stadiumSelectionState.restoredFence - stadiumSelectionState.baseFence) < 0.1, "switching back to Ohanabi Stadium should restore the original fence distance");
 assert(Math.abs(stadiumSelectionState.restoredHeight - stadiumSelectionState.baseHeight) < 0.1, "switching back to Ohanabi Stadium should restore the original fence height");
 assert(stadiumSelectionState.baseFirstSame === true, "stadium changes should not move the diamond bases");
-const aozoraExpectedOutfieldDepth = 0.92 - 3 / 85;
+// 深さの基準は script.js の outfieldStartDepthRatio を正とする
+const aozoraExpectedOutfieldDepth = runInGame(context, "outfieldStartDepthRatio") - 3 / 85;
 assert(
   stadiumSelectionState.aozoraOutfieldDepths.every((depth) => Math.abs(depth - aozoraExpectedOutfieldDepth) < 0.01),
   "outfielders should start three meters forward from their standard depth at the active stadium fence"
@@ -4077,6 +4078,7 @@ const stealStateCheck = JSON.parse(runInGame(
       normalThrowEnd,
       normalThrowTime,
       catcherThrowSpeedScale: stealTuning.catcherThrowSpeedScale,
+      pitcherTypeLead: { ...stealTuning.pitcherTypeLead },
       swingMissDelay,
       swingMissThrowStart,
       normalSafe,
@@ -4115,6 +4117,19 @@ const stealStateCheck = JSON.parse(runInGame(
 assert(stealStateCheck.normalStarted === true, "first-base runners should be able to start a steal with stick+B during the pitch motion");
 assert(stealStateCheck.normalThrowStarted === true, "CPU catchers should automatically throw to the steal base after the ball reaches home");
 assert(Math.abs(stealStateCheck.catcherThrowSpeedScale - 0.95) < 0.001, "catcher steal throws should use the requested 0.95 speed scale");
+
+// 球種ごとのリードは「速い球ほど短い」順序を保つ。
+// ただし球速の差は投球の飛行時間 (遅い球0.82秒 / 速球0.41秒) としてすでに判定に効いているので、
+// ここで差を広げすぎると二重に不利になり、走力10でも速球を盗めなくなる。
+const stealLead = stealStateCheck.pitcherTypeLead;
+assert(
+  stealLead.slow > stealLead.normal && stealLead.normal > stealLead.fast && stealLead.fast > stealLead.special,
+  `盗塁のリードは 遅い球 > 直球 > 速球 > 決め球 の順であるべき (${JSON.stringify(stealLead)})`
+);
+assert(
+  stealLead.slow - stealLead.special <= 0.4,
+  `球種によるリード差を広げすぎると速球・決め球が盗塁不可能になる (差 ${Math.round((stealLead.slow - stealLead.special) * 100) / 100}秒)`
+);
 assert(stealStateCheck.manualWaitsForThrow === true, "player-controlled catchers should wait for a manual throw after receiving a steal pitch");
 assert(stealStateCheck.manualThrowStarted === true && stealStateCheck.manualThrowTarget === "second", "player catcher button-2 plus up input should throw to second");
 assert(stealStateCheck.manualThrowRank === "perfect" && Math.abs(stealStateCheck.manualThrowScale - 1.18) < 0.001, "same-frame catcher throw input should use the highest throw speed");
@@ -10359,7 +10374,9 @@ const outfieldPositionAndRollState = JSON.parse(runInGame(
 
     return JSON.stringify({
       depths,
-      expectedDepth: 0.92 - 3 / getCurrentStadium().centerFenceMeters,
+      // 外野の深さは script.js の定数を正とする (以前は 0.92 を直接書いていた)
+      expectedDepth: outfieldStartDepthRatio - 3 / getCurrentStadium().centerFenceMeters,
+      outfieldStartDepthRatio,
       normalRollDistance,
       longerRollDistance,
       frontDropRollDistance,
@@ -10393,6 +10410,11 @@ assert(Math.abs(outfieldPositionAndRollState.depths.C - outfieldPositionAndRollS
 assert(Math.abs(outfieldPositionAndRollState.depths.R - outfieldPositionAndRollState.expectedDepth) < 0.01, "right fielder should start three meters forward from the standard outfield depth");
 assert(outfieldPositionAndRollState.outfieldGrounderLinerScale === 1.95, "outfield grounders and liners should use the increased roll scale");
 assert(["L", "C", "R"].includes(outfieldPositionAndRollState.frontDropChoiceRole), "center-front outfield drops should make an outfielder charge forward");
+// 外野に落ちる打球で外野手が守備位置に突っ立ってしまわないよう、深すぎない位置に立たせる
+assert(
+  outfieldPositionAndRollState.outfieldStartDepthRatio <= 0.88,
+  `外野が深すぎると手前に落ちる打球へ物理的に届かなくなる (${outfieldPositionAndRollState.outfieldStartDepthRatio})`
+);
 assert(outfieldPositionAndRollState.frontDropRollDistance >= 160 && outfieldPositionAndRollState.frontDropRollDistance <= 460, "front-of-outfield line drops should roll naturally after landing instead of racing deep");
 assert(outfieldPositionAndRollState.frontDropRollDuration >= 1.35 && outfieldPositionAndRollState.frontDropRollDuration <= 4.8, "front-of-outfield line drops should settle into a short natural roll after landing");
 assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < 0.34, "front-of-outfield line drops should not shoot forward immediately after landing");
