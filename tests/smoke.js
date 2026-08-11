@@ -2429,8 +2429,8 @@ assert(rosterAndPointState.dingler.run === 3, "Dingler run should match the rost
 assert(rosterAndPointState.dingler.arm === 8, "Dingler arm should match the catcher roster table");
 assert(rosterAndPointState.dingler.cost === 5, "Dingler cost should match the roster table");
 assert(rosterAndPointState.calraleigh.power === 8 && rosterAndPointState.calraleigh.arm === 8, "Cal Raleigh should be available as a catcher");
-assert(rosterAndPointState.nomura.power === 24 && rosterAndPointState.nomura.meet === 16 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
-assert(rosterAndPointState.johnnybench.power === 26 && rosterAndPointState.johnnybench.meet === 17 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
+assert(rosterAndPointState.nomura.power === 15 && rosterAndPointState.nomura.meet === 12 && rosterAndPointState.nomura.arm === 21 && rosterAndPointState.nomura.cost === 27, "Nomura catcher should match the updated roster table");
+assert(rosterAndPointState.johnnybench.power === 17 && rosterAndPointState.johnnybench.meet === 14 && rosterAndPointState.johnnybench.arm === 24 && rosterAndPointState.johnnybench.cost === 29, "Johnny Bench should be available as a new elite catcher");
 assert(rosterAndPointState.rodgersCatcher.bats === "R", "Rodgers catcher should be a right-handed batter");
 assert(rosterAndPointState.rodgersCatcher.power === 6, "Rodgers catcher power should match the catcher roster table");
 assert(rosterAndPointState.rodgersCatcher.meet === 1, "Rodgers catcher meet should match the catcher roster table");

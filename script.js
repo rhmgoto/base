@@ -319,11 +319,11 @@ const batters = [
 const catchers = [
   { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 8, cost: 6 },
   { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 7, cost: 5 },
-  { id: "nomura", name: "ノムラ", bats: "R", power: 24, meet: 16, run: 5, arm: 21, cost: 27 },
+  { id: "nomura", name: "ノムラ", bats: "R", power: 15, meet: 12, run: 5, arm: 21, cost: 27 },
   { id: "kaicannon", name: "カイキャノン", bats: "R", power: 3, meet: 4, run: 4, arm: 10, cost: 4 },
   { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 8, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 3 },
-  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 26, meet: 17, run: 5, arm: 24, cost: 29 },
+  { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 17, meet: 14, run: 5, arm: 24, cost: 29 },
   { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 6, cost: 4 },
   { id: "wakatsuki", name: "ワカツキ", bats: "R", power: 3, meet: 3, run: 3, arm: 5, cost: 2 }
 ];
