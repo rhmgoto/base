@@ -317,11 +317,11 @@ const batters = [
 ];
 
 const catchers = [
-  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 8, meet: 2, run: 3, arm: 8, cost: 6 },
-  { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 4, meet: 6, run: 4, arm: 7, cost: 5 },
+  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 6, meet: 2, run: 3, arm: 8, cost: 5 },
+  { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 5, meet: 7, run: 6, arm: 8, cost: 6 },
   { id: "nomura", name: "ノムラ", bats: "R", power: 15, meet: 12, run: 5, arm: 13, cost: 27 },
   { id: "kaicannon", name: "カイキャノン", bats: "R", power: 3, meet: 4, run: 4, arm: 10, cost: 4 },
-  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 3, run: 3, arm: 8, cost: 5 },
+  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 6, run: 3, arm: 9, cost: 7 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 3 },
   { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 17, meet: 14, run: 5, arm: 15, cost: 29 },
   { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 6, cost: 4 },
@@ -348,7 +348,7 @@ const pitchers = [
   { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 3, cost: 3 },
   { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 7, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 5 },
   { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 8 },
-  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 3, leftBreak: 5, slowChange: 3, fastChange: 3, control: 3, stuff: 4, fielding: 5, stamina: 4, cost: 3 },
+  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 4, leftBreak: 6, slowChange: 4, fastChange: 4, control: 4, stuff: 5, fielding: 5, stamina: 4, cost: 3 },
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 18, leftBreak: 17, slowChange: 27, fastChange: 17, control: 27, stuff: 33, fielding: 7, stamina: 16, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 22, leftBreak: 20, slowChange: 29, fastChange: 18, control: 29, stuff: 32, fielding: 7, stamina: 15, cost: 32 },
@@ -368,6 +368,8 @@ const pitchers = [
   { id: "sabrowski", name: "\u30b5\u30d6\u30ed\u30a6\u30b9\u30ad", throws: "L", fastKmh: 151, rightBreak: 4, leftBreak: 10, slowChange: 10, fastChange: 10, control: 2, stuff: 10, fielding: 4, stamina: 1, cost: 2 },
   { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 4 },
   { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 3, stuff: 8, fielding: 4, stamina: 5, cost: 4 },
+  { id: "anderson", name: "アンダーソン", throws: "R", fastKmh: 157, rightBreak: 5, leftBreak: 2, slowChange: 7, fastChange: 5, control: 5, stuff: 6, fielding: 5, stamina: 4, cost: 3 },
+  { id: "tscott", name: "T.スコット", throws: "L", fastKmh: 160, rightBreak: 3, leftBreak: 9, slowChange: 3, fastChange: 9, control: 7, stuff: 9, fielding: 7, stamina: 4, cost: 3 },
   { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 3, stuff: 6, fielding: 4, stamina: 5, cost: 3 }
 ];
 
@@ -633,7 +635,7 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 67;
+const teamPointLimit = 68;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
