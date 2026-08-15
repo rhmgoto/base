@@ -6161,11 +6161,22 @@ function getPauseMainOptions(team) {
   return [{ label: "\u9589\u3058\u308b", action: "close" }];
 }
 
+function getPausePlayerHandLabel(player, kind = "batter") {
+  const hand = kind === "pitcher" ? player?.throws : player?.bats;
+  if (!hand) return "";
+  return kind === "pitcher" ? `${handLabel(hand)}投` : `${handLabel(hand)}打`;
+}
+
 function getPausePlayerRoleLabel(player, role = null, kind = "batter") {
-  if (kind === "pitcher") return "投手";
-  if (role) return getMenuRoleLabel(role);
-  if (isCatcherLikePlayer(player)) return "捕手";
-  return "野手";
+  const roleLabel = kind === "pitcher"
+    ? "投手"
+    : role
+      ? getMenuRoleLabel(role)
+      : isCatcherLikePlayer(player)
+        ? "捕手"
+        : "野手";
+  const handLabelText = getPausePlayerHandLabel(player, kind);
+  return handLabelText ? `${roleLabel} ${handLabelText}` : roleLabel;
 }
 
 function formatPausePlayerAbilityLine(player, role = null, kind = "batter") {
@@ -6233,7 +6244,11 @@ function getPauseOptions() {
   if (pauseMenuState.mode === "pitcher") {
     return selected?.[team]?.pitchers
       ?.filter((pitcherInfo) => canUsePitcher(team, pitcherInfo.id))
-      .map((pitcherInfo) => ({ label: `${pitcherInfo.name} ${getPitcherGameStaminaText(pitcherInfo)}`, action: "usePitcher", pitcherId: pitcherInfo.id })) || [];
+      .map((pitcherInfo) => ({
+        label: `${pitcherInfo.name} / ${getPausePlayerRoleLabel(pitcherInfo, null, "pitcher")} / ${pitcherInfo.cost ?? 0}P`,
+        action: "usePitcher",
+        pitcherId: pitcherInfo.id
+      })) || [];
   }
   if (pauseMenuState.mode === "defenseRole") {
     return defensiveBatterRoles.map((role) => {
@@ -6242,11 +6257,14 @@ function getPauseOptions() {
     });
   }
   if (pauseMenuState.mode === "defenseBench" || pauseMenuState.mode === "pinchHitBench" || pauseMenuState.mode === "runnerBench") {
-    return getAvailableBenchEntries(team).map((entry) => ({
-      label: `${entry.player.name} ${entry.player.cost ?? 0}P`,
-      action: "useBench",
-      benchId: entry.player.id
-    }));
+    return getAvailableBenchEntries(team).map((entry) => {
+      const role = pauseMenuState.mode === "defenseBench" ? pauseMenuState.selectedRole : null;
+      return {
+        label: `${entry.player.name} / ${getPausePlayerRoleLabel(entry.player, role, "batter")} / ${entry.player.cost ?? 0}P`,
+        action: "useBench",
+        benchId: entry.player.id
+      };
+    });
   }
   if (pauseMenuState.mode === "runnerBase") {
     return baseNames
@@ -16958,9 +16976,11 @@ function drawSwitchChoiceButton(x, y, width, height, label, selected) {
 
 function drawPauseMenu() {
   const options = getPauseOptions();
-  const width = 520;
-  const rowHeight = 42;
-  const height = 120 + Math.max(1, options.length) * rowHeight;
+  const replacementContext = getPauseReplacementContext();
+  const width = 680;
+  const rowHeight = 58;
+  const contextHeight = replacementContext ? 50 : 0;
+  const height = 124 + contextHeight + Math.max(1, options.length) * rowHeight;
   const x = (canvas.width - width) / 2;
   const y = (canvas.height - height) / 2;
   ctx.save();
@@ -16979,21 +16999,37 @@ function drawPauseMenu() {
   ctx.font = "14px sans-serif";
   ctx.fillStyle = "#4b5563";
   ctx.fillText("Left stick: select   Button1: OK   Button2/12: back", x + 28, y + 66);
+  let listTop = y + 92;
+  if (replacementContext) {
+    ctx.fillStyle = "#dbeafe";
+    ctx.fillRect(x + 24, y + 82, width - 48, 42);
+    ctx.fillStyle = "#1e3a8a";
+    ctx.font = "700 15px sans-serif";
+    drawPauseFittedText(`${replacementContext.label}: ${replacementContext.roleLabel} ${replacementContext.player.name}`, x + 42, y + 101, width - 84, 15, "700");
+    ctx.fillStyle = "#1f2937";
+    drawPauseFittedText(replacementContext.ability, x + 42, y + 119, width - 84, 13, "normal");
+    listTop = y + 138;
+  }
   if (!options.length) {
     ctx.fillStyle = "#991b1b";
     ctx.font = "18px sans-serif";
-    ctx.fillText("No available players", x + 28, y + 108);
+    ctx.fillText("No available players", x + 28, listTop + 16);
     ctx.restore();
     return;
   }
   options.forEach((option, index) => {
-    const rowY = y + 92 + index * rowHeight;
+    const rowY = listTop + index * rowHeight;
     const selectedRow = index === pauseMenuState.selectedIndex;
     ctx.fillStyle = selectedRow ? "#2563eb" : "#e5e7eb";
     ctx.fillRect(x + 24, rowY, width - 48, rowHeight - 8);
     ctx.fillStyle = selectedRow ? "#ffffff" : "#111827";
-    ctx.font = selectedRow ? "700 19px sans-serif" : "18px sans-serif";
-    ctx.fillText(option.label, x + 42, rowY + 26);
+    ctx.font = selectedRow ? "700 18px sans-serif" : "17px sans-serif";
+    drawPauseFittedText(option.label, x + 42, rowY + 22, width - 84, selectedRow ? 18 : 17, selectedRow ? "700" : "normal");
+    const detail = getPauseOptionDetail(option);
+    if (detail) {
+      ctx.fillStyle = selectedRow ? "#e0ecff" : "#374151";
+      drawPauseFittedText(detail, x + 42, rowY + 43, width - 84, 13, "normal");
+    }
   });
   ctx.restore();
 }
