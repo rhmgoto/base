@@ -723,6 +723,18 @@ const realFieldMetrics = {
   fairLineAngleDegrees: 55
 };
 
+// 白いファウルラインの端点を、フェア判定と同じ角度 (realFieldMetrics.fairLineAngleDegrees) から引く。
+// 以前は foulLineInset に生の座標 (-2250 * scale) を持たせていて、本塁から見た描画角度が 56.9 度、
+// 判定の 55 度と 1.9 度ずれていた。この帯 (フェンス際で片側 200px 前後) に落ちた打球は
+// 「白線の内側に落ちたのにファウル」になり、一塁・三塁ベースも白線の内側に描かれていた。
+function getFoulLineInsetForTopY(topY, home = defenseField.bases.home) {
+  const plate = home || { x: field.plateX, y: field.plateY + 42 };
+  const depth = Math.max(0, plate.y - topY);
+  return plate.x - Math.tan(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)) * depth;
+}
+
+defenseField.foulLineInset = getFoulLineInsetForTopY(defenseField.foulLineTopY);
+
 const stadiumPresets = {
   fireworks: {
     id: "fireworks",
@@ -933,7 +945,7 @@ function applyStadiumPreset(stadiumId = currentStadiumId) {
   defenseField.doubleDistance = baseDefenseField.doubleDistance * distanceRatio;
   defenseField.wallHitDistance = baseDefenseField.wallHitDistance * distanceRatio;
   defenseField.foulLineTopY = baseDefenseField.foulLineTopY * distanceRatio;
-  defenseField.foulLineInset = baseDefenseField.foulLineInset * distanceRatio;
+  defenseField.foulLineInset = getFoulLineInsetForTopY(defenseField.foulLineTopY);
 }
 
 const battedBallSpeedMultiplier = {
@@ -1087,6 +1099,16 @@ const defenseRangeTuning = {
   difficultCatchBaseChance: 0.16,
   difficultCatchFieldingChance: 0.084
 };
+
+// グラブが届く高さ (メートル)。ジャンプして捕る分を含めた上限。
+// 以前は 124 ユニット (約7m) を固定で使っていて、頭上はるか上を通過する打球まで
+// 「捕球円に入った」と判定されていた。マウンド付近を通るだけの外野への飛球を投手が
+// 吸い込み、本来の担当だった外野手はその場で固まる、という見た目の原因になっていた。
+const liveCircleCatchReachMeters = 2.6;
+
+function getLiveCircleCatchReachHeight() {
+  return getFieldUnitsForMeters(liveCircleCatchReachMeters);
+}
 
 // 外野の守備位置の深さ (フェンスまでの割合)。
 // 0.92 だと深すぎて、フェンスの50〜60%地点に落ちる打球まで600〜800ユニット離れており、
@@ -12899,7 +12921,11 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     : isLineLiner ? randomBetween(34, 58)
     : isLineEdge ? randomBetween(18, 38)
     : isFenceLiner ? randomBetween(92, 176) + Math.max(0, power - 1.12) * 42
-    : isSoftDrop ? 56 : getBattedBallMaxHeight(trajectory, power, flightDistance) * (trajectory === "fly" ? 1.32 : 1);
+    // ポテンヒットは内野手の頭を越えて落ちる打球なので、外野まで運ぶほど山なりにする。
+    // 固定の56 (約3m) だと、60m先へ落ちる当たりでもマウンドの高さ3mを通過する軌道になり、
+    // その場に立っている投手の捕球円に引っかかっていた。
+    : isSoftDrop ? clamp(56 + Math.max(0, landingDistance - 620) * 0.14, 56, 210)
+    : getBattedBallMaxHeight(trajectory, power, flightDistance) * (trajectory === "fly" ? 1.32 : 1);
   const wallImpactHeight = wallHit ? clamp(heightAtFence || 74 + (power - 0.75) * 88, 18, defenseField.fenceHeight - 8) : 0;
   const rawTarget = {
     x: origin.x + direction.x * flightDistance,
@@ -13459,11 +13485,15 @@ function isInfielderAwareOfRouteBall(fielder, battedBall) {
   return distance <= awarenessRadius;
 }
 
+// 「この打球なら守れる」という担当決めの高さ上限。
+// 実際に捕れるかどうかを見る resolveUnifiedFielderCircleCatch と同じグラブの高さを基準にする。
+// ここだけ高いままにすると、頭上を通る打球の担当に内野手が選ばれ、外野手は候補から外れ、
+// 結局だれも追わないまま打球が外野へ抜けていく。
 function isInfielderPlayableRouteHeight(fielder, battedBall, point, bonus = 0) {
   if (!battedBall || battedBall.isGrounder) return true;
   const fielding = getFielderFieldingRating(fielder);
   const ballHeight = getBattedBallRouteHeightAtPoint(point, battedBall);
-  const playableHeight = 58 + fielding * 5 + bonus;
+  const playableHeight = getLiveCircleCatchReachHeight() + fielding * 1.6 + bonus * 0.4;
   return ballHeight <= playableHeight;
 }
 
@@ -14345,7 +14375,7 @@ function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
 
   const progress = clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1);
   const height = getDefenseBallHeightAtPoint(progress, elapsedSeconds);
-  if (height > 124) return false;
+  if (height > getLiveCircleCatchReachHeight()) return false;
 
   const ballRadius = ball?.radius ?? 8;
   const candidates = (defenseState.fielders || [])
@@ -15074,6 +15104,9 @@ function getDefenseFielderMovementTarget(fielder, elapsedSeconds) {
   if (fielder.role === defenseState.chosenFielder?.role) {
     return clampOutfielderBeyondRiversideRiver(getDefenseFielderChaseTarget(elapsedSeconds), fielder.role);
   }
+  if (shouldOutfielderChaseAsBackup(fielder)) {
+    return clampOutfielderBeyondRiversideRiver(getOutfielderBackupChaseTarget(elapsedSeconds), fielder.role);
+  }
   if (!isInfielderRole(defenseState.chosenFielder?.role) && shouldInfielderAttemptRollingRoute(fielder, defenseState.battedBall, defenseState.target)) {
     return getInfielderRollingAttemptTarget(fielder, defenseState.battedBall, defenseState.target);
   }
@@ -15084,6 +15117,44 @@ function getDefenseFielderMovementTarget(fielder, elapsedSeconds) {
     return getInfielderRollingAttemptTarget(fielder, defenseState.battedBall, defenseState.target);
   }
   return null;
+}
+
+// 打球の落下点にいちばん近い外野手。担当エリアの持ち主を決める。
+function getResponsibleOutfielderRole(landingPoint = defenseState.landingTarget || defenseState.battedBall?.target || defenseState.target) {
+  if (!landingPoint) return null;
+  let bestRole = null;
+  let bestDistance = Infinity;
+  (defenseState.fielders || []).forEach((entry) => {
+    if (isInfielderRole(entry.role)) return;
+    const distance = Math.hypot(landingPoint.x - entry.x, landingPoint.y - entry.y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestRole = entry.role;
+    }
+  });
+  return bestRole;
+}
+
+// 担当エリアの外野手は、chosenFielder に選ばれていなくても打球へ走る。
+// 以前は chosenFielder 以外の外野手が getDefenseFielderMovementTarget で null を返し、
+// その場から一歩も動かなかった。センター前へ落ちる打球を投手や内野手が処理する形になると、
+// センターはフェンス手前に突っ立ったまま最後まで動かない見た目になっていた。
+function shouldOutfielderChaseAsBackup(fielder) {
+  const battedBall = defenseState.battedBall;
+  if (!fielder || !battedBall || isInfielderRole(fielder.role)) return false;
+  if (battedBall.fenceOver || battedBall.isFoulBall) return false;
+  if (fielder.role === defenseState.chosenFielder?.role) return false;
+  if (defenseState.throw || defenseState.unifiedCircleCatchComplete || defenseState.resolved) return false;
+  if (defenseState.outcome?.caught && !defenseState.outcome.needsThrow) return false;
+  return getResponsibleOutfielderRole() === fielder.role;
+}
+
+function getOutfielderBackupChaseTarget(elapsedSeconds) {
+  const battedBall = defenseState.battedBall;
+  const landing = defenseState.landingTarget || battedBall?.target || defenseState.target;
+  const ballTime = Math.max(0.1, battedBall?.ballTime ?? 1);
+  if (elapsedSeconds <= ballTime + 0.05) return landing;
+  return { x: ball.x, y: ball.y };
 }
 
 function getInfielderRollingAttemptTarget(fielder, battedBall, fieldingTarget) {
@@ -15151,7 +15222,13 @@ function getDefenseFielderChaseTarget(elapsedSeconds) {
 function shouldOutfielderChaseLivePostLandingBall(battedBall, elapsedSeconds, ballTime) {
   if (!battedBall || battedBall.isGrounder || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
   if (!isOutfieldFrontLandingBall(battedBall) && !isDeepDriveFrontLandingBall(battedBall) && !isOutfieldFlyLandingBall(battedBall)) return false;
-  return elapsedSeconds > ballTime + 0.04 && !defenseState.throw && !defenseState.outcome?.caught;
+  // outcome.caught は「いつか処理できる」という予定でしかなく、needsThrow が付く打球では
+  // まだ誰もボールを持っていない。以前はこれで追いかけるのをやめていたため、
+  // 目の前に落ちたボールを残したまま外野手が立ち止まっていた。
+  // 本当にボールが収まったかどうかは unifiedCircleCatchComplete を見る。
+  if (defenseState.throw || defenseState.unifiedCircleCatchComplete) return false;
+  if (defenseState.outcome?.caught && !defenseState.outcome.needsThrow) return false;
+  return elapsedSeconds > ballTime + 0.04;
 }
 
 function isOutfieldFlyChaseToLanding(battedBall, elapsedSeconds, ballTime) {
@@ -15569,7 +15646,12 @@ function getDefenseBallPoint(progress, eased, elapsedSeconds = 0) {
       y: defenseState.origin.y + (target.y - defenseState.origin.y) * t
     };
   }
-  if (outcome?.caught) {
+  // 空中で捕る打球だけ、捕球者が到達する時刻に合わせてボールを運ぶ。
+  // needsThrow が付く「落ちてから拾う」打球までこの分岐に入れていたため、
+  // ボールの位置は捕球時刻 (数秒後) の時間軸、高さは滞空時間 (getDefenseBallHeightAtPoint) の
+  // 時間軸という食い違いが起きていた。結果、外野へ向かう打球がマウンド手前を低空でのろのろ進み、
+  // その場に立っている投手や内野手の捕球円に吸い込まれていた。
+  if (outcome?.caught && !outcome.needsThrow) {
     const fieldingTime = Math.max(0.1, outcome.fieldingTime ?? defenseState.battedBall?.ballTime ?? 1);
     const catchProgress = clamp(elapsedSeconds / fieldingTime, 0, 1);
     const t = getBattedBallTravelProgress(catchProgress);
@@ -16495,8 +16577,11 @@ function getFoulVisualTarget(point, direction = null) {
   const depth = Math.max(70, home.y - (point?.y ?? home.y - 160));
   const side = Math.sign(direction?.x ?? 0) || Math.sign((point?.x ?? home.x) - home.x) || (Math.random() < 0.5 ? -1 : 1);
   const fairLimit = Math.tan(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)) * depth;
+  // 白線からの余白は深さに比例させる。固定の58pxだと、外野の深い位置では画面上ほとんど線に
+  // 重なって見えて「フェアに落ちたのにファウル」と誤解されやすかった。
+  const outsideMargin = 58 + depth * 0.06;
   return {
-    x: home.x + side * (fairLimit + 58),
+    x: home.x + side * (fairLimit + outsideMargin),
     y: home.y - depth
   };
 }
