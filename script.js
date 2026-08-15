@@ -2393,6 +2393,8 @@ function ensureBatterGameRecord(team, player = activeBatter, role = getCurrentBa
     name: player.name,
     role: role || lineup[lineupIndex]?.role || "",
     order: lineupIndex >= 0 ? lineupIndex : lineup.length + existingCount,
+    entrySequence: existingCount,
+    appeared: true,
     plateAppearances: 0,
     atBats: 0,
     runs: 0,
@@ -2411,6 +2413,7 @@ function ensureBatterGameRecord(team, player = activeBatter, role = getCurrentBa
   };
   record.name = player.name;
   if (role) record.role = role;
+  record.appeared = true;
   teamRecords[key] = record;
   return record;
 }
@@ -6158,6 +6161,72 @@ function getPauseMainOptions(team) {
   return [{ label: "\u9589\u3058\u308b", action: "close" }];
 }
 
+function getPausePlayerRoleLabel(player, role = null, kind = "batter") {
+  if (kind === "pitcher") return "投手";
+  if (role) return getMenuRoleLabel(role);
+  if (isCatcherLikePlayer(player)) return "捕手";
+  return "野手";
+}
+
+function formatPausePlayerAbilityLine(player, role = null, kind = "batter") {
+  if (!player) return "";
+  if (kind === "pitcher") {
+    return `球速${player.fastKmh ?? "--"} / 制${player.control ?? "-"} 球威${player.stuff ?? "-"} スタ${player.stamina ?? "-"} 守${player.fielding ?? "-"} / ${getPitcherGameStaminaText(player)}`;
+  }
+  const resolved = role ? applyBenchDefenseRoleAdjustment({ ...player, fromBench: player.fromBench }, role) : player;
+  const isCatcher = isCatcherRole(role) || isCatcherLikePlayer(resolved);
+  const defenseText = isCatcher
+    ? `肩${resolved.arm ?? 5}`
+    : `内${resolved.infieldDefense ?? resolved.fielding ?? 5} 外${resolved.outfieldDefense ?? resolved.fielding ?? 5} 肩${resolved.arm ?? 5}`;
+  return `パ${resolved.power ?? "-"} ミ${resolved.meet ?? "-"} 走${resolved.run ?? "-"} ${defenseText} / ${resolved.cost ?? 0}P`;
+}
+
+function getPauseReplacementContext() {
+  const team = pauseMenuState.team;
+  if (pauseMenuState.mode === "pitcher") {
+    const player = getTeamActivePitcher(team);
+    return player ? { label: "現在", player, roleLabel: "投手", ability: formatPausePlayerAbilityLine(player, null, "pitcher") } : null;
+  }
+  if (pauseMenuState.mode === "pinchHitBench") {
+    const lineup = selected?.[team]?.batters || [];
+    const entry = lineup[battingOrderIndex[team] % Math.max(1, lineup.length)];
+    return entry?.player ? { label: "元", player: entry.player, roleLabel: getMenuRoleLabel(entry.role), ability: formatPausePlayerAbilityLine(entry.player, entry.role, "batter") } : null;
+  }
+  if (pauseMenuState.mode === "runnerBench") {
+    const player = bases?.[pauseMenuState.selectedBase];
+    const entry = player ? findLineupEntryByPlayerId(team, player.id) : null;
+    return player ? { label: "元", player, roleLabel: entry?.role ? getMenuRoleLabel(entry.role) : "走者", ability: formatPausePlayerAbilityLine(player, entry?.role, "batter") } : null;
+  }
+  if (pauseMenuState.mode === "defenseBench") {
+    const entry = selected?.[team]?.batters?.find((item) => item.role === pauseMenuState.selectedRole);
+    return entry?.player ? { label: "元", player: entry.player, roleLabel: getMenuRoleLabel(entry.role), ability: formatPausePlayerAbilityLine(entry.player, entry.role, "batter") } : null;
+  }
+  return null;
+}
+
+function getPauseOptionDetail(option) {
+  if (!option) return "";
+  if (option.action === "usePitcher") {
+    const pitcherInfo = selected?.[pauseMenuState.team]?.pitchers?.find((player) => player.id === option.pitcherId);
+    return formatPausePlayerAbilityLine(pitcherInfo, null, "pitcher");
+  }
+  if (option.action === "useBench") {
+    const benchPlayer = getAvailableBenchEntries(pauseMenuState.team).find((entry) => entry.player.id === option.benchId)?.player;
+    const targetRole = pauseMenuState.mode === "defenseBench" ? pauseMenuState.selectedRole : null;
+    return formatPausePlayerAbilityLine(benchPlayer, targetRole, "batter");
+  }
+  return option.detail || "";
+}
+
+function drawPauseFittedText(text, x, y, maxWidth, startSize = 14, weight = "normal") {
+  let fontSize = startSize;
+  ctx.font = `${weight} ${fontSize}px sans-serif`;
+  while (ctx.measureText(text).width > maxWidth && fontSize > 9) {
+    fontSize -= 1;
+    ctx.font = `${weight} ${fontSize}px sans-serif`;
+  }
+  ctx.fillText(text, x, y);
+}
 function getPauseOptions() {
   const team = pauseMenuState.team;
   if (pauseMenuState.mode === "main") return getPauseMainOptions(team);
@@ -22060,8 +22129,12 @@ function drawGameResultBoard() {
 
 function getBattingGameRecordEntries(team) {
   return Object.values(batterGameRecords[team] || {})
-    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
-    .filter((record) => record.plateAppearances > 0 || selected?.[team]?.batters?.some((entry) => entry?.player?.id === record.id));
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999)
+      || (a.entrySequence ?? 999) - (b.entrySequence ?? 999)
+      || a.name.localeCompare(b.name))
+    .filter((record) => record.appeared
+      || record.plateAppearances > 0
+      || selected?.[team]?.batters?.some((entry) => entry?.player?.id === record.id));
 }
 
 function getTeamHitsFromBatters(team) {
@@ -22207,8 +22280,9 @@ function drawGameResultBattingTable(team, x, y, width, height) {
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
   const widths = colWidths.map((value) => value * scale);
   const rowHeight = 26;
+  const maxRows = Math.max(0, Math.floor(height / rowHeight) - 1);
   drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize: 11 });
-  getBattingGameRecordEntries(team).slice(0, 9).forEach((record, index) => {
+  getBattingGameRecordEntries(team).slice(0, maxRows).forEach((record, index) => {
     const values = [
       getMenuRoleLabel(record.role).slice(0, 2),
       record.name,

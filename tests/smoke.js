@@ -12095,4 +12095,62 @@ assert(Math.abs(temporaryBoostState.firstSpeed - temporaryBoostState.baseSpeed *
 assert(Math.abs(temporaryBoostState.secondSpeed - temporaryBoostState.baseSpeed * 1.05) < 0.001, "relief speed should use the same-inning boost after the first batter");
 assert(Math.abs(temporaryBoostState.firstStuff - (temporaryBoostState.baseStuff + temporaryBoostState.stuffBoost) * 1.2) < 0.001, "relief stuff should use the first-batter boost");
 
+const battingSubstitutionRecordState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    selected = createSelectedTeams({
+      away: cloneTeamSelection(teamPresets.allstar.selection),
+      home: cloneTeamSelection(teamPresets.dodgers.selection)
+    });
+    gameMode = "versus";
+    firstBatTeam = "away";
+    battingTeam = "away";
+    half = "top";
+    inning = 1;
+    count = { strikes: 0, balls: 0, outs: 0 };
+    bases = createEmptyBases();
+    scores = { away: 0, home: 0 };
+    inningScores = createInningScores();
+    batterGameRecords = createBatterGameRecords();
+    pitcherGameRecords = createPitcherGameRecords();
+    reliefBoostState = createReliefBoostState();
+    battingOrderIndex = { away: 0, home: 0 };
+    gamePhase = "playing";
+    initializeBatterGameRecords();
+    setMatchup();
+
+    const replacedStarterName = activeBatter.name;
+    const benchPlayers = selected.away.bench.map((entry) => entry.player).filter(Boolean);
+    const pinchChanged = substituteCurrentBatter("away", benchPlayers[0]);
+    const pinchName = activeBatter.name;
+    recordBatterPlateAppearance("walk");
+
+    bases.first = makeBaseRunner(selected.away.batters[1].player);
+    bases.second = makeBaseRunner(selected.away.batters[2].player);
+    const firstRunnerChanged = substituteRunner("away", "first", benchPlayers[1]);
+    const secondRunnerChanged = substituteRunner("away", "second", benchPlayers[2]);
+    const entries = getBattingGameRecordEntries("away");
+
+    return JSON.stringify({
+      pinchChanged,
+      firstRunnerChanged,
+      secondRunnerChanged,
+      replacedStarterName,
+      pinchName,
+      firstRunnerName: benchPlayers[1].name,
+      secondRunnerName: benchPlayers[2].name,
+      entryCount: entries.length,
+      names: entries.map((record) => record.name),
+      lastName: entries[entries.length - 1]?.name || ""
+    });
+  })()`
+));
+
+assert(battingSubstitutionRecordState.pinchChanged === true, "pinch hitter should enter for the current batter in record tests");
+assert(battingSubstitutionRecordState.firstRunnerChanged === true && battingSubstitutionRecordState.secondRunnerChanged === true, "pinch runners should enter for existing base runners");
+assert(battingSubstitutionRecordState.entryCount === 10, "batting result entries should include all seven starters plus three substitutes");
+assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.replacedStarterName), "a starter removed before his first plate appearance should remain in the game result batting table");
+assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.pinchName), "a pinch hitter should appear in the game result batting table");
+assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.firstRunnerName), "a pinch runner on first should appear in the game result batting table even with no plate appearance");
+assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.secondRunnerName), "a pinch runner on second should appear in the game result batting table even with no plate appearance");
 console.log("Smoke check passed");
