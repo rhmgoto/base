@@ -2811,6 +2811,30 @@ function getReliefPitcherBoostMultiplier(player = activePitcher) {
   return (state?.battersFaced ?? 0) <= 0 ? 1.2 : 1.05;
 }
 
+function formatTemporaryBoostPercentFromMultiplier(multiplier) {
+  if (!Number.isFinite(multiplier) || multiplier <= 1) return "";
+  return `+${Math.round((multiplier - 1) * 100)}%`;
+}
+
+function formatTemporaryBoostPercentFromDelta(baseValue, deltaValue) {
+  const base = Number(baseValue);
+  const delta = Number(deltaValue);
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(delta) || delta <= 0) return "";
+  return `+${Math.round((delta / base) * 100)}%`;
+}
+
+function getReliefPitcherBoostLabel(player = activePitcher) {
+  return formatTemporaryBoostPercentFromMultiplier(getReliefPitcherBoostMultiplier(player));
+}
+
+function getPinchHitAbilityBoostAmount(batter = activeBatter) {
+  return isPinchHitBoostActive(batter) ? 3 : 0;
+}
+
+function getPinchHitBoostLabel(batter = activeBatter, abilityKey = "power") {
+  return formatTemporaryBoostPercentFromDelta(batter?.[abilityKey] ?? 5, getPinchHitAbilityBoostAmount(batter));
+}
+
 function markReliefBoostBatterFaced(team = fieldingTeam(), pitcherInfo = activePitcher) {
   const state = reliefBoostState?.[team];
   if (!state || !pitcherInfo || state.pitcherId !== pitcherInfo.id || state.halfInningKey !== getHalfInningKey()) return;
@@ -3843,28 +3867,29 @@ function renderPitcherPanel(player, nameElement, statsElement) {
 
 function updateSidebarAbilityPanels() {
   if (!activeBatterName || !activePitcherName || !activeBatterStats || !activePitcherStats) return;
+  const reliefBoostLabel = getReliefPitcherBoostLabel(activePitcher);
   activePitcherName.textContent = `${activePitcher.name} ${handLabel(activePitcher.throws)}`;
   activePitcherStats.innerHTML = [
-    speedRow("球速", activePitcher.fastKmh),
+    speedRow("球速", activePitcher.fastKmh, { boostLabel: reliefBoostLabel }),
     staminaBar(activePitcher),
     statRow("投球数", activePitcher.pitchCount ?? 0),
     pitchCross(activePitcher),
     statRow("制球", activePitcher.control),
-    statRow("球威", activePitcher.stuff)
+    statRow("球威", activePitcher.stuff, { boostLabel: reliefBoostLabel })
   ].join("");
 
   activeBatterName.textContent = `${activeBatter.name} ${handLabel(activeBatter.bats)}`;
   const activeRole = isAnyPracticeMode() ? null : getCurrentBatterRole(battingTeam);
   const activeIsCatcher = isCatcherRole(activeRole) || isCatcherLikePlayer(activeBatter);
   activeBatterStats.innerHTML = (activeIsCatcher ? [
-    statRow("パワー", activeBatter.power),
-    statRow("ミート", activeBatter.meet),
+    statRow("パワー", activeBatter.power, { boostLabel: getPinchHitBoostLabel(activeBatter, "power") }),
+    statRow("ミート", activeBatter.meet, { boostLabel: getPinchHitBoostLabel(activeBatter, "meet") }),
     statRow("走塁", activeBatter.run),
     statRow("肩", activeBatter.arm ?? 5),
     statRow("打席", handLabel(activeBatterSide))
   ] : [
-    statRow("パワー", activeBatter.power),
-    statRow("ミート", activeBatter.meet),
+    statRow("パワー", activeBatter.power, { boostLabel: getPinchHitBoostLabel(activeBatter, "power") }),
+    statRow("ミート", activeBatter.meet, { boostLabel: getPinchHitBoostLabel(activeBatter, "meet") }),
     statRow("走塁", activeBatter.run),
     statRow("内野", activeBatter.infieldDefense ?? activeBatter.fielding ?? 5),
     statRow("外野", activeBatter.outfieldDefense ?? activeBatter.fielding ?? 5),
@@ -3904,12 +3929,15 @@ function statRow(label, value, options = {}) {
   const className = ["stat-row", options.className].filter(Boolean).join(" ");
   const valueHtml = showAbilityBar
     ? `
-      <span class="stat-value-main">${value}</span>
+      <span class="stat-value-line">
+        <span class="stat-value-main">${value}</span>
+        ${options.boostLabel ? `<span class="temporary-boost-badge">${escapeHtml(options.boostLabel)}</span>` : ""}
+      </span>
       <span class="ability-bar" aria-hidden="true">
         <span class="ability-bar-fill" style="width: ${clamp(numericValue, 0, 10) * 10}%"></span>
       </span>
     `
-    : value;
+    : `${value}${options.boostLabel ? ` <span class="temporary-boost-badge">${escapeHtml(options.boostLabel)}</span>` : ""}`;
   return `
     <div class="${className}"${sortAttr}>
       <span class="stat-name">${label}</span>
@@ -3950,7 +3978,7 @@ function speedRow(label, value, options = {}) {
   return `
     <div class="${className}"${sortAttr}>
       <span class="stat-name">${label}</span>
-      <span class="stat-value">${value} km/h</span>
+      <span class="stat-value">${value} km/h${options.boostLabel ? ` <span class="temporary-boost-badge">${escapeHtml(options.boostLabel)}</span>` : ""}</span>
     </div>
   `;
 }
@@ -8650,7 +8678,7 @@ function isActiveBatterObject(batter) {
 }
 
 function getEffectiveBatterMeet(batter = activeBatter) {
-  const meet = (batter?.meet ?? 5) + (isPinchHitBoostActive(batter) ? 3 : 0);
+  const meet = (batter?.meet ?? 5) + getPinchHitAbilityBoostAmount(batter);
   if (!isActiveBatterObject(batter)) return meet;
   const swingType = getCurrentSwingType();
   if (swingType === "bunt") return meet + 5;
@@ -8658,7 +8686,7 @@ function getEffectiveBatterMeet(batter = activeBatter) {
 }
 
 function getEffectiveBatterPower(batter = activeBatter) {
-  const power = (batter?.power ?? 5) + (isPinchHitBoostActive(batter) ? 3 : 0);
+  const power = (batter?.power ?? 5) + getPinchHitAbilityBoostAmount(batter);
   const swingType = isActiveBatterObject(batter) ? getCurrentSwingType() : "strong";
   const swingAdjustedPower = swingType === "bunt"
     ? Math.max(1, power - 5)
@@ -21124,7 +21152,8 @@ function drawPitcher() {
     if (isReliefBoostActive(activePitcher)) {
       drawTemporaryBoostAura(pitcher.x, pitcher.y - 10, {
         radiusX: 52,
-        radiusY: 82
+        radiusY: 82,
+        label: getReliefPitcherBoostLabel(activePitcher)
       });
     }
   }
@@ -21237,6 +21266,9 @@ function drawPitcherSprite(team) {
   }
   ctx.drawImage(spriteSet.image, frame.sx, frame.sy, frame.sw, frame.sh, drawX, footY - drawHeight, drawWidth, drawHeight);
   ctx.restore();
+  if (isReliefBoostActive(activePitcher)) {
+    drawTemporaryBoostFloatingLabel(pitcher.x, pitcher.y - 84, getReliefPitcherBoostLabel(activePitcher));
+  }
 }
 
 function drawBatter() {
@@ -21250,7 +21282,8 @@ function drawBatter() {
     if (isPinchHitBoostActive(activeBatter)) {
       drawTemporaryBoostAura(batter.x, batter.y - 12, {
         radiusX: 54,
-        radiusY: 88
+        radiusY: 88,
+        label: getPinchHitBoostLabel(activeBatter, "power")
       });
     }
   }
@@ -21315,6 +21348,24 @@ function drawTemporaryBoostAura(x, y, options = {}) {
   ctx.restore();
 }
 
+function drawTemporaryBoostFloatingLabel(x, y, label) {
+  if (!label) return;
+  ctx.save();
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const width = Math.max(48, ctx.measureText(label).width + 20);
+  ctx.fillStyle = "rgba(40, 12, 18, 0.78)";
+  roundRect(x - width / 2, y - 14, width, 28, 8);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 207, 112, 0.82)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#fff2a8";
+  ctx.fillText(label, x, y + 1);
+  ctx.restore();
+}
+
 function drawHbpHitBox() {
   if (!showHbpHitBox) return;
   const polygon = getHbpHitPolygon();
@@ -21367,6 +21418,9 @@ function drawBatterSprite(team) {
   });
   ctx.globalAlpha = 1;
   ctx.restore();
+  if (isPinchHitBoostActive(activeBatter)) {
+    drawTemporaryBoostFloatingLabel(batter.x, batter.y - 90, getPinchHitBoostLabel(activeBatter, "power"));
+  }
 }
 
 function getBatterPoseLayers() {
@@ -22174,10 +22228,11 @@ function drawPitcherGameCard(x, y, player) {
   const height = 254;
   const safeX = clamp(x, 18, canvas.width - width - 18);
   const safeY = clamp(y, 100, canvas.height - height - 18);
+  const reliefBoostLabel = getReliefPitcherBoostLabel(player);
   drawAbilityCardFrame(safeX, safeY, width, height, "投手能力", player.name, "#3787bd");
-  drawGameStatRow(safeX + 16, safeY + 54, 150, "球速", `${player.fastKmh} km/h`);
+  drawGameStatRow(safeX + 16, safeY + 54, 150, "球速", `${player.fastKmh} km/h`, { boostLabel: reliefBoostLabel });
   drawGameStatRow(safeX + 182, safeY + 54, 144, "制球", player.control ?? 5);
-  drawGameStatRow(safeX + 182, safeY + 84, 144, "球威", player.stuff ?? 5);
+  drawGameStatRow(safeX + 182, safeY + 84, 144, "球威", player.stuff ?? 5, { boostLabel: reliefBoostLabel });
   drawGameStatRow(safeX + 16, safeY + 84, 150, "投球数", player.pitchCount ?? 0);
   drawGameStaminaBar(safeX + 16, safeY + 114, width - 32, player);
   drawGamePitchCross(safeX + 72, safeY + 148, player);
@@ -22541,8 +22596,8 @@ function drawBatterGameCard(x, y, player) {
   const safeX = clamp(x, 18, canvas.width - width - 18);
   const safeY = clamp(y, 100, canvas.height - height - 18);
   drawAbilityCardFrame(safeX, safeY, width, height, "打者能力", player.name, "#d84e5f");
-  drawGameStatRow(safeX + 16, safeY + 56, 126, "パワー", player.power);
-  drawGameStatRow(safeX + 158, safeY + 56, 126, "ミート", player.meet);
+  drawGameStatRow(safeX + 16, safeY + 56, 126, "パワー", player.power, { boostLabel: getPinchHitBoostLabel(player, "power") });
+  drawGameStatRow(safeX + 158, safeY + 56, 126, "ミート", player.meet, { boostLabel: getPinchHitBoostLabel(player, "meet") });
   drawGameStatRow(safeX + 16, safeY + 86, 126, "走塁", player.run);
   drawGameStatRow(safeX + 158, safeY + 86, 126, "打席", handLabel(activeBatterSide));
 }
@@ -22570,7 +22625,7 @@ function drawAbilityCardFrame(x, y, width, height, role, name, headerColor) {
   fitText(name, x + 98, y + 28, width - 112);
 }
 
-function drawGameStatRow(x, y, width, label, value) {
+function drawGameStatRow(x, y, width, label, value, options = {}) {
   ctx.fillStyle = "#eaf6ff";
   roundRect(x, y, width, 24, 7);
   ctx.fill();
@@ -22582,8 +22637,38 @@ function drawGameStatRow(x, y, width, label, value) {
   ctx.fillText(label, x + 8, y + 16);
   ctx.textAlign = "right";
   ctx.font = "bold 17px sans-serif";
-  ctx.fillText(String(value), x + width - 8, y + 18);
+  const valueRight = options.boostLabel ? x + width - 50 : x + width - 8;
+  drawFittedCanvasText(String(value), valueRight, y + 18, Math.max(30, valueRight - x - 54), 17, "bold", "right");
+  if (options.boostLabel) {
+    drawTemporaryBoostBadge(x + width - 46, y + 4, 38, 16, options.boostLabel);
+  }
   ctx.textAlign = "left";
+}
+
+function drawTemporaryBoostBadge(x, y, width, height, label) {
+  ctx.fillStyle = "#bf4331";
+  roundRect(x, y, width, height, 5);
+  ctx.fill();
+  ctx.strokeStyle = "#ffcf70";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = "#fff8df";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x + width / 2, y + height / 2 + 1);
+  ctx.textBaseline = "alphabetic";
+}
+
+function drawFittedCanvasText(text, x, y, maxWidth, startSize = 17, weight = "bold", align = "left") {
+  let fontSize = startSize;
+  ctx.textAlign = align;
+  ctx.font = `${weight} ${fontSize}px sans-serif`;
+  while (ctx.measureText(text).width > maxWidth && fontSize > 9) {
+    fontSize -= 1;
+    ctx.font = `${weight} ${fontSize}px sans-serif`;
+  }
+  ctx.fillText(text, x, y);
 }
 
 function drawGamePitchCross(x, y, player) {

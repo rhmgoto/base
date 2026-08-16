@@ -997,9 +997,32 @@ canvas {
   text-align: left;
 }
 
+.stat-value-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
 .stat-value-main {
   line-height: 1;
   text-align: right;
+}
+
+.temporary-boost-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  padding: 2px 5px;
+  color: #fff8df;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+  background: #bf4331;
+  border: 1px solid #ffcf70;
+  border-radius: 5px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 
 .ability-bar {
