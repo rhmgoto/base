@@ -1501,7 +1501,8 @@ const bgmTracks = {
   title: new Audio("audio/title music.mp3"),
   menu: new Audio("audio/sports_broadcast_baseball_bgm_loop.wav"),
   relaxed: new Audio("audio/bright_relaxed_sports_broadcast_bgm_loop.wav"),
-  scoring: new Audio("audio/mountain_wind_stadium_anthem_bgm_loop.wav")
+  scoring: new Audio("audio/mountain_wind_stadium_anthem_bgm_loop.wav"),
+  result: new Audio("audio/スコアのあと.mp3")
 };
 
 Object.values(bgmTracks).forEach((track) => {
@@ -7552,7 +7553,7 @@ function handleBgmButtonClick() {
 
 function getCurrentBgmKey() {
   if (gamePhase === "menu") return selectedMenuMode === "main" ? "title" : "menu";
-  if (gamePhase === "gameover") return "menu";
+  if (gamePhase === "gameover") return "result";
   if (gamePhase !== "playing" && gamePhase !== "defense") return null;
   return bases.second || bases.third ? "scoring" : "relaxed";
 }
@@ -14269,9 +14270,55 @@ function makeStrictCircleMissOutcome(fielder, battedBall, fieldingPoint, fielder
   return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false, fieldingTime: Math.max(fieldingPointBallTime, fielderTime) };
 }
 
+function clearWallHitFlagsForCatch(battedBall) {
+  battedBall.wallHit = false;
+  battedBall.wallReboundTarget = null;
+  battedBall.wallImpactHeight = 0;
+  battedBall.cancelledHomerFallback = null;
+}
+
+function resolveReachableWallHitCatchOutcome(fielder, battedBall, runner = null) {
+  if (!fielder || !battedBall?.wallHit || battedBall.fenceOver || battedBall.groundRuleDouble) return null;
+  if (isInfielderRole(fielder.role)) return null;
+  const fieldingPoint = fielder.fieldingPoint || battedBall.target;
+  const routeProgress = getBattedBallRouteProgressForPoint(fieldingPoint, battedBall);
+  if (routeProgress < 0.72) return null;
+
+  const speed = getFielderSpeed(fielder);
+  const fielderReach = getStableFielderCatchRangeRadius(fielder);
+  const distanceToTarget = Number.isFinite(fielder.distanceToTarget)
+    ? fielder.distanceToTarget
+    : Math.hypot(fieldingPoint.x - fielder.x, fieldingPoint.y - fielder.y);
+  const runDistance = Math.max(0, distanceToTarget - fielderReach);
+  const reactionDelay = getFielderReactionDelay(fielder);
+  const fielderTime = runDistance <= 0
+    ? 0
+    : reactionDelay + runDistance / speed;
+  const ballTime = battedBall.ballTime ?? getBattedBallRouteArrivalTime(fieldingPoint, battedBall);
+  const fielding = getFielderFieldingRating(fielder);
+  const catchGrace = 0.02 + fielding * 0.004;
+  if (fielderTime > ballTime + catchGrace) return null;
+
+  const ballHeight = getWallHitFlightHeight(routeProgress, battedBall);
+  const maxCatchHeight = getLiveCircleCatchMaxHeight(battedBall) + 14;
+  if (ballHeight < airCatchMinHeight || ballHeight > maxCatchHeight) return null;
+
+  clearWallHitFlagsForCatch(battedBall);
+  return makeStrictCircleCatchOutcome(
+    fielder,
+    battedBall,
+    fieldingPoint,
+    Math.max(ballTime, fielderTime),
+    runner
+  );
+}
 function resolveDefenseOutcome(fielder, battedBall, runner = null) {
   if (battedBall.fenceOver) return { kind: "homer", label: hitLabels.homer, scoreType: "homer", caught: false };
-  if (battedBall.wallHit) return { kind: "double", label: "フェンス直撃", scoreType: "double", caught: false };
+  if (battedBall.wallHit) {
+    const reachableCatch = resolveReachableWallHitCatchOutcome(fielder, battedBall, runner);
+    if (reachableCatch) return reachableCatch;
+    return { kind: "double", label: "\u30d5\u30a7\u30f3\u30b9\u76f4\u6483", scoreType: "double", caught: false };
+  }
 
   const fieldingPoint = fielder.fieldingPoint || battedBall.target;
   const speed = getFielderSpeed(fielder);
