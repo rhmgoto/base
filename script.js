@@ -1498,7 +1498,7 @@ Object.values(sounds).forEach((sound) => {
 });
 
 const bgmTracks = {
-  menu: new Audio("audio/sports_broadcast_baseball_bgm_loop.wav"),
+  menu: new Audio("audio/title music.mp3"),
   relaxed: new Audio("audio/bright_relaxed_sports_broadcast_bgm_loop.wav"),
   scoring: new Audio("audio/mountain_wind_stadium_anthem_bgm_loop.wav")
 };
@@ -6077,7 +6077,10 @@ function initializeMenuGamepadCursor(team) {
   const cursor = gamepadState.menuCursors[team];
   const fallbackX = team === "away" ? window.innerWidth * 0.34 : window.innerWidth * 0.66;
   const fallbackY = window.innerHeight * 0.44;
-  const card = document.querySelector(`.menu-player-card[data-team="${team}"]`);
+  const rootModeButton = selectedMenuMode === "main" && team === "away"
+    ? document.querySelector('.menu-mode-button[data-menu-mode="versus"]')
+    : null;
+  const card = rootModeButton || document.querySelector(`.menu-player-card[data-team="${team}"]`);
   const rect = card?.getBoundingClientRect?.();
   cursor.x = rect ? rect.left + rect.width / 2 : fallbackX;
   cursor.y = rect ? rect.top + rect.height / 2 : fallbackY;
@@ -6492,6 +6495,11 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
 
   if (gamePhase === "menu") {
     if (!canUseMenuGamepadCursor(team)) {
+      gamepadState.previousButtons[team] = pressed;
+      return;
+    }
+    if (selectedMenuMode === "main" && team === "away" && justPressed(gamepadButtons.A)) {
+      updateMenuModeView("versus");
       gamepadState.previousButtons[team] = pressed;
       return;
     }
