@@ -1211,6 +1211,71 @@ assert(
   `タッチアップが成功すれば犠飛で1点、アウトは捕球の1つだけ (${caughtFlyWithThrowOut.safe.outs}アウト ${caughtFlyWithThrowOut.safe.runs}点)`
 );
 
+const manualTwoOutTagUpState = JSON.parse(run(`
+  startGame();
+  gameMode = "versus";
+  battingTeam = "away";
+  gamePhase = "defense";
+  count.outs = 2;
+  scores = { away: 0, home: 0 };
+  bases = createEmptyBases();
+  bases.first = makeBaseRunner(findById(batters, "sato"));
+  bases.second = makeBaseRunner(findById(batters, "shuto"));
+  const thirdRunner = makeBaseRunner(findById(batters, "ichiro"));
+  bases.third = thirdRunner;
+  activeBatter = findById(batters, "suzuki");
+  const target = { x: field.plateX + 200, y: field.plateY - 1500 };
+  const hit = {
+    target, direction: normalize({ x: 0.15, y: -1 }), flightDistance: 1500, landingDistance: 1500,
+    ballTime: 3.2, isGrounder: false, isLiner: false, isDeep: true, isPopupFly: false,
+    power: 0.7, trajectory: "fly", fenceOver: false, wallHit: false, groundRuleDouble: false
+  };
+  const outcome = { kind: "out", label: "外野フライ", caught: true, needsThrow: false, fieldingTime: 3.2 };
+  const fielder = { role: "C", x: target.x, y: target.y, speed: 5, fielding: 5, arm: 5 };
+  defenseState = {
+    ...createDefenseState(), active: true, resolved: false,
+    startTime: performance.now() - 12000, duration: 30000,
+    outcome, battedBall: hit, runner: createBatterRunner(activeBatter),
+    baseRunners: [{
+      ...thirdRunner,
+      startBase: "third",
+      currentBase: "third",
+      targetBase: "third",
+      manualTargetBase: null,
+      tagUp: false,
+      scored: false,
+      route: [{ ...defenseField.bases.third }],
+      routeStartTime: 0,
+      routeDuration: 0,
+      arrivalTime: 0,
+      arrived: true,
+      x: defenseField.bases.third.x,
+      y: defenseField.bases.third.y,
+      speed: getDefenseBaseRunnerSpeed(thirdRunner)
+    }],
+    fielders: [fielder], chosenFielder: fielder, target,
+    unifiedCircleCatchComplete: true,
+    throw: null
+  };
+  handleBatterRunnerBaseCommand("home", "advance");
+  const command = {
+    targetBase: defenseState.baseRunners[0]?.targetBase,
+    tagUp: Boolean(defenseState.baseRunners[0]?.tagUp),
+    throwTarget: defenseState.throw?.targetBase || null
+  };
+  finishDefensePlay();
+  return JSON.stringify({
+    command,
+    outs: count.outs,
+    runs: scores.away
+  });
+`));
+
+assert(manualTwoOutTagUpState.command.targetBase === "third", "2アウト捕球後の手動タッチアップ指示は走者を本塁へ向かわせない");
+assert(manualTwoOutTagUpState.command.tagUp === false, "2アウト捕球後の手動タッチアップ指示で tagUp を立てない");
+assert(manualTwoOutTagUpState.command.throwTarget === null, "2アウト捕球後の手動タッチアップ指示で本塁送球を作らない");
+assert(manualTwoOutTagUpState.runs === 0, "2アウト満塁の外野フライ捕球後に手動タッチアップ得点を認めない");
+
 // ---------------------------------------------------------------------------
 // 統合テスト: シード固定の観戦試合で走塁の不変条件を検査する
 // ---------------------------------------------------------------------------

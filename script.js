@@ -442,13 +442,13 @@ const MVP_CONFIG = {
   tieBreakSeed: null,
   weights: { basic: 0.6, wpa: 0.4 },
   batting: {
-    single: 1.0, double: 1.7, triple: 2.4, homeRun: 3.2,
+    single: 1.0, double: 1.5, triple: 1.7, homeRun: 2.5,
     walk: 0.6, hbp: 0.6, rbi: 0.5, run: 0.3,
     sacrificeFly: 0.7, sacrificeBunt: 0.3,
     stolenBase: 0.5, caughtStealing: -0.7, groundedIntoDoublePlay: -0.8
   },
   fielding: {
-    difficultCatch: 0.5, finePlay: 1.0, assistOut: 0.8,
+    catch: 0.2, assistOut: 0.8,
     homeAssistOut: 1.2, doublePlay: 0.5, error: -1.0
   },
   pitching: {
@@ -460,8 +460,8 @@ const MVP_CONFIG = {
     goAheadHit: 0.5, comebackHit: 1.0,
     walkOffHit: 1.5, walkOffHomeRun: 2.0,
     grandSlam: 1.5, twoHomeRuns: 1.0, threeHits: 0.7, cycle: 3.0,
-    completeGame: 0.7, shutout: 2.0, noHitShutout: 4.0,
-    perfectGame: 6.0, save: 0.5, threeStrikeoutInning: 0.3,
+    completeGame: 0.7, shutout: 2.0, noHitShutout: 3.0,
+    perfectGame: 4.5, save: 0.5, threeStrikeoutInning: 0.3,
     plateAppearanceCap: 3.0
   },
   pitchingSpecialStacking: {
@@ -2666,16 +2666,7 @@ function recordMvpFieldingContribution({ fielder = null, error = false, caught =
   if (error) {
     basic += MVP_CONFIG.fielding.error;
   } else {
-    const routeDistance = fielder.distanceToTarget || 0;
-    if (caught && routeDistance >= 300) {
-      basic += MVP_CONFIG.fielding.finePlay;
-      reason = "ファインプレー！";
-      reasonPriority = 42;
-    } else if (caught && routeDistance >= 190) {
-      basic += MVP_CONFIG.fielding.difficultCatch;
-      reason = "難しい打球を好捕！";
-      reasonPriority = 30;
-    }
+    if (caught) basic += MVP_CONFIG.fielding.catch;
     if (assistBase) {
       basic += assistBase === "home"
         ? MVP_CONFIG.fielding.homeAssistOut
@@ -11910,7 +11901,7 @@ function handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds)
   if (mode === "return") {
     setDefenseBaseRunnerReturnDestination(runner, targetIndex, elapsedSeconds);
   } else {
-    setDefenseBaseRunnerManualDestination(runner, targetIndex, elapsedSeconds);
+    if (!setDefenseBaseRunnerManualDestination(runner, targetIndex, elapsedSeconds)) return false;
   }
   message = mode === "return" ? `${getBaseLabel(targetBase)}へ帰塁指示` : `${getBaseLabel(targetBase)}へ走塁指示`;
   return true;
@@ -12076,6 +12067,7 @@ function updateDefenseBaseRunnerPosition(runner, elapsedSeconds) {
 }
 
 function setDefenseBaseRunnerManualDestination(runner, nextBase, elapsedSeconds) {
+  if (isCaughtFlyThirdOutPending()) return false;
   const targetBase = nextBase >= 4 ? "home" : baseNameByIndex[nextBase];
   runner.routeStartTime = elapsedSeconds;
   runner.route = [{ x: runner.x, y: runner.y }, { ...getDefenseBasePoint(nextBase) }];
@@ -12088,6 +12080,14 @@ function setDefenseBaseRunnerManualDestination(runner, nextBase, elapsedSeconds)
   runner.routeDuration = getRunnerRouteDistance(runner.route) / runner.speed;
   runner.arrivalTime = elapsedSeconds + runner.routeDuration;
   runner.arrived = false;
+  return true;
+}
+
+function isCaughtFlyThirdOutPending() {
+  return defenseState.outcome?.kind === "out"
+    && defenseState.outcome.caught
+    && !defenseState.outcome.needsThrow
+    && count.outs >= 2;
 }
 
 function setDefenseBaseRunnerReturnDestination(runner, baseIndex, elapsedSeconds) {
@@ -16764,13 +16764,13 @@ function finishDefensePlay() {
       recordLastOutFromDefense(forceOutBases, throwOutRunner);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, outsToAdd);
       adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
-      // 封殺で3アウト目が成立した場合、その回の得点は認めない。
+      // 3アウト目が成立した場合、その回の追加得点は認めない。
       const runs = resolveDefensePlayBaseState({
         batterInfo: activeBatter,
         forceOutBases: isForceOut ? forceOutBases : [],
         outRunners: isForceOut ? [] : [throwOutRunner],
         batterOut: caughtBatterOut,
-        allowRuns: !(isForceOut && count.outs >= 3)
+        allowRuns: count.outs < 3
       });
       const batterResultType = caughtBatterOut
         ? getCaughtOutBatterResultType(runs)
