@@ -193,11 +193,24 @@ h1 {
   max-width: none;
 }
 
+.game-shell.result-open {
+  width: 100vw;
+  max-width: none;
+}
+
 .game-shell.menu-open .play-area {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.game-shell.result-open .play-area {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .game-shell.menu-open .side-panel {
+  display: none;
+}
+
+.game-shell.result-open .side-panel {
   display: none;
 }
 

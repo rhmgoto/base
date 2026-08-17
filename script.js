@@ -1489,6 +1489,14 @@ let pauseMenuState = {
   message: ""
 };
 
+let ppDetailState = {
+  active: false,
+  entry: null,
+  panelRect: null,
+  closeRect: null
+};
+let ppDetailHitAreas = [];
+
 let switchBatterChoice = {
   active: false,
   team: "away",
@@ -2467,6 +2475,7 @@ function ensureMvpPlayerRecord(team, player = null) {
     wpa: 0,
     eventSpecial: 0,
     reasons: [],
+    events: [],
     strikeoutsByHalf: {}
   };
   if (player.name) record.name = player.name;
@@ -2490,6 +2499,15 @@ function recordMvpEvent({
   record.wpa += Number.isFinite(wpa) ? wpa : 0;
   record.eventSpecial += Number.isFinite(special) ? special : 0;
   if (reason) record.reasons.push({ text: reason, priority: reasonPriority });
+  if (basic || wpa || special || reason) {
+    record.events.push({
+      basic: Number.isFinite(basic) ? basic : 0,
+      wpa: Number.isFinite(wpa) ? wpa : 0,
+      special: Number.isFinite(special) ? special : 0,
+      reason,
+      priority: reasonPriority
+    });
+  }
   return record;
 }
 
@@ -2871,6 +2889,7 @@ function calculateActivityPointStandings(gameData = createGameMvpData(), options
         wpa: 0,
         eventSpecial: 0,
         reasons: [],
+        events: [],
         strikeoutsByHalf: {}
       };
       const basicScore = getMvpBattingBasicScore(battingRecord)
@@ -2896,6 +2915,9 @@ function calculateActivityPointStandings(gameData = createGameMvpData(), options
         reasons: specialResult.reasons,
         battingRecord,
         pitchingRecord,
+        eventBasic: eventRecord.eventBasic || 0,
+        eventSpecial: eventRecord.eventSpecial || 0,
+        events: eventRecord.events || [],
         rosterOrder: rosterOrderById[id] ?? 999,
         tieValue: getMvpSeedValue(MVP_CONFIG.tieBreakSeed, id)
       };
@@ -2932,7 +2954,13 @@ function calculateActivityPointStandings(gameData = createGameMvpData(), options
     specialBonus: Number(candidate.specialBonus.toFixed(2)),
     activityPoints: Number(candidate.totalScore.toFixed(2)),
     totalScore: Number(candidate.totalScore.toFixed(2)),
-    reason: candidate.reason
+    reason: candidate.reason,
+    battingRecord: candidate.battingRecord,
+    pitchingRecord: candidate.pitchingRecord,
+    eventBasic: Number((candidate.eventBasic || 0).toFixed(2)),
+    eventSpecial: Number((candidate.eventSpecial || 0).toFixed(2)),
+    events: candidate.events,
+    reasons: candidate.reasons
   }));
 }
 
@@ -4674,10 +4702,12 @@ function startGame(modeOverride = null) {
   count = { strikes: 0, balls: 0, outs: 0 };
   inputLockedUntil = 0;
   resetDefenseState();
+  closePpDetail();
   gamePhase = "playing";
   lastPitchSpeedKmh = null;
   battingFeedback.active = false;
   shell?.classList.remove("menu-open");
+  shell?.classList.remove("result-open");
   menu.classList.add("hidden");
   closePlayerChooser();
   initializeBatterGameRecords();
@@ -4700,7 +4730,9 @@ function showMenu() {
   gamePhase = "menu";
   inputLockedUntil = 0;
   clearPendingGameEnd();
+  closePpDetail();
   shell?.classList.add("menu-open");
+  shell?.classList.remove("result-open");
   menu.classList.remove("hidden");
   updateMenuModeView("main");
   updateMenuAbilityPanels();
@@ -5041,6 +5073,8 @@ function advanceHomeRunDerbyTurn() {
 function endHomeRunDerby() {
   clearPendingGameEnd();
   gamePhase = "gameover";
+  shell?.classList.add("result-open");
+  shell?.classList.remove("menu-open");
   ball.active = false;
   pendingPitch = null;
   isPitching = false;
@@ -6819,10 +6853,11 @@ function closePauseMenu() {
   pauseMenuState.selectedIndex = 0;
   pauseMenuState.selectedRole = null;
   pauseMenuState.selectedBase = null;
+  closePpDetail();
 }
 
 function getPauseMainOptions(team) {
-  const activityOption = { label: "活躍ポイント", action: "activity" };
+  const activityOption = { label: "PP一覧", action: "activity" };
   const menuOption = { label: "メイン画面に戻る", action: "menu" };
   const closeOption = { label: "閉じる", action: "close" };
   if (team === fieldingTeam()) {
@@ -17223,6 +17258,8 @@ function finishGameEnd(reasonLabel = "") {
   markPitcherWinLossAndHolds();
   gameMvpResult = calculateGameMVP(createGameMvpData({ final: true }));
   gamePhase = "gameover";
+  shell?.classList.add("result-open");
+  shell?.classList.remove("menu-open");
   const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "チームA勝利" : "チームB勝利";
   message = `${reasonLabel ? `${reasonLabel} ` : ""}試合終了 ${scores.away}-${scores.home} ${result}`;
   showEffect(result, "#ff6f61");
@@ -17806,12 +17843,14 @@ function showEffect(text, color) {
 }
 
 function draw() {
+  clearPpDetailHitAreas();
   if (gamePhase === "xStadiumPrompt") {
     drawDefenseView();
     drawHud();
     drawXStadiumPrompt();
     if (pauseMenuState.active) drawPauseMenu();
     if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
+    if (ppDetailState.active) drawPpDetailPanel();
     return;
   }
   if (gamePhase === "defense") {
@@ -17821,6 +17860,7 @@ function draw() {
     drawHitEffect();
     if (pauseMenuState.active) drawPauseMenu();
     if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
+    if (ppDetailState.active) drawPpDetailPanel();
     return;
   }
   drawField();
@@ -17841,6 +17881,7 @@ function draw() {
   drawHitEffect();
   if (pauseMenuState.active) drawPauseMenu();
   if (isSwitchBatterChoicePending()) drawSwitchBatterChoice();
+  if (ppDetailState.active) drawPpDetailPanel();
 }
 
 function drawSwitchBatterChoice() {
@@ -17887,6 +17928,187 @@ function getActivityPointRoleText(entry) {
   return getMenuRoleLabel(entry.role);
 }
 
+function getGameResultActivityPointMaps() {
+  const maps = { away: new Map(), home: new Map() };
+  const standings = calculateActivityPointStandings(
+    createGameMvpData({ final: true }),
+    { allTeams: true }
+  );
+  standings.forEach((entry) => {
+    if (maps[entry.team]) maps[entry.team].set(entry.playerId, entry);
+  });
+  return maps;
+}
+
+function formatGameResultActivityPoints(activityPointMap, record) {
+  const entry = activityPointMap?.get(record?.id);
+  const value = typeof entry === "object" ? entry.activityPoints : entry;
+  return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+}
+
+function clearPpDetailHitAreas() {
+  ppDetailHitAreas = [];
+}
+
+function registerPpDetailHitArea(rect, entry) {
+  if (!entry) return;
+  ppDetailHitAreas.push({ ...rect, entry });
+}
+
+function openPpDetail(entry) {
+  if (!entry) return;
+  ppDetailState.active = true;
+  ppDetailState.entry = entry;
+}
+
+function closePpDetail() {
+  ppDetailState.active = false;
+  ppDetailState.entry = null;
+  ppDetailState.panelRect = null;
+  ppDetailState.closeRect = null;
+}
+
+function findPpEntryAtPoint(point) {
+  for (let index = ppDetailHitAreas.length - 1; index >= 0; index -= 1) {
+    const area = ppDetailHitAreas[index];
+    if (isPointInRect(point, area)) return area.entry;
+  }
+  return null;
+}
+
+function addPpFormulaLine(lines, label, count, score) {
+  if (!count || !score) return;
+  const total = count * score;
+  lines.push(`${label}: ${count} × ${score} = ${total.toFixed(2)}`);
+}
+
+function buildPpBasicDetailLines(entry) {
+  const lines = [];
+  const batting = entry.battingRecord || {};
+  const doubles = batting.doubles || 0;
+  const triples = batting.triples || 0;
+  const homeRuns = batting.homeRuns || 0;
+  const singles = Math.max(0, (batting.hits || 0) - doubles - triples - homeRuns);
+  addPpFormulaLine(lines, "単打", singles, MVP_CONFIG.batting.single);
+  addPpFormulaLine(lines, "二塁打", doubles, MVP_CONFIG.batting.double);
+  addPpFormulaLine(lines, "三塁打", triples, MVP_CONFIG.batting.triple);
+  addPpFormulaLine(lines, "本塁打", homeRuns, MVP_CONFIG.batting.homeRun);
+  addPpFormulaLine(lines, "四球", batting.walks || 0, MVP_CONFIG.batting.walk);
+  addPpFormulaLine(lines, "死球", batting.hbp || 0, MVP_CONFIG.batting.hbp);
+  addPpFormulaLine(lines, "打点", batting.rbi || 0, MVP_CONFIG.batting.rbi);
+  addPpFormulaLine(lines, "得点", batting.runs || 0, MVP_CONFIG.batting.run);
+  addPpFormulaLine(lines, "犠飛", batting.sacrificeFlies || 0, MVP_CONFIG.batting.sacrificeFly);
+  addPpFormulaLine(lines, "犠打", batting.sacrificeBunts || 0, MVP_CONFIG.batting.sacrificeBunt);
+  addPpFormulaLine(lines, "併殺打", batting.groundedIntoDoublePlays || 0, MVP_CONFIG.batting.groundedIntoDoublePlay);
+
+  const pitching = entry.pitchingRecord || {};
+  addPpFormulaLine(lines, "投球アウト", pitching.outs || 0, MVP_CONFIG.pitching.out);
+  addPpFormulaLine(lines, "奪三振", pitching.strikeouts || 0, MVP_CONFIG.pitching.strikeout);
+  addPpFormulaLine(lines, "被安打", pitching.hitsAllowed || 0, MVP_CONFIG.pitching.hitAllowed);
+  addPpFormulaLine(lines, "与四死球", pitching.walksAllowed || 0, MVP_CONFIG.pitching.walkAllowed);
+  addPpFormulaLine(lines, "失点", pitching.runsAllowed || 0, MVP_CONFIG.pitching.runAllowed);
+  addPpFormulaLine(lines, "自責点", pitching.earnedRunsAllowed || 0, MVP_CONFIG.pitching.earnedRunAllowed);
+  addPpFormulaLine(lines, "被本塁打", pitching.homeRunsAllowed || 0, MVP_CONFIG.pitching.homeRunAllowed);
+
+  const basicEvents = (entry.events || []).filter((event) => event.basic);
+  basicEvents.forEach((event) => {
+    const label = event.reason || (event.basic > 0 ? "守備/走塁加点" : "守備/走塁減点");
+    lines.push(`${label}: ${event.basic.toFixed(2)}`);
+  });
+  if (!basicEvents.length && entry.eventBasic) {
+    lines.push(`守備/走塁イベント合計: ${entry.eventBasic.toFixed(2)}`);
+  }
+  if (!lines.length) lines.push("基本点に該当する記録なし");
+  return lines;
+}
+
+function buildPpSpecialDetailLines(entry) {
+  const lines = [];
+  const specialEvents = (entry.events || []).filter((event) => event.special);
+  specialEvents.forEach((event) => {
+    const label = event.reason || "試合展開ボーナス";
+    lines.push(`${label}: ${event.special.toFixed(2)}`);
+  });
+  const finalSpecialOnly = (entry.specialBonus || 0) - (entry.eventSpecial || 0);
+  if (finalSpecialOnly > 0.005) {
+    const labels = [...(entry.reasons || [])]
+      .map((reason) => reason.text)
+      .filter(Boolean)
+      .filter((text, index, array) => array.indexOf(text) === index);
+    const label = labels.length ? labels.join(" / ") : "試合終了時ボーナス";
+    lines.push(`${label}: ${finalSpecialOnly.toFixed(2)}`);
+  }
+  if (!lines.length) lines.push("特別ボーナスなし");
+  return lines;
+}
+
+function buildPpDetailLines(entry) {
+  const basicWeighted = (entry.basicScore || 0) * MVP_CONFIG.weights.basic;
+  const wpaWeighted = (entry.wpaScore || 0) * MVP_CONFIG.weights.wpa;
+  return [
+    `${teamLabel(entry.team)} ${getActivityPointRoleText(entry)} ${entry.playerName}`,
+    `TOTAL PP = BASIC_SCORE×${MVP_CONFIG.weights.basic} + WPA_SCORE×${MVP_CONFIG.weights.wpa} + SPECIAL_BONUS`,
+    `= ${(entry.basicScore || 0).toFixed(2)}×${MVP_CONFIG.weights.basic} + ${(entry.wpaScore || 0).toFixed(2)}×${MVP_CONFIG.weights.wpa} + ${(entry.specialBonus || 0).toFixed(2)} = ${(entry.activityPoints || 0).toFixed(2)}`,
+    "",
+    `BASIC_SCORE ${(entry.basicScore || 0).toFixed(2)}  (反映 ${basicWeighted.toFixed(2)})`,
+    ...buildPpBasicDetailLines(entry),
+    "",
+    `WPA_SCORE ${(entry.wpaScore || 0).toFixed(2)}  (反映 ${wpaWeighted.toFixed(2)})`,
+    `勝率変動 ${Number(entry.wpa || 0).toFixed(1)}% ÷ ${MVP_CONFIG.wpa.scoreDivisor} = ${(entry.wpaScore || 0).toFixed(2)}`,
+    "",
+    `SPECIAL_BONUS ${(entry.specialBonus || 0).toFixed(2)}`,
+    ...buildPpSpecialDetailLines(entry)
+  ];
+}
+
+function drawPpDetailPanel() {
+  if (!ppDetailState.active || !ppDetailState.entry) return;
+  const lines = buildPpDetailLines(ppDetailState.entry);
+  const width = Math.min(760, canvas.width - 96);
+  const height = Math.min(620, canvas.height - 92);
+  const x = (canvas.width - width) / 2;
+  const y = (canvas.height - height) / 2;
+  const closeSize = 34;
+  ppDetailState.panelRect = { x, y, width, height };
+  ppDetailState.closeRect = { x: x + width - closeSize - 16, y: y + 14, width: closeSize, height: closeSize };
+  ctx.save();
+  ctx.fillStyle = "rgba(9, 18, 30, 0.56)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(248, 251, 255, 0.98)";
+  roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#233047";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#102833";
+  ctx.font = "700 22px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("PP詳細", x + 24, y + 32);
+  ctx.fillStyle = "#dbe4ee";
+  roundRect(ppDetailState.closeRect.x, ppDetailState.closeRect.y, closeSize, closeSize, 6);
+  ctx.fill();
+  ctx.fillStyle = "#172033";
+  ctx.font = "700 20px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("×", ppDetailState.closeRect.x + closeSize / 2, ppDetailState.closeRect.y + closeSize / 2 + 1);
+  let textY = y + 68;
+  lines.forEach((line, index) => {
+    if (textY > y + height - 24) return;
+    if (!line) {
+      textY += 10;
+      return;
+    }
+    const isHeader = index === 0 || line.startsWith("BASIC_SCORE") || line.startsWith("WPA_SCORE") || line.startsWith("SPECIAL_BONUS");
+    ctx.fillStyle = isHeader ? "#102833" : line.startsWith("TOTAL PP") || line.startsWith("=") ? "#9b4d00" : "#334155";
+    ctx.font = isHeader ? "700 15px sans-serif" : "13px sans-serif";
+    ctx.textAlign = "left";
+    drawPauseFittedText(line, x + 28, textY, width - 56, isHeader ? 15 : 13, isHeader ? "700" : "normal");
+    textY += isHeader ? 22 : 18;
+  });
+  ctx.restore();
+}
+
 function drawActivityPointStandings(x, y, width, height, options = {}) {
   const standings = calculateActivityPointStandings(
     createGameMvpData({ final: Boolean(options.final) }),
@@ -17905,7 +18127,11 @@ function drawActivityPointStandings(x, y, width, height, options = {}) {
         return 0;
       });
     }
-    const rowHeight = clamp(Math.floor((height - 48) / Math.max(1, entries.length)), 24, 32);
+    const titleHeight = options.compact ? 30 : 43;
+    const rowHeight = options.compact
+      ? clamp(Math.floor((height - titleHeight - 6) / Math.max(1, entries.length)), 11, 20)
+      : clamp(Math.floor((height - 48) / Math.max(1, entries.length)), 24, 32);
+    const maxRows = Math.max(0, Math.floor((height - titleHeight - 4) / rowHeight));
     ctx.fillStyle = team === "away" ? "#eaf5ff" : "#fff0ef";
     roundRect(columnX, y, columnWidth, height, 7);
     ctx.fill();
@@ -17913,27 +18139,28 @@ function drawActivityPointStandings(x, y, width, height, options = {}) {
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = team === "away" ? "#14517d" : "#8d302b";
-    ctx.font = "700 19px sans-serif";
+    ctx.font = options.compact ? "700 15px sans-serif" : "700 19px sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${teamLabel(team)}  活躍ポイント`, columnX + 14, y + 23);
-    entries.forEach((entry, index) => {
-      const rowY = y + 43 + index * rowHeight;
+    ctx.fillText(`${teamLabel(team)}  PP`, columnX + 14, y + (options.compact ? 17 : 23));
+    entries.slice(0, maxRows).forEach((entry, index) => {
+      const rowY = y + titleHeight + index * rowHeight;
       const isMvp = options.final && gameMvpResult?.playerId === entry.playerId && gameMvpResult?.team === team;
       ctx.fillStyle = isMvp ? "#fff0a8" : index % 2 === 0 ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.44)";
       ctx.fillRect(columnX + 8, rowY, columnWidth - 16, rowHeight - 2);
       ctx.fillStyle = "#64748b";
-      ctx.font = "700 13px sans-serif";
+      ctx.font = options.compact ? "700 10px sans-serif" : "700 13px sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(`${index + 1}`, columnX + 31, rowY + rowHeight / 2);
       ctx.textAlign = "left";
-      drawPauseFittedText(getActivityPointRoleText(entry), columnX + 42, rowY + rowHeight / 2 + 5, 76, 12, "normal");
+      drawPauseFittedText(getActivityPointRoleText(entry), columnX + 42, rowY + rowHeight / 2 + 5, 76, options.compact ? 10 : 12, "normal");
       ctx.fillStyle = "#172033";
-      drawPauseFittedText(entry.playerName, columnX + 122, rowY + rowHeight / 2 + 6, columnWidth - 225, isMvp ? 16 : 15, isMvp ? "700" : "normal");
+      drawPauseFittedText(entry.playerName, columnX + 122, rowY + rowHeight / 2 + 6, columnWidth - 225, options.compact ? 12 : isMvp ? 16 : 15, isMvp ? "700" : "normal");
       ctx.fillStyle = entry.activityPoints > 0 ? "#b54708" : entry.activityPoints < 0 ? "#9f1239" : "#475569";
-      ctx.font = "700 16px sans-serif";
+      ctx.font = options.compact ? "700 12px sans-serif" : "700 16px sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(entry.activityPoints.toFixed(2), columnX + columnWidth - 18, rowY + rowHeight / 2);
+      registerPpDetailHitArea({ x: columnX + 8, y: rowY, width: columnWidth - 16, height: rowHeight - 2 }, entry);
     });
   });
 }
@@ -17957,7 +18184,7 @@ function drawPauseActivityPoints() {
   ctx.font = "700 27px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("現在の活躍ポイント", x + width / 2, y + 32);
+  ctx.fillText("現在のPP", x + width / 2, y + 32);
   drawActivityPointStandings(x + 24, y + 58, width - 48, height - 140, { final: false });
   const buttonWidth = 190;
   const buttonGap = 16;
@@ -23188,7 +23415,15 @@ function drawGameResultBoard() {
   ctx.fillText(`${teamLabel("away")} ${scores.away} - ${scores.home} ${teamLabel("home")}`, board.x + board.width / 2, board.y + 58);
   drawGameMvpBanner(board.x + 24, board.y + 76, board.width - 48, 44);
   drawGameResultScoreTable(board.x + 24, board.y + 130, board.width - 48, 86);
-  drawActivityPointStandings(board.x + 24, board.y + 236, board.width - 48, board.height - 260, { final: true });
+  const contentX = board.x + 24;
+  const contentWidth = board.width - 48;
+  const columnGap = 44;
+  const halfWidth = (contentWidth - columnGap) / 2;
+  const activityPointMaps = getGameResultActivityPointMaps();
+  drawGameResultBattingTable("away", contentX, board.y + 244, halfWidth, 330, { activityPointMap: activityPointMaps.away });
+  drawGameResultBattingTable("home", contentX + halfWidth + columnGap, board.y + 244, halfWidth, 330, { activityPointMap: activityPointMaps.home });
+  drawGameResultPitchingTable("away", contentX, board.y + 620, halfWidth, 190, { activityPointMap: activityPointMaps.away });
+  drawGameResultPitchingTable("home", contentX + halfWidth + columnGap, board.y + 620, halfWidth, 190, { activityPointMap: activityPointMaps.home });
   ctx.restore();
 }
 
@@ -23207,7 +23442,7 @@ function drawGameMvpBanner(x, y, width, height) {
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   const activityPoints = gameMvpResult.activityPoints ?? gameMvpResult.totalScore ?? 0;
-  drawGameResultFittedText(`MVP  ${gameMvpResult.playerName}  ${activityPoints.toFixed(2)}pt`, x + 14, y + height / 2, nameWidth - 20, 18, "bold", "left");
+  drawGameResultFittedText(`MVP  ${gameMvpResult.playerName}  ${activityPoints.toFixed(2)}PP`, x + 14, y + height / 2, nameWidth - 20, 18, "bold", "left");
   ctx.fillStyle = "#233047";
   drawGameResultFittedText(gameMvpResult.reason, x + nameWidth, y + height / 2, width - nameWidth - 14, 17, "bold", "left");
   ctx.restore();
@@ -23359,19 +23594,23 @@ function drawGameResultFittedText(text, x, y, maxWidth, startSize = 12, weight =
   ctx.fillText(text, x, y);
 }
 
-function drawGameResultBattingTable(team, x, y, width, height) {
+function drawGameResultBattingTable(team, x, y, width, height, options = {}) {
   drawGameResultSectionTitle(`${teamLabel(team)} 打撃成績`, x, y - 12, width);
-  const headers = ["守", "選手名", "率", "OPS", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "犠打", "犠飛", "失"];
-  const colWidths = [30, 116, 42, 45, 28, 28, 28, 28, 26, 26, 26, 26, 26, 26, 32, 32, 26];
+  const headers = ["守", "選手名", "PP", "率", "OPS", "打", "得", "安", "点", "二", "三", "本", "振", "四", "死", "犠打", "犠飛", "失"];
+  const colWidths = [28, 104, 42, 40, 43, 26, 26, 26, 26, 24, 24, 24, 24, 24, 24, 30, 30, 24];
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
   const widths = colWidths.map((value) => value * scale);
-  const rowHeight = 26;
+  const entries = getBattingGameRecordEntries(team);
+  const rowHeight = clamp(Math.floor(height / (Math.min(entries.length, 12) + 1)), 17, 26);
+  const fontSize = rowHeight <= 18 ? 9 : rowHeight <= 21 ? 10 : 11;
   const maxRows = Math.max(0, Math.floor(height / rowHeight) - 1);
-  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize: 11 });
-  getBattingGameRecordEntries(team).slice(0, maxRows).forEach((record, index) => {
+  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize });
+  entries.slice(0, maxRows).forEach((record, index) => {
+    const ppEntry = options.activityPointMap?.get(record.id);
     const values = [
       getMenuRoleLabel(record.role).slice(0, 2),
       record.name,
+      formatGameResultActivityPoints(options.activityPointMap, record),
       formatBattingAverage(record),
       formatBattingOps(record),
       record.atBats,
@@ -23388,24 +23627,32 @@ function drawGameResultBattingTable(team, x, y, width, height) {
       record.sacrificeFlies || 0,
       record.errorsReached
     ];
-    drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
+    const rowY = y + rowHeight * (index + 1);
+    drawGameResultRow(values, x, rowY, widths, rowHeight, { fontSize, nameColumn: 1 });
+    const ppX = x + widths[0] + widths[1];
+    registerPpDetailHitArea({ x: ppX, y: rowY, width: widths[2], height: rowHeight }, ppEntry);
   });
 }
 
-function drawGameResultPitchingTable(team, x, y, width, height) {
+function drawGameResultPitchingTable(team, x, y, width, height, options = {}) {
   drawGameResultSectionTitle(`${teamLabel(team)} 投手成績`, x, y - 12, width);
   drawPitchingAchievementBadge(team, x, y - 12, width);
-  const headers = ["勝敗", "選手名", "防御率", "回", "球", "打者", "安", "本", "三", "四死", "失", "責"];
-  const colWidths = [40, 118, 50, 36, 40, 40, 30, 30, 30, 36, 30, 30];
+  const headers = ["勝敗", "選手名", "PP", "防御率", "回", "球", "打者", "安", "本", "三", "四死", "失", "責"];
+  const colWidths = [38, 112, 42, 48, 34, 38, 38, 28, 28, 28, 34, 28, 28];
   const scale = width / colWidths.reduce((sum, value) => sum + value, 0);
   const widths = colWidths.map((value) => value * scale);
-  const rowHeight = 30;
-  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize: 11 });
-  getPitcherGameRecordEntries(team).slice(0, 6).forEach((record, index) => {
+  const entries = getPitcherGameRecordEntries(team);
+  const rowHeight = clamp(Math.floor(height / (Math.min(entries.length, 6) + 1)), 17, 30);
+  const fontSize = rowHeight <= 18 ? 9 : rowHeight <= 22 ? 10 : 11;
+  const maxRows = Math.max(0, Math.floor(height / rowHeight) - 1);
+  drawGameResultRow(headers, x, y, widths, rowHeight, { fill: "#e9edf2", bold: true, fontSize });
+  entries.slice(0, maxRows).forEach((record, index) => {
+    const ppEntry = options.activityPointMap?.get(record.id);
     const battersFaced = (record.outs || 0) + (record.hitsAllowed || 0) + (record.walksAllowed || 0);
     const values = [
       formatPitcherDecisionLabelsPlain(record),
       record.name,
+      formatGameResultActivityPoints(options.activityPointMap, record),
       formatPitcherEra(record),
       record.innings,
       record.pitchCount || 0,
@@ -23417,7 +23664,10 @@ function drawGameResultPitchingTable(team, x, y, width, height) {
       record.runsAllowed || 0,
       record.earnedRunsAllowed || 0
     ];
-    drawGameResultRow(values, x, y + rowHeight * (index + 1), widths, rowHeight, { fontSize: 11, nameColumn: 1 });
+    const rowY = y + rowHeight * (index + 1);
+    drawGameResultRow(values, x, rowY, widths, rowHeight, { fontSize, nameColumn: 1 });
+    const ppX = x + widths[0] + widths[1];
+    registerPpDetailHitArea({ x: ppX, y: rowY, width: widths[2], height: rowHeight }, ppEntry);
   });
 }
 
@@ -23924,9 +24174,22 @@ canvas.addEventListener("mouseleave", () => {
 
 canvas.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
+  const point = getCanvasPoint(event);
+  if (ppDetailState.active) {
+    event.preventDefault();
+    if (isPointInRect(point, ppDetailState.closeRect) || !isPointInRect(point, ppDetailState.panelRect)) {
+      closePpDetail();
+    }
+    return;
+  }
+  const ppEntry = findPpEntryAtPoint(point);
+  if (ppEntry && (gamePhase === "gameover" || pauseMenuState.mode === "activity")) {
+    event.preventDefault();
+    openPpDetail(ppEntry);
+    return;
+  }
   if (gamePhase === "xStadiumPrompt") {
     event.preventDefault();
-    const point = getCanvasPoint(event);
     if (isPointInRect(point, xStadiumPrompt.goRect)) handleXStadiumPromptChoice(true);
     else if (isPointInRect(point, xStadiumPrompt.dontRect)) handleXStadiumPromptChoice(false);
     return;
