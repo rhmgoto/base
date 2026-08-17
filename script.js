@@ -432,6 +432,52 @@ const staminaTuning = {
   speedChangeExhaustedMultiplier: 0.45,
   mistakeChanceMax: 0.1
 };
+
+// MVP evaluation values are kept together so game balance can be adjusted
+// without touching the scoring logic.
+const MVP_CONFIG = {
+  enabled: true,
+  debug: false,
+  winnerOnly: true,
+  tieBreakSeed: null,
+  weights: { basic: 0.6, wpa: 0.4 },
+  batting: {
+    single: 1.0, double: 1.7, triple: 2.4, homeRun: 3.2,
+    walk: 0.6, hbp: 0.6, rbi: 0.5, run: 0.3,
+    sacrificeFly: 0.7, sacrificeBunt: 0.3,
+    stolenBase: 0.5, caughtStealing: -0.7, groundedIntoDoublePlay: -0.8
+  },
+  fielding: {
+    difficultCatch: 0.5, finePlay: 1.0, assistOut: 0.8,
+    homeAssistOut: 1.2, doublePlay: 0.5, error: -1.0
+  },
+  pitching: {
+    out: 0.35, strikeout: 0.2, hitAllowed: -0.35,
+    walkAllowed: -0.35, runAllowed: -0.8,
+    earnedRunAllowed: -0.3, homeRunAllowed: -0.5
+  },
+  special: {
+    goAheadHit: 0.5, comebackHit: 1.0,
+    walkOffHit: 1.5, walkOffHomeRun: 2.0,
+    grandSlam: 1.5, twoHomeRuns: 1.0, threeHits: 0.7, cycle: 3.0,
+    completeGame: 0.7, shutout: 2.0, noHitShutout: 4.0,
+    perfectGame: 6.0, save: 0.5, threeStrikeoutInning: 0.3,
+    plateAppearanceCap: 3.0
+  },
+  pitchingSpecialStacking: {
+    completeGameWithHigherAchievement: true,
+    shutoutWithNoHitter: false,
+    noHitterWithPerfectGame: false
+  },
+  wpa: {
+    scoreDivisor: 10,
+    scoreLeadWeight: 1.18,
+    baseRunnerWeight: 0.24,
+    homeFieldAdvantage: 0.08,
+    minimumRemainingHalfInnings: 0.65
+  }
+};
+
 const stealTuning = {
   enabled: true,
   catcherArm: 5,
@@ -1301,6 +1347,9 @@ let inningScores = createInningScores();
 let batterGameRecords = createBatterGameRecords();
 let pitcherGameRecords = createPitcherGameRecords();
 let pitcherDecisionEvents = [];
+let mvpGameRecords = createMvpGameRecords();
+let mvpPlateAppearanceStartState = null;
+let gameMvpResult = null;
 let selected = createSelectedTeams(defaultMenuSelection);
 let menuSelection = cloneMenuSelection(defaultMenuSelection);
 let battingOrderIndex = { away: 0, home: 0 };
@@ -2402,6 +2451,515 @@ function createBatterGameRecords() {
   return { away: {}, home: {} };
 }
 
+function createMvpGameRecords() {
+  return { away: {}, home: {} };
+}
+
+function ensureMvpPlayerRecord(team, player = null) {
+  if (!team || !player) return null;
+  const id = player.id || player.playerId || player.name;
+  if (!id) return null;
+  const teamRecords = mvpGameRecords[team] || (mvpGameRecords[team] = {});
+  const record = teamRecords[id] || {
+    id,
+    name: player.name || id,
+    eventBasic: 0,
+    wpa: 0,
+    eventSpecial: 0,
+    reasons: [],
+    strikeoutsByHalf: {}
+  };
+  if (player.name) record.name = player.name;
+  teamRecords[id] = record;
+  return record;
+}
+
+function recordMvpEvent({
+  team,
+  player = null,
+  basic = 0,
+  wpa = 0,
+  special = 0,
+  reason = "",
+  reasonPriority = 0
+} = {}) {
+  if (!MVP_CONFIG.enabled || isAnyPracticeMode()) return null;
+  const record = ensureMvpPlayerRecord(team, player);
+  if (!record) return null;
+  record.eventBasic += Number.isFinite(basic) ? basic : 0;
+  record.wpa += Number.isFinite(wpa) ? wpa : 0;
+  record.eventSpecial += Number.isFinite(special) ? special : 0;
+  if (reason) record.reasons.push({ text: reason, priority: reasonPriority });
+  return record;
+}
+
+function captureMvpGameState() {
+  return {
+    maxInnings,
+    inning,
+    half,
+    firstBatTeam,
+    battingTeam,
+    outs: count.outs,
+    scores: { away: scores.away, home: scores.home },
+    bases: {
+      first: Boolean(bases.first),
+      second: Boolean(bases.second),
+      third: Boolean(bases.third)
+    },
+    pendingGameEnd: Boolean(pendingGameEnd),
+    gameOver: gamePhase === "gameover"
+  };
+}
+
+function isFinalMvpGameState(state) {
+  if (!state || state.scores.away === state.scores.home) return false;
+  if (state.gameOver || state.pendingGameEnd) return true;
+  const secondBatTeam = state.firstBatTeam === "away" ? "home" : "away";
+  const firstBatTeam = state.firstBatTeam;
+  if (state.inning < state.maxInnings) return false;
+  if (state.half === "bottom" && state.battingTeam === secondBatTeam) {
+    if (state.scores[secondBatTeam] > state.scores[firstBatTeam]) return true;
+    return state.outs >= 3;
+  }
+  return state.half === "top"
+    && state.battingTeam === firstBatTeam
+    && state.outs >= 3
+    && state.scores[secondBatTeam] > state.scores[firstBatTeam];
+}
+
+function calculateWinProbability(gameState, team = "away") {
+  if (!gameState || !gameState.scores) return 0.5;
+  const opponent = team === "away" ? "home" : "away";
+  if (isFinalMvpGameState(gameState)) {
+    return gameState.scores[team] > gameState.scores[opponent] ? 1 : 0;
+  }
+  const remainingRegulation = Math.max(0, gameState.maxInnings - gameState.inning);
+  const currentHalfRemaining = gameState.half === "top" ? 2 : 1;
+  const outProgress = clamp((gameState.outs || 0) / 3, 0, 1);
+  const remainingHalfInnings = Math.max(
+    MVP_CONFIG.wpa.minimumRemainingHalfInnings,
+    remainingRegulation * 2 + currentHalfRemaining - outProgress
+  );
+  const leverage = Math.sqrt(2 / remainingHalfInnings);
+  const scoreDiff = (gameState.scores[team] || 0) - (gameState.scores[opponent] || 0);
+  const baseThreat = (
+    (gameState.bases?.first ? 0.2 : 0)
+    + (gameState.bases?.second ? 0.35 : 0)
+    + (gameState.bases?.third ? 0.55 : 0)
+  ) * Math.max(0.18, 1 - outProgress * 0.72);
+  const battingThreat = gameState.battingTeam === team ? baseThreat : -baseThreat;
+  const secondBatTeam = gameState.firstBatTeam === "away" ? "home" : "away";
+  const secondBatAdvantage = team === secondBatTeam
+    ? MVP_CONFIG.wpa.homeFieldAdvantage
+    : -MVP_CONFIG.wpa.homeFieldAdvantage;
+  const logit = scoreDiff * MVP_CONFIG.wpa.scoreLeadWeight * leverage
+    + battingThreat * MVP_CONFIG.wpa.baseRunnerWeight * leverage
+    + secondBatAdvantage;
+  return clamp(1 / (1 + Math.exp(-logit)), 0.001, 0.999);
+}
+
+function startMvpPlateAppearance() {
+  if (!MVP_CONFIG.enabled || isAnyPracticeMode() || gamePhase === "menu") {
+    mvpPlateAppearanceStartState = null;
+    return;
+  }
+  mvpPlateAppearanceStartState = captureMvpGameState();
+}
+
+function getMvpLead(team, state) {
+  const opponent = team === "away" ? "home" : "away";
+  return (state?.scores?.[team] || 0) - (state?.scores?.[opponent] || 0);
+}
+
+function formatMvpHomeRunReason(prefix, runs) {
+  if (runs <= 1) return `${prefix}ホームラン！`;
+  return `${prefix}${runs}ランホームラン！`;
+}
+
+function recordMvpPlateAppearance(resultType, options = {}) {
+  if (!MVP_CONFIG.enabled || isAnyPracticeMode()) return;
+  const before = mvpPlateAppearanceStartState || captureMvpGameState();
+  const after = captureMvpGameState();
+  const offense = battingTeam;
+  const defense = fieldingTeam();
+  const batterInfo = activeBatter;
+  const pitcherInfo = activePitcher;
+  const offenseWpa = calculateWinProbability(after, offense) - calculateWinProbability(before, offense);
+  const runs = Math.max(0, options.rbi ?? options.runs ?? 0);
+  const hit = scoringHitTypes.has(resultType);
+  const homeRun = resultType === "homer";
+  const preLead = getMvpLead(offense, before);
+  const postLead = getMvpLead(offense, after);
+  const loaded = before.bases.first && before.bases.second && before.bases.third;
+  const walkOff = hit && runs > 0 && isFinalMvpGameState(after)
+    && offense === (firstBatTeam === "away" ? "home" : "away");
+  let special = 0;
+  const reasons = [];
+  if (hit && preLead === 0 && postLead > 0) {
+    special += MVP_CONFIG.special.goAheadHit;
+    reasons.push({ text: homeRun ? formatMvpHomeRunReason("勝ち越し", runs) : "勝ち越し打！", priority: 70 });
+  }
+  if (hit && preLead < 0 && postLead > 0) {
+    special += MVP_CONFIG.special.comebackHit;
+    reasons.push({ text: homeRun ? formatMvpHomeRunReason("逆転", runs) : "逆転タイムリー！", priority: 85 });
+  }
+  if (walkOff) {
+    special += homeRun ? MVP_CONFIG.special.walkOffHomeRun : MVP_CONFIG.special.walkOffHit;
+    reasons.push({ text: homeRun ? "サヨナラホームラン！" : "サヨナラ安打！", priority: 100 });
+  }
+  if (homeRun && loaded) {
+    special += MVP_CONFIG.special.grandSlam;
+    reasons.push({ text: "満塁ホームラン！", priority: 95 });
+  }
+  if (homeRun && loaded && preLead < 0 && postLead > 0) {
+    reasons.push({ text: "逆転満塁ホームラン！", priority: 106 });
+  } else if (homeRun && loaded && walkOff) {
+    reasons.push({ text: "サヨナラ満塁ホームラン！", priority: 104 });
+  }
+  special = Math.min(special, MVP_CONFIG.special.plateAppearanceCap);
+  const strongestReason = reasons.sort((a, b) => b.priority - a.priority)[0];
+  recordMvpEvent({
+    team: offense,
+    player: batterInfo,
+    wpa: offenseWpa,
+    special,
+    reason: strongestReason?.text || "",
+    reasonPriority: strongestReason?.priority || 0
+  });
+  recordMvpEvent({ team: defense, player: pitcherInfo, wpa: -offenseWpa });
+  mvpPlateAppearanceStartState = null;
+}
+
+function recordMvpStealResult(runner, isOut, beforeState) {
+  if (!MVP_CONFIG.enabled || isAnyPracticeMode() || !runner) return;
+  const afterState = captureMvpGameState();
+  const offense = battingTeam;
+  const defense = fieldingTeam();
+  const offenseWpa = calculateWinProbability(afterState, offense) - calculateWinProbability(beforeState, offense);
+  recordMvpEvent({
+    team: offense,
+    player: runner,
+    basic: isOut ? MVP_CONFIG.batting.caughtStealing : MVP_CONFIG.batting.stolenBase,
+    wpa: offenseWpa,
+    reason: isOut ? "" : "盗塁成功！",
+    reasonPriority: 18
+  });
+  if (isOut) {
+    recordMvpEvent({
+      team: defense,
+      player: getTeamCatcher(defense),
+      basic: MVP_CONFIG.fielding.assistOut,
+      wpa: -offenseWpa,
+      reason: "盗塁を阻止！",
+      reasonPriority: 36
+    });
+  }
+  startMvpPlateAppearance();
+}
+
+function recordMvpFieldingContribution({ fielder = null, error = false, caught = false, assistBase = "", doublePlay = false } = {}) {
+  if (!fielder || isAnyPracticeMode()) return;
+  let basic = 0;
+  let reason = "";
+  let reasonPriority = 0;
+  if (error) {
+    basic += MVP_CONFIG.fielding.error;
+  } else {
+    const routeDistance = fielder.distanceToTarget || 0;
+    if (caught && routeDistance >= 300) {
+      basic += MVP_CONFIG.fielding.finePlay;
+      reason = "ファインプレー！";
+      reasonPriority = 42;
+    } else if (caught && routeDistance >= 190) {
+      basic += MVP_CONFIG.fielding.difficultCatch;
+      reason = "難しい打球を好捕！";
+      reasonPriority = 30;
+    }
+    if (assistBase) {
+      basic += assistBase === "home"
+        ? MVP_CONFIG.fielding.homeAssistOut
+        : MVP_CONFIG.fielding.assistOut;
+      if (assistBase === "home") {
+        reason = "本塁で走者を刺す好返球！";
+        reasonPriority = 55;
+      }
+    }
+    if (doublePlay) basic += MVP_CONFIG.fielding.doublePlay;
+  }
+  recordMvpEvent({ team: fieldingTeam(), player: fielder, basic, reason, reasonPriority });
+}
+
+// TODO: When the defense flow exposes a stable play-importance flag, add
+// game-ending double plays and plays that prevent the tying run here.
+
+function formatMvpPitchingOuts(outs = 0) {
+  const innings = Math.floor(outs / 3);
+  const partialOuts = outs % 3;
+  return partialOuts ? `${innings}回${partialOuts}/3` : `${innings}回`;
+}
+
+function getMvpBattingBasicScore(record) {
+  if (!record) return 0;
+  const doubles = record.doubles || 0;
+  const triples = record.triples || 0;
+  const homeRuns = record.homeRuns || 0;
+  const singles = Math.max(0, (record.hits || 0) - doubles - triples - homeRuns);
+  return singles * MVP_CONFIG.batting.single
+    + doubles * MVP_CONFIG.batting.double
+    + triples * MVP_CONFIG.batting.triple
+    + homeRuns * MVP_CONFIG.batting.homeRun
+    + (record.walks || 0) * MVP_CONFIG.batting.walk
+    + (record.hbp || 0) * MVP_CONFIG.batting.hbp
+    + (record.rbi || 0) * MVP_CONFIG.batting.rbi
+    + (record.runs || 0) * MVP_CONFIG.batting.run
+    + (record.sacrificeFlies || 0) * MVP_CONFIG.batting.sacrificeFly
+    + (record.sacrificeBunts || 0) * MVP_CONFIG.batting.sacrificeBunt
+    + (record.groundedIntoDoublePlays || 0) * MVP_CONFIG.batting.groundedIntoDoublePlay;
+}
+
+function getMvpPitchingBasicScore(record) {
+  if (!record) return 0;
+  return (record.outs || 0) * MVP_CONFIG.pitching.out
+    + (record.strikeouts || 0) * MVP_CONFIG.pitching.strikeout
+    + (record.hitsAllowed || 0) * MVP_CONFIG.pitching.hitAllowed
+    + (record.walksAllowed || 0) * MVP_CONFIG.pitching.walkAllowed
+    + (record.runsAllowed || 0) * MVP_CONFIG.pitching.runAllowed
+    + (record.earnedRunsAllowed || 0) * MVP_CONFIG.pitching.earnedRunAllowed
+    + (record.homeRunsAllowed || 0) * MVP_CONFIG.pitching.homeRunAllowed;
+}
+
+function getMvpSeedValue(seed, id) {
+  if (seed == null) return Math.random();
+  const text = `${seed}:${id}`;
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function getMvpFinalSpecial(team, player, battingRecord, pitchingRecord, data) {
+  let special = player.eventSpecial || 0;
+  const reasons = [...(player.reasons || [])];
+  if (battingRecord) {
+    if ((battingRecord.homeRuns || 0) >= 2) {
+      special += MVP_CONFIG.special.twoHomeRuns;
+      reasons.push({ text: `${battingRecord.homeRuns}本塁打！`, priority: 76 });
+    }
+    if ((battingRecord.hits || 0) >= 3) {
+      special += MVP_CONFIG.special.threeHits;
+      reasons.push({ text: `${battingRecord.hits}安打${battingRecord.rbi ? `${battingRecord.rbi}打点` : ""}！`, priority: 62 });
+    }
+    const singles = Math.max(0, (battingRecord.hits || 0) - (battingRecord.doubles || 0) - (battingRecord.triples || 0) - (battingRecord.homeRuns || 0));
+    if (singles > 0 && battingRecord.doubles > 0 && battingRecord.triples > 0 && battingRecord.homeRuns > 0) {
+      special += MVP_CONFIG.special.cycle;
+      reasons.push({ text: "サイクル安打達成！", priority: 110 });
+    }
+  }
+  if (pitchingRecord) {
+    const teamPitchers = Object.values(data.pitcherGameRecords[team] || {});
+    const finalGameState = data.final !== false;
+    const completeGame = finalGameState && pitchingRecord.started && teamPitchers.length === 1 && (pitchingRecord.outs || 0) > 0;
+    const opponent = team === "away" ? "home" : "away";
+    const shutout = completeGame && (data.scores[opponent] || 0) === 0;
+    const noHit = shutout && (pitchingRecord.hitsAllowed || 0) === 0;
+    const opponentTimesReached = data.timesReachedByTeam?.[opponent] ?? getTeamTimesReachedBase(opponent);
+    const tiebreakRunnerUsed = data.automaticTiebreakRunnerUsed?.[opponent]
+      ?? automaticTiebreakRunnerUsed[opponent];
+    const perfect = noHit && opponentTimesReached === 0 && !tiebreakRunnerUsed;
+    const higherPitchingAchievement = shutout || noHit || perfect;
+    if (completeGame && (!higherPitchingAchievement || MVP_CONFIG.pitchingSpecialStacking.completeGameWithHigherAchievement)) {
+      special += MVP_CONFIG.special.completeGame;
+      reasons.push({ text: `${formatMvpPitchingOuts(pitchingRecord.outs)}完投！`, priority: 48 });
+    }
+    if (perfect) {
+      special += MVP_CONFIG.special.perfectGame;
+      reasons.push({ text: "完全試合！", priority: 120 });
+      if (MVP_CONFIG.pitchingSpecialStacking.noHitterWithPerfectGame) special += MVP_CONFIG.special.noHitShutout;
+      if (MVP_CONFIG.pitchingSpecialStacking.shutoutWithNoHitter) special += MVP_CONFIG.special.shutout;
+    } else if (noHit) {
+      special += MVP_CONFIG.special.noHitShutout;
+      reasons.push({ text: "無安打完封！", priority: 115 });
+      if (MVP_CONFIG.pitchingSpecialStacking.shutoutWithNoHitter) special += MVP_CONFIG.special.shutout;
+    } else if (shutout) {
+      special += MVP_CONFIG.special.shutout;
+      reasons.push({ text: `${formatMvpPitchingOuts(pitchingRecord.outs)}完封・${pitchingRecord.strikeouts || 0}奪三振！`, priority: 92 });
+    }
+    if (finalGameState && pitchingRecord.save) {
+      special += MVP_CONFIG.special.save;
+      reasons.push({ text: "試合を締めるセーブ！", priority: 38 });
+    }
+    const threeStrikeoutInnings = Object.values(player.strikeoutsByHalf || {})
+      .reduce((total, value) => total + Math.floor(value / 3), 0);
+    if (threeStrikeoutInnings > 0) {
+      special += threeStrikeoutInnings * MVP_CONFIG.special.threeStrikeoutInning;
+      reasons.push({ text: "1イニング3奪三振！", priority: 52 });
+    }
+  }
+  return { special, reasons };
+}
+
+function buildMvpReason(candidate) {
+  const strongest = [...candidate.reasons].sort((a, b) => b.priority - a.priority)[0];
+  if (strongest?.text) return strongest.text;
+  if (candidate.battingRecord?.hits) {
+    return `${candidate.battingRecord.hits}安打${candidate.battingRecord.rbi ? `${candidate.battingRecord.rbi}打点` : ""}！`;
+  }
+  if (candidate.pitchingRecord?.outs) {
+    return `${formatMvpPitchingOuts(candidate.pitchingRecord.outs)}・${candidate.pitchingRecord.strikeouts || 0}奪三振！`;
+  }
+  return "勝利に大きく貢献！";
+}
+
+function getActivityPointRosterPlayers(team) {
+  const roster = [];
+  const addPlayer = (player, role, kind) => {
+    if (!player) return;
+    const id = player.id || player.name;
+    if (!id) return;
+    const existing = roster.find((entry) => entry.id === id);
+    if (existing) {
+      if (existing.kind !== kind) existing.kind = "twoWay";
+      return;
+    }
+    roster.push({ id, name: player.name || id, role, kind });
+  };
+  (selected?.[team]?.batters || []).forEach((entry) => addPlayer(entry?.player, entry?.role, "batter"));
+  (selected?.[team]?.bench || []).forEach((entry) => addPlayer(entry?.player, entry?.role, "batter"));
+  (selected?.[team]?.pitchers || []).forEach((player, index) => addPlayer(player, pitcherRoles[index] || "pitcher", "pitcher"));
+  return roster;
+}
+
+function createGameMvpData(options = {}) {
+  return {
+    scores,
+    maxInnings,
+    final: options.final ?? gamePhase === "gameover",
+    batterGameRecords,
+    pitcherGameRecords,
+    mvpGameRecords,
+    rosterPlayers: {
+      away: getActivityPointRosterPlayers("away"),
+      home: getActivityPointRosterPlayers("home")
+    },
+    timesReachedByTeam: {
+      away: getTeamTimesReachedBase("away"),
+      home: getTeamTimesReachedBase("home")
+    },
+    automaticTiebreakRunnerUsed: { ...automaticTiebreakRunnerUsed }
+  };
+}
+
+function calculateActivityPointStandings(gameData = createGameMvpData(), options) {
+  options = options || {};
+  if (!MVP_CONFIG.enabled || !gameData?.scores) return [];
+  const tied = gameData.scores.away === gameData.scores.home;
+  const winner = tied ? null : gameData.scores.away > gameData.scores.home ? "away" : "home";
+  const candidateTeams = options.allTeams || !MVP_CONFIG.winnerOnly || !winner ? ["away", "home"] : [winner];
+  const candidates = [];
+  candidateTeams.forEach((team) => {
+    const rosterPlayers = gameData.rosterPlayers?.[team] || [];
+    const rosterById = Object.fromEntries(rosterPlayers.map((player) => [player.id, player]));
+    const rosterOrderById = Object.fromEntries(rosterPlayers.map((player, index) => [player.id, index]));
+    const playerIds = new Set([
+      ...Object.keys(rosterById),
+      ...Object.keys(gameData.batterGameRecords[team] || {}),
+      ...Object.keys(gameData.pitcherGameRecords[team] || {}),
+      ...Object.keys(gameData.mvpGameRecords[team] || {})
+    ]);
+    playerIds.forEach((id) => {
+      const battingRecord = gameData.batterGameRecords[team]?.[id] || null;
+      const pitchingRecord = gameData.pitcherGameRecords[team]?.[id] || null;
+      const rosterPlayer = rosterById[id] || null;
+      const eventRecord = gameData.mvpGameRecords[team]?.[id] || {
+        id,
+        name: rosterPlayer?.name || battingRecord?.name || pitchingRecord?.name || id,
+        eventBasic: 0,
+        wpa: 0,
+        eventSpecial: 0,
+        reasons: [],
+        strikeoutsByHalf: {}
+      };
+      const basicScore = getMvpBattingBasicScore(battingRecord)
+        + getMvpPitchingBasicScore(pitchingRecord)
+        + (eventRecord.eventBasic || 0);
+      const wpa = eventRecord.wpa || 0;
+      const wpaScore = (wpa * 100) / MVP_CONFIG.wpa.scoreDivisor;
+      const specialResult = getMvpFinalSpecial(team, eventRecord, battingRecord, pitchingRecord, gameData);
+      const totalScore = basicScore * MVP_CONFIG.weights.basic
+        + wpaScore * MVP_CONFIG.weights.wpa
+        + specialResult.special;
+      const candidate = {
+        playerId: id,
+        playerName: eventRecord.name || rosterPlayer?.name || battingRecord?.name || pitchingRecord?.name || id,
+        team,
+        role: rosterPlayer?.role || battingRecord?.role || (pitchingRecord ? "pitcher" : "R"),
+        kind: rosterPlayer?.kind || (battingRecord && pitchingRecord ? "twoWay" : pitchingRecord ? "pitcher" : "batter"),
+        basicScore,
+        wpa,
+        wpaScore,
+        specialBonus: specialResult.special,
+        totalScore,
+        reasons: specialResult.reasons,
+        battingRecord,
+        pitchingRecord,
+        rosterOrder: rosterOrderById[id] ?? 999,
+        tieValue: getMvpSeedValue(MVP_CONFIG.tieBreakSeed, id)
+      };
+      candidate.reason = buildMvpReason(candidate);
+      candidates.push(candidate);
+    });
+  });
+  candidates.sort((a, b) => b.totalScore - a.totalScore
+    || b.wpaScore - a.wpaScore
+    || b.specialBonus - a.specialBonus
+    || b.basicScore - a.basicScore
+    || (options.useMvpTieBreak
+      ? b.tieValue - a.tieValue
+      : a.team.localeCompare(b.team) || a.rosterOrder - b.rosterOrder || a.playerName.localeCompare(b.playerName)));
+  if (MVP_CONFIG.debug) {
+    console.table(candidates.map((candidate) => ({
+      PLAYER: candidate.playerName,
+      BASIC_SCORE: candidate.basicScore.toFixed(2),
+      WPA: `${(candidate.wpa * 100).toFixed(1)}%`,
+      WPA_SCORE: candidate.wpaScore.toFixed(2),
+      SPECIAL_BONUS: candidate.specialBonus.toFixed(2),
+      ACTIVITY_POINTS: candidate.totalScore.toFixed(2)
+    })));
+  }
+  return candidates.map((candidate) => ({
+    playerId: candidate.playerId,
+    playerName: candidate.playerName,
+    team: candidate.team,
+    role: candidate.role,
+    kind: candidate.kind,
+    basicScore: Number(candidate.basicScore.toFixed(2)),
+    wpa: Number((candidate.wpa * 100).toFixed(1)),
+    wpaScore: Number(candidate.wpaScore.toFixed(2)),
+    specialBonus: Number(candidate.specialBonus.toFixed(2)),
+    activityPoints: Number(candidate.totalScore.toFixed(2)),
+    totalScore: Number(candidate.totalScore.toFixed(2)),
+    reason: candidate.reason
+  }));
+}
+
+function calculateGameMVP(gameData = createGameMvpData()) {
+  if (!MVP_CONFIG.enabled || !gameData?.scores) return null;
+  const tied = gameData.scores.away === gameData.scores.home;
+  const winner = tied ? null : gameData.scores.away > gameData.scores.home ? "away" : "home";
+  const standings = calculateActivityPointStandings(gameData, { allTeams: true, useMvpTieBreak: true });
+  const candidates = MVP_CONFIG.winnerOnly && winner
+    ? standings.filter((candidate) => candidate.team === winner)
+    : standings;
+  return candidates[0] || null;
+}
+
+function setMvpDebugEnabled(enabled) {
+  MVP_CONFIG.debug = Boolean(enabled);
+}
+
 function getBatterRecordKey(player) {
   return player?.id || player?.name || "unknown";
 }
@@ -2457,8 +3015,12 @@ function recordBatterPlateAppearance(resultType, options = {}) {
   const runsBattedIn = Math.max(0, options.rbi ?? options.runs ?? 0);
   record.plateAppearances += 1;
   record.rbi += runsBattedIn;
+  if (options.doublePlay) {
+    record.groundedIntoDoublePlays = (record.groundedIntoDoublePlays || 0) + 1;
+  }
   markReliefBoostBatterFaced(fieldingTeam(), activePitcher);
   clearPinchHitBoost(activeBatter);
+  recordMvpPlateAppearance(resultType, options);
   if (resultType === "walk") {
     record.walks += 1;
     record.timesReachedBase += 1;
@@ -2553,6 +3115,13 @@ function recordPitcherStat(team, pitcherInfo, stat, amount = 1) {
   if (isAnyPracticeMode() || !stat || !amount) return;
   const record = ensurePitcherGameRecord(team, pitcherInfo);
   if (record) record[stat] = (record[stat] || 0) + amount;
+  if (stat === "strikeouts") {
+    const mvpRecord = ensureMvpPlayerRecord(team, pitcherInfo);
+    if (mvpRecord) {
+      const halfKey = getHalfInningKey();
+      mvpRecord.strikeoutsByHalf[halfKey] = (mvpRecord.strikeoutsByHalf[halfKey] || 0) + amount;
+    }
+  }
 }
 
 function applyPitcherEventStaminaPenalty(player, amount) {
@@ -4099,6 +4668,9 @@ function startGame(modeOverride = null) {
   batterGameRecords = createBatterGameRecords();
   pitcherGameRecords = createPitcherGameRecords();
   pitcherDecisionEvents = [];
+  mvpGameRecords = createMvpGameRecords();
+  mvpPlateAppearanceStartState = null;
+  gameMvpResult = null;
   bases = createEmptyBases();
   battingOrderIndex = { away: 0, home: 0 };
   lastOutBatterByTeam = { away: null, home: null };
@@ -4168,6 +4740,7 @@ function setMatchup() {
   const box = getBatterMoveBox();
   batter.x = getInitialBatterX(box);
   batter.y = 738;
+  startMvpPlateAppearance();
   updateSidebarAbilityPanels();
 }
 
@@ -6245,7 +6818,7 @@ function canOpenPauseMenu() {
 
 function openPauseMenu(team) {
   if (!canOpenPauseMenu()) return false;
-  pauseMenuState = { active: true, team, mode: "main", selectedIndex: 0, selectedRole: null, selectedBase: null, message: "" };
+  pauseMenuState = { active: true, team, mode: "activity", selectedIndex: 0, selectedRole: null, selectedBase: null, message: "" };
   return true;
 }
 
@@ -6258,10 +6831,12 @@ function closePauseMenu() {
 }
 
 function getPauseMainOptions(team) {
+  const activityOption = { label: "活躍ポイント", action: "activity" };
   const menuOption = { label: "メイン画面に戻る", action: "menu" };
   const closeOption = { label: "閉じる", action: "close" };
   if (team === fieldingTeam()) {
     return [
+      activityOption,
       { label: "投手交代", action: "pitcher" },
       { label: "守備選手交代", action: "defenseRole" },
       menuOption,
@@ -6270,13 +6845,14 @@ function getPauseMainOptions(team) {
   }
   if (team === battingTeam) {
     return [
+      activityOption,
       { label: "代打", action: "pinchHit" },
       { label: "代走", action: "runnerBase" },
       menuOption,
       closeOption
     ];
   }
-  return [menuOption, closeOption];
+  return [activityOption, menuOption, closeOption];
 }
 function getPausePlayerHandLabel(player, kind = "batter") {
   const hand = kind === "pitcher" ? player?.throws : player?.bats;
@@ -6357,6 +6933,12 @@ function drawPauseFittedText(text, x, y, maxWidth, startSize = 14, weight = "nor
 }
 function getPauseOptions() {
   const team = pauseMenuState.team;
+  if (pauseMenuState.mode === "activity") {
+    return [
+      { label: "選手交代", action: "pauseMain" },
+      { label: "閉じる", action: "close" }
+    ];
+  }
   if (pauseMenuState.mode === "main") return getPauseMainOptions(team);
   if (pauseMenuState.mode === "pitcher") {
     return selected?.[team]?.pitchers
@@ -6403,6 +6985,11 @@ function handlePauseSelection(option) {
     showMenu();
     return;
   }
+  if (option.action === "activity" || option.action === "pauseMain") {
+    pauseMenuState.mode = option.action === "activity" ? "activity" : "main";
+    pauseMenuState.selectedIndex = 0;
+    return;
+  }
   if (option.action === "pitcher" || option.action === "defenseRole" || option.action === "pinchHit") {
     pauseMenuState.mode = option.action === "pinchHit" ? "pinchHitBench" : option.action;
     pauseMenuState.selectedIndex = 0;
@@ -6442,18 +7029,26 @@ function handlePauseSelection(option) {
 function handlePauseMenuGamepad(gamepad, justPressed) {
   const options = getPauseOptions();
   const axisY = gamepad.axes?.[1] ?? 0;
-  if (justPressed(gamepadButtons.B) || justPressed(gamepadButtons.PAUSE)) {
-    if (pauseMenuState.mode === "main") closePauseMenu();
-    else {
+  const navigationAxis = pauseMenuState.mode === "activity" ? (gamepad.axes?.[0] ?? 0) : axisY;
+  if (justPressed(gamepadButtons.PAUSE)) {
+    closePauseMenu();
+    return;
+  }
+  if (justPressed(gamepadButtons.B)) {
+    if (pauseMenuState.mode === "activity") closePauseMenu();
+    else if (pauseMenuState.mode === "main") {
+      pauseMenuState.mode = "activity";
+      pauseMenuState.selectedIndex = 0;
+    } else {
       pauseMenuState.mode = "main";
       pauseMenuState.selectedIndex = 0;
     }
     return;
   }
-  if (Math.abs(axisY) > 0.55 && !pauseMenuState.axisHeld) {
-    pauseMenuState.selectedIndex = clamp(pauseMenuState.selectedIndex + (axisY > 0 ? 1 : -1), 0, Math.max(0, options.length - 1));
+  if (Math.abs(navigationAxis) > 0.55 && !pauseMenuState.axisHeld) {
+    pauseMenuState.selectedIndex = clamp(pauseMenuState.selectedIndex + (navigationAxis > 0 ? 1 : -1), 0, Math.max(0, options.length - 1));
     pauseMenuState.axisHeld = true;
-  } else if (Math.abs(axisY) <= 0.3) {
+  } else if (Math.abs(navigationAxis) <= 0.3) {
     pauseMenuState.axisHeld = false;
   }
   if (justPressed(gamepadButtons.A)) handlePauseSelection(options[pauseMenuState.selectedIndex]);
@@ -6961,6 +7556,7 @@ function getStealThrowBallColor(throwState) {
 
 function resolveSteal(isOut) {
   if (!stealState.active || stealState.resolved) return;
+  const mvpBeforeState = captureMvpGameState();
   stealState.resolved = true;
   const runner = stealState.runner;
   if (isOut) {
@@ -6975,6 +7571,7 @@ function resolveSteal(isOut) {
     message = `${getBaseLabel(stealState.targetBase)}盗塁成功`;
     showEffect("盗塁成功", "#fff2a8");
   }
+  recordMvpStealResult(runner, isOut, mvpBeforeState);
   const shouldCheckCount = stealState.pitchResultPending || isOut;
   stealState = createStealState();
   if (shouldCheckCount) {
@@ -10878,6 +11475,7 @@ function getDefensiveLineup(team) {
     if (fielder.role === "P") {
       return clampFielderInsideFence({
         ...getPitcherDefenseStartPoint(stadiumFielder),
+        id: pitcherInfo.id,
         name: pitcherInfo.name,
         speed: pitcherInfo.fielding ?? 5,
         fielding: pitcherInfo.fielding ?? 5,
@@ -10888,6 +11486,7 @@ function getDefensiveLineup(team) {
     const defenseRating = getBatterDefenseRating(player, fielder.role);
     return clampFielderInsideFence({
       ...stadiumFielder,
+      id: player.id,
       name: player.name,
       speed: defenseRating,
       fielding: defenseRating,
@@ -16055,6 +16654,7 @@ function finishDefensePlay() {
     return;
   }
   const defendingPitcher = activePitcher;
+  const mvpFielder = defenseState.chosenFielder;
   const metricText = getBattedBallMetricText(defenseState.battedBall);
   refreshDefenseThrowSafety();
   defenseState.resolved = true;
@@ -16069,6 +16669,7 @@ function finishDefensePlay() {
       recordLastOutBatter(battingTeam, activeBatter);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
       adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
+      recordMvpFieldingContribution({ fielder: mvpFielder, caught: true });
       resetCountOnly();
       const baseMessage = `${outcome.label || "ファールフライ"}、アウト`;
       message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
@@ -16180,7 +16781,17 @@ function finishDefensePlay() {
             runnerSnapshot,
             runs
           });
-      recordBatterPlateAppearance(batterResultType, { runs });
+      const completedOutsOnPlay = count.outs - outsBeforePlay;
+      recordMvpFieldingContribution({
+        fielder: mvpFielder,
+        caught: caughtBatterOut,
+        assistBase: defenseState.throw?.targetBase || "",
+        doublePlay: completedOutsOnPlay >= 2
+      });
+      recordBatterPlateAppearance(batterResultType, {
+        runs,
+        doublePlay: completedOutsOnPlay >= 2 && batterResultType !== "sacrificeBunt"
+      });
       const throwOutMessage = outsToAdd >= 2 ? "ゲッツー" : `${defenseState.throw.baseLabel}アウト`;
       const outMessage = caughtBatterOut
         ? `${outcome.label || "フライ"}、アウト / ${throwOutMessage}`
@@ -16221,6 +16832,7 @@ function finishDefensePlay() {
     recordLastOutBatter(battingTeam, activeBatter);
     recordPitcherOuts(fieldingTeam(), defendingPitcher, 1);
     adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
+    recordMvpFieldingContribution({ fielder: mvpFielder, caught: true });
     const advanceRuns = count.outs < 3 ? applyDefenseOutAdvancements() : 0;
     const batterResultType = getCaughtOutBatterResultType(advanceRuns);
     recordBatterPlateAppearance(batterResultType, { runs: advanceRuns });
@@ -16235,6 +16847,7 @@ function finishDefensePlay() {
     message = metricText ? `${baseMessage} / ${metricText}` : baseMessage;
     showEffect(advanceRuns > 0 ? `進塁 +${advanceRuns}` : "アウト", "#ffcf70");
   } else if (outcome.fieldingError) {
+    recordMvpFieldingContribution({ fielder: mvpFielder, error: true });
     const runs = advanceRunners("single", activeBatter, defenseState.battedBall, outcome);
     recordBatterPlateAppearance("error", { runs });
     const baseMessage = `${outcome.label}: ${formatRuns(runs)}`;
@@ -16608,6 +17221,7 @@ function finishGameEnd(reasonLabel = "") {
   ensurePitcherGameRecord("home", getTeamActivePitcher("home"));
   markPitcherSaveIfEligible();
   markPitcherWinLossAndHolds();
+  gameMvpResult = calculateGameMVP(createGameMvpData({ final: true }));
   gamePhase = "gameover";
   const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "チームA勝利" : "チームB勝利";
   message = `${reasonLabel ? `${reasonLabel} ` : ""}試合終了 ${scores.away}-${scores.home} ${result}`;
@@ -17268,7 +17882,104 @@ function drawSwitchChoiceButton(x, y, width, height, label, selected) {
   ctx.fillText(label, x + width / 2, y + 35);
 }
 
+function getActivityPointRoleText(entry) {
+  if (entry.kind === "twoWay") return "二刀流";
+  return getMenuRoleLabel(entry.role);
+}
+
+function drawActivityPointStandings(x, y, width, height, options = {}) {
+  const standings = calculateActivityPointStandings(
+    createGameMvpData({ final: Boolean(options.final) }),
+    { allTeams: true }
+  );
+  const gap = 18;
+  const columnWidth = (width - gap) / 2;
+  ["away", "home"].forEach((team, teamIndex) => {
+    const columnX = x + teamIndex * (columnWidth + gap);
+    const entries = standings.filter((entry) => entry.team === team);
+    if (options.final && gameMvpResult?.team === team) {
+      entries.sort((a, b) => {
+        if (a.activityPoints !== b.activityPoints) return b.activityPoints - a.activityPoints;
+        if (a.playerId === gameMvpResult.playerId) return -1;
+        if (b.playerId === gameMvpResult.playerId) return 1;
+        return 0;
+      });
+    }
+    const rowHeight = clamp(Math.floor((height - 48) / Math.max(1, entries.length)), 24, 32);
+    ctx.fillStyle = team === "away" ? "#eaf5ff" : "#fff0ef";
+    roundRect(columnX, y, columnWidth, height, 7);
+    ctx.fill();
+    ctx.strokeStyle = team === "away" ? "#4a91c9" : "#d46b63";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = team === "away" ? "#14517d" : "#8d302b";
+    ctx.font = "700 19px sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${teamLabel(team)}  活躍ポイント`, columnX + 14, y + 23);
+    entries.forEach((entry, index) => {
+      const rowY = y + 43 + index * rowHeight;
+      const isMvp = options.final && gameMvpResult?.playerId === entry.playerId && gameMvpResult?.team === team;
+      ctx.fillStyle = isMvp ? "#fff0a8" : index % 2 === 0 ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.44)";
+      ctx.fillRect(columnX + 8, rowY, columnWidth - 16, rowHeight - 2);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "700 13px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${index + 1}`, columnX + 31, rowY + rowHeight / 2);
+      ctx.textAlign = "left";
+      drawPauseFittedText(getActivityPointRoleText(entry), columnX + 42, rowY + rowHeight / 2 + 5, 76, 12, "normal");
+      ctx.fillStyle = "#172033";
+      drawPauseFittedText(entry.playerName, columnX + 122, rowY + rowHeight / 2 + 6, columnWidth - 225, isMvp ? 16 : 15, isMvp ? "700" : "normal");
+      ctx.fillStyle = entry.activityPoints > 0 ? "#b54708" : entry.activityPoints < 0 ? "#9f1239" : "#475569";
+      ctx.font = "700 16px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(entry.activityPoints.toFixed(2), columnX + columnWidth - 18, rowY + rowHeight / 2);
+    });
+  });
+}
+
+function drawPauseActivityPoints() {
+  const width = Math.min(1120, canvas.width - 70);
+  const height = Math.min(750, canvas.height - 60);
+  const x = (canvas.width - width) / 2;
+  const y = (canvas.height - height) / 2;
+  const options = getPauseOptions();
+  ctx.save();
+  ctx.fillStyle = "rgba(9, 18, 30, 0.8)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(248, 251, 255, 0.98)";
+  roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#233047";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#102833";
+  ctx.font = "700 27px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("現在の活躍ポイント", x + width / 2, y + 32);
+  drawActivityPointStandings(x + 24, y + 58, width - 48, height - 140, { final: false });
+  const buttonWidth = 190;
+  const buttonGap = 16;
+  const buttonsX = x + width / 2 - buttonWidth - buttonGap / 2;
+  options.forEach((option, index) => {
+    const buttonX = buttonsX + index * (buttonWidth + buttonGap);
+    const selectedButton = pauseMenuState.selectedIndex === index;
+    ctx.fillStyle = selectedButton ? "#2563eb" : "#dbe4ee";
+    roundRect(buttonX, y + height - 66, buttonWidth, 44, 7);
+    ctx.fill();
+    ctx.fillStyle = selectedButton ? "#ffffff" : "#172033";
+    ctx.font = selectedButton ? "700 17px sans-serif" : "16px sans-serif";
+    ctx.fillText(option.label, buttonX + buttonWidth / 2, y + height - 44);
+  });
+  ctx.restore();
+}
+
 function drawPauseMenu() {
+  if (pauseMenuState.mode === "activity") {
+    drawPauseActivityPoints();
+    return;
+  }
   const options = getPauseOptions();
   const replacementContext = getPauseReplacementContext();
   const width = 680;
@@ -22475,12 +23186,30 @@ function drawGameResultBoard() {
   ctx.fillText("試合結果", board.x + board.width / 2, board.y + 28);
   ctx.font = "bold 20px sans-serif";
   ctx.fillText(`${teamLabel("away")} ${scores.away} - ${scores.home} ${teamLabel("home")}`, board.x + board.width / 2, board.y + 58);
-  drawGameResultScoreTable(board.x + 24, board.y + 78, board.width - 48, 86);
-  const halfWidth = (board.width - 68) / 2;
-  drawGameResultBattingTable("away", board.x + 24, board.y + 184, halfWidth, 330);
-  drawGameResultBattingTable("home", board.x + 44 + halfWidth, board.y + 184, halfWidth, 330);
-  drawGameResultPitchingTable("away", board.x + 24, board.y + 536, halfWidth, 250);
-  drawGameResultPitchingTable("home", board.x + 44 + halfWidth, board.y + 536, halfWidth, 250);
+  drawGameMvpBanner(board.x + 24, board.y + 76, board.width - 48, 44);
+  drawGameResultScoreTable(board.x + 24, board.y + 130, board.width - 48, 86);
+  drawActivityPointStandings(board.x + 24, board.y + 236, board.width - 48, board.height - 260, { final: true });
+  ctx.restore();
+}
+
+function drawGameMvpBanner(x, y, width, height) {
+  if (!gameMvpResult) return;
+  ctx.save();
+  ctx.fillStyle = "#fff3bd";
+  roundRect(x, y, width, height, 7);
+  ctx.fill();
+  ctx.strokeStyle = "#d49b22";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  const nameWidth = Math.min(310, width * 0.36);
+  ctx.fillStyle = "#9b4d00";
+  ctx.font = "bold 18px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const activityPoints = gameMvpResult.activityPoints ?? gameMvpResult.totalScore ?? 0;
+  drawGameResultFittedText(`MVP  ${gameMvpResult.playerName}  ${activityPoints.toFixed(2)}pt`, x + 14, y + height / 2, nameWidth - 20, 18, "bold", "left");
+  ctx.fillStyle = "#233047";
+  drawGameResultFittedText(gameMvpResult.reason, x + nameWidth, y + height / 2, width - nameWidth - 14, 17, "bold", "left");
   ctx.restore();
 }
 

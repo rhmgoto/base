@@ -4,6 +4,7 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $suite = @(
   (Join-Path $root "tests\smoke.js"),
   (Join-Path $root "tests\baserunning.js"),
+  (Join-Path $root "tests\mvp.js"),
   (Join-Path $root "tests\static-checks.js")
 )
 $bundledNode = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
