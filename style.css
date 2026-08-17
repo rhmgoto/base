@@ -379,29 +379,6 @@ canvas {
   border-color: rgba(174, 231, 255, 0.72);
 }
 
-.defense-run-field {
-  gap: 4px;
-  padding: 5px 7px;
-  border: 2px solid rgba(46, 75, 91, 0.28);
-  border-radius: 8px;
-}
-
-.defense-run-field span {
-  color: #233047;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.defense-run-away {
-  background: rgba(255, 227, 116, 0.48);
-  border-color: rgba(191, 67, 49, 0.52);
-}
-
-.defense-run-home {
-  background: rgba(174, 231, 255, 0.48);
-  border-color: rgba(57, 116, 155, 0.52);
-}
-
 .team-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 5px;
@@ -2105,3 +2082,151 @@ button {
   }
 }
 
+
+.menu-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.menu-mode-button {
+  min-height: 48px;
+  margin: 0;
+  padding: 0 10px;
+  color: #233047;
+  font-size: 16px;
+  font-weight: 900;
+  background: #f8fbff;
+  border: 3px solid rgba(46, 75, 91, 0.46);
+  border-radius: 8px;
+  box-shadow: 0 5px 0 rgba(35, 48, 71, 0.18);
+}
+
+.menu-mode-button.active {
+  color: #ffffff;
+  background: #2f6fb2;
+  border-color: #173e72;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.22), 0 5px 0 rgba(35, 48, 71, 0.22);
+}
+
+.mode-panel.hidden,
+.menu-actions button.hidden,
+.practice-select-panel .hidden {
+  display: none;
+}
+
+.mode-section-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.mode-section-heading h2 {
+  margin: 0;
+  color: #233047;
+  font-size: 18px;
+}
+
+.matchup-panel {
+  display: block;
+}
+
+.practice-select-panel.mode-panel,
+.home-run-derby-settings.mode-panel {
+  margin-top: 8px;
+}
+
+.home-run-derby-settings.mode-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid rgba(46, 75, 91, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.home-run-derby-settings.mode-panel label {
+  grid-template-columns: minmax(78px, max-content) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mode-panel.hidden,
+.home-run-derby-settings.mode-panel.hidden {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .menu-mode-tabs,
+  .home-run-derby-settings.mode-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.start-menu.menu-root-mode .last-updated {
+  display: none;
+}
+
+.start-menu.menu-root-mode .menu-card {
+  display: grid;
+  align-content: center;
+}
+
+.start-menu.menu-root-mode .menu-mode-tabs {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.root-menu-audio {
+  width: min(360px, 100%);
+  margin: 12px auto 0;
+}
+
+.start-menu:not(.menu-root-mode) .menu-mode-tabs,
+.start-menu:not(.menu-root-mode) .root-menu-audio {
+  display: none;
+}
+
+.start-menu.menu-root-mode .menu-mode-button[data-menu-mode="versus"] {
+  outline: 4px solid rgba(255, 227, 116, 0.82);
+  outline-offset: 3px;
+}
+
+.title-logo {
+  display: none;
+}
+
+.start-menu.menu-root-mode {
+  background:
+    linear-gradient(180deg, rgba(10, 24, 36, 0.2), rgba(10, 24, 36, 0.58)),
+    url("assets/title picture.png") center / cover no-repeat;
+}
+
+.start-menu.menu-root-mode .title-logo {
+  display: block;
+  margin: 0 auto 24px;
+  color: #ffffff;
+  font-family: Impact, "Arial Black", "Yu Gothic", sans-serif;
+  font-size: clamp(44px, 7vw, 98px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: 0;
+  text-align: center;
+  text-shadow:
+    0 5px 0 #163f88,
+    0 9px 0 #bf4331,
+    0 14px 20px rgba(0, 0, 0, 0.6);
+}
+.start-menu.menu-root-mode .menu-card {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.start-menu.menu-root-mode .menu-mode-button {
+  background: rgba(248, 251, 255, 0.92);
+}

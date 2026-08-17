@@ -21,17 +21,29 @@
 
         <section id="startMenu" class="start-menu" aria-label="ゲーム開始メニュー">
           <div class="menu-card">
+            <div class="title-logo" aria-label="SIMPLEST BASEBALL">SIMPLEST BASEBALL</div>
             <p class="last-updated">
               最終修正日時:
               <time datetime="2026-08-17T06:03:00+09:00">2026年8月17日 06:03</time>
             </p>
-            <div class="menu-grid">
-              <label class="mode-setting-field">
-                モード
+            <nav id="menuModeTabs" class="menu-mode-tabs" aria-label="モード選択">
+              <button class="menu-mode-button active" type="button" data-menu-mode="versus">通常対戦</button>
+              <button class="menu-mode-button" type="button" data-menu-mode="practice">打撃練習</button>
+              <button class="menu-mode-button" type="button" data-menu-mode="pitchPractice">投球練習</button>
+              <button class="menu-mode-button" type="button" data-menu-mode="homerDerby">ホームラン競争</button>
+            </nav>
+            <div class="menu-audio-controls root-menu-audio audio-controls" aria-label="メニュー音声設定">
+              <button id="menuSoundToggleButton" class="audio-toggle" type="button" aria-pressed="true">効果音 ON</button>
+              <button id="menuBgmToggleButton" class="audio-toggle" type="button" aria-pressed="true">BGM開始</button>
+            </div>
+            <section class="mode-panel matchup-panel" data-menu-panel="versus">
+              <div class="menu-grid">
+                <label class="mode-setting-field matchup-play-mode-field">
+                プレイ人数
                 <select id="modeSelect">
-                  <option value="single">1人用</option>
-                  <option value="versus" selected>2人用</option>
-                  <option value="watch">観戦モード</option>
+                  <option value="single" selected>一人用</option>
+                  <option value="versus">二人用</option>
+                  <option value="watch">観戦</option>
                 </select>
               </label>
 
@@ -46,9 +58,9 @@
               <label class="mode-setting-field">
                 試合回数
                 <select id="inningsSelect">
-                  <option value="1" selected>1回</option>
+                  <option value="1">1回</option>
                   <option value="2">2回</option>
-                  <option value="3">3回</option>
+                  <option value="3" selected>3回</option>
                   <option value="5">5回</option>
                   <option value="9">9回</option>
                 </select>
@@ -70,11 +82,6 @@
                 </select>
               </label>
 
-              <div class="menu-audio-controls audio-controls" aria-label="メニュー音声設定">
-                <button id="menuSoundToggleButton" class="audio-toggle" type="button" aria-pressed="true">効果音 ON</button>
-                <button id="menuBgmToggleButton" class="audio-toggle" type="button" aria-pressed="true">BGM開始</button>
-              </div>
-
               <div class="team-setup-field team-preset-away">
                 <label class="team-preset-field">
                   <span>チームA 初期チーム</span>
@@ -84,12 +91,6 @@
                     <option value="dendos">デンドーズ</option>
                     <option value="allstar">オールスター</option>
                     <option value="samurai">侍ジャパン</option>
-                  </select>
-                </label>
-                <label class="defense-run-field defense-run-away">
-                  <span>チームA（1P）守備・走塁</span>
-                  <select id="p1DefenseSelect">
-                    <option value="manual" selected>捕球だけオート</option>
                   </select>
                 </label>
               </div>
@@ -105,33 +106,31 @@
                     <option value="samurai">侍ジャパン</option>
                   </select>
                 </label>
-                <label class="defense-run-field defense-run-home">
-                  <span>チームB（2P）守備・走塁</span>
-                  <select id="p2DefenseSelect">
-                    <option value="manual" selected>捕球だけオート</option>
-                  </select>
-                </label>
               </div>
             </div>
+            </section>
 
-            <section class="practice-select-panel" aria-label="練習モードとホームラン競争の選択">
+            <section class="practice-select-panel mode-panel" data-menu-panel="practice pitchPractice" aria-label="練習モードの選択">
               <div class="practice-mode-settings">
+                <div class="mode-section-heading">
+                  <h2 id="practicePanelTitle">打撃練習</h2>
+                </div>
                 <label>
-                  練習打者
+                  <span id="practiceBatterLabel">練習打者</span>
                   <select id="practiceBatterSelect"></select>
                 </label>
                 <label>
-                  練習投手
+                  <span id="practicePitcherLabel">打撃投手（CPU）</span>
                   <select id="practicePitcherSelect"></select>
                 </label>
-                <label>
-                  練習投手モード
+                <label class="batting-practice-control">
+                  投球操作
                   <select id="practicePitcherControlSelect">
-                    <option value="auto" selected>オート</option>
+                    <option value="auto" selected>CPU</option>
                     <option value="manual">マニュアル</option>
                   </select>
                 </label>
-                <label>
+                <label class="batting-practice-control">
                   打撃投手タイプ
                   <select id="practicePitcherTypeSelect">
                     <option value="A" selected>A：真ん中直球</option>
@@ -139,34 +138,38 @@
                     <option value="C">C：通常CPU</option>
                   </select>
                 </label>
-                <label>
-                  投球練習打者タイプ
+                <label class="pitching-practice-control">
+                  CPU打者タイプ
                   <select id="pitchingPracticeBatterTypeSelect">
                     <option value="A" selected>A：打つ気なし</option>
                     <option value="B">B：打ってくる</option>
                   </select>
                 </label>
               </div>
-              <div class="home-run-derby-settings">
-                <label>
-                  ホームラン競争 人数
-                  <select id="homeRunDerbyPlayerCountSelect">
-                    <option value="1" selected>1人用</option>
-                    <option value="2">2人用</option>
-                  </select>
-                </label>
-                <label>
-                  A 打者
-                  <select id="homeRunDerbyAwayBatterSelect"></select>
-                </label>
-                <label>
-                  B 打者
-                  <select id="homeRunDerbyHomeBatterSelect"></select>
-                </label>
-              </div>
             </section>
 
-            <div class="team-grid">
+            <section class="home-run-derby-settings mode-panel" data-menu-panel="homerDerby" aria-label="ホームラン競争の選択">
+              <div class="mode-section-heading">
+                <h2>ホームラン競争</h2>
+              </div>
+              <label>
+                人数
+                <select id="homeRunDerbyPlayerCountSelect">
+                  <option value="1" selected>一人用</option>
+                  <option value="2">二人用</option>
+                </select>
+              </label>
+              <label>
+                1P 打者
+                <select id="homeRunDerbyAwayBatterSelect"></select>
+              </label>
+              <label>
+                2P 打者
+                <select id="homeRunDerbyHomeBatterSelect"></select>
+              </label>
+            </section>
+
+            <div class="team-grid mode-panel" data-menu-panel="versus">
               <section class="team-panel">
                 <div class="team-header">
                   <div class="team-title-row">

@@ -13,6 +13,11 @@ const shell = document.querySelector(".game-shell");
 const menu = byId("startMenu");
 const menuButton = byId("menuButton");
 const startButton = byId("startButton");
+const menuModeButtons = Array.from(document.querySelectorAll(".menu-mode-button"));
+const menuModePanels = Array.from(document.querySelectorAll(".mode-panel"));
+const practicePanelTitle = byId("practicePanelTitle");
+const practiceBatterLabel = byId("practiceBatterLabel");
+const practicePitcherLabel = byId("practicePitcherLabel");
 const practiceStartButton = byId("practiceStartButton");
 const pitchingPracticeStartButton = byId("pitchingPracticeStartButton");
 const homeRunDerbyStartButton = byId("homeRunDerbyStartButton");
@@ -48,8 +53,6 @@ const modeSelect = byId("modeSelect");
 const firstBatSelect = byId("firstBatSelect");
 const inningsSelect = byId("inningsSelect");
 const stadiumSelect = byId("stadiumSelect");
-const p1DefenseSelect = byId("p1DefenseSelect");
-const p2DefenseSelect = byId("p2DefenseSelect");
 const awayPresetSelect = byId("awayPresetSelect");
 const homePresetSelect = byId("homePresetSelect");
 const practicePitcherControlSelect = byId("practicePitcherControlSelect");
@@ -1267,6 +1270,7 @@ const pitcherSpriteSets = {
   }
 };
 
+let selectedMenuMode = "main";
 let gameMode = "versus";
 let practicePitcherControl = "auto";
 let practicePitcherType = "A";
@@ -2341,16 +2345,9 @@ function readMenu() {
   };
   firstBatTeam = firstBatSelect.value;
   maxInnings = Number(inningsSelect.value);
-  if (gameMode === "watch") {
-    if (p1DefenseSelect) p1DefenseSelect.value = "manual";
-    if (p2DefenseSelect) p2DefenseSelect.value = "manual";
-  }
   defenseControlMode = gameMode === "watch"
     ? { away: "auto", home: "auto" }
-    : {
-        away: getDefenseRunControlMode(p1DefenseSelect?.value),
-        home: getDefenseRunControlMode(p2DefenseSelect?.value)
-      };
+    : { away: "manual", home: "manual" };
   selected = createSelectedTeams(menuSelection);
 }
 
@@ -4026,6 +4023,47 @@ function pitchCross(player, sortable = false) {
   `;
 }
 
+function resetMenuGamepadCursors() {
+  teamIds.forEach((team) => {
+    const cursor = gamepadState.menuCursors[team];
+    if (cursor) cursor.initialized = false;
+  });
+}
+
+function isPanelForMenuMode(panel, mode) {
+  return (panel.dataset.menuPanel || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .includes(mode);
+}
+
+function updateMenuModeView(mode = selectedMenuMode) {
+  selectedMenuMode = ["main", "versus", "practice", "pitchPractice", "homerDerby"].includes(mode) ? mode : "main";
+  menu.classList.toggle("menu-root-mode", selectedMenuMode === "main");
+  menuModeButtons.forEach((button) => {
+    const active = button.dataset.menuMode === selectedMenuMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  menuModePanels.forEach((panel) => {
+    panel.classList.toggle("hidden", !isPanelForMenuMode(panel, selectedMenuMode));
+  });
+  startButton.classList.toggle("hidden", selectedMenuMode !== "versus");
+  practiceStartButton.classList.toggle("hidden", selectedMenuMode !== "practice");
+  pitchingPracticeStartButton.classList.toggle("hidden", selectedMenuMode !== "pitchPractice");
+  homeRunDerbyStartButton.classList.toggle("hidden", selectedMenuMode !== "homerDerby");
+  if (selectedMenuMode !== "main") resetMenuGamepadCursors();
+  if (selectedMenuMode === "main") {
+    menuModeButtons.find((button) => button.dataset.menuMode === "versus")?.focus?.();
+    resetMenuGamepadCursors();
+  }
+  const isPitchingPractice = selectedMenuMode === "pitchPractice";
+  practicePanelTitle.textContent = isPitchingPractice ? "投球練習" : "打撃練習";
+  practiceBatterLabel.textContent = isPitchingPractice ? "打者" : "練習打者";
+  practicePitcherLabel.textContent = isPitchingPractice ? "投手" : "打撃投手（CPU）";
+  document.querySelectorAll(".batting-practice-control").forEach((element) => element.classList.toggle("hidden", isPitchingPractice));
+  document.querySelectorAll(".pitching-practice-control").forEach((element) => element.classList.toggle("hidden", !isPitchingPractice));
+}
 function startGame(modeOverride = null) {
   readMenu();
   if (modeOverride) gameMode = modeOverride;
@@ -4094,6 +4132,7 @@ function showMenu() {
   clearPendingGameEnd();
   shell?.classList.add("menu-open");
   menu.classList.remove("hidden");
+  updateMenuModeView("main");
   updateMenuAbilityPanels();
   resetBall();
   resetSwing();
@@ -5954,10 +5993,22 @@ function addGamepadVirtualKey(key) {
   gamepadState.virtualKeys.add(key);
 }
 
+function isTwoPlayerMenuModeActive() {
+  if (selectedMenuMode === "versus") return modeSelect?.value === "versus";
+  if (selectedMenuMode === "homerDerby") return homeRunDerbyPlayerCountSelect?.value === "2";
+  return false;
+}
+
+function canUseMenuGamepadCursor(team) {
+  if (gamePhase !== "menu") return false;
+  if (team === "away") return true;
+  if (team === "home") return isTwoPlayerMenuModeActive();
+  return false;
+}
 function updateMenuGamepadCursor(gamepad, team) {
   const cursor = gamepadState.menuCursors[team];
   if (!cursor) return;
-  if (gamePhase !== "menu") {
+  if (!canUseMenuGamepadCursor(team)) {
     setMenuGamepadCursorVisible(team, false);
     return;
   }
@@ -6009,8 +6060,7 @@ function updatePlayerChooserGamepadScroll(gamepad, team, verticalInput = 0) {
 }
 
 function updateMenuGamepadCursorVisibility() {
-  if (gamePhase === "menu") return;
-  teamIds.forEach((team) => setMenuGamepadCursorVisible(team, false));
+  teamIds.forEach((team) => setMenuGamepadCursorVisible(team, gamePhase === "menu" && canUseMenuGamepadCursor(team)));
 }
 
 function ensureMenuGamepadCursor(team) {
@@ -6111,6 +6161,10 @@ function closeMenuGamepadOverlay(team = null) {
     playerEditor.classList.add("hidden");
     return true;
   }
+  if (selectedMenuMode !== "main") {
+    updateMenuModeView("main");
+    return true;
+  }
   return false;
 }
 
@@ -6194,23 +6248,26 @@ function closePauseMenu() {
 }
 
 function getPauseMainOptions(team) {
+  const menuOption = { label: "メイン画面に戻る", action: "menu" };
+  const closeOption = { label: "閉じる", action: "close" };
   if (team === fieldingTeam()) {
     return [
-      { label: "\u6295\u624b\u4ea4\u4ee3", action: "pitcher" },
-      { label: "\u5b88\u5099\u9078\u624b\u4ea4\u4ee3", action: "defenseRole" },
-      { label: "\u9589\u3058\u308b", action: "close" }
+      { label: "投手交代", action: "pitcher" },
+      { label: "守備選手交代", action: "defenseRole" },
+      menuOption,
+      closeOption
     ];
   }
   if (team === battingTeam) {
     return [
-      { label: "\u4ee3\u6253", action: "pinchHit" },
-      { label: "\u4ee3\u8d70", action: "runnerBase" },
-      { label: "\u9589\u3058\u308b", action: "close" }
+      { label: "代打", action: "pinchHit" },
+      { label: "代走", action: "runnerBase" },
+      menuOption,
+      closeOption
     ];
   }
-  return [{ label: "\u9589\u3058\u308b", action: "close" }];
+  return [menuOption, closeOption];
 }
-
 function getPausePlayerHandLabel(player, kind = "batter") {
   const hand = kind === "pitcher" ? player?.throws : player?.bats;
   if (!hand) return "";
@@ -6331,6 +6388,11 @@ function handlePauseSelection(option) {
     closePauseMenu();
     return;
   }
+  if (option.action === "menu") {
+    closePauseMenu();
+    showMenu();
+    return;
+  }
   if (option.action === "pitcher" || option.action === "defenseRole" || option.action === "pinchHit") {
     pauseMenuState.mode = option.action === "pinchHit" ? "pinchHitBench" : option.action;
     pauseMenuState.selectedIndex = 0;
@@ -6429,6 +6491,10 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   }
 
   if (gamePhase === "menu") {
+    if (!canUseMenuGamepadCursor(team)) {
+      gamepadState.previousButtons[team] = pressed;
+      return;
+    }
     if (justPressed(gamepadButtons.A)) clickMenuGamepadCursor(team);
     if (justPressed(gamepadButtons.B)) closeMenuGamepadOverlay(team);
     gamepadState.previousButtons[team] = pressed;
@@ -23100,6 +23166,10 @@ function handleLineupOrderButtonClick(event) {
   return true;
 }
 
+menuModeButtons.forEach((button) => {
+  button.addEventListener("click", () => updateMenuModeView(button.dataset.menuMode));
+});
+updateMenuModeView("main");
 startButton.addEventListener("click", () => startGame());
 modeSelect?.addEventListener("change", () => {
   readMenu();
