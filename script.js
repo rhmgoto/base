@@ -1498,7 +1498,8 @@ Object.values(sounds).forEach((sound) => {
 });
 
 const bgmTracks = {
-  menu: new Audio("audio/title music.mp3"),
+  title: new Audio("audio/title music.mp3"),
+  menu: new Audio("audio/sports_broadcast_baseball_bgm_loop.wav"),
   relaxed: new Audio("audio/bright_relaxed_sports_broadcast_bgm_loop.wav"),
   scoring: new Audio("audio/mountain_wind_stadium_anthem_bgm_loop.wav")
 };
@@ -3755,19 +3756,17 @@ function getPitcherRoleShortLabel(role) {
 function renderMenuPitcherSlot(player, nameElement, statsElement) {
   nameElement.textContent = player?.name ?? "未選択";
   statsElement.innerHTML = `
-    <div class="menu-simple-cost">
-      <span>獲得P</span>
+    <div class="menu-simple-cost pitcher-cost-only">
       <strong>${player?.cost ?? 0}</strong>
     </div>
   `;
 }
 
 function renderMenuBenchSlot(player, nameElement, statsElement) {
-  nameElement.textContent = player?.name ?? "Not selected";
+  nameElement.textContent = player?.name ?? "未選択";
   statsElement.innerHTML = `
-    <div class="menu-simple-cost">
-      <span>Bench</span>
-      <strong>${player?.cost ?? 0}pt</strong>
+    <div class="menu-simple-cost bench-cost-only">
+      <strong>${player?.cost ?? 0}</strong>
     </div>
   `;
 }
@@ -3777,7 +3776,7 @@ function renderMenuFielderSymbol(team, role, player, nameElement, statsElement) 
   statsElement.innerHTML = `
     <div class="field-symbol-info">
       <button class="lineup-order-button" type="button" data-team="${team}" data-role="${role}">${getLineupSlotNumber(team, role)}番</button>
-      <strong>${player?.cost ?? 0}pt</strong>
+      <strong>${player?.cost ?? 0}</strong>
     </div>
     ${renderLineupOrderPicker(team, role)}
   `;
@@ -4040,6 +4039,8 @@ function isPanelForMenuMode(panel, mode) {
 function updateMenuModeView(mode = selectedMenuMode) {
   selectedMenuMode = ["main", "versus", "practice", "pitchPractice", "homerDerby"].includes(mode) ? mode : "main";
   menu.classList.toggle("menu-root-mode", selectedMenuMode === "main");
+  menu.classList.remove("menu-mode-versus", "menu-mode-practice", "menu-mode-pitchPractice", "menu-mode-homerDerby");
+  if (selectedMenuMode !== "main") menu.classList.add(`menu-mode-${selectedMenuMode}`);
   menuModeButtons.forEach((button) => {
     const active = button.dataset.menuMode === selectedMenuMode;
     button.classList.toggle("active", active);
@@ -4063,6 +4064,7 @@ function updateMenuModeView(mode = selectedMenuMode) {
   practicePitcherLabel.textContent = isPitchingPractice ? "投手" : "打撃投手（CPU）";
   document.querySelectorAll(".batting-practice-control").forEach((element) => element.classList.toggle("hidden", isPitchingPractice));
   document.querySelectorAll(".pitching-practice-control").forEach((element) => element.classList.toggle("hidden", !isPitchingPractice));
+  if (gamePhase === "menu") updateCurrentBgm(true);
 }
 function startGame(modeOverride = null) {
   readMenu();
@@ -6498,11 +6500,7 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
       gamepadState.previousButtons[team] = pressed;
       return;
     }
-    if (selectedMenuMode === "main" && team === "away" && justPressed(gamepadButtons.A)) {
-      updateMenuModeView("versus");
-      gamepadState.previousButtons[team] = pressed;
-      return;
-    }
+
     if (justPressed(gamepadButtons.A)) clickMenuGamepadCursor(team);
     if (justPressed(gamepadButtons.B)) closeMenuGamepadOverlay(team);
     gamepadState.previousButtons[team] = pressed;
@@ -7553,7 +7551,8 @@ function handleBgmButtonClick() {
 }
 
 function getCurrentBgmKey() {
-  if (gamePhase === "menu" || gamePhase === "gameover") return "menu";
+  if (gamePhase === "menu") return selectedMenuMode === "main" ? "title" : "menu";
+  if (gamePhase === "gameover") return "menu";
   if (gamePhase !== "playing" && gamePhase !== "defense") return null;
   return bases.second || bases.third ? "scoring" : "relaxed";
 }
