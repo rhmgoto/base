@@ -146,6 +146,14 @@ const field = {
   leftBox: { left: 695, right: 828, top: 649, bottom: 802 }
 };
 
+const homePlateGeometry = {
+  topHalfWidth: 36,
+  topOffsetY: -12,
+  shoulderInset: 10,
+  sideToTopRatio: 0.55,
+  sizeScale: 0.9
+};
+
 const batterMoveTuning = {
   plateSideGap: 46,
   moundSideShrink: (42 * field.plateScale) / 3,
@@ -1275,6 +1283,10 @@ teamAPitcherSprite.src = "assets/team-a-pitcher.png";
 
 const teamBPitcherSprite = new Image();
 teamBPitcherSprite.src = "assets/team-b-pitcher.png";
+
+const matchupFieldBackground = new Image();
+matchupFieldBackground.src = "assets/フィールド画面.png";
+let matchupHomePlateCover = null;
 
 const batterSpriteSets = {
   away: {
@@ -17506,7 +17518,7 @@ function isStrikePitchForHbp() {
   if (ball.touchedPlate || isBallTouchingHomePlate()) return true;
   if (!ball.inPitch || ball.vy <= 0) return false;
 
-  const plateBottom = field.plateY + 42 * field.plateScale;
+  const plateBottom = getHomePlateBottomY();
   const framesToPlateBottom = (plateBottom - ball.y) / ball.vy;
   if (framesToPlateBottom < 0) return false;
 
@@ -17547,14 +17559,27 @@ function isBallInStrikeZone() {
 }
 
 function getHomePlatePoints() {
-  const scale = field.plateScale;
+  const scale = field.plateScale * homePlateGeometry.sizeScale;
+  const halfTop = homePlateGeometry.topHalfWidth * scale;
+  const topY = field.plateY + homePlateGeometry.topOffsetY * scale;
+  const shoulderInset = homePlateGeometry.shoulderInset * scale;
+  const sideLength = halfTop * 2 * homePlateGeometry.sideToTopRatio;
+  const shoulderHalfWidth = halfTop - shoulderInset;
+  const shoulderDrop = Math.sqrt(sideLength ** 2 - shoulderInset ** 2);
+  const pointDrop = Math.sqrt(sideLength ** 2 - shoulderHalfWidth ** 2);
+  const shoulderY = topY + shoulderDrop;
+  const pointY = shoulderY + pointDrop;
   return [
-    { x: field.plateX - 36 * scale, y: field.plateY - 12 * scale },
-    { x: field.plateX + 36 * scale, y: field.plateY - 12 * scale },
-    { x: field.plateX + 26 * scale, y: field.plateY + 22 * scale },
-    { x: field.plateX, y: field.plateY + 42 * scale },
-    { x: field.plateX - 26 * scale, y: field.plateY + 22 * scale }
+    { x: field.plateX - halfTop, y: topY },
+    { x: field.plateX + halfTop, y: topY },
+    { x: field.plateX + shoulderHalfWidth, y: shoulderY },
+    { x: field.plateX, y: pointY },
+    { x: field.plateX - shoulderHalfWidth, y: shoulderY }
   ];
+}
+
+function getHomePlateBottomY() {
+  return Math.max(...getHomePlatePoints().map((point) => point.y));
 }
 
 function getGoodContactZonePoints() {
@@ -17581,7 +17606,7 @@ function getGoodContactZonePoints() {
 }
 
 function hasBallPassedHomePlate() {
-  const plateBottom = field.plateY + 42 * field.plateScale;
+  const plateBottom = getHomePlateBottomY();
   return ball.y - ball.radius > plateBottom;
 }
 
@@ -20265,6 +20290,7 @@ function drawRiversideRiver() {
 function drawField() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const stadium = getCurrentStadium();
+  if (drawMatchupFieldBackground(stadium)) return;
   drawStadiumTurfPattern(stadium);
   drawNextDomeRoofScreen();
   drawStadiumFoulGroundDetails(field.plateY + 42);
@@ -20313,6 +20339,63 @@ function drawField() {
   ctx.fillRect(field.centerX - 96, pitcher.y + 13, 192, 8);
   ctx.fillStyle = "#233047";
   ctx.fillRect(pitcher.x - 9, pitcher.y + 9, 18, 16);
+}
+
+function usesMatchupFieldBackground(stadium = getCurrentStadium()) {
+  return stadium?.id === "fireworks";
+}
+
+function drawMatchupFieldBackground(stadium = getCurrentStadium()) {
+  if (!usesMatchupFieldBackground(stadium)) return false;
+  if (!matchupFieldBackground.complete || !matchupFieldBackground.naturalWidth) return false;
+  ctx.drawImage(matchupFieldBackground, 0, 0, canvas.width, canvas.height);
+  concealMatchupBackgroundHomePlate();
+  return true;
+}
+
+function concealMatchupBackgroundHomePlate() {
+  const cover = getMatchupHomePlateCover();
+  if (!cover) return;
+  ctx.drawImage(cover, field.plateX - cover.width / 2, field.plateY + 2);
+}
+
+function getMatchupHomePlateCover() {
+  if (matchupHomePlateCover) return matchupHomePlateCover;
+  if (!matchupFieldBackground.naturalWidth || !matchupFieldBackground.naturalHeight) return null;
+  const cover = document.createElement("canvas");
+  cover.width = 160;
+  cover.height = 112;
+  const coverContext = cover.getContext("2d");
+  const sourceWidth = matchupFieldBackground.naturalWidth;
+  const sourceHeight = matchupFieldBackground.naturalHeight;
+  coverContext.drawImage(
+    matchupFieldBackground,
+    sourceWidth * 0.57,
+    sourceHeight * 0.93,
+    sourceWidth * 0.1,
+    sourceHeight * 0.065,
+    0,
+    0,
+    cover.width,
+    cover.height
+  );
+  coverContext.globalCompositeOperation = "destination-in";
+  const horizontalFade = coverContext.createLinearGradient(0, 0, cover.width, 0);
+  horizontalFade.addColorStop(0, "rgba(255,255,255,0)");
+  horizontalFade.addColorStop(0.2, "rgba(255,255,255,1)");
+  horizontalFade.addColorStop(0.8, "rgba(255,255,255,1)");
+  horizontalFade.addColorStop(1, "rgba(255,255,255,0)");
+  coverContext.fillStyle = horizontalFade;
+  coverContext.fillRect(0, 0, cover.width, cover.height);
+  const verticalFade = coverContext.createLinearGradient(0, 0, 0, cover.height);
+  verticalFade.addColorStop(0, "rgba(255,255,255,0)");
+  verticalFade.addColorStop(0.18, "rgba(255,255,255,1)");
+  verticalFade.addColorStop(0.82, "rgba(255,255,255,1)");
+  verticalFade.addColorStop(1, "rgba(255,255,255,0)");
+  coverContext.fillStyle = verticalFade;
+  coverContext.fillRect(0, 0, cover.width, cover.height);
+  matchupHomePlateCover = cover;
+  return cover;
 }
 
 function drawDefenseView() {
@@ -22153,14 +22236,13 @@ function drawPlateAndZone() {
     drawSpaceHomePlate();
     return;
   }
-  const scale = field.plateScale;
+  const points = getHomePlatePoints();
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(field.plateX - 36 * scale, field.plateY - 12 * scale);
-  ctx.lineTo(field.plateX + 36 * scale, field.plateY - 12 * scale);
-  ctx.lineTo(field.plateX + 26 * scale, field.plateY + 22 * scale);
-  ctx.lineTo(field.plateX, field.plateY + 42 * scale);
-  ctx.lineTo(field.plateX - 26 * scale, field.plateY + 22 * scale);
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
   ctx.closePath();
   ctx.fill();
 }
