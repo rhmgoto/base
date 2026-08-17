@@ -92,8 +92,10 @@ assertIncludesAll(
     // ベースをかすめる球は当たりやすくし、増えた接触はファウル・詰まった当たりに逃がす
     "const edgeStrikeContactTuning",
     "const edgeExtendedUse = isEdgeStrikeContact",
+    "const edgeExtendedFoulChance = edgeStrikeOutsideAssist",
     "const edgeExtendedFoul = edgeExtendedUse > 0",
-    "exitVelocity: exitVelocity * edgeExtendedWeaken",
+    "exitVelocity: finalExitVelocity",
+    "carry: finalCarry",
     "const lateralMiss = Math.max(0, Math.abs(ball.x - field.plateX) - field.strikeZoneWidth / 2 - ball.radius)",
     "const breakPressure = clamp(Math.abs(ball.curvePower)",
     "const chaseTemptation = clamp(",

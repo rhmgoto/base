@@ -579,7 +579,7 @@ assert(
 
 // 落球はライナーに限らず「強い打球」全般が対象。守備力で増減し、弱い打球では起きない。
 assert(
-  run(`return JSON.stringify([battedBallDropTuning.linerChance, battedBallDropTuning.freezeSeconds]);`) === "[0.1,0.9]",
+  run(`return JSON.stringify([battedBallDropTuning.linerChance, battedBallDropTuning.freezeSeconds]);`) === "[0.05,0.9]",
   "ライナーの落球率と硬直時間の基準値"
 );
 
@@ -598,7 +598,7 @@ const dropChances = JSON.parse(run(`
   });
 `));
 
-assert(Math.abs(dropChances.ライナー - 0.1) < 0.001, `守備力が平均のライナーは従来どおり10% (${dropChances.ライナー})`);
+assert(Math.abs(dropChances.ライナー - 0.05) < 0.001, `守備力が平均のライナーは5% (${dropChances.ライナー})`);
 assert(dropChances.弱いゴロ === 0, `弱い打球では落球しない (${dropChances.弱いゴロ})`);
 assert(dropChances.バント === 0, "バントは落球の対象外");
 assert(dropChances.強いゴロ > 0 && dropChances.強いフライ > 0, "強い打球はライナー以外でも落球しうる");

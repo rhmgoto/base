@@ -325,14 +325,32 @@ canvas {
 }
 
 .menu-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(150px, 180px);
-  align-items: end;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(210px, 0.82fr) minmax(120px, 0.86fr) minmax(190px, 1.25fr);
+  align-items: stretch;
 }
 
 .mode-setting-field {
   grid-column: span 1;
   grid-template-columns: minmax(58px, max-content) minmax(0, 1fr);
   gap: 8px;
+}
+
+.menu-start-action {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: grid;
+  align-self: stretch;
+}
+
+.menu-start-action #startButton {
+  width: 100%;
+  min-height: 76px;
+  margin-top: 0;
+  padding: 0 18px;
+  font-size: 20px;
+  font-weight: 900;
+  white-space: nowrap;
+  border-radius: 8px;
 }
 
 .team-setup-field {
@@ -354,9 +372,12 @@ canvas {
   font-weight: 900;
 }
 
-.team-preset-away,
+.team-preset-away {
+  grid-column: 1 / span 2;
+}
+
 .team-preset-home {
-  grid-column: span 2;
+  grid-column: 4 / span 2;
 }
 
 .menu-audio-controls {
@@ -2061,6 +2082,13 @@ button {
   .player-picks,
   .ability-board {
     grid-template-columns: 1fr;
+  }
+
+  .menu-start-action,
+  .team-preset-away,
+  .team-preset-home {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .menu-card label,

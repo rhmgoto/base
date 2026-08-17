@@ -252,18 +252,22 @@ function getComputerPitchReadScore() {
 // reachBonus を大きくすると空振りが減るが、この帯は quality の減点が大きいので
 // 増えた接触はヒットではなくファウルや凡打になる。
 const edgeStrikeContactTuning = {
-  // 36 (元) → 68。ベースをかすめる球の空振りが多すぎたので届く範囲を広げる。
-  reachBonus: 68,
+  // ベースをかすめる球の空振りが多すぎたので届く範囲を広げる。外角側だけ少し厚めに補助する。
+  reachBonus: 54,
+  outsideReachBonus: 78,
   meetScale: 0.4,
   // 広げる前の基準。reachBonus をこれより大きくした分が「広げた帯」になる。
   referenceReachBonus: 36,
+  outsideReferenceReachBonus: 40,
   // 広げた帯に頼って当てた打球をファウルにする確率。
   // この帯の quality はもともと0付近まで落ちていて減点しても効かないので、
   // 「空振りをファウルに変える」ことで安打が増えないようにする。
   // 1 を超える値にすると、帯の浅いところで当てた打球もほぼ確実にファウルになる。
-  extendedFoulChance: 2,
+  extendedFoulChance: 1.6,
+  outsideExtendedFoulChance: 2.1,
   // ファウルにならなかった打球も、詰まった当たりにして安打になりにくくする。
-  extendedPowerDrop: 0.6,
+  extendedPowerDrop: 0.5,
+  outsideExtendedPowerDrop: 0.68,
   extendedLaunchAngleCap: 10
 };
 
@@ -1049,18 +1053,18 @@ const airCatchMinHeight = 12;
 // 記録上のエラーにはせず、拾い直すまで送球できない「硬直」で表現する。
 // ライナー限定だったものを、強い打球全般に広げた。
 const battedBallDropTuning = {
-  // ライナー系はこの確率 (守備力が平均なら従来どおり10%)
-  linerChance: 0.1,
+  // ライナー系はこの確率 (守備力が平均なら5%)
+  linerChance: 0.05,
   // ライナー以外は、この強さを超えた打球だけが落球の対象になる
   minPower: 0.72,
   // この強さで落球確率が最大になる
   fullPower: 1.25,
-  minChance: 0.04,
-  maxChance: 0.2,
+  minChance: 0.02,
+  maxChance: 0.1,
   // 守備力による増減の幅。守備5が基準で、守備10なら -fieldingSwing/2 される。
-  fieldingSwing: 0.09,
-  chanceFloor: 0.01,
-  chanceCeiling: 0.32,
+  fieldingSwing: 0.045,
+  chanceFloor: 0.005,
+  chanceCeiling: 0.16,
   // 弾いたあと動けない時間
   freezeSeconds: 0.9,
   // 強い打球ほど長く弾む
@@ -7646,14 +7650,21 @@ function buildContactProfile(bestHit) {
   // 低ミート打者にとって「際どいストライク」が「明らかなボール球」とほぼ同じ難易度になり、
   // 空振り確定に近くなってしまうため、この帯だけ meet の影響を弱める。
   const edgeStrikeMeetBonus = meetBonus * edgeStrikeContactTuning.meetScale;
-  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 + meetBonus : outsideStrikeZone ? ball.radius + 22 + meetBonus : ball.radius + edgeStrikeContactTuning.reachBonus + edgeStrikeMeetBonus)) * batThicknessMultiplier * meetContactScale;
+  const isEdgeStrikeContact = !inGoodContactZone && !outsideStrikeZone;
+  const edgeStrikeOutsideAssist = isEdgeStrikeContact && outsideContactPoint;
+  const edgeStrikeReachBonus = edgeStrikeOutsideAssist
+    ? edgeStrikeContactTuning.outsideReachBonus
+    : edgeStrikeContactTuning.reachBonus;
+  const rawPreExtensionContactRange = ((inGoodContactZone ? ball.radius + 58 + meetBonus : outsideStrikeZone ? ball.radius + 22 + meetBonus : ball.radius + edgeStrikeReachBonus + edgeStrikeMeetBonus)) * batThicknessMultiplier * meetContactScale;
   const preExtensionContactRange = rawPreExtensionContactRange * meetZoneWidthScale;
   const baseContactRange = preExtensionContactRange + outsideReachBonus * batThicknessMultiplier * meetZoneWidthScale;
   // 際どいストライクで「広げた帯」に頼って当てた度合い。
   // ここに頼った打球は quality を落として、ヒットではなくファウルや凡打に寄せる。
-  const isEdgeStrikeContact = !inGoodContactZone && !outsideStrikeZone;
+  const edgeStrikeReferenceBonus = edgeStrikeOutsideAssist
+    ? edgeStrikeContactTuning.outsideReferenceReachBonus
+    : edgeStrikeContactTuning.referenceReachBonus;
   const edgeStrikeReferenceRange = isEdgeStrikeContact
-    ? (ball.radius + edgeStrikeContactTuning.referenceReachBonus + edgeStrikeMeetBonus)
+    ? (ball.radius + edgeStrikeReferenceBonus + edgeStrikeMeetBonus)
       * batThicknessMultiplier * meetContactScale * meetZoneWidthScale
     : 0;
   const edgeExtendedUse = isEdgeStrikeContact && preExtensionContactRange > edgeStrikeReferenceRange
@@ -7717,6 +7728,7 @@ function buildContactProfile(bestHit) {
     contactRange,
     // 際どいストライクで「広げた帯」に頼って当てた度合い (ファウル判定で使う)
     edgeExtendedUse,
+    edgeStrikeOutsideAssist,
     x: bestHit.x,
     y: bestHit.y,
     timeDiff,
@@ -7983,6 +7995,19 @@ function decideUnifiedBattedBallResult(contact, profile, feedbackScore, roll = M
   if (zoneBand === "farOutside" && Math.random() < 0.54) trajectory = Math.random() < 0.52 ? "popup" : "grounder";
   else if (zoneBand === "outside" && Math.random() < 0.34) trajectory = Math.random() < 0.45 ? "popup" : "grounder";
 
+  const lowLineDriveCandidate = !grounderSwing
+    && trajectory === "fly"
+    && launchAngle >= 10
+    && launchAngle <= 25
+    && (profile.exitVelocity ?? 0) >= 0.54
+    && quality >= 0.5
+    && quality < 0.88
+    && ["center", "middle", "edge"].includes(zoneBand);
+  if (lowLineDriveCandidate) {
+    const lowLineDriveChance = clamp(0.18 + (profile.lineLinerScore ?? 0) * 0.28 + clamp(((profile.exitVelocity ?? 0) - 0.62) / 0.42, 0, 1) * 0.16, 0.18, 0.48);
+    if (Math.random() < lowLineDriveChance) trajectory = "liner";
+  }
+
   if (trajectory === "popup") return makeUnifiedPopupResult(unifiedProfile, quality);
   if (trajectory === "grounder") return makeUnifiedGrounderResult(unifiedProfile, quality);
   if (trajectory === "liner") return makeUnifiedLinerResult(unifiedProfile, quality);
@@ -8232,7 +8257,7 @@ function makeStrongFeedbackGroundDriveResult(profile, roll = Math.random()) {
   if (roll < sideChance) {
     return makeLineEdgeResultFromProfile(strongProfile);
   }
-  if (roll < sideChance + 0.2 && (profile.launchAngle ?? 0) >= 18 && (profile.lineDropScore ?? 0) > 0.08) {
+  if (roll < sideChance + 0.34 && (profile.launchAngle ?? 0) >= 16 && (profile.lineDropScore ?? 0) > 0.06) {
     return makeLineDropResultFromProfile(strongProfile);
   }
   return makeHardOutfieldBounceHitResultFromProfile(strongProfile);
@@ -8341,7 +8366,8 @@ function buildBattedBallProfile(contact) {
     buntAimX = 0,
     buntAimY = 0,
     buntAimMagnitude = 0,
-    edgeExtendedUse = 0
+    edgeExtendedUse = 0,
+    edgeStrikeOutsideAssist = false
   } = contact;
   const swingType = getCurrentSwingType();
   const grounderSwing = swingType === "grounder";
@@ -8437,14 +8463,14 @@ function buildBattedBallProfile(contact) {
   const lineQuality = clamp(readableQuality * 0.58 + sweetSpotScore * 0.34 + zoneScore * 0.18 - spin * 0.16, 0, 1);
   const lowDriveContact = clamp((launchAngle - 15) / 16, 0, 1) * clamp((32 - launchAngle) / 13, 0, 1);
   const lineLinerScore = clamp(
-    (0.1 + lineContact * 0.92 + lowDriveContact * 0.54 + Math.abs(direction.x) * 0.18)
+    (0.14 + lineContact * 0.92 + lowDriveContact * 0.72 + Math.abs(direction.x) * 0.18 + centerDriveScore * 0.28)
       * lineQuality
       * clamp((exitVelocity - 0.42) / 0.44, 0, 1),
     0,
     0.94
   );
   const lineDropScore = clamp(
-    0.2 + (0.26 + lineContact * 0.78 + Math.abs(direction.x) * 0.18)
+    0.24 + (0.3 + lineContact * 0.78 + Math.abs(direction.x) * 0.18 + lowDriveContact * 0.22)
       * (1 - sweetSpotScore * 0.24)
       * clamp((launchAngle - 8) / 18, 0, 1)
       * clamp((1.2 - exitVelocity) / 0.72, 0, 1)
@@ -8514,8 +8540,11 @@ function buildBattedBallProfile(contact) {
   const centerFenceEdgeFlyScore = clamp(fenceEdgeFlyScore + centerDriveScore * powerDriveScore * 0.18, 0, 0.84);
   const yellowFenceEdgeFlyScore = clamp(centerFenceEdgeFlyScore + yellowDriveScore * yellowZoneHitTuning.fenceScoreBoost * 0.72, 0, 0.88);
   // 際どいストライクを「広げた帯」で拾った打球は、安打にせずファウルへ逃がす。
+  const edgeExtendedFoulChance = edgeStrikeOutsideAssist
+    ? edgeStrikeContactTuning.outsideExtendedFoulChance
+    : edgeStrikeContactTuning.extendedFoulChance;
   const edgeExtendedFoul = edgeExtendedUse > 0
-    && Math.random() < edgeExtendedUse * edgeStrikeContactTuning.extendedFoulChance;
+    && Math.random() < edgeExtendedUse * edgeExtendedFoulChance;
   const isFoul = edgeExtendedFoul
     || (Math.abs(timingPull) > 0.82 && (readableQuality < 0.62 || spin > 0.72));
   const feedbackScore = getRawBattingFeedbackScore({
@@ -8701,13 +8730,18 @@ function buildBattedBallProfile(contact) {
     };
   }
   // 広げた帯で拾った打球は詰まった当たりにする。強い打球にはしない。
-  const edgeExtendedWeaken = 1 - edgeExtendedUse * edgeStrikeContactTuning.extendedPowerDrop;
+  const edgeExtendedPowerDrop = edgeStrikeOutsideAssist
+    ? edgeStrikeContactTuning.outsideExtendedPowerDrop
+    : edgeStrikeContactTuning.extendedPowerDrop;
+  const edgeExtendedWeaken = 1 - edgeExtendedUse * edgeExtendedPowerDrop;
+  const finalExitVelocity = exitVelocity * edgeExtendedWeaken;
+  const finalCarry = carry * edgeExtendedWeaken;
   return {
-    exitVelocity: exitVelocity * edgeExtendedWeaken,
+    exitVelocity: finalExitVelocity,
     launchAngle: edgeExtendedUse > 0 ? Math.min(launchAngle, edgeStrikeContactTuning.extendedLaunchAngleCap) : launchAngle,
     direction,
     spin,
-    carry: carry * edgeExtendedWeaken,
+    carry: finalCarry,
     feedbackScore,
     gapScore,
     timingPull,
@@ -8721,7 +8755,7 @@ function buildBattedBallProfile(contact) {
     chaseFlyScore,
     toweringFlyScore: clamp(toweringFlyScore + practicePitcherContactBoost * 0.36 + lowStuffProfileBoost * 0.18, 0, 0.96),
     fenceEdgeFlyScore: clamp((yellowZoneBoost > 0 ? yellowFenceEdgeFlyScore : inGoodContactZone ? centerFenceEdgeFlyScore : fenceEdgeFlyScore) + practicePitcherContactBoost * 0.42 + lowStuffProfileBoost * 0.2, 0, 0.96),
-    power: clamp(exitVelocity * 0.74 + carry * 0.52 + practicePitcherContactBoost * 0.42 + lowStuffProfileBoost * 0.22, 0.08, deepDriveTuning.maxPower),
+    power: clamp(finalExitVelocity * 0.74 + finalCarry * 0.52 + practicePitcherContactBoost * 0.42 + lowStuffProfileBoost * 0.22, 0.08, deepDriveTuning.maxPower),
     readableQuality,
     sweetSpotCenterBoost,
     outsideZoneDrag,
@@ -9138,6 +9172,9 @@ function makeFenceEdgeFlyResultFromProfile(profile) {
 }
 
 function makeDeepDriveResultFromProfile(profile) {
+  if (shouldConvertHomerCandidateToFenceLiner(profile)) {
+    return makeFenceLinerResultFromProfile(makeHomerCandidateFenceLinerProfile(profile));
+  }
   if (shouldConvertHomerCandidateToStrongInfieldGrounder(profile)) {
     return makeStrongInfieldGrounderResultFromProfile(profile);
   }
@@ -9177,6 +9214,30 @@ function makeDeepDriveResultFromProfile(profile) {
   };
 }
 
+function shouldConvertHomerCandidateToFenceLiner(profile, powerProfile = getHomeRunPowerProfile(), roll = Math.random()) {
+  if (!profile || profile.isFoul || profile.battingPracticeHomerCandidate) return false;
+  const feedbackScore = clamp(profile.feedbackScore ?? profile.quality ?? 0.6, 0, 1);
+  const launchAngle = profile.launchAngle ?? 20;
+  if (feedbackScore < 0.58 || launchAngle < 16 || launchAngle > 38) return false;
+  const powerDrive = clamp(powerProfile.standardDrive + powerProfile.superPower * 0.04, 0, 1.25);
+  const lowAngleBias = clamp((30 - launchAngle) / 16, 0, 1) * 0.08;
+  const chance = clamp(0.1 + powerDrive * 0.1 + lowAngleBias + clamp(((profile.exitVelocity ?? 0.8) - 0.82) / 0.42, 0, 1) * 0.06, 0.1, 0.28);
+  return roll < chance;
+}
+
+function makeHomerCandidateFenceLinerProfile(profile) {
+  return {
+    ...profile,
+    unifiedForceWallHit: true,
+    unifiedFlightTimeScale: Math.min(profile.unifiedFlightTimeScale ?? 1, randomBetween(0.72, 0.9)),
+    feedbackScore: Math.max(profile.feedbackScore ?? 0, profile.quality ?? 0.64),
+    power: Math.max(profile.power ?? 1.1, 1.22),
+    exitVelocity: Math.max(profile.exitVelocity ?? 0.86, 0.98),
+    carry: Math.max(profile.carry ?? 0.82, 0.9),
+    launchAngle: clamp(profile.launchAngle ?? 20, 17, 24),
+    fenceLinerScore: Math.max(profile.fenceLinerScore ?? 0, 0.58)
+  };
+}
 function shouldConvertHomerCandidateToStrongInfieldGrounder(profile, roll = Math.random()) {
   if (!profile || profile.isFoul) return false;
   if (profile.battingPracticeHomerCandidate) return false;
@@ -14792,7 +14853,7 @@ function isLinerTypeBattedBall(battedBall) {
     && (battedBall.isLiner || battedBall.isLineLiner || battedBall.isLineDrop || battedBall.isFenceLiner));
 }
 
-// 打球の強さで落球しやすさが決まる。ライナーは従来どおり基準10%。
+// 打球の強さで落球しやすさが決まる。ライナーは守備力が平均なら基準5%。
 function getBattedBallDropPowerScore(battedBall) {
   const span = Math.max(0.01, battedBallDropTuning.fullPower - battedBallDropTuning.minPower);
   return clamp(((battedBall?.power ?? 0) - battedBallDropTuning.minPower) / span, 0, 1);
