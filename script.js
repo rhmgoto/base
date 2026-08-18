@@ -1286,6 +1286,8 @@ teamBPitcherSprite.src = "assets/team-b-pitcher.png";
 
 const matchupFieldBackground = new Image();
 matchupFieldBackground.src = "assets/フィールド画面.png";
+const fireworksDefenseBackground = new Image();
+fireworksDefenseBackground.src = "assets/fireworks-defense-field.webp";
 let matchupHomePlateCover = null;
 
 const batterSpriteSets = {
@@ -20398,6 +20400,30 @@ function getMatchupHomePlateCover() {
   return cover;
 }
 
+function drawFireworksDefenseBackground(stadium = getCurrentStadium()) {
+  if (stadium?.id !== "fireworks") return false;
+  if (!fireworksDefenseBackground.complete || !fireworksDefenseBackground.naturalWidth) return false;
+
+  // The expanded background keeps the detailed field at its original scale,
+  // with extra sky and side scenery for the out-of-stadium homer camera.
+  const sourceFenceRadius = 840;
+  const sourceHomeX = 1966;
+  const sourceHomeY = 2468;
+  const verticalScale = defenseField.fenceDistance / sourceFenceRadius;
+  const horizontalScale = verticalScale * 1.12;
+  const home = defenseField.bases.home;
+  const drawWidth = fireworksDefenseBackground.naturalWidth * horizontalScale;
+  const drawHeight = fireworksDefenseBackground.naturalHeight * verticalScale;
+  ctx.drawImage(
+    fireworksDefenseBackground,
+    home.x - sourceHomeX * horizontalScale,
+    home.y - sourceHomeY * verticalScale,
+    drawWidth,
+    drawHeight
+  );
+  return true;
+}
+
 function drawDefenseView() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const stadium = getCurrentStadium();
@@ -20418,33 +20444,36 @@ function drawDefenseView() {
   drawAozoraRuralBeyondOutfield();
   drawStadiumFoulGroundDetails(field.plateY + 42);
   drawNextDomeFoulGroundDetails(field.plateY + 42);
+  const hasPaintedField = drawFireworksDefenseBackground(stadium);
 
-  ctx.fillStyle = stadium.surface === "obsidian" ? getObsidianFieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
-  ctx.beginPath();
-  ctx.moveTo(field.plateX, field.plateY + 42);
-  ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
-  ctx.lineTo(canvas.width - defenseField.foulLineInset, defenseField.foulLineTopY);
-  ctx.closePath();
-  ctx.fill();
+  if (!hasPaintedField) {
+    ctx.fillStyle = stadium.surface === "obsidian" ? getObsidianFieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : stadium.surface === "seaBreezeGrass" ? "#82cf5c" : stadium.surface === "spaceGlow" ? getSpaceInfieldFill(field.plateX, defenseField.foulLineTopY, field.plateY + 42) : "#d89548";
+    ctx.beginPath();
+    ctx.moveTo(field.plateX, field.plateY + 42);
+    ctx.lineTo(defenseField.foulLineInset, defenseField.foulLineTopY);
+    ctx.lineTo(canvas.width - defenseField.foulLineInset, defenseField.foulLineTopY);
+    ctx.closePath();
+    ctx.fill();
 
-  ctx.fillStyle = stadium.surface === "dirt"
-    ? "rgba(255, 235, 174, 0.14)"
-    : stadium.surface === "obsidian"
-      ? getObsidianFieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
-    : stadium.surface === "seaBreezeGrass"
-      ? "#82cf5c"
-    : stadium.surface === "spaceGlow"
-      ? getSpaceOutfieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
-    : stadium.surface === "royalGrass"
-      ? "rgba(45, 116, 67, 0.94)"
-      : "#6ebf69";
-  ctx.beginPath();
-  ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
-  ctx.fill();
-  drawRealisticFieldDetails(stadium, field.plateX, field.plateY + 42);
-  drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
-  drawSpaceStadiumFieldLights(field.plateX, field.plateY + 42, defenseField.grassRadius);
-  drawAmericanRoyalBeyondOutfield();
+    ctx.fillStyle = stadium.surface === "dirt"
+      ? "rgba(255, 235, 174, 0.14)"
+      : stadium.surface === "obsidian"
+        ? getObsidianFieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
+      : stadium.surface === "seaBreezeGrass"
+        ? "#82cf5c"
+      : stadium.surface === "spaceGlow"
+        ? getSpaceOutfieldFill(field.plateX, field.plateY + 42, defenseField.grassRadius)
+      : stadium.surface === "royalGrass"
+        ? "rgba(45, 116, 67, 0.94)"
+        : "#6ebf69";
+    ctx.beginPath();
+    ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
+    ctx.fill();
+    drawRealisticFieldDetails(stadium, field.plateX, field.plateY + 42);
+    drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
+    drawSpaceStadiumFieldLights(field.plateX, field.plateY + 42, defenseField.grassRadius);
+    drawAmericanRoyalBeyondOutfield();
+  }
 
   ctx.strokeStyle = "rgba(255,255,255,0.78)";
   ctx.lineWidth = 5;
@@ -20452,12 +20481,14 @@ function drawDefenseView() {
   drawLine(field.plateX, field.plateY + 42, canvas.width - defenseField.foulLineInset, defenseField.foulLineTopY);
   drawDefenseBases();
 
-  ctx.strokeStyle = "rgba(35,48,71,0.28)";
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.arc(field.plateX, field.plateY + 42, defenseField.fenceDistance, Math.PI, Math.PI * 2);
-  ctx.stroke();
-  drawOutfieldWall();
+  if (!hasPaintedField) {
+    ctx.strokeStyle = "rgba(35,48,71,0.28)";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(field.plateX, field.plateY + 42, defenseField.fenceDistance, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    drawOutfieldWall();
+  }
 
   drawDefenseTarget();
   drawHomeRunFireworks();
