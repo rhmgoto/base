@@ -1287,7 +1287,7 @@ teamBPitcherSprite.src = "assets/team-b-pitcher.png";
 const matchupFieldBackground = new Image();
 matchupFieldBackground.src = "assets/フィールド画面.png";
 const fireworksDefenseBackground = new Image();
-fireworksDefenseBackground.src = "assets/fireworks-defense-field.webp";
+fireworksDefenseBackground.src = "assets/fireworks-defense-field-fence-repair.webp";
 let matchupHomePlateCover = null;
 
 const batterSpriteSets = {
