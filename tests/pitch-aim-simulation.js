@@ -52,8 +52,6 @@ function createGameContext() {
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "1";
   makeElement("stadiumSelect").value = "fireworks";
-  makeElement("p1DefenseSelect").value = "auto";
-  makeElement("p2DefenseSelect").value = "auto";
 
   const context = {
     console,

@@ -51,8 +51,8 @@ function createGameContext(seed) {
     "menuPointStatus", "playerChooser", "chooserTitle", "chooserOptions", "chooserClose",
     "chooserTitleHome", "chooserOptionsHome", "chooserCloseHome", "modeSelect", "awayPresetSelect",
     "homePresetSelect", "firstBatSelect", "inningsSelect", "stadiumSelect", "practicePitcherControlSelect",
-    "practicePitcherTypeSelect", "practiceBatterSelect", "practicePitcherSelect", "p1DefenseSelect",
-    "p2DefenseSelect"
+    "practicePitcherTypeSelect", "practiceBatterSelect", "practicePitcherSelect"
+
   ].forEach(makeElement);
 
   makeElement("modeSelect").value = "watch";
@@ -61,8 +61,6 @@ function createGameContext(seed) {
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "3";
   makeElement("stadiumSelect").value = "fireworks";
-  makeElement("p1DefenseSelect").value = "auto";
-  makeElement("p2DefenseSelect").value = "auto";
 
   let now = 1000;
   let randomState = seed >>> 0;
@@ -351,8 +349,6 @@ const simulationCode = `
     firstBatSelect.value = "away";
     inningsSelect.value = "${requestedInnings}";
     stadiumSelect.value = "fireworks";
-    p1DefenseSelect.value = "auto";
-    p2DefenseSelect.value = "auto";
     selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
     menuSelection = cloneMenuSelection(defaultMenuSelection);
     games.push({

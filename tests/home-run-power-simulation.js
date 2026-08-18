@@ -54,8 +54,7 @@ function createGameContext(seed = 260724) {
     "awayPresetSelect", "homePresetSelect", "firstBatSelect", "inningsSelect", "stadiumSelect",
     "practicePitcherControlSelect", "practicePitcherTypeSelect", "practiceBatterSelect",
     "practicePitcherSelect", "pitchingPracticePitcherSelect", "pitchingPracticeBatterSelect",
-    "pitchingPracticeBatterTypeSelect", "p1DefenseSelect", "p2DefenseSelect",
-    "homeRunDerbyPlayerCountSelect", "homeRunDerbyAwayBatterSelect", "homeRunDerbyHomeBatterSelect"
+    "pitchingPracticeBatterTypeSelect", "homeRunDerbyPlayerCountSelect", "homeRunDerbyAwayBatterSelect", "homeRunDerbyHomeBatterSelect"
   ].forEach(makeElement);
   makeElement("modeSelect").value = "watch";
   makeElement("awayPresetSelect").value = "dodgers";
@@ -63,8 +62,6 @@ function createGameContext(seed = 260724) {
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "3";
   makeElement("stadiumSelect").value = "fireworks";
-  makeElement("p1DefenseSelect").value = "auto";
-  makeElement("p2DefenseSelect").value = "auto";
 
   let randomState = seed >>> 0;
   const seededMath = Object.create(Math);
@@ -217,8 +214,13 @@ if (!(powerForty.averageHomeRunMeters > powerTen.averageHomeRunMeters + 25)) {
   throw new Error("super-power hitters should have clearly exceptional home-run distance");
 }
 const powerFive = result.find((entry) => entry.power === 5);
-if (!(powerFive.wallHitRate > 5 && powerFive.homeRunRate > 5)) {
-  throw new Error("ordinary power should produce both home runs and fence hits");
+// 平均パワーの打者は「壁まで届くがほとんど越えない」のが現在の設計。
+// script.js の homeRunPowerTuning.lowPowerCandidatePenalty* で低パワーの
+// ホームラン候補率を意図的に下げたため、以前の「パワー5で本塁打5%以上」は
+// 満たさなくなった。2026年8月18日時点の実測は本塁打1.0% / 壁当て38.1%。
+// ホームランが出なくなる回帰だけを拾えるよう、下限だけを残している。
+if (!(powerFive.wallHitRate > 20 && powerFive.homeRunRate > 0.5)) {
+  throw new Error("ordinary power should still clear the fence occasionally while most well-hit balls die at the wall");
 }
 if (!(powerFive.minimumHomeRunMeters < powerFive.averageHomeRunMeters - 2)) {
   throw new Error("power 5 should include weaker home runs instead of one fixed distance");

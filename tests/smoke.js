@@ -126,8 +126,6 @@ function createGameContext() {
   makeElement("firstBatSelect").value = "away";
   makeElement("inningsSelect").value = "1";
   makeElement("stadiumSelect").value = "fireworks";
-  makeElement("p1DefenseSelect").value = "manual";
-  makeElement("p2DefenseSelect").value = "manual";
 
   let now = 1000;
   const context = {
@@ -211,7 +209,6 @@ function assertHtmlShell() {
     'value="dodgers"',
     'value="dendos"',
     'value="allstar"',
-    '>捕球だけオート</option>',
     'value="watch"',
     'id="practicePitcherControlSelect"',
     'id="practicePitcherTypeSelect"',
@@ -762,6 +759,9 @@ const bgmSelectionState = JSON.parse(runInGame(
   context,
   `(() => {
     showMenu();
+    const titleKey = getCurrentBgmKey();
+    const titleSrc = bgmTracks.title.src;
+    updateMenuModeView("versus");
     const menuKey = getCurrentBgmKey();
     const menuSrc = bgmTracks.menu.src;
     startGame();
@@ -786,6 +786,8 @@ const bgmSelectionState = JSON.parse(runInGame(
     toggleBgm();
     showMenu();
     return JSON.stringify({
+      titleKey,
+      titleSrc,
       menuKey,
       menuSrc,
       emptyKey,
@@ -800,8 +802,10 @@ const bgmSelectionState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(bgmSelectionState.menuKey === "menu", "main menu should select the menu BGM");
-assert(bgmSelectionState.menuSrc.includes("sports_broadcast_baseball_bgm_loop.wav"), "menu BGM should use the sports broadcast loop");
+assert(bgmSelectionState.titleKey === "title", "main menu should select the title BGM");
+assert(bgmSelectionState.titleSrc.includes("title music.mp3"), "title BGM should use the title music track");
+assert(bgmSelectionState.menuKey === "menu", "mode panels should select the menu BGM");
+assert(bgmSelectionState.menuSrc.includes("sports_broadcast_baseball_bgm_loop.wav"), "mode panel BGM should use the sports broadcast loop");
 assert(bgmSelectionState.emptyKey === "relaxed", "empty bases should select the relaxed play BGM");
 assert(bgmSelectionState.firstKey === "relaxed", "runner on first should keep the relaxed play BGM");
 assert(bgmSelectionState.relaxedSrc.includes("bright_relaxed_sports_broadcast_bgm_loop.wav"), "relaxed play BGM should use the bright relaxed loop");
@@ -815,9 +819,9 @@ const bgmUnlockState = JSON.parse(runInGame(
   context,
   `(() => {
     showMenu();
-    const originalPlay = bgmTracks.menu.play;
+    const originalPlay = bgmTracks.title.play;
     let attempts = 0;
-    bgmTracks.menu.play = () => {
+    bgmTracks.title.play = () => {
       attempts += 1;
       if (attempts === 1) {
         return {
@@ -831,7 +835,7 @@ const bgmUnlockState = JSON.parse(runInGame(
           }
         };
       }
-      bgmTracks.menu.paused = false;
+      bgmTracks.title.paused = false;
       return {
         catch() {},
         then(callback) {
@@ -848,25 +852,25 @@ const bgmUnlockState = JSON.parse(runInGame(
       buttonText: bgmToggleButton.textContent
     };
     handleBgmButtonClick();
-    bgmTracks.menu.play = originalPlay;
+    bgmTracks.title.play = originalPlay;
     return JSON.stringify({
       blocked,
       attempts,
       needsGesture: bgmNeedsUserGesture,
       current: currentBgmKey,
-      paused: bgmTracks.menu.paused
+      paused: bgmTracks.title.paused
     });
   })()`
 ));
 
-assert(bgmUnlockState.blocked.attempts === 1, "initial menu BGM should try to play immediately");
-assert(bgmUnlockState.blocked.needsGesture === true, "blocked menu BGM should wait for a user gesture retry");
-assert(bgmUnlockState.blocked.current === null, "blocked menu BGM should clear the current BGM key for retry");
-assert(bgmUnlockState.blocked.buttonText.includes("BGM"), "blocked menu BGM should show a start prompt on the BGM button");
-assert(bgmUnlockState.attempts === 2, "BGM button should retry menu BGM without changing screens");
+assert(bgmUnlockState.blocked.attempts === 1, "initial menu BGM (title track) should try to play immediately");
+assert(bgmUnlockState.blocked.needsGesture === true, "blocked title BGM should wait for a user gesture retry");
+assert(bgmUnlockState.blocked.current === null, "blocked title BGM should clear the current BGM key for retry");
+assert(bgmUnlockState.blocked.buttonText.includes("BGM"), "blocked title BGM should show a start prompt on the BGM button");
+assert(bgmUnlockState.attempts === 2, "BGM button should retry title BGM without changing screens");
 assert(bgmUnlockState.needsGesture === false, "successful unlock should clear the user gesture flag");
-assert(bgmUnlockState.current === "menu", "successful unlock should keep menu BGM active");
-assert(bgmUnlockState.paused === false, "successful unlock should start menu BGM playback");
+assert(bgmUnlockState.current === "title", "successful unlock should keep title BGM active");
+assert(bgmUnlockState.paused === false, "successful unlock should start title BGM playback");
 
 const lineupState = JSON.parse(runInGame(
   context,
@@ -887,27 +891,32 @@ const catchAutoControlState = JSON.parse(runInGame(
   context,
   `(() => {
     modeSelect.value = "versus";
-    p1DefenseSelect.value = "manual";
-    p2DefenseSelect.value = "manual";
     readMenu();
     battingTeam = "away";
+    const awayMode = defenseControlMode.away;
+    const homeMode = defenseControlMode.home;
     const awayManualBaserun = isManualBaserunningControl("away");
     const homeManualCatch = isManualDefenseControl();
     const homeManualThrow = isManualThrowControl();
-    p1DefenseSelect.value = "auto";
-    p2DefenseSelect.value = "auto";
+    modeSelect.value = "watch";
     readMenu();
     battingTeam = "away";
-    const awayAutoBaserun = isManualBaserunningControl("away");
-    const homeAutoThrow = isManualThrowControl();
+    const watchAwayMode = defenseControlMode.away;
+    const watchHomeMode = defenseControlMode.home;
+    const watchBaserun = isManualBaserunningControl("away");
+    const watchThrow = isManualThrowControl();
+    modeSelect.value = "versus";
+    readMenu();
     return JSON.stringify({
-      awayMode: defenseControlMode.away,
-      homeMode: defenseControlMode.home,
+      awayMode,
+      homeMode,
       awayManualBaserun,
       homeManualCatch,
       homeManualThrow,
-      awayAutoBaserun,
-      homeAutoThrow
+      watchAwayMode,
+      watchHomeMode,
+      watchBaserun,
+      watchThrow
     });
   })()`
 ));
@@ -915,8 +924,9 @@ const catchAutoControlState = JSON.parse(runInGame(
 assert(catchAutoControlState.homeManualCatch === false, "catch-only-auto mode should keep all catches automatic");
 assert(catchAutoControlState.homeManualThrow === true, "catch-only-auto mode should keep throws manual");
 assert(catchAutoControlState.awayManualBaserun === true, "catch-only-auto mode should keep baserunning manual");
-assert(catchAutoControlState.awayAutoBaserun === true, "removed auto mode should fall back to catch-only-auto baserunning");
-assert(catchAutoControlState.homeAutoThrow === true, "removed auto mode should fall back to catch-only-auto manual throws");
+assert(catchAutoControlState.awayMode === "manual" && catchAutoControlState.homeMode === "manual", "versus mode should keep both teams on catch-only-auto control");
+assert(catchAutoControlState.watchAwayMode === "auto" && catchAutoControlState.watchHomeMode === "auto", "watch mode should switch both teams to automatic control");
+assert(catchAutoControlState.watchBaserun === false && catchAutoControlState.watchThrow === false, "watch mode should not ask the player for baserunning or throws");
 
 const swingLockState = JSON.parse(runInGame(
   context,
@@ -2869,8 +2879,6 @@ const watchModeState = JSON.parse(runInGame(
     homePresetSelect.value = "dodgers";
     firstBatSelect.value = "home";
     inningsSelect.value = "9";
-    p1DefenseSelect.value = "manual";
-    p2DefenseSelect.value = "manual";
     selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
     menuSelection = cloneMenuSelection(defaultMenuSelection);
     readMenu();
@@ -2881,9 +2889,7 @@ const watchModeState = JSON.parse(runInGame(
       awayPreset: getSelectedTeamPresetId("away"),
       homePreset: getSelectedTeamPresetId("home"),
       awayDefenseControl: defenseControlMode.away,
-      homeDefenseControl: defenseControlMode.home,
-      awayDefenseSelect: p1DefenseSelect.value,
-      homeDefenseSelect: p2DefenseSelect.value
+      homeDefenseControl: defenseControlMode.home
     };
     battingTeam = "away";
     const awayBattingPlayerControlled = isPlayerBatting();
@@ -2911,8 +2917,6 @@ const watchModeState = JSON.parse(runInGame(
     homePresetSelect.value = "dodgers";
     firstBatSelect.value = "away";
     inningsSelect.value = "1";
-    p1DefenseSelect.value = "auto";
-    p2DefenseSelect.value = "auto";
     gameMode = "versus";
     selectedTeamPresetBySide = { ...defaultTeamPresetBySide };
     menuSelection = cloneMenuSelection(defaultMenuSelection);
@@ -2954,7 +2958,6 @@ assert(watchModeState.readState.maxInnings === 9, "watch mode should honor the i
 assert(watchModeState.readState.awayPreset === "tigers", "watch mode should honor Team A preset selection");
 assert(watchModeState.readState.homePreset === "dodgers", "watch mode should honor Team B preset selection");
 assert(watchModeState.readState.awayDefenseControl === "auto" && watchModeState.readState.homeDefenseControl === "auto", "watch mode should force defense and baserunning to auto");
-assert(watchModeState.readState.awayDefenseSelect === "manual" && watchModeState.readState.homeDefenseSelect === "manual", "watch mode should keep the catch-only-auto selectors visible");
 assert(watchModeState.awayBattingPlayerControlled === false && watchModeState.homeBattingPlayerControlled === false, "watch mode should not let either batter side wait for player input");
 assert(watchModeState.homePitchingPlayerControlled === false && watchModeState.awayPitchingPlayerControlled === false, "watch mode should not let either pitcher side wait for player input");
 assert(watchModeState.manualHomeDefense === false && watchModeState.manualAwayDefense === false, "watch mode should disable manual defense");
@@ -9129,12 +9132,17 @@ const manualRunningCpuDefenseState = JSON.parse(runInGame(
     finishDefensePlay();
     const twoOutTagUpResult = {
       outs: count.outs,
-      runs: scores.away
+      runs: scores.away,
+      battingTeamAfter: battingTeam
     };
 
     count = { strikes: 0, balls: 0, outs: 0 };
     scores = { away: 0, home: 0 };
     bases = createEmptyBases();
+    battingTeam = "away";
+    defenseControlMode = { away: "manual", home: "auto" };
+    activeBatter = findById(batters, "suzuki");
+    activePitcher = getTeamActivePitcher("home");
     gamePhase = "defense";
     const relayRunner = createBatterRunner(activeBatter);
     relayRunner.x = defenseField.bases.first.x;
@@ -9215,7 +9223,8 @@ assert(manualRunningCpuDefenseState.safeTagResult.thirdEmpty === true, "a scorin
 assert(manualRunningCpuDefenseState.twoOutTagUpCommand.targetBase === "third", "manual tag-up commands should be ignored when the catch is already the third out");
 assert(manualRunningCpuDefenseState.twoOutTagUpCommand.tagUp === false, "ignored two-out tag-up commands should not mark the runner as tagging up");
 assert(manualRunningCpuDefenseState.twoOutTagUpCommand.throwTarget === null, "ignored two-out tag-up commands should not create a home throw");
-assert(manualRunningCpuDefenseState.twoOutTagUpResult.outs === 3, "two-out caught flies should still end the inning");
+assert(manualRunningCpuDefenseState.twoOutTagUpResult.battingTeamAfter === "home", "two-out caught flies should end the inning and switch sides");
+assert(manualRunningCpuDefenseState.twoOutTagUpResult.outs === 0, "the side change after a two-out caught fly should clear the out count");
 assert(manualRunningCpuDefenseState.twoOutTagUpResult.runs === 0, "two-out caught flies should not allow a manual tag-up run");
 assert(manualRunningCpuDefenseState.firstThrowKeptInFlight === true, "CPU defense should not redirect a throw that is already in flight");
 assert(manualRunningCpuDefenseState.relayThrowCreated === true, `CPU defense should relay to the next base when a runner keeps advancing (${JSON.stringify(manualRunningCpuDefenseState.relayThrowActual)})`);
@@ -11035,6 +11044,8 @@ const finalBottomMercyState = JSON.parse(runInGame(
     scores = { away: 1, home: 2 };
     gamePhase = "playing";
     changeSide();
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const alreadyLeadingAtBottom = { gamePhase, message, inning, half, battingTeam };
 
     startGame();
@@ -11046,6 +11057,8 @@ const finalBottomMercyState = JSON.parse(runInGame(
     scores = { away: 3, home: 2 };
     gamePhase = "playing";
     addRunsToBattingTeam(2);
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const takesLeadDuringBottom = { gamePhase, message, scores: { ...scores } };
 
     startGame();
@@ -11057,6 +11070,8 @@ const finalBottomMercyState = JSON.parse(runInGame(
     scores = { away: 3, home: 2 };
     gamePhase = "playing";
     addRunsToBattingTeam(2);
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const notFinalBottom = { gamePhase, scores: { ...scores } };
 
     return JSON.stringify({ alreadyLeadingAtBottom, takesLeadDuringBottom, notFinalBottom });
@@ -11080,6 +11095,8 @@ const mercyRuleState = JSON.parse(runInGame(
     scores = { away: 2, home: 11 };
     gamePhase = "playing";
     addRunsToBattingTeam(1);
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const bottomFifthTenRunLead = { gamePhase, message, scores: { ...scores } };
 
     startGame();
@@ -11090,6 +11107,8 @@ const mercyRuleState = JSON.parse(runInGame(
     scores = { away: 4, home: 10 };
     gamePhase = "playing";
     addRunsToBattingTeam(1);
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const bottomSeventhSevenRunLead = { gamePhase, message, scores: { ...scores } };
 
     startGame();
@@ -11100,6 +11119,8 @@ const mercyRuleState = JSON.parse(runInGame(
     scores = { away: 12, home: 2 };
     gamePhase = "playing";
     changeSide();
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const awayLeadAfterTopFifth = { gamePhase, inning, half, battingTeam };
 
     startGame();
@@ -11110,6 +11131,8 @@ const mercyRuleState = JSON.parse(runInGame(
     scores = { away: 12, home: 2 };
     gamePhase = "playing";
     changeSide();
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const awayLeadAfterBottomFifth = { gamePhase, message };
 
     startGame();
@@ -11120,6 +11143,8 @@ const mercyRuleState = JSON.parse(runInGame(
     scores = { away: 3, home: 10 };
     gamePhase = "playing";
     changeSide();
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const homeLeadAfterTopSeventh = { gamePhase, message };
 
     return JSON.stringify({
@@ -11176,6 +11201,8 @@ const extraInningTiebreakState = JSON.parse(runInGame(
     count.outs = 3;
     scores = { away: 4, home: 3 };
     changeSide();
+    __advanceTime(gameEndResultDelayMs + 100);
+    updatePendingGameEnd();
     const extraFinished = { gamePhase, message };
 
     return JSON.stringify({ extraTop, extraBottom, extraFinished });
@@ -11255,7 +11282,7 @@ const pitcherGameRecordState = JSON.parse(runInGame(
     const homeSecond = getTeamActivePitcher("home").name;
     recordPitcherOuts("home", getTeamActivePitcher("home"), 2);
     recordPitcherOuts("away", getTeamActivePitcher("away"), 3);
-    endGame();
+    endGame("", { delay: false });
     draw();
     return JSON.stringify({
       homeStarter,
@@ -11286,7 +11313,7 @@ const pitcherSaveRecordState = JSON.parse(runInGame(
     changePitcher("away", threeRunRelieverId);
     const threeRunReliever = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 3);
-    endGame();
+    endGame("", { delay: false });
     const threeRunLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11303,7 +11330,7 @@ const pitcherSaveRecordState = JSON.parse(runInGame(
     changePitcher("away", threatRelieverId);
     const threatReliever = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 1);
-    endGame();
+    endGame("", { delay: false });
     const threatLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11317,7 +11344,7 @@ const pitcherSaveRecordState = JSON.parse(runInGame(
     changePitcher("away", noSaveRelieverId);
     const noSaveReliever = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 1);
-    endGame();
+    endGame("", { delay: false });
     const noSaveLines = buildPitcherGameRecordLines("away");
 
     return JSON.stringify({
@@ -11347,7 +11374,7 @@ const pitcherDecisionRecordState = JSON.parse(runInGame(
     const homeStarter = getTeamActivePitcher("home").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 3);
     addRunsToBattingTeam(1);
-    endGame();
+    endGame("", { delay: false });
     const winLossAwayLines = buildPitcherGameRecordLines("away");
     const winLossHomeLines = buildPitcherGameRecordLines("home");
 
@@ -11364,7 +11391,7 @@ const pitcherDecisionRecordState = JSON.parse(runInGame(
     const finalRelieverId = selected.away.pitchers[2].id;
     changePitcher("away", finalRelieverId);
     recordPitcherOuts("away", getTeamActivePitcher("away"), 3);
-    endGame();
+    endGame("", { delay: false });
     const leadHoldLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11380,7 +11407,7 @@ const pitcherDecisionRecordState = JSON.parse(runInGame(
     scores = { away: 3, home: 2 };
     changePitcher("away", selected.away.pitchers[2].id);
     recordPitcherOuts("away", getTeamActivePitcher("away"), 2);
-    endGame();
+    endGame("", { delay: false });
     const tieHoldLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11394,7 +11421,7 @@ const pitcherDecisionRecordState = JSON.parse(runInGame(
     changePitcher("home", selected.home.pitchers[1].id);
     const inheritedReliever = getTeamActivePitcher("home").name;
     addRunsToBattingTeam(1, [selected.home.pitchers[0].id]);
-    endGame();
+    endGame("", { delay: false });
     const inheritedLossLines = buildPitcherGameRecordLines("home");
 
     startGame();
@@ -11409,7 +11436,7 @@ const pitcherDecisionRecordState = JSON.parse(runInGame(
     recordPitcherOuts("away", getTeamActivePitcher("away"), 3);
     changePitcher("away", selected.away.pitchers[2].id);
     scores = { away: 3, home: 4 };
-    endGame();
+    endGame("", { delay: false });
     const losingTeamHoldLines = buildPitcherGameRecordLines("away");
 
     return JSON.stringify({
@@ -11453,7 +11480,7 @@ const fiveInningStarterWinState = JSON.parse(runInGame(
     const shortStarter = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 6);
     addRunsToBattingTeam(1);
-    endGame();
+    endGame("", { delay: false });
     const shortStarterLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11466,7 +11493,7 @@ const fiveInningStarterWinState = JSON.parse(runInGame(
     const qualifiedStarter = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 9);
     addRunsToBattingTeam(1);
-    endGame();
+    endGame("", { delay: false });
     const qualifiedStarterLines = buildPitcherGameRecordLines("away");
 
     return JSON.stringify({ shortStarter, qualifiedStarter, shortStarterLines, qualifiedStarterLines });
@@ -11489,7 +11516,7 @@ const nineInningRulesState = JSON.parse(runInGame(
     const shortStarter = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 12);
     addRunsToBattingTeam(1);
-    endGame();
+    endGame("", { delay: false });
     const shortStarterLines = buildPitcherGameRecordLines("away");
 
     startGame();
@@ -11502,7 +11529,7 @@ const nineInningRulesState = JSON.parse(runInGame(
     const qualifiedStarter = getTeamActivePitcher("away").name;
     recordPitcherOuts("away", getTeamActivePitcher("away"), 15);
     addRunsToBattingTeam(1);
-    endGame();
+    endGame("", { delay: false });
     const qualifiedStarterLines = buildPitcherGameRecordLines("away");
 
     startGame();
