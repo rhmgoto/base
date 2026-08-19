@@ -4423,7 +4423,9 @@ const fenceState = JSON.parse(runInGame(
 
     return JSON.stringify({
       clampedDistance: getFenceDistance(clamped),
+      clampedBoundaryDistance: getFenceBoundaryDistanceForPoint(clamped),
       wallDistance: getFenceDistance(wallBall.target),
+      wallBoundaryDistance: getFenceBoundaryDistanceForPoint(wallBall.target),
       reboundDistance: getFenceDistance(afterWall),
       reboundTravelDistance,
       wallRollDuration,
@@ -4435,14 +4437,73 @@ const fenceState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(fenceState.clampedDistance <= defenseTuningState.fenceDistance - 35, "fielders should stay inside the fence");
-assert(Math.abs(fenceState.wallDistance - defenseTuningState.fenceDistance) < 1, "wall hits should impact the fence");
+assert(fenceState.clampedDistance <= fenceState.clampedBoundaryDistance - 35, "fielders should stay inside the fence");
+assert(Math.abs(fenceState.wallDistance - fenceState.wallBoundaryDistance) < 1, "wall hits should impact the fence");
 assert(fenceState.reboundDistance < fenceState.wallDistance, "wall hits should bounce back into the field");
 assert(fenceState.reboundTravelDistance <= 235, "wall hits should rebound only a short distance");
 assert(fenceState.wallRollDuration >= 1.8, "wall-hit rebounds should roll slowly after impact");
 assert(fenceState.rollerGroundRuleDouble === false, "balls rolling to the fence should remain in play");
 assert(fenceState.rollerNeedsThrow === true, "balls rolling to the fence should be fielded and thrown");
 assert(fenceState.boundaryKind === undefined, "balls rolling to the fence should not become ground-rule doubles");
+
+const fireworksFenceGeometryState = JSON.parse(runInGame(
+  context,
+  `(() => {
+    const previousStadium = currentStadiumId;
+    applyStadiumPreset("fireworks");
+    const center = getFenceCenter();
+    const centerHit = getFenceIntersectionFromPoint(center, normalize({ x: 0, y: -1 }));
+    const leftHit = getFenceIntersectionFromPoint(center, normalize({ x: -1, y: -1 }));
+    const rightHit = getFenceIntersectionFromPoint(center, normalize({ x: 1, y: -1 }));
+    const nearLineHit = getFenceIntersectionFromPoint(center, normalize({ x: Math.tan(degreesToRadians(54)), y: -1 }));
+    const battedBallOrigin = { x: field.plateX, y: field.plateY - 10 };
+    const battedLeftHit = getFenceIntersectionFromPoint(
+      battedBallOrigin,
+      normalize({ x: -Math.tan(degreesToRadians(54)), y: -1 })
+    );
+    const battedRightHit = getFenceIntersectionFromPoint(
+      battedBallOrigin,
+      normalize({ x: Math.tan(degreesToRadians(54)), y: -1 })
+    );
+    const outsideNearLine = {
+      x: center.x + Math.tan(degreesToRadians(54)) * nearLineHit.travelDistance * 0.8,
+      y: center.y - nearLineHit.travelDistance * 0.8
+    };
+    const clampedNearLine = clampPointInsideFence(outsideNearLine, 36);
+    const clampedNearLineBoundary = getFenceBoundaryDistanceForPoint(clampedNearLine);
+    applyStadiumPreset("aozora");
+    const circularHit = getFenceIntersectionFromPoint(getFenceCenter(), normalize({ x: 1, y: -1 }));
+    const circularFenceDistance = defenseField.fenceDistance;
+    applyStadiumPreset(previousStadium);
+    return JSON.stringify({
+      pointCount: fireworksDefenseBackgroundLayout.fenceSourcePoints.length,
+      centerDistance: centerHit.travelDistance,
+      leftDistance: leftHit.travelDistance,
+      rightDistance: rightHit.travelDistance,
+      nearLineDistance: nearLineHit.travelDistance,
+      battedLeftUsesSampledFence: Number.isInteger(battedLeftHit.segmentIndex),
+      battedRightUsesSampledFence: Number.isInteger(battedRightHit.segmentIndex),
+      battedLineDistanceDifference: Math.abs(battedLeftHit.travelDistance - battedRightHit.travelDistance),
+      fenceHeight: centerHit.fenceHeight,
+      expectedFenceHeight: stadiumPresets.fireworks.fenceHeight,
+      clampedNearLineDistance: getFenceDistance(clampedNearLine),
+      clampedNearLineBoundary,
+      circularDistance: circularHit.travelDistance,
+      circularFenceDistance
+    });
+  })()`
+));
+
+assert(fireworksFenceGeometryState.pointCount === 23, "the fireworks stadium should use all sampled background-fence points");
+assert(Math.abs(fireworksFenceGeometryState.centerDistance - defenseTuningState.fenceDistance) < 10, "the sampled center fence should stay aligned with the previous center-field distance");
+assert(Math.abs(fireworksFenceGeometryState.leftDistance - fireworksFenceGeometryState.rightDistance) < 18, "the sampled left-center and right-center fence distances should remain visually symmetric");
+assert(fireworksFenceGeometryState.nearLineDistance > fireworksFenceGeometryState.centerDistance * 1.25, "the near-line collision boundary should follow the wider painted fence arc");
+assert(fireworksFenceGeometryState.battedLeftUsesSampledFence, "left-field batted balls should intersect the sampled background fence");
+assert(fireworksFenceGeometryState.battedRightUsesSampledFence, "right-field batted balls should intersect the sampled background fence");
+assert(fireworksFenceGeometryState.battedLineDistanceDifference < 18, "line-side batted-ball fence distances should remain visually symmetric");
+assert(Math.abs(fireworksFenceGeometryState.fenceHeight - fireworksFenceGeometryState.expectedFenceHeight) < 0.001, "the sampled fence should carry the stadium's configured wall height");
+assert(fireworksFenceGeometryState.clampedNearLineDistance <= fireworksFenceGeometryState.clampedNearLineBoundary - 35, "fielders should clamp inside the sampled near-line fence");
+assert(Math.abs(fireworksFenceGeometryState.circularDistance - fireworksFenceGeometryState.circularFenceDistance) < 1, "other stadiums should keep their circular fence collision");
 
 const homeRunDistanceVarietyState = JSON.parse(runInGame(
   context,
@@ -5658,6 +5719,7 @@ const variedBattedBallState = JSON.parse(runInGame(
       builtLineEdgeHeight: builtLineEdge.maxHeight,
       builtLineEdgeLandingDistance: builtLineEdge.landingDistance,
       builtLineEdgeDistance: builtLineEdge.distance,
+      builtLineEdgeFenceRoom: getFenceBoundaryDistanceForPoint(builtLineEdge.target) - getFenceDistance(builtLineEdge.target),
       builtLineEdgeRollDistance: Math.hypot(builtLineEdgeRollTarget.x - builtLineEdge.target.x, builtLineEdgeRollTarget.y - builtLineEdge.target.y),
       builtLineEdgeRollDirectionX: Math.sign(builtLineEdgeRollTarget.x - builtLineEdge.target.x) === Math.sign(builtLineEdge.direction.x),
       builtChaseFlag: builtChase.isChaseFly,
@@ -5785,7 +5847,10 @@ assert(variedBattedBallState.builtLineEdgeDirectionX > 0.65, "line-edge balls sh
 assert(variedBattedBallState.builtLineEdgeTrajectory === "liner", "line-edge balls should stay as low liner trajectories");
 assert(variedBattedBallState.builtLineEdgeHeight <= 42, "line-edge liners should stay visibly low instead of becoming high flies");
 assert(variedBattedBallState.builtLineEdgeLandingDistance < variedBattedBallState.builtLineEdgeDistance * 0.9, "line-edge liners should bounce before their final carry distance");
-assert(variedBattedBallState.builtLineEdgeRollDistance >= 360, "line-edge liners should keep rolling naturally after the bounce");
+assert(
+  variedBattedBallState.builtLineEdgeRollDistance >= Math.min(360, Math.max(0, variedBattedBallState.builtLineEdgeFenceRoom - 12)),
+  "line-edge liners should keep rolling naturally after the bounce until they reach the fence"
+);
 assert(variedBattedBallState.builtLineEdgeRollDirectionX === true, "line-edge rolls should continue along the foul-line side");
 assert(variedBattedBallState.builtChaseFlag === true, "chase-fly labels should create chase-fly batted balls");
 assert(variedBattedBallState.builtFenceLinerFlag === true, "fence-liner labels should create low fence-liner batted balls");
@@ -10178,7 +10243,7 @@ const hardGrounderFenceState = JSON.parse(runInGame(
     return JSON.stringify({
       groundRuleDouble: hardGrounder.groundRuleDouble,
       atFence: isAtOutfieldFence(target),
-      targetFieldableInsideFence: defenseField.fenceDistance - getFenceDistance(target) >= outfieldFenceFieldingInset - 1,
+      targetFieldableInsideFence: getFenceBoundaryDistanceForPoint(target) - getFenceDistance(target) >= outfieldFenceFieldingInset - 1,
       needsThrow: throwPlay.needsThrow,
       throwActive: Boolean(throwState)
     });
@@ -10319,7 +10384,10 @@ const outfieldPositionAndRollState = JSON.parse(runInGame(
   `(() => {
     const lineup = getDefensiveLineup("away");
     const outfielders = lineup.filter((fielder) => ["L", "C", "R"].includes(fielder.role));
-    const depths = Object.fromEntries(outfielders.map((fielder) => [fielder.role, getFenceDistance(fielder) / defenseField.fenceDistance]));
+    const depths = Object.fromEntries(outfielders.map((fielder) => [
+      fielder.role,
+      getFenceDistance(fielder) / getFenceBoundaryDistanceForPoint(fielder)
+    ]));
 
     const battedBall = {
       target: { x: field.centerX, y: defenseField.bases.home.y - defenseField.fenceDistance * 0.18 },

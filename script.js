@@ -1161,6 +1161,41 @@ const defenseRangeTuning = {
   difficultCatchFieldingChance: 0.084
 };
 
+// 大花火球場の背景画像で、芝とフェンスが接する位置を5度刻みで採取した点列。
+// 描画と判定で同じ画像座標を使うことで、画像の拡大率が変わっても判定線がずれないようにする。
+const fireworksDefenseBackgroundLayout = Object.freeze({
+  sourceFenceRadius: 840,
+  sourceHomeX: 1966,
+  sourceHomeY: 2468,
+  horizontalScaleRatio: 1.12,
+  fenceHeightScale: 1,
+  fenceSourcePoints: Object.freeze([
+    Object.freeze({ x: 1153, y: 1830 }),
+    Object.freeze({ x: 1240, y: 1785 }),
+    Object.freeze({ x: 1323, y: 1748 }),
+    Object.freeze({ x: 1404, y: 1717 }),
+    Object.freeze({ x: 1482, y: 1693 }),
+    Object.freeze({ x: 1557, y: 1675 }),
+    Object.freeze({ x: 1630, y: 1661 }),
+    Object.freeze({ x: 1700, y: 1649 }),
+    Object.freeze({ x: 1768, y: 1641 }),
+    Object.freeze({ x: 1835, y: 1635 }),
+    Object.freeze({ x: 1901, y: 1631 }),
+    Object.freeze({ x: 1966, y: 1630 }),
+    Object.freeze({ x: 2031, y: 1631 }),
+    Object.freeze({ x: 2097, y: 1635 }),
+    Object.freeze({ x: 2164, y: 1639 }),
+    Object.freeze({ x: 2233, y: 1647 }),
+    Object.freeze({ x: 2303, y: 1658 }),
+    Object.freeze({ x: 2377, y: 1671 }),
+    Object.freeze({ x: 2453, y: 1690 }),
+    Object.freeze({ x: 2531, y: 1714 }),
+    Object.freeze({ x: 2612, y: 1744 }),
+    Object.freeze({ x: 2696, y: 1782 }),
+    Object.freeze({ x: 2782, y: 1828 })
+  ])
+});
+
 // グラブが届く高さ (メートル)。ジャンプして捕る分を含めた上限。
 // 以前は 124 ユニット (約7m) を固定で使っていて、頭上はるか上を通過する打球まで
 // 「捕球円に入った」と判定されていた。マウンド付近を通るだけの外野への飛球を投手が
@@ -1180,17 +1215,19 @@ function outfielderStartPoint(side, depthRatio = outfieldStartDepthRatio) {
   const center = defenseField.bases.home;
   const angle = side === "L" ? -132 : side === "R" ? -48 : -90;
   const radians = degreesToRadians(angle);
+  const direction = { x: Math.cos(radians), y: Math.sin(radians) };
   const activeDepthRatio = getCurrentStadium().hasRiver && getCurrentStadium().riverInPlay === false
     ? Math.min(depthRatio, 0.9)
     : depthRatio;
   const centerFenceMeters = Number.isFinite(getCurrentStadium().centerFenceMeters)
     ? getCurrentStadium().centerFenceMeters
     : realFieldMetrics.centerFieldFenceMeters;
-  const forwardUnits = 3 / Math.max(0.001, centerFenceMeters / Math.max(1, defenseField.fenceDistance));
-  const depth = Math.max(0, defenseField.fenceDistance * activeDepthRatio - forwardUnits);
+  const activeFenceDistance = getFenceTravelDistanceForDirection(direction);
+  const forwardUnits = 3 / Math.max(0.001, centerFenceMeters / Math.max(1, activeFenceDistance));
+  const depth = Math.max(0, activeFenceDistance * activeDepthRatio - forwardUnits);
   return clampOutfielderBeyondRiversideRiver(clampPointInsideFence({
-    x: center.x + Math.cos(radians) * depth,
-    y: center.y + Math.sin(radians) * depth
+    x: center.x + direction.x * depth,
+    y: center.y + direction.y * depth
   }, 42), side);
 }
 
@@ -1211,9 +1248,10 @@ function infielderStartPoint(role) {
 }
 
 function getFieldUnitsForMeters(meters, direction = { x: 0, y: -1 }) {
+  const fenceTravelDistance = getFenceTravelDistanceForDirection(direction);
   const metersPerUnit = getMetersPerBattedBallFieldUnit({
     direction,
-    fenceTravelDistance: defenseField.fenceDistance
+    fenceTravelDistance
   });
   return meters / Math.max(0.001, metersPerUnit);
 }
@@ -11773,7 +11811,9 @@ function isForceEligibleBattedBall(battedBall, outcome = null) {
 }
 
 function isAtOutfieldFence(point, tolerance = outfieldFenceFieldingInset + 4) {
-  return point && point.y < getFenceCenter().y && getFenceDistance(point) >= defenseField.fenceDistance - tolerance;
+  return point
+    && point.y < getFenceCenter().y
+    && getFenceDistance(point) >= getFenceBoundaryDistanceForPoint(point) - tolerance;
 }
 
 function setBatterRunnerDestination(runner, targetBase) {
@@ -13093,7 +13133,9 @@ function getLineEdgeRollTarget(battedBall, outcome = {}) {
   const lineCarry = Math.abs(battedBall.direction?.x ?? 0);
   const powerRoll = clamp((battedBall.power ?? 0.82) - 0.72, 0, 0.42) * 520;
   const lineRoll = lineCarry * 180;
-  const rollDistance = clamp(randomBetween(extraBaseRoll ? 580 : 420, extraBaseRoll ? 1080 : 780) + powerRoll + lineRoll, 430, 1280);
+  const directionalScale = getDirectionalFieldScale(battedBall.direction || { x: 0, y: -1 });
+  const rollDistance = clamp(randomBetween(extraBaseRoll ? 580 : 420, extraBaseRoll ? 1080 : 780) + powerRoll + lineRoll, 430, 1280)
+    * directionalScale;
   const projectedTarget = {
     x: battedBall.target.x + battedBall.direction.x * rollDistance,
     y: battedBall.target.y + battedBall.direction.y * rollDistance
@@ -13185,7 +13227,7 @@ function shouldBounceIntoStands(battedBall, projectedTarget) {
 
 function getOutfieldFenceOvershoot(point) {
   if (!isPastOutfieldFence(point)) return 0;
-  return getFenceDistance(point) - defenseField.fenceDistance;
+  return getFenceDistance(point) - getFenceBoundaryDistanceForPoint(point);
 }
 
 function isOutfieldGrounderOrLiner(battedBall) {
@@ -13215,6 +13257,86 @@ function getFenceCenter() {
 function getFenceDistance(point) {
   const center = getFenceCenter();
   return Math.hypot(point.x - center.x, point.y - center.y);
+}
+
+function getFireworksDefenseBackgroundTransform() {
+  const layout = fireworksDefenseBackgroundLayout;
+  const verticalScale = defenseField.fenceDistance / layout.sourceFenceRadius;
+  return {
+    verticalScale,
+    horizontalScale: verticalScale * layout.horizontalScaleRatio,
+    home: getFenceCenter()
+  };
+}
+
+function getActiveFencePolyline() {
+  if (getCurrentStadium().id !== "fireworks") return null;
+  const layout = fireworksDefenseBackgroundLayout;
+  const transform = getFireworksDefenseBackgroundTransform();
+  return layout.fenceSourcePoints.map((point) => ({
+    x: transform.home.x + (point.x - layout.sourceHomeX) * transform.horizontalScale,
+    y: transform.home.y + (point.y - layout.sourceHomeY) * transform.verticalScale,
+    fenceHeight: defenseField.fenceHeight * layout.fenceHeightScale
+  }));
+}
+
+function crossFenceVectors2d(a, b) {
+  return a.x * b.y - a.y * b.x;
+}
+
+function getPolylineFenceIntersection(origin, direction, points = getActiveFencePolyline()) {
+  if (!points || points.length < 2) return null;
+  let nearest = null;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const segment = { x: end.x - start.x, y: end.y - start.y };
+    const denominator = crossFenceVectors2d(direction, segment);
+    if (Math.abs(denominator) < 0.000001) continue;
+    const offset = { x: start.x - origin.x, y: start.y - origin.y };
+    const travelDistance = crossFenceVectors2d(offset, segment) / denominator;
+    const segmentRatio = crossFenceVectors2d(offset, direction) / denominator;
+    if (travelDistance <= 0 || segmentRatio < -0.000001 || segmentRatio > 1.000001) continue;
+    if (nearest && travelDistance >= nearest.travelDistance) continue;
+    const segmentLength = Math.hypot(segment.x, segment.y) || 1;
+    const normal = { x: -segment.y / segmentLength, y: segment.x / segmentLength };
+    nearest = {
+      point: {
+        x: origin.x + direction.x * travelDistance,
+        y: origin.y + direction.y * travelDistance
+      },
+      travelDistance,
+      segmentIndex: index,
+      segmentRatio,
+      normal,
+      fenceHeight: start.fenceHeight + (end.fenceHeight - start.fenceHeight) * segmentRatio
+    };
+  }
+  return nearest;
+}
+
+function getFenceBoundaryIntersectionForDirection(direction) {
+  const length = Math.hypot(direction.x, direction.y) || 1;
+  const normalized = { x: direction.x / length, y: direction.y / length };
+  return getPolylineFenceIntersection(getFenceCenter(), normalized);
+}
+
+function getFenceBoundaryDistanceForPoint(point) {
+  const center = getFenceCenter();
+  const direction = { x: point.x - center.x, y: point.y - center.y };
+  const intersection = getFenceBoundaryIntersectionForDirection(direction);
+  return intersection?.travelDistance ?? defenseField.fenceDistance;
+}
+
+function getFenceTravelDistanceForDirection(direction, origin = getFenceCenter()) {
+  const length = Math.hypot(direction.x, direction.y) || 1;
+  const normalized = { x: direction.x / length, y: direction.y / length };
+  return getFenceIntersectionFromPoint(origin, normalized)?.travelDistance ?? defenseField.fenceDistance;
+}
+
+function getDirectionalFieldScale(direction) {
+  if (getCurrentStadium().id !== "fireworks") return 1;
+  return getFenceTravelDistanceForDirection(direction) / Math.max(1, defenseField.fenceDistance);
 }
 
 function getRiversideRiverDistanceForMeters(meters) {
@@ -13295,14 +13417,15 @@ function clampFielderOutsideRiversideRiver(point, role = "") {
 }
 
 function isPastOutfieldFence(point) {
-  return point.y < getFenceCenter().y && getFenceDistance(point) > defenseField.fenceDistance;
+  return point.y < getFenceCenter().y && getFenceDistance(point) > getFenceBoundaryDistanceForPoint(point);
 }
 
 function clampPointInsideFence(point, inset = 0) {
   if (!isPastOutfieldFence(point)) return { ...point };
   const center = getFenceCenter();
   const distance = getFenceDistance(point) || 1;
-  const scale = Math.max(0, defenseField.fenceDistance - inset) / distance;
+  const boundaryDistance = getFenceBoundaryDistanceForPoint(point);
+  const scale = Math.max(0, boundaryDistance - inset) / distance;
   return {
     x: center.x + (point.x - center.x) * scale,
     y: center.y + (point.y - center.y) * scale
@@ -13315,6 +13438,8 @@ function clampFielderInsideFence(fielder) {
 }
 
 function getFenceIntersectionFromPoint(origin, direction) {
+  const polylineIntersection = getPolylineFenceIntersection(origin, direction);
+  if (polylineIntersection) return polylineIntersection;
   const center = getFenceCenter();
   const dx = direction.x;
   const dy = direction.y;
@@ -13334,7 +13459,7 @@ function getFenceIntersectionFromPoint(origin, direction) {
     y: origin.y + dy * travelDistance
   };
   if (point.y >= center.y) return null;
-  return { point, travelDistance };
+  return { point, travelDistance, fenceHeight: defenseField.fenceHeight };
 }
 
 function buildBattedBall(power, direction, label, battedProfile = null) {
@@ -13476,6 +13601,10 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const fairDeepFlight = !isGrounder && isFairDirection(direction);
   const fenceIntersection = isFairDirection(direction) ? getFenceIntersectionFromPoint(origin, direction) : null;
   const fenceTravelDistance = fenceIntersection?.travelDistance ?? fenceDistance;
+  if (fenceIntersection && getCurrentStadium().id === "fireworks") {
+    distance *= getDirectionalFieldScale(direction);
+  }
+  const activeFenceHeight = fenceIntersection?.fenceHeight ?? defenseField.fenceHeight;
   const forceUnifiedWallHit = Boolean(battedProfile?.unifiedForceWallHit && fairDeepFlight && fenceIntersection);
   if (forceUnifiedWallHit) {
     distance = Math.max(distance, fenceTravelDistance + 18);
@@ -13620,7 +13749,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     ? randomBetween(116, 206) + Math.max(0, power - 1.18) * 340
     : getBattedBallMaxHeight(trajectory, power, possibleHomerFlightDistance) * (isRoutineFly || isChaseFly || isDeepDrive ? bigOutfieldFlyHeightScale : 1);
   if (forceUnifiedWallHit) {
-    possibleHomerHeight = Math.min(possibleHomerHeight, defenseField.fenceHeight * 0.88);
+    possibleHomerHeight = Math.min(possibleHomerHeight, activeFenceHeight * 0.88);
   }
   if (!isFenceLiner && !isLiner) {
     const homerQuality = getHomeRunQuality({ contactScore, profileExitVelocity, power });
@@ -13644,7 +13773,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   });
   const clearanceMeters = possibleHomerMeters - fenceMeters;
   const clearsFenceNaturally = possibleFenceOver
-    && heightAtFence >= defenseField.fenceHeight;
+    && heightAtFence >= activeFenceHeight;
   const possibleWallHit = clearsFenceNaturally
     && Math.random() < getNaturalFenceWallHitChance({
       powerProfile: batterHomeRunPower,
@@ -13737,7 +13866,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
     // その場に立っている投手の捕球円に引っかかっていた。
     : isSoftDrop ? clamp(56 + Math.max(0, landingDistance - 620) * 0.14, 56, 210)
     : getBattedBallMaxHeight(trajectory, power, flightDistance) * (trajectory === "fly" ? 1.32 : 1);
-  const wallImpactHeight = wallHit ? clamp(heightAtFence || 74 + (power - 0.75) * 88, 18, defenseField.fenceHeight - 8) : 0;
+  const wallImpactHeight = wallHit ? clamp(heightAtFence || 74 + (power - 0.75) * 88, 18, activeFenceHeight - 8) : 0;
   const rawTarget = {
     x: origin.x + direction.x * flightDistance,
     y: origin.y + direction.y * flightDistance
@@ -13753,10 +13882,20 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   if (riverEntryPoint) {
     groundRuleDouble = true;
   }
+  const wallReboundDirection = wallHit && fenceIntersection?.normal
+    ? (() => {
+        const normal = fenceIntersection.normal;
+        const dot = direction.x * normal.x + direction.y * normal.y;
+        return normalize({
+          x: direction.x - 2 * dot * normal.x,
+          y: direction.y - 2 * dot * normal.y
+        });
+      })()
+    : { x: -direction.x, y: -direction.y };
   const wallReboundTarget = wallHit
     ? clampPointInsideFence({
-        x: target.x - direction.x * getWallReboundDistance(power),
-        y: target.y - direction.y * getWallReboundDistance(power)
+        x: target.x + wallReboundDirection.x * getWallReboundDistance(power),
+        y: target.y + wallReboundDirection.y * getWallReboundDistance(power)
       }, 42)
     : null;
   const lowGravityTimeScale = !isGrounder && !isBunt ? (getCurrentStadium().lowGravityTimeScale ?? 1) : 1;
@@ -20406,18 +20545,14 @@ function drawFireworksDefenseBackground(stadium = getCurrentStadium()) {
 
   // The expanded background keeps the detailed field at its original scale,
   // with extra sky and side scenery for the out-of-stadium homer camera.
-  const sourceFenceRadius = 840;
-  const sourceHomeX = 1966;
-  const sourceHomeY = 2468;
-  const verticalScale = defenseField.fenceDistance / sourceFenceRadius;
-  const horizontalScale = verticalScale * 1.12;
-  const home = defenseField.bases.home;
+  const layout = fireworksDefenseBackgroundLayout;
+  const { verticalScale, horizontalScale, home } = getFireworksDefenseBackgroundTransform();
   const drawWidth = fireworksDefenseBackground.naturalWidth * horizontalScale;
   const drawHeight = fireworksDefenseBackground.naturalHeight * verticalScale;
   ctx.drawImage(
     fireworksDefenseBackground,
-    home.x - sourceHomeX * horizontalScale,
-    home.y - sourceHomeY * verticalScale,
+    home.x - layout.sourceHomeX * horizontalScale,
+    home.y - layout.sourceHomeY * verticalScale,
     drawWidth,
     drawHeight
   );
