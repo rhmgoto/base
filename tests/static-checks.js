@@ -257,15 +257,22 @@ assertIncludesAll(
 assertIncludesAll(
   html,
   [
-    "<option value=\"homeRunVision\">ホームランヴィジョンフィールド</option>",
-    "<option value=\"mStadium\">Mスタジアム</option>",
-    "<option value=\"shiokaze\">潮風球場</option>"
+    "<option value=\"fireworks\" selected>大花火スタジアム</option>",
+    "<option value=\"hyperOcean\">ハイパーオーシャンパーク</option>",
+    "<option value=\"riverside\">リバーサイドパーク</option>",
+    "<option value=\"spaceStadium\">スペーススタジアム</option>",
+    "<option value=\"nextDome\">ネクストドーム</option>"
   ],
-  "index.html home run vision field option"
+  "index.html visible stadium options"
 );
 
 assert(!html.includes("spectatorModeButton"), "index.html should no longer expose spectator mode");
 assert(!html.includes("value=\"xStadium\""), "X Stadium should stay hidden from the normal stadium selector");
+assert(!html.includes("value=\"homeRunVision\""), "Home Run Vision Field should stay hidden from the normal stadium selector");
+assert(!html.includes("value=\"mStadium\""), "M Stadium should stay hidden from the normal stadium selector");
+assert(!html.includes("value=\"aozora\""), "Aozora Ground should stay hidden from the normal stadium selector");
+assert(!html.includes("value=\"shiokaze\""), "Shiokaze Stadium should stay hidden from the normal stadium selector");
+assert(!html.includes("value=\"americanRoyal\""), "American Royal Park should stay hidden from the normal stadium selector");
 assert(!script.includes("startSpectatorMode"), "script.js should no longer include spectator mode startup");
 assert(!script.includes('gamePhase === "spectator"'), "script.js should no longer route through spectator mode");
 

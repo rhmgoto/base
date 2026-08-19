@@ -1019,6 +1019,11 @@ const defenseRollTuning = {
   distanceScale: 2.25,
   grounderScale: 1.5,
   outfieldGrounderLinerScale: 1.95,
+  exitSpeedReferenceKmh: 145,
+  minimumEndSpeedRatio: 0.1,
+  hardEndSpeedRatio: 0.24,
+  slowRollTimeScale: 1.18,
+  hardRollTimeScale: 0.94,
   frontDropRollMin: 115,
   frontDropRollMax: 260,
   frontFlyDropRollMin: 135,
@@ -12448,9 +12453,13 @@ function getDefenseFieldingTarget(battedBall, outcome) {
     ? defenseRollTuning.outfieldGrounderLinerScale
     : 1;
   const grounderRollScale = battedBall.isGrounder ? defenseRollTuning.grounderScale : 1;
+  const rollSpeedRatio = getBattedBallRollSpeedRatio(battedBall);
+  const rollSpeedDistanceScale = hardGrounder
+    ? lerp(0.92, 1.18, rollSpeedRatio)
+    : lerp(0.72, 1.24, rollSpeedRatio);
   const rollDistance = hardGrounder
-    ? clamp(scaledRollDistance * grounderRollScale * outfieldRollScale * hardGrounderTuning.rollDistanceScale, hardGrounderTuning.rollMinDistance, hardGrounderTuning.rollMaxDistance * grounderRollScale * outfieldRollScale)
-    : scaledRollDistance * grounderRollScale * outfieldRollScale;
+    ? clamp(scaledRollDistance * grounderRollScale * outfieldRollScale * hardGrounderTuning.rollDistanceScale * rollSpeedDistanceScale, hardGrounderTuning.rollMinDistance, hardGrounderTuning.rollMaxDistance * grounderRollScale * outfieldRollScale)
+    : scaledRollDistance * grounderRollScale * outfieldRollScale * rollSpeedDistanceScale;
   const projectedTarget = {
     x: battedBall.target.x + battedBall.direction.x * rollDistance,
     y: battedBall.target.y + battedBall.direction.y * rollDistance
@@ -15478,12 +15487,14 @@ function getDefenseBallPoint(progress, eased, elapsedSeconds = 0) {
 function getGrounderContinuousRollDuration(battedBall, landing, target) {
   const firstHopSeconds = Math.max(0.1, battedBall?.ballTime ?? 0.45);
   const rollSeconds = getDefenseRollDuration(battedBall, landing, target);
-  return Math.max(0.35, firstHopSeconds + rollSeconds * 0.86);
+  const speedRatio = getBattedBallRollSpeedRatio(battedBall);
+  const postBounceBlend = lerp(0.94, 0.8, speedRatio);
+  return Math.max(0.5, firstHopSeconds + rollSeconds * postBounceBlend);
 }
 
-function getGrounderContinuousRollProgress(progress) {
+function getGrounderContinuousRollProgress(progress, battedBall = defenseState.battedBall) {
   const t = clamp(progress, 0, 1);
-  return 1 - Math.pow(1 - t, 1.85);
+  return getNaturalRollingProgress(t, battedBall);
 }
 
 function getPostLandingHoldSeconds(battedBall) {
@@ -15506,24 +15517,43 @@ function shouldResetTrailAtLanding(elapsedSeconds) {
 function getRollingEaseProgress(progress, battedBall = defenseState.battedBall) {
   const t = clamp(progress, 0, 1);
   if (isDeepDriveFrontLandingBall(battedBall)) {
-    return getSmoothPostLandingRollProgress(t, 1.62, 1.06);
+    return getNaturalRollingProgress(t, battedBall, 0.18);
   }
   if (isOutfieldFrontLandingBall(battedBall)) {
     return getSoftOutfieldDropRollProgress(t);
   }
-  const exponent = isHardGrounder(battedBall) ? 1.82 : 1.72;
-  const startExponent = isHardGrounder(battedBall) ? 0.96 : 1.12;
-  return getSmoothPostLandingRollProgress(t, exponent, startExponent);
+  return getNaturalRollingProgress(t, battedBall);
 }
 
 function getSoftOutfieldDropRollProgress(progress) {
   const t = clamp(progress, 0, 1);
-  return 1 - Math.pow(1 - Math.pow(t, 1.25), 1.55);
+  return getNaturalRollingProgress(Math.pow(t, 1.08), defenseState.battedBall, 0.08);
 }
 
 function getSmoothPostLandingRollProgress(progress, easeOutExponent = 1.72, startExponent = 1.12) {
   const t = clamp(progress, 0, 1);
   return 1 - Math.pow(1 - Math.pow(t, startExponent), easeOutExponent);
+}
+
+function getBattedBallRollSpeedRatio(battedBall) {
+  const powerRatio = clamp(battedBall?.power ?? 0.55, 0, 1.35) / 1.35;
+  const exitSpeedRatio = Number.isFinite(battedBall?.exitSpeedKmh)
+    ? clamp(battedBall.exitSpeedKmh / defenseRollTuning.exitSpeedReferenceKmh, 0.25, 1.25)
+    : powerRatio;
+  return clamp(powerRatio * 0.42 + exitSpeedRatio * 0.58, 0, 1);
+}
+
+function getNaturalRollingProgress(progress, battedBall = defenseState.battedBall, minimumEndSpeedRatio = null) {
+  const t = clamp(progress, 0, 1);
+  const speedRatio = getBattedBallRollSpeedRatio(battedBall);
+  const endSpeedRatio = minimumEndSpeedRatio ?? lerp(
+    defenseRollTuning.minimumEndSpeedRatio,
+    defenseRollTuning.hardEndSpeedRatio,
+    speedRatio
+  );
+  const constantFrictionDistance = ((2 * t) - (1 - endSpeedRatio) * t * t) / (1 + endSpeedRatio);
+  const finishEase = t < 0.86 ? 0 : Math.pow((t - 0.86) / 0.14, 2) * 0.035;
+  return clamp(constantFrictionDistance * (1 - finishEase) + t * finishEase, 0, 1);
 }
 
 function getDefenseRollDuration(battedBall, landing, target) {
@@ -15546,10 +15576,11 @@ function getDefenseRollDuration(battedBall, landing, target) {
     ? clamp(0.82 + (battedBall?.power ?? 1.1) * 0.14, 0.92, 1.18)
     : isOutfieldFrontLandingBall(battedBall)
     ? clamp(0.68 + (battedBall?.power ?? 0.6) * 0.14, 0.68, 0.86)
-    : battedBall?.power ? clamp(0.72 + battedBall.power * 0.18, 0.72, 0.96) : 0.82;
+    : lerp(0.72, 1.04, getBattedBallRollSpeedRatio(battedBall));
+  const timeScale = lerp(defenseRollTuning.slowRollTimeScale, defenseRollTuning.hardRollTimeScale, getBattedBallRollSpeedRatio(battedBall));
   const minSeconds = isDeepDriveFrontLandingBall(battedBall) ? 1.25 : isOutfieldFrontLandingBall(battedBall) ? 1.35 : 1.15;
-  const maxSeconds = isDeepDriveFrontLandingBall(battedBall) ? 4.2 : isOutfieldFrontLandingBall(battedBall) ? 4.8 : 8.4;
-  return clamp(rollDistance / (baseSpeed * battedBallPaceMultiplier * powerFactor), minSeconds, maxSeconds);
+  const maxSeconds = isDeepDriveFrontLandingBall(battedBall) ? 4.6 : isOutfieldFrontLandingBall(battedBall) ? 5.2 : 9.2;
+  return clamp(rollDistance / (baseSpeed * battedBallPaceMultiplier * powerFactor) * timeScale, minSeconds, maxSeconds);
 }
 
 function getDefenseRollProgress(elapsedSeconds, ballTime) {
@@ -21456,9 +21487,7 @@ function drawBall() {
     ctx.globalAlpha = 1;
     return;
   }
-  const pitch = pitchTypes[currentPitchType];
-  if (currentPitchType === "special") drawSpecialPitchGlow(ball.x, ball.y, ball.radius);
-  drawBaseballIcon(ball.x, ball.y, ball.radius, pitch ? pitch.color : "#ffffff", ball.spin);
+  drawBaseballIcon(ball.x, ball.y, ball.radius, "#ffffff", ball.spin);
   ctx.globalAlpha = 1;
 }
 
@@ -21482,17 +21511,90 @@ function drawSpecialPitchGlow(x, y, radius = ball.radius) {
 }
 
 function drawBaseballIcon(x, y, radius = ball.radius, fill = "#ffffff", spin = ball.spin) {
-  ctx.fillStyle = fill;
+  const leatherGradient = ctx.createRadialGradient(
+    x - radius * 0.35,
+    y - radius * 0.42,
+    radius * 0.2,
+    x,
+    y,
+    radius * 1.15
+  );
+  leatherGradient.addColorStop(0, "#ffffff");
+  leatherGradient.addColorStop(0.48, fill);
+  leatherGradient.addColorStop(0.82, "#e8e6df");
+  leatherGradient.addColorStop(1, "#cfcac0");
+  ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.beginPath();
+  ctx.ellipse(x + radius * 0.12, y + radius * 0.2, radius * 0.88, radius * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = leatherGradient;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#bf4331";
-  ctx.lineWidth = Math.max(1.4, radius * 0.22);
-  const seam = Math.sin(spin) * Math.min(3, radius * 0.38);
-  const seamX = radius * 0.5;
-  const seamY = radius * 0.25;
-  drawLine(x - seamX, y - seamY + seam, x + seamX, y + seamY - seam);
-  drawLine(x - seamX, y + seamY - seam, x + seamX, y - seamY + seam);
+  ctx.strokeStyle = "rgba(62, 55, 48, 0.28)";
+  ctx.lineWidth = Math.max(0.8, radius * 0.08);
+  ctx.beginPath();
+  ctx.arc(x, y, radius - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius - 0.25, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(spin * 0.22) * 0.18);
+  ctx.translate(-x, -y);
+  const seamShift = Math.sin(spin) * Math.min(2.2, radius * 0.22);
+  const seamWidth = radius * 0.78;
+  const seamHeight = radius * 0.58;
+  const topY = y - radius * 0.34 + seamShift;
+  const bottomY = y + radius * 0.34 - seamShift;
+  ctx.strokeStyle = "#9e1f2d";
+  ctx.lineWidth = Math.max(1.3, radius * 0.16);
+  ctx.lineCap = "round";
+  drawBaseballSeamCurve(x, topY, seamWidth, seamHeight, -1);
+  drawBaseballSeamCurve(x, bottomY, seamWidth, seamHeight, 1);
+  ctx.strokeStyle = "#cf2e3a";
+  ctx.lineWidth = Math.max(0.7, radius * 0.08);
+  drawBaseballStitches(x, topY, seamWidth, seamHeight, -1, radius);
+  drawBaseballStitches(x, bottomY, seamWidth, seamHeight, 1, radius);
+  ctx.fillStyle = "rgba(22, 38, 70, 0.52)";
+  ctx.font = `700 ${Math.max(4, radius * 0.28)}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("OFFICIAL", x, y - radius * 0.05);
+  ctx.font = `700 ${Math.max(3, radius * 0.2)}px sans-serif`;
+  ctx.fillText("BASEBALL", x, y + radius * 0.2);
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.beginPath();
+  ctx.ellipse(x - radius * 0.28, y - radius * 0.36, radius * 0.28, radius * 0.16, -0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBaseballSeamCurve(x, y, width, height, direction) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, width, height, direction * 0.12, Math.PI * 0.08, Math.PI * 0.92);
+  ctx.stroke();
+}
+
+function drawBaseballStitches(x, y, width, height, direction, radius) {
+  const count = Math.max(6, Math.floor(radius * 1.35));
+  const stitchLength = Math.max(3.2, radius * 0.34);
+  for (let index = 0; index <= count; index += 1) {
+    const t = 0.12 + (index / count) * 0.76;
+    const angle = Math.PI * t;
+    const sx = x + Math.cos(angle) * width;
+    const sy = y + Math.sin(angle) * height;
+    const tangent = angle + Math.PI / 2;
+    const laceAngle = tangent + direction * 0.88;
+    const dx = Math.cos(laceAngle) * stitchLength;
+    const dy = Math.sin(laceAngle) * stitchLength;
+    drawLine(sx - dx * 0.5, sy - dy * 0.5, sx + dx * 0.5, sy + dy * 0.5);
+  }
 }
 
 function drawDefenseBall() {
@@ -22650,6 +22752,10 @@ function batterAngleToCanvasRadians(degreesFromUp) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function lerp(start, end, amount) {
+  return start + (end - start) * clamp(amount, 0, 1);
 }
 
 function randomBetween(min, max) {
