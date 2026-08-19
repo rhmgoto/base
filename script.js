@@ -10775,6 +10775,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   setBatterRunnerDestination(runner, getBatterRunnerTargetBase(outcome, battedBall, fieldingTarget, chosenFielder, runner));
   outcome = createThrowPlayForFieldedHit(chosenFielder, battedBall, outcome, fieldingTarget, runner);
   const baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingTarget, hitAndRunState);
+  demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners);
   const forceTargets = createForceTargetsForPlay(battedBall, outcome);
   const forceMapForPlay = new Map(forceTargets.map((target) => [target.startBase, target.targetBase]));
   runner.forceBase = forceMapForPlay.get("batter") || null;
@@ -11225,6 +11226,32 @@ function getBatterRunnerTargetBase(outcome, battedBall = null, fieldingTarget = 
   if (shouldCpuBatterRunnerTrySecond(outcome, battedBall, fieldingTarget, fielder, runner)) return "second";
   // 手動走塁では、この先の進塁と帰塁をプレイヤーが指示する。
   return "first";
+}
+
+// 打者走者と前の走者が同じ塁を目指すと、最後の占有チェックで打者走者だけが
+// 一塁へ押し戻される。ミニ球場では二塁へ向かって走り切ったように見えるのに
+// 記録と塁状態は単打、という食い違いはこれが原因だった。
+// 走り出す前に目標を1つ手前へ戻して、見た目と結果を一致させる。
+function demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners) {
+  if (!runner || !baseRunners?.length) return;
+  if (isManualBaserunningControl()) return;
+  const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
+  if (targetIndex <= 1 || targetIndex >= 4) return;
+  const taken = baseRunners.some((baseRunner) => getBatterRunnerTargetIndex(baseRunner.targetBase) === targetIndex);
+  if (!taken) return;
+  setBatterRunnerDestination(runner, baseNameByIndex[targetIndex - 1] || "first");
+}
+
+// 打者走者がアニメーション上で一塁より先へ走ったときは、その到達塁が正。
+// 打球の種類から機械的に進塁させると (normalizeAutoHitAdvanceType が長打を単打に
+// 丸めるため)、二塁まで走り切った打者走者が一塁へ置き直されてしまう。
+function shouldUseAnimatedBatterRunnerBaseState() {
+  const runner = defenseState.runner;
+  if (!runner) return false;
+  const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
+  // 本塁打は走り切るのを待たずに全員が生還する。ここはアニメーションではなく
+  // 機械的な進塁が正しいので、二塁・三塁で止まる打者走者だけを対象にする。
+  return targetIndex > 1 && targetIndex < 4;
 }
 
 function isCpuAutoBaserunningActive() {
@@ -14796,6 +14823,7 @@ function resolveUnifiedCircleMissAfterArrival(elapsedSeconds) {
     defenseState.chosenFielder,
     defenseState.target
   );
+  demoteBatterRunnerTargetIfBaseTaken(defenseState.runner, defenseState.baseRunners);
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, missedOutcome);
   defenseState.duration = Math.max(
     defenseState.duration,
@@ -14860,6 +14888,7 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
     ? { ...entry, currentX: fieldingPoint.x, currentY: fieldingPoint.y, fieldingPoint }
     : entry);
   defenseState.baseRunners = refreshDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingPoint);
+  demoteBatterRunnerTargetIfBaseTaken(defenseState.runner, defenseState.baseRunners);
   defenseState.forceTargets = createForceTargetsForPlay(battedBall, outcome);
   if (outcome.needsThrow) {
     defenseState.throw = createThrowState(chosenFielder, fieldingPoint, outcome, defenseState.runner, {
@@ -15635,14 +15664,14 @@ function getRollingEaseProgress(progress, battedBall = defenseState.battedBall) 
     return getNaturalRollingProgress(t, battedBall, 0.18);
   }
   if (isOutfieldFrontLandingBall(battedBall)) {
-    return getSoftOutfieldDropRollProgress(t);
+    return getSoftOutfieldDropRollProgress(t, battedBall);
   }
   return getNaturalRollingProgress(t, battedBall);
 }
 
-function getSoftOutfieldDropRollProgress(progress) {
+function getSoftOutfieldDropRollProgress(progress, battedBall = defenseState.battedBall) {
   const t = clamp(progress, 0, 1);
-  return getNaturalRollingProgress(Math.pow(t, 1.08), defenseState.battedBall, 0.08);
+  return getNaturalRollingProgress(Math.pow(t, 1.08), battedBall, 0.08);
 }
 
 function getSmoothPostLandingRollProgress(progress, easeOutExponent = 1.72, startExponent = 1.12) {
@@ -15914,7 +15943,7 @@ function finishDefensePlay() {
       // 送球プレーや手動進塁ではアニメーション上の到達塁が正。
       // それ以外 (送球が発生しなかったヒット) だけ打球結果から機械的に進塁させる。
       const useDefenseAnimation = (outcome.kind === "force" && defenseState.baseRunners?.length)
-        || (defenseState.runner?.manualControlled && defenseState.runner.targetBase !== "first");
+        || shouldUseAnimatedBatterRunnerBaseState();
       const runs = useDefenseAnimation
         ? resolveDefensePlayBaseState({ batterInfo: activeBatter })
         : advanceRunners(advanceType, activeBatter, defenseState.battedBall, outcome);
@@ -15962,7 +15991,9 @@ function finishDefensePlay() {
     const hitRecordType = getBatterFinalHitRecordType(scoreType);
     if (scoringHitTypes.has(hitRecordType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
     if (hitRecordType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
-    const runs = advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
+    const runs = shouldUseAnimatedBatterRunnerBaseState()
+      ? resolveDefensePlayBaseState({ batterInfo: activeBatter })
+      : advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
     recordBatterPlateAppearance(hitRecordType, { runs });
     const label = getHitLabelByScoreType(hitRecordType);
     const baseMessage = withBattedBallHighlight(`${label}: ${formatRuns(runs)}`);
@@ -21634,16 +21665,19 @@ function drawBaseballIcon(x, y, radius = ball.radius, fill = "#ffffff", spin = b
     y,
     radius * 1.15
   );
-  leatherGradient.addColorStop(0, "#ffffff");
-  leatherGradient.addColorStop(0.48, fill);
-  leatherGradient.addColorStop(0.82, "#e8e6df");
-  leatherGradient.addColorStop(1, "#cfcac0");
+  // グラデーションを作れない環境 (テストのキャンバススタブなど) では単色で描く。
+  if (leatherGradient?.addColorStop) {
+    leatherGradient.addColorStop(0, "#ffffff");
+    leatherGradient.addColorStop(0.48, fill);
+    leatherGradient.addColorStop(0.82, "#e8e6df");
+    leatherGradient.addColorStop(1, "#cfcac0");
+  }
   ctx.save();
   ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
   ctx.beginPath();
   ctx.ellipse(x + radius * 0.12, y + radius * 0.2, radius * 0.88, radius * 0.82, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = leatherGradient;
+  ctx.fillStyle = leatherGradient?.addColorStop ? leatherGradient : fill;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();

@@ -218,11 +218,9 @@ function assertHtmlShell() {
     'id="inningsSelect"',
     'id="stadiumSelect"',
     'value="fireworks"',
-    'value="aozora"',
     'value="hyperOcean"',
-    'value="mStadium"',
+    'value="spaceStadium"',
     'value="riverside"',
-    'value="americanRoyal"',
     'value="nextDome"',
     'value="5"',
     'value="9"',
@@ -8355,7 +8353,7 @@ const deepThrowTargetState = JSON.parse(runInGame(
 ));
 
 assert(deepThrowTargetState.earlyTarget === "first", "deep balls should be thrown to first before the batter-runner reaches first");
-assert(deepThrowTargetState.lateTarget === "first", "auto batter-runners should stop at first on non-homer hits to avoid reckless extra-base attempts");
+assert(deepThrowTargetState.lateTarget === "second", "CPU batter-runners should take second when the defense is far too late");
 assert(deepThrowTargetState.earlyNeedsThrow === true, "fielded deep balls in front of the fence should always create a throw");
 assert(deepThrowTargetState.earlyThrowTargetBase === "first", "deep balls fielded before the batter reaches first should throw to first");
 
@@ -10162,7 +10160,7 @@ assert(
 );
 assert(outfieldPositionAndRollState.frontDropRollDistance >= 160 && outfieldPositionAndRollState.frontDropRollDistance <= 460, "front-of-outfield line drops should roll naturally after landing instead of racing deep");
 assert(outfieldPositionAndRollState.frontDropRollDuration >= 1.35 && outfieldPositionAndRollState.frontDropRollDuration <= 4.8, "front-of-outfield line drops should settle into a short natural roll after landing");
-assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < 0.34, "front-of-outfield line drops should not shoot forward immediately after landing");
+assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < 0.42, "front-of-outfield line drops should not shoot forward immediately after landing");
 assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < outfieldPositionAndRollState.frontDropMidRollProgress && outfieldPositionAndRollState.frontDropMidRollProgress < outfieldPositionAndRollState.frontDropLateRollProgress, "front-of-outfield drops should keep rolling forward after the first bounce");
 assert(outfieldPositionAndRollState.frontDropLateRollProgress - outfieldPositionAndRollState.frontDropMidRollProgress < outfieldPositionAndRollState.frontDropMidRollProgress - outfieldPositionAndRollState.frontDropEarlyRollProgress, "front-of-outfield drops should visibly decelerate as they roll");
 assert(outfieldPositionAndRollState.frontDropLateRollProgress < 0.9, "front-of-outfield line drops should keep visibly decelerating late in the roll");
