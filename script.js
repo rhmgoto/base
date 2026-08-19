@@ -1059,6 +1059,17 @@ const defenseThrowResultHoldSeconds = 2.0;
 const runnerSpeedScale = 0.85;
 const runnerSpeedBaseRun = 3.5;
 const runnerSpeedUnit = 27.84375;
+const cpuExtraBaseRunningTuning = {
+  batterDoubleSafetyMargin: 0.22,
+  runnerScoreSafetyMargin: 0.12,
+  outfieldHitDepthRatio: 0.42,
+  deepOutfieldHitDepthRatio: 0.56,
+  minimumBatterDoubleScore: 0.68,
+  minimumSecondRunnerScore: 0.62,
+  lateGameAggressiveBonus: 0.06,
+  trailingAggressiveBonus: 0.07,
+  twoOutAggressiveBonus: 0.04
+};
 // 手動守備で、捕球や送球到達のあと次の送球指示を待つ時間 (秒)。
 // これを過ぎて指示がなければ次のプレーへ進む。
 const manualThrowIdleSeconds = 2;
@@ -10103,10 +10114,13 @@ function endGameIfMercyRuleReached() {
   return true;
 }
 
-function getExtraRunnerAdvance(base, type, runner, battedBall, outcome) {
+function getExtraRunnerAdvance(base, type, runner, battedBall, outcome, fielder = null, fieldingTarget = null) {
   if (!runner || !battedBall || type === "walk" || type === "homer" || type === "triple") return 0;
-  if (!isManualBaserunningControl()) return 0;
-  if (base === 2 && type === "single" && shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome)) return 1;
+  if (!isManualBaserunningControl()) {
+    if (base === 2 && type === "single" && shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome, fielder, fieldingTarget)) return 1;
+    return 0;
+  }
+  if (base === 2 && type === "single" && shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome, fielder, fieldingTarget)) return 1;
   if (base === 1 && type === "single" && shouldRunnerReachThirdFromFirstOnSingle(runner, battedBall, outcome)) return 1;
   if (base === 1 && type === "double" && shouldRunnerScoreFromFirstOnDouble(runner, battedBall, outcome)) return 1;
   return 0;
@@ -10159,7 +10173,7 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const advanceType = battedBall?.groundRuleDouble
     ? "double"
     : manualBaserunning && automaticAdvanceType && !tagUp && !groundOutAdvance ? "single" : automaticAdvanceType;
-  const extraAdvance = manualBaserunning || outcome?.kind === "force" ? 0 : getExtraRunnerAdvance(startBase, advanceType, runnerInfo, battedBall, outcome);
+  const extraAdvance = manualBaserunning ? 0 : getExtraRunnerAdvance(startBase, advanceType, runnerInfo, battedBall, outcome, fielder, fieldingTarget);
   const nextBase = advanceType
     ? Math.min(4, startBase + getBaseAdvanceSteps(advanceType) + (advanceType === "tagup" ? 0 : extraAdvance))
     : startBase;
@@ -10356,7 +10370,8 @@ function getRedistributedFieldingMovementRating(rating) {
   return boosted.boostedRatingOne + ((value - 1) / 9) * (boosted.maxRating - boosted.boostedRatingOne);
 }
 
-function shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome) {
+function shouldRunnerScoreFromSecondOnSingle(runner, battedBall, outcome, fielder = null, fieldingTarget = null) {
+  if (isCpuAutoBaserunningActive()) return shouldCpuRunnerScoreFromSecondOnSingle(runner, battedBall, outcome, fielder, fieldingTarget);
   return getAggressiveRunnerScore(runner, battedBall, outcome) >= 0.66;
 }
 
@@ -10391,6 +10406,28 @@ function getAggressiveRunnerScore(runner, battedBall, outcome) {
     : 0;
   const shortHitPenalty = outcome?.scoreType === "single" && depthRatio < 0.34 ? 0.2 : 0;
   return depthRatio * 0.84 + runnerBoost + ballTimeBoost + trajectoryBoost + powerBoost + fieldingDelayBoost + cleanHitBoost - shortHitPenalty - slowRunnerPenalty;
+}
+
+function shouldCpuRunnerScoreFromSecondOnSingle(runner, battedBall, outcome, fielder = null, fieldingTarget = null) {
+  const activeFielder = fielder || defenseState.chosenFielder;
+  const activeFieldingTarget = fieldingTarget || outcome?.fieldingPoint || defenseState.target || battedBall?.wallReboundTarget || battedBall?.target;
+  if (!isOutfieldHitForExtraBase(outcome, battedBall, activeFieldingTarget, activeFielder)) return false;
+  const runnerArrival = estimateRunnerArrivalFromBaseToTarget(runner, "second", "home");
+  const defenseArrival = estimateDefenseThrowArrivalFromFieldingPoint("home", outcome, battedBall, activeFieldingTarget, activeFielder);
+  if (!Number.isFinite(runnerArrival) || !Number.isFinite(defenseArrival)) return false;
+  const depthRatio = clamp(getFenceDistance(activeFieldingTarget) / Math.max(1, defenseField.fenceDistance), 0, 1);
+  const runScore = clamp((getOpenEndedAbilityRating(runner?.run ?? 5) - 1) / 9, 0, 1);
+  const ballSpeedScore = getBattedBallRollSpeedRatio(battedBall);
+  const score = depthRatio * 0.46
+    + runScore * 0.28
+    + ballSpeedScore * 0.12
+    + getCpuExtraBaseSituationBonus()
+    + (battedBall.wallHit ? 0.14 : 0)
+    + (depthRatio >= cpuExtraBaseRunningTuning.deepOutfieldHitDepthRatio ? 0.1 : 0);
+  const requiredMargin = cpuExtraBaseRunningTuning.runnerScoreSafetyMargin
+    + clamp((5 - getOpenEndedAbilityRating(runner?.run ?? 5)) / 6, 0, 1) * 0.16;
+  return defenseArrival - runnerArrival >= requiredMargin
+    && score >= cpuExtraBaseRunningTuning.minimumSecondRunnerScore;
 }
 
 function makeBaseRunner(player) {
@@ -11185,9 +11222,85 @@ function getBatterRunnerTargetBase(outcome, battedBall = null, fieldingTarget = 
   if (battedBall?.fenceOver || outcome?.scoreType === "homer") return "home";
   if (battedBall?.groundRuleDouble) return "second";
   if (outcome?.targetBase) return outcome.targetBase;
-  // 打者走者は一塁で止める。長打性の当たりでどこまで進むかの自動判断は行わない。
+  if (shouldCpuBatterRunnerTrySecond(outcome, battedBall, fieldingTarget, fielder, runner)) return "second";
   // 手動走塁では、この先の進塁と帰塁をプレイヤーが指示する。
   return "first";
+}
+
+function isCpuAutoBaserunningActive() {
+  return !isManualBaserunningControl();
+}
+
+function isOutfieldHitForExtraBase(outcome, battedBall, fieldingTarget, fielder) {
+  if (!outcome || !battedBall || !fieldingTarget) return false;
+  if (battedBall.fenceOver || battedBall.groundRuleDouble || battedBall.isBunt || outcome.fieldingError) return false;
+  if (!scoringHitTypes.has(outcome.scoreType) && !["single", "double"].includes(outcome.kind)) return false;
+  if (fielder && isInfielderRole(fielder.role)) return false;
+  const depthRatio = clamp(getFenceDistance(fieldingTarget) / Math.max(1, defenseField.fenceDistance), 0, 1);
+  return depthRatio >= cpuExtraBaseRunningTuning.outfieldHitDepthRatio
+    || isOutfieldGrounderOrLiner(battedBall)
+    || isOutfieldFrontLandingBall(battedBall)
+    || isDeepDriveFrontLandingBall(battedBall)
+    || battedBall.isDeep
+    || battedBall.wallHit;
+}
+
+function getCpuExtraBaseSituationBonus() {
+  if (isAnyPracticeMode()) return 0;
+  const opponent = fieldingTeam();
+  const trailingBonus = (scores[battingTeam] || 0) < (scores[opponent] || 0)
+    ? cpuExtraBaseRunningTuning.trailingAggressiveBonus
+    : 0;
+  const lateBonus = inning >= Math.max(1, maxInnings - 1)
+    ? cpuExtraBaseRunningTuning.lateGameAggressiveBonus
+    : 0;
+  const twoOutBonus = count.outs >= 2 ? cpuExtraBaseRunningTuning.twoOutAggressiveBonus : 0;
+  return trailingBonus + lateBonus + twoOutBonus;
+}
+
+function estimateDefenseThrowArrivalFromFieldingPoint(targetBase, outcome, battedBall, fieldingTarget, fielder) {
+  if (!targetBase || !fieldingTarget || !fielder) return null;
+  const destination = getDefenseBasePointByName(targetBase);
+  const throwDistance = Math.hypot(destination.x - fieldingTarget.x, destination.y - fieldingTarget.y);
+  const fieldingTime = getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, fielder);
+  const throwProfile = getThrowProfile(fielder, throwDistance, {
+    targetBase,
+    from: fieldingTarget
+  });
+  return fieldingTime + getAutoThrowSetSeconds(fielder) + throwProfile.throwTime;
+}
+
+function estimateRunnerArrivalFromBaseToTarget(runnerInfo, startBase, targetBase) {
+  const startIndex = startBase === "batter" ? 0 : baseIndexByName[startBase];
+  const targetIndex = getBatterRunnerTargetIndex(targetBase);
+  if (!Number.isFinite(startIndex) || !Number.isFinite(targetIndex) || targetIndex <= startIndex) return null;
+  const route = createBaseRunnerRoute(startIndex, targetIndex);
+  const speed = getDefenseBaseRunnerSpeed(runnerInfo);
+  const distance = getRunnerRouteDistance(route);
+  return speed > 0 ? distance / speed : null;
+}
+
+function shouldCpuBatterRunnerTrySecond(outcome, battedBall, fieldingTarget, fielder, runner) {
+  if (!isCpuAutoBaserunningActive()) return false;
+  if (!isOutfieldHitForExtraBase(outcome, battedBall, fieldingTarget, fielder)) return false;
+  const runnerInfo = runner || activeBatter;
+  const runnerArrival = estimateRunnerArrivalFromBaseToTarget(runnerInfo, "batter", "second");
+  const defenseArrival = estimateDefenseThrowArrivalFromFieldingPoint("second", outcome, battedBall, fieldingTarget, fielder);
+  if (!Number.isFinite(runnerArrival) || !Number.isFinite(defenseArrival)) return false;
+  const fieldingDepthRatio = clamp(getFenceDistance(fieldingTarget) / Math.max(1, defenseField.fenceDistance), 0, 1);
+  const runScore = clamp((getOpenEndedAbilityRating(runnerInfo?.run ?? 5) - 1) / 9, 0, 1);
+  const speedScore = getBattedBallRollSpeedRatio(battedBall);
+  const baseScore = fieldingDepthRatio * 0.42
+    + runScore * 0.26
+    + speedScore * 0.16
+    + getCpuExtraBaseSituationBonus()
+    + (outcome?.scoreType === "double" || outcome?.kind === "double" ? 0.22 : 0)
+    + (battedBall.wallHit ? 0.18 : 0)
+    + (fieldingDepthRatio >= cpuExtraBaseRunningTuning.deepOutfieldHitDepthRatio ? 0.1 : 0);
+  const requiredMargin = cpuExtraBaseRunningTuning.batterDoubleSafetyMargin
+    + clamp((5 - getOpenEndedAbilityRating(runnerInfo?.run ?? 5)) / 6, 0, 1) * 0.18;
+  return defenseArrival - runnerArrival >= requiredMargin
+    && baseScore >= cpuExtraBaseRunningTuning.minimumBatterDoubleScore;
 }
 
 function getFieldingTimeForThrowDecision(outcome, battedBall, fieldingTarget, fielder) {
@@ -11211,6 +11324,7 @@ function createThrowPlayForFieldedHit(fielder, battedBall, outcome, fieldingTarg
     label: `${fielder.role} 送球`,
     caught: true,
     needsThrow: true,
+    fieldingPoint: fieldingTarget,
     fieldingTime: Math.max(
       outcome.fieldingTime ?? battedBall?.ballTime ?? 0,
       getDefenseBallFieldingArrivalTime(battedBall, fieldingTarget),
@@ -12417,6 +12531,7 @@ function resolveGrounderPickupThrow(fielder, battedBall, outcome, fieldingTarget
       caught: true,
       needsThrow: true,
       targetBase,
+      fieldingPoint: fieldingTarget,
       fieldingTime: pickupTime
     }
   };
