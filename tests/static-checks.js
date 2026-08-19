@@ -171,8 +171,7 @@ assertIncludesAll(
     '? "#ff8a83"',
     "drawBaseballIcon(ball.x, ball.y - visualHeightOffset, radius, defenseThrowBallFill)",
     "const trailLength = 44",
-    "if (!isPreparing && !quickThrow)",
-    'ctx.fillText("守備: 左スティック方向 + ボタン2 送球", 34, 824)'
+    "if (!isPreparing && !quickThrow)"
   ],
   "script.js quick and normal throw distinction"
 );
@@ -195,7 +194,7 @@ assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.B)"), "s
 assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.X)"), "screen BTN 3 should not throw");
 const batterRunnerTargetSection = script.slice(
   script.indexOf("function getBatterRunnerTargetBase"),
-  script.indexOf("function shouldUseRunnerPositionForOutfieldThrow")
+  script.indexOf("function getFieldingTimeForThrowDecision")
 );
 assert(batterRunnerTargetSection.includes('if (battedBall?.groundRuleDouble) return "second"'), "ground-rule doubles should still award second");
 assert(!batterRunnerTargetSection.includes('outcome.scoreType === "double"'), "ordinary double labels should not auto-send a manual batter-runner to second");

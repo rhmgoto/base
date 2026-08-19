@@ -268,6 +268,21 @@ vm.runInContext(fs.readFileSync(path.join(root, "script.js"), "utf8"), context, 
   filename: "script.js"
 });
 
+// 投手成績はゲーム側では結果ボードへ直接描画している。
+// テストで文字列として検証するための整形はテスト側に置く。
+runInGame(context, `
+function buildPitcherGameRecordLines(team) {
+  const entries = getPitcherGameRecordEntries(team);
+  if (!entries.length) return ["登板なし"];
+  return entries.map((record) => record.name + "投手 " + record.innings + "イニング" + formatPitcherDecisionLabels(record)
+    + " / 投球数" + (record.pitchCount || 0)
+    + " / 奪三振" + (record.strikeouts || 0)
+    + " / 被安打" + (record.hitsAllowed || 0)
+    + " / 失点" + (record.runsAllowed || 0)
+    + " / 四死球" + (record.walksAllowed || 0));
+}
+`);
+
 assert(makeElement("awayBatterLName").textContent.length > 0, "menu cards are not populated");
 
 const pitchingAchievementAndOpsState = JSON.parse(runInGame(
@@ -398,8 +413,8 @@ const riversideStadiumState = JSON.parse(runInGame(
     const centerMeters = getBattedBallDistanceMeters(defenseField.fenceDistance, { direction: { x: 0, y: -1 } });
     const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
     const riverMetrics = getRiversideRiverMetrics();
-    const bankWidth = getRiversideHomeRunZoneUnits(stadiumPresets.riverside.riverBankMeters);
-    const riverWidth = getRiversideHomeRunZoneUnits(stadiumPresets.riverside.riverWidthMeters);
+    const bankWidth = getRiversideRiverDistanceForMeters(stadiumPresets.riverside.riverBankMeters);
+    const riverWidth = getRiversideRiverDistanceForMeters(stadiumPresets.riverside.riverWidthMeters);
     const koiSchool = getRiversideKoiSchool(defenseField.fenceDistance + bankWidth, defenseField.fenceDistance + bankWidth + riverWidth, 3.2);
     const koiVariantKeys = new Set(Array.from({ length: 64 }, (_, index) => JSON.stringify(getRiversideKoiVariant(index))));
     const oldDefenseState = defenseState;
@@ -896,7 +911,6 @@ const catchAutoControlState = JSON.parse(runInGame(
     const awayMode = defenseControlMode.away;
     const homeMode = defenseControlMode.home;
     const awayManualBaserun = isManualBaserunningControl("away");
-    const homeManualCatch = isManualDefenseControl();
     const homeManualThrow = isManualThrowControl();
     modeSelect.value = "watch";
     readMenu();
@@ -911,7 +925,6 @@ const catchAutoControlState = JSON.parse(runInGame(
       awayMode,
       homeMode,
       awayManualBaserun,
-      homeManualCatch,
       homeManualThrow,
       watchAwayMode,
       watchHomeMode,
@@ -921,7 +934,6 @@ const catchAutoControlState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(catchAutoControlState.homeManualCatch === false, "catch-only-auto mode should keep all catches automatic");
 assert(catchAutoControlState.homeManualThrow === true, "catch-only-auto mode should keep throws manual");
 assert(catchAutoControlState.awayManualBaserun === true, "catch-only-auto mode should keep baserunning manual");
 assert(catchAutoControlState.awayMode === "manual" && catchAutoControlState.homeMode === "manual", "versus mode should keep both teams on catch-only-auto control");
@@ -1468,17 +1480,7 @@ const lineupEditState = JSON.parse(runInGame(
   `(() => {
     menuSelection = cloneMenuSelection(defaultMenuSelection);
     const originalFirst = menuSelection.away.R;
-    const originalRight = menuSelection.away.R;
     const originalLeft = menuSelection.away.L;
-    const positionChanged = changeLineupSlotPosition("away", "2B", "R");
-    selected = createSelectedTeams(menuSelection);
-    const afterPosition = {
-      order: [...menuSelection.away.lineupOrder],
-      firstRole: selected.away.batters[0].role,
-      firstPlayer: selected.away.batters[0].player.id,
-      secondBasePlayer: menuSelection.away["2B"],
-      rightPlayer: menuSelection.away.R
-    };
     const playersSwapped = swapMenuLineupPlayers("away", "R", "L");
     selected = createSelectedTeams(menuSelection);
     const afterDrag = {
@@ -1499,29 +1501,21 @@ const lineupEditState = JSON.parse(runInGame(
     selected = createSelectedTeams(menuSelection);
     return JSON.stringify({
       originalFirst,
-      originalRight,
       originalLeft,
-      positionChanged,
       playersSwapped,
       movedToFifth,
-      afterPosition,
       afterDrag,
       afterNumberPick
     });
   })()`
 ));
 
-assert(lineupEditState.positionChanged === true, "lineup position select should accept another fielder role");
-assert(lineupEditState.afterPosition.order.join(",") === "2B,L,R,CA,C,SS,DH", "changing a slot position should update batting order roles");
-assert(lineupEditState.afterPosition.firstRole === "2B", "changed slot should swap defensive positions in the batting order");
-assert(lineupEditState.afterPosition.firstPlayer === lineupEditState.afterPosition.secondBasePlayer, "changing position should keep the first listed role tied to the swapped position player");
-assert(lineupEditState.afterPosition.secondBasePlayer === lineupEditState.originalRight, "changing position should swap the displaced fielder into the old position");
 assert(lineupEditState.playersSwapped === true, "dragging a lineup card should swap players between slots");
-assert(lineupEditState.afterDrag.order.join(",") === "2B,L,R,CA,C,SS,DH", "dragging players should not change slot defensive positions");
-assert(lineupEditState.afterDrag.firstPlayer === lineupEditState.originalFirst, "dragging other roles should leave the first batting slot player in place");
+assert(lineupEditState.afterDrag.order.join(",") === "R,L,2B,CA,C,SS,DH", "dragging players should not change slot defensive positions");
+assert(lineupEditState.afterDrag.leftPlayer === lineupEditState.originalFirst, "dragging should move the right fielder into the left-field role");
 assert(lineupEditState.afterDrag.rightPlayer === lineupEditState.originalLeft, "dragging should move the left fielder into the right-field role");
 assert(lineupEditState.movedToFifth === true, "number picking should move a batting-order role to the selected slot");
-assert(lineupEditState.afterNumberPick.order.join(",") === "2B,L,CA,C,R,SS,DH", "number picking should reorder the batting slots");
+assert(lineupEditState.afterNumberPick.order.join(",") === "L,2B,CA,C,R,SS,DH", "number picking should reorder the batting slots");
 assert(lineupEditState.afterNumberPick.fifthRole === "R", "number picking should put the chosen role at the requested order number");
 
 const teamResetState = JSON.parse(runInGame(
@@ -1749,14 +1743,6 @@ const rosterAndPointState = JSON.parse(runInGame(
     const rodgersBatterConflictIncomplete = !isMenuTeamComplete("away");
     menuSelection.away = originalAway;
     const selectedPitcherIds = createSelectedTeams(menuSelection).away.pitchers.map((pitcherInfo) => pitcherInfo.id);
-    const costBadgeName = { textContent: "" };
-    const costBadgeStats = { innerHTML: "" };
-    renderBatterPanel(shuto, costBadgeName, costBadgeStats);
-    const cardHtml = costBadgeStats.innerHTML;
-    const pitcherCardName = { textContent: "" };
-    const pitcherCardStats = { innerHTML: "" };
-    renderPitcherPanel(shohei, pitcherCardName, pitcherCardStats);
-    const pitcherCardHtml = pitcherCardStats.innerHTML;
     const injectedBatter = {
       id: 'custom" onclick="alert(1)',
       name: '<img src=x onerror=alert(1)>',
@@ -2315,8 +2301,6 @@ const rosterAndPointState = JSON.parse(runInGame(
       rodgersCatcherDisabledByBatter,
       rodgersBatterConflictIncomplete,
       selectedPitcherIds,
-      cardHtml,
-      pitcherCardHtml,
       escapedPracticeSelectHtml,
       escapedChooserHtml,
       originalCreatorFirst,
@@ -2781,8 +2765,6 @@ assert(rosterAndPointState.chooserHtml.includes("外野"), "batter chooser shoul
 assert(!rosterAndPointState.catcherChooserHtml.includes("内野"), "catcher chooser should not show infield defense");
 assert(!rosterAndPointState.catcherChooserHtml.includes("外野"), "catcher chooser should not show outfield defense");
 assert(!rosterAndPointState.chooserHtml.includes("起用守備"), "batter chooser should not show the redundant assigned-defense row");
-assert(!rosterAndPointState.cardHtml.includes("cost-badge"), "batter cards should move cost into the title area");
-assert(!rosterAndPointState.pitcherCardHtml.includes("cost-badge"), "pitcher cards should move cost into the title area");
 assert(rosterAndPointState.escapedPracticeSelectHtml.includes("&quot;"), "practice player selects should escape player ids");
 assert(rosterAndPointState.escapedPracticeSelectHtml.includes("&lt;img"), "practice player selects should escape player names");
 assert(rosterAndPointState.escapedChooserHtml.includes("&quot;"), "player chooser should escape player ids in data attributes");
@@ -2894,12 +2876,10 @@ const watchModeState = JSON.parse(runInGame(
     battingTeam = "away";
     const awayBattingPlayerControlled = isPlayerBatting();
     const homePitchingPlayerControlled = isPlayerPitching();
-    const manualHomeDefense = isManualDefenseControl();
     const manualAwayRun = isManualBaserunningControl("away");
     battingTeam = "home";
     const homeBattingPlayerControlled = isPlayerBatting();
     const awayPitchingPlayerControlled = isPlayerPitching();
-    const manualAwayDefense = isManualDefenseControl();
     const manualHomeRun = isManualBaserunningControl("home");
     startGame();
     const startedPhase = gamePhase;
@@ -2937,11 +2917,9 @@ const watchModeState = JSON.parse(runInGame(
       readState,
       awayBattingPlayerControlled,
       homePitchingPlayerControlled,
-      manualHomeDefense,
       manualAwayRun,
       homeBattingPlayerControlled,
       awayPitchingPlayerControlled,
-      manualAwayDefense,
       manualHomeRun,
       startedPhase,
       startedBattingTeam,
@@ -2960,7 +2938,6 @@ assert(watchModeState.readState.homePreset === "dodgers", "watch mode should hon
 assert(watchModeState.readState.awayDefenseControl === "auto" && watchModeState.readState.homeDefenseControl === "auto", "watch mode should force defense and baserunning to auto");
 assert(watchModeState.awayBattingPlayerControlled === false && watchModeState.homeBattingPlayerControlled === false, "watch mode should not let either batter side wait for player input");
 assert(watchModeState.homePitchingPlayerControlled === false && watchModeState.awayPitchingPlayerControlled === false, "watch mode should not let either pitcher side wait for player input");
-assert(watchModeState.manualHomeDefense === false && watchModeState.manualAwayDefense === false, "watch mode should disable manual defense");
 assert(watchModeState.manualAwayRun === false && watchModeState.manualHomeRun === false, "watch mode should disable manual baserunning");
 assert(watchModeState.startedPhase === "playing", "watch mode should start a normal game");
 assert(watchModeState.startedBattingTeam === "home", "watch mode should start with the selected first-bat team");
@@ -3595,15 +3572,6 @@ const battingPracticeModeState = JSON.parse(runInGame(
     startPitch("special", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
     const practiceStaminaAfterPitch = activePitcher.currentStamina;
     const practicePitchCountAfterPitch = activePitcher.pitchCount;
-    const practiceStaminaBeforeHomer = activePitcher.currentStamina;
-    applyHomeRunPitcherStaminaPenalty(activePitcher);
-    const practiceStaminaAfterHomer = activePitcher.currentStamina;
-    gameMode = "versus";
-    const versusPitcher = createMatchPitcher(findById(pitchers, "sawamura"));
-    const versusStaminaBeforeHomer = versusPitcher.currentStamina;
-    applyHomeRunPitcherStaminaPenalty(versusPitcher);
-    const versusStaminaAfterHomer = versusPitcher.currentStamina;
-    gameMode = "practice";
     resetBall();
     count = { strikes: 2, balls: 3, outs: 2 };
     bases.first = makeBaseRunner(findById(batters, "ichiro"));
@@ -3797,10 +3765,6 @@ const battingPracticeModeState = JSON.parse(runInGame(
       practiceStaminaAfterPitch,
       practicePitchCountBeforePitch,
       practicePitchCountAfterPitch,
-      practiceStaminaBeforeHomer,
-      practiceStaminaAfterHomer,
-      versusStaminaBeforeHomer,
-      versusStaminaAfterHomer,
       practiceSameBatterAfterReset,
       practiceSamePitcherAfterReset,
       practiceCountReset,
@@ -3858,8 +3822,6 @@ assert(battingPracticeModeState.selectedPracticeBatter === "ruth", "practice mod
 assert(battingPracticeModeState.selectedPracticePitcher === "sawamura", "practice mode should use the individually selected pitcher");
 assert(battingPracticeModeState.practiceStaminaAfterPitch === battingPracticeModeState.practiceStaminaBeforePitch, "practice mode pitches should not consume pitcher stamina");
 assert(battingPracticeModeState.practicePitchCountAfterPitch === battingPracticeModeState.practicePitchCountBeforePitch + 1, "practice mode pitches should still count as pitches thrown");
-assert(battingPracticeModeState.practiceStaminaAfterHomer === battingPracticeModeState.practiceStaminaBeforeHomer, "practice mode homers should not consume pitcher stamina");
-assert(battingPracticeModeState.versusStaminaBeforeHomer - battingPracticeModeState.versusStaminaAfterHomer === 7, "versus mode home-run run penalties should consume seven stamina for a solo homer");
 assert(battingPracticeModeState.practiceSameBatterAfterReset === true, "practice mode should keep the same batter after each plate appearance");
 assert(battingPracticeModeState.practiceSamePitcherAfterReset === true, "practice mode should keep the same pitcher after each plate appearance");
 assert(battingPracticeModeState.practiceCountReset === true, "practice mode should reset the count and bases between repeated matchups");
@@ -4080,7 +4042,6 @@ const stealStateCheck = JSON.parse(runInGame(
       normalThrowStart,
       normalThrowEnd,
       normalThrowTime,
-      catcherThrowSpeedScale: stealTuning.catcherThrowSpeedScale,
       pitcherTypeLead: { ...stealTuning.pitcherTypeLead },
       swingMissDelay,
       swingMissThrowStart,
@@ -4119,7 +4080,6 @@ const stealStateCheck = JSON.parse(runInGame(
 
 assert(stealStateCheck.normalStarted === true, "first-base runners should be able to start a steal with stick+B during the pitch motion");
 assert(stealStateCheck.normalThrowStarted === true, "CPU catchers should automatically throw to the steal base after the ball reaches home");
-assert(Math.abs(stealStateCheck.catcherThrowSpeedScale - 0.95) < 0.001, "catcher steal throws should use the requested 0.95 speed scale");
 
 // 球種ごとのリードは「速い球ほど短い」順序を保つ。
 // ただし球速の差は投球の飛行時間 (遅い球0.82秒 / 速球0.41秒) としてすでに判定に効いているので、
@@ -5453,19 +5413,6 @@ const variedBattedBallState = JSON.parse(runInGame(
       hardOutfieldBounceBall,
       hardOutfieldBounceInfieldPoint
     );
-    const hardOutfieldBounceCloseCatch = getCloseHardBallCatch(
-      hardOutfieldBounceInfielder,
-      hardOutfieldBounceBall,
-      hardOutfieldBounceInfieldPoint,
-      0
-    );
-    const hardOutfieldBounceDifficultCatch = getDifficultHardBallCatch(
-      hardOutfieldBounceInfielder,
-      hardOutfieldBounceBall,
-      0.1,
-      hardOutfieldBounceBall.ballTime,
-      0
-    );
     const hardOutfieldBounceReactionRoute = isInfielderReactionRouteBall(hardOutfieldBounceInfielder, hardOutfieldBounceBall);
     const hardOutfieldBounceAttemptRoute = isInfielderAttemptRouteBall(hardOutfieldBounceInfielder, hardOutfieldBounceBall);
     const hardOutfieldBounceFieldingTarget = getDefenseFieldingTarget(hardOutfieldBounceBall, {
@@ -5693,8 +5640,6 @@ const variedBattedBallState = JSON.parse(runInGame(
       hardOutfieldBounceLineLiner: hardOutfieldBounceBall.isLineLiner,
       hardOutfieldBounceDirectionX: Math.abs(hardOutfieldBounceBall.direction.x),
       hardOutfieldBounceRouteCatch: hardOutfieldBounceRouteCatch.caught,
-      hardOutfieldBounceCloseCatch: hardOutfieldBounceCloseCatch.caught,
-      hardOutfieldBounceDifficultCatch: hardOutfieldBounceDifficultCatch.caught,
       hardOutfieldBounceReactionRoute,
       hardOutfieldBounceAttemptRoute,
       hardOutfieldBouncePostLandingRoll,
@@ -5823,8 +5768,6 @@ assert(variedBattedBallState.hardOutfieldBounceInfieldClearHeight >= 80, "hard o
 assert(variedBattedBallState.hardOutfieldBounceLineLiner === false, "hard outfield-bounce liners should not use the line-edge liner route");
 assert(variedBattedBallState.hardOutfieldBounceDirectionX <= 0.42, "hard outfield-bounce liners should stay in center/gap lanes instead of hugging the foul lines");
 assert(variedBattedBallState.hardOutfieldBounceRouteCatch === false, "hard outfield-bounce liners should not be body-caught by infielders");
-assert(variedBattedBallState.hardOutfieldBounceCloseCatch === false, "hard outfield-bounce liners should not use close infielder catch rescue");
-assert(variedBattedBallState.hardOutfieldBounceDifficultCatch === false, "hard outfield-bounce liners should not use difficult infielder catch rescue");
 assert(variedBattedBallState.hardOutfieldBounceReactionRoute === false, "hard outfield-bounce liners should not invite an infielder reaction route");
 assert(variedBattedBallState.hardOutfieldBounceAttemptRoute === false, "hard outfield-bounce liners should not invite an infielder attempt route");
 assert(variedBattedBallState.hardOutfieldBouncePostLandingRoll >= 300, "uncaught hard outfield-bounce liners should keep rolling after the first landing");
@@ -5938,26 +5881,7 @@ const infieldGrounderOutBoostState = JSON.parse(runInGame(
     const secondBall = buildBattedBall(secondSide.power, secondSide.direction, secondSide.label);
     const shortBall = buildBattedBall(shortSide.power, shortSide.direction, shortSide.label);
     const gapGrounder = makeGapGrounderResult({ ...profile, direction: normalize({ x: 0.06, y: -1 }), power: 0.56 });
-    const hardLaneContact = {
-      quality: 0.62,
-      sweetSpotScore: 0.56,
-      inGoodContactZone: true
-    };
-    const hardLaneProfile = {
-      ...profile,
-      power: 0.86,
-      quality: 0.62,
-      exitVelocity: 0.92,
-      launchAngle: 12,
-      gapScore: 0.48,
-      lineEdgeScore: 0.18,
-      lineLinerScore: 0.18,
-      sweetSpotScore: 0.56,
-      direction: normalize({ x: 0.04, y: -1 })
-    };
-    const hardLaneAllowed = shouldRouteHardContactToOpenLane(hardLaneProfile, hardLaneContact, 0.28);
-    const hardLaneResult = makeHardOpenLaneResult(hardLaneProfile);
-    const centerGrounderResult = makeCenterReturnResultFromProfile({
+    const centerGrounderResult = makeCenterReturnGrounderResultFromProfile({
       ...profile,
       power: 0.84,
       quality: 0.66,
@@ -5966,7 +5890,7 @@ const infieldGrounderOutBoostState = JSON.parse(runInGame(
       timingPull: 0.02,
       direction: normalize({ x: 0.02, y: -1 })
     });
-    const centerLinerResult = makeCenterReturnResultFromProfile({
+    const centerLinerResult = makeCenterReturnLinerResultFromProfile({
       ...profile,
       power: 0.9,
       quality: 0.68,
@@ -5995,10 +5919,6 @@ const infieldGrounderOutBoostState = JSON.parse(runInGame(
       pulledX: pulledByTiming.direction.x,
       gapGrounderX: Math.abs(gapGrounder.direction.x),
       gapGrounderPower: gapGrounder.power,
-      hardLaneAllowed,
-      hardLaneKind: hardLaneResult.kind,
-      hardLaneGap: Boolean(hardLaneResult.grounderGap || hardLaneResult.lineEdge || hardLaneResult.lineLiner || hardLaneResult.gapLiner || hardLaneResult.centerReturn),
-      hardLaneX: Math.abs(hardLaneResult.direction.x),
       centerGrounderFlag: Boolean(centerGrounderResult.centerReturnGrounder),
       centerGrounderBallGrounder: centerGrounderBall.isGrounder,
       centerGrounderX: Math.abs(centerGrounderBall.direction.x),
@@ -6025,10 +5945,6 @@ assert(infieldGrounderOutBoostState.shortLandingDistance > 880, "boosted shortst
 assert(infieldGrounderOutBoostState.pulledX > 0.25, "timing pull should influence boosted infield grounder direction");
 assert(infieldGrounderOutBoostState.gapGrounderX >= infieldGrounderOutBoostState.gapMinSide * 0.7, "gap grounders should be aimed into the lanes instead of straight at infielders");
 assert(infieldGrounderOutBoostState.gapGrounderPower >= 0.66, "gap grounders should stay firm enough to challenge infield range");
-assert(infieldGrounderOutBoostState.hardLaneAllowed === true, "strong low contact should sometimes be routed away from fielder-perfect lanes");
-assert(infieldGrounderOutBoostState.hardLaneKind === "hit", "open-lane hard contact should become a fielding challenge instead of an automatic front-of-fielder out");
-assert(infieldGrounderOutBoostState.hardLaneGap === true, "open-lane hard contact should use line, gap, or center-return batted-ball routes");
-assert(infieldGrounderOutBoostState.hardLaneX <= 0.12 || infieldGrounderOutBoostState.hardLaneX >= 0.3, "open-lane hard contact should be scattered toward a lane or kept clean through the middle");
 assert(infieldGrounderOutBoostState.centerGrounderFlag === true && infieldGrounderOutBoostState.centerGrounderBallGrounder === true, "clean center-return grounders should stay on the ground");
 assert(infieldGrounderOutBoostState.centerGrounderX <= 0.12, "clean center-return grounders should stay near the middle");
 assert(infieldGrounderOutBoostState.centerLinerFlag === true && infieldGrounderOutBoostState.centerLinerBallLiner === true, "clean center-return liners should stay as liner hits");
@@ -6831,37 +6747,26 @@ const powerSeparationState = JSON.parse(runInGame(
       };
     });
     activeBatter = { ...findById(batters, "judge"), power: 10, meet: 5 };
-    Math.random = () => 0.01;
-    const powerHitterHomerConverted = shouldReducePowerHitterHomeRunToWallHit({
-      fenceOver: true,
-      isDeepDrive: true,
-      contactScore: 0.72,
-      profileExitVelocity: 1.12,
-      profileCarry: 1.08,
-      power: 1.7
-    });
-    Math.random = () => 0.99;
-    const powerHitterHomerKept = shouldReducePowerHitterHomeRunToWallHit({
-      fenceOver: true,
-      isDeepDrive: true,
-      contactScore: 0.72,
-      profileExitVelocity: 1.12,
-      profileCarry: 1.08,
-      power: 1.7
-    });
     Math.random = originalRandom;
+    // フェンス際の壁当て変換は buildBattedBall が getNaturalFenceWallHitChance を
+    // 直接引いている。ここでは確率そのものが 0 と 1 の間に収まることを見る。
+    const powerHitterWallHitChance = getNaturalFenceWallHitChance({
+      powerProfile: getHomeRunPowerProfile(10),
+      contactScore: 0.72,
+      clearanceMeters: 2,
+      isDeepDrive: true
+    });
     return JSON.stringify({
       values,
-      powerHitterHomerConverted,
-      powerHitterHomerKept
+      powerHitterWallHitChance
     });
   })()`
 ));
 
 assert(powerSeparationState.values[5].distanceMeters >= powerSeparationState.values[1].distanceMeters + 6, `power-5 hitters should clearly outdistance power-1 hitters (${JSON.stringify(powerSeparationState.values)})`);
 assert(powerSeparationState.values[10].distanceMeters >= powerSeparationState.values[5].distanceMeters + 5, `power-10 hitters should keep a clearly higher deep-outfield ceiling (${JSON.stringify(powerSeparationState.values)})`);
-assert(powerSeparationState.powerHitterHomerConverted === true, "some power-hitter home-run candidates should be converted into fence doubles");
-assert(powerSeparationState.powerHitterHomerKept === false, "power-hitter home-run conversion should not remove every homer");
+assert(powerSeparationState.powerHitterWallHitChance > 0, "power-hitter fence-clearing drives should sometimes be pulled back to the wall");
+assert(powerSeparationState.powerHitterWallHitChance < 1, "wall-hit conversion should not remove every power-hitter homer");
 
 const hitDirectionState = JSON.parse(runInGame(
   context,
@@ -7609,24 +7514,6 @@ const runnerDecisionState = JSON.parse(runInGame(
     };
     refreshDefenseThrowSafety();
     const lateThrowToAlreadySafeRunnerSafe = defenseState.throw.safe;
-    const alreadySafeHeldBaseRunner = createBatterRunner(findById(batters, "ichiro"));
-    alreadySafeHeldBaseRunner.currentBase = "second";
-    alreadySafeHeldBaseRunner.targetBase = "second";
-    alreadySafeHeldBaseRunner.arrivalTime = 1.2;
-    alreadySafeHeldBaseRunner.arrived = true;
-    defenseState = {
-      ...createDefenseState(),
-      runner: alreadySafeHeldBaseRunner,
-      chosenFielder: fielder,
-      target: fielder,
-      battedBall: longBall,
-      outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 0.6 },
-      heldBallBase: "second",
-      heldBallSince: 3.0,
-      throw: { targetBase: "second", startTime: 2.2, endTime: 3.0, holdDeadline: 5.0, safe: false }
-    };
-    retargetDefenseThrowToBatterRunner(3.2);
-    const lateHeldBaseToAlreadySafeRunnerSafe = defenseState.throw.safe;
     const alreadySafeBaseRunner = {
       ...makeBaseRunner(findById(batters, "nomo")),
       startBase: "second",
@@ -7862,12 +7749,10 @@ const runnerDecisionState = JSON.parse(runInGame(
     defenseControlMode.home = "manual";
     gamePhase = "playing";
     startDefensePlay(hitLabels.grounder, "hit", 0.42, 0, normalize({ x: 0.04, y: -1 }));
-    const realGrounderCatchAutomatic = defenseState.manualFielding === false;
     const realGrounderThrowWaitsManual = Boolean(
       defenseState.throw?.manualWait
       && !Number.isFinite(defenseState.throw.startTime)
     );
-    const realGrounderInitialManualFielding = defenseState.manualFielding;
     const realGrounderInitialHasThrow = Boolean(defenseState.throw);
     const realGrounderPostCatchTarget = defenseState.throw?.targetBase;
     const realGrounderBatterId = activeBatter.id;
@@ -8119,7 +8004,6 @@ const runnerDecisionState = JSON.parse(runInGame(
       lateFirstThrowAcceptedAfter,
       finalRuleOutWhenThrowArrivedFirst,
       lateThrowToAlreadySafeRunnerSafe,
-      lateHeldBaseToAlreadySafeRunnerSafe,
       lateThrowToAlreadySafeBaseRunnerSafe,
       lateHeldBaseToAlreadySafeBaseRunnerSafe,
       earlyThrowToLateBaseRunnerOut,
@@ -8138,9 +8022,7 @@ const runnerDecisionState = JSON.parse(runInGame(
       preselectedSecondCommandForceOut,
       routeOnlyThirdRunnerOut
       ,
-      realGrounderCatchAutomatic,
       realGrounderThrowWaitsManual,
-      realGrounderInitialManualFielding,
       realGrounderInitialHasThrow,
       realGrounderPostCatchTarget,
       realGrounderSecondForceOut,
@@ -8233,7 +8115,6 @@ assert(runnerDecisionState.lateFirstThrowAcceptedBefore === true, "late first th
 assert(runnerDecisionState.lateFirstThrowAcceptedAfter === true, "late first throws should create a real throw once commanded");
 assert(runnerDecisionState.finalRuleOutWhenThrowArrivedFirst === true, "final safety refresh should force out when the throw arrived before the runner");
 assert(runnerDecisionState.lateThrowToAlreadySafeRunnerSafe === true, "throws arriving after the batter-runner is already on the base should be safe");
-assert(runnerDecisionState.lateHeldBaseToAlreadySafeRunnerSafe === true, "held-ball retargeting should not out a batter-runner who was already safe at the base");
 assert(runnerDecisionState.lateThrowToAlreadySafeBaseRunnerSafe === true, "throws arriving after a base runner is already on the base should be safe");
 assert(runnerDecisionState.lateHeldBaseToAlreadySafeBaseRunnerSafe === true, "held-ball retargeting should not out a base runner who was already safe at the base");
 assert(runnerDecisionState.earlyThrowToLateBaseRunnerOut === true, "base runners advancing to a base after the throw already arrived should still be out");
@@ -8251,7 +8132,7 @@ assert(runnerDecisionState.preselectedSecondCommandAllowed === true, "manual for
 assert(runnerDecisionState.preselectedSecondCommandStarted === true, "pressing the already-selected second-base target should start the pending throw");
 assert(runnerDecisionState.preselectedSecondCommandForceOut === true, "already-selected second-base force throws should still record the force out");
 assert(runnerDecisionState.routeOnlyThirdRunnerOut === true, "runners whose route reaches third should be out when the ball is waiting at third before arrival");
-assert(runnerDecisionState.realGrounderCatchAutomatic === true, `catch-only-auto grounders should field the ball automatically (${runnerDecisionState.realGrounderInitialManualFielding}/${runnerDecisionState.realGrounderInitialHasThrow})`);
+assert(runnerDecisionState.realGrounderInitialHasThrow === true, "automatically fielded grounders should create a throw opportunity");
 assert(runnerDecisionState.realGrounderThrowWaitsManual === true, "catch-only-auto grounders should wait for the player's throw command after fielding");
 assert(runnerDecisionState.realGrounderPostCatchTarget === "second", "catch-only-auto grounders with a runner on first should preselect the second-base force");
 assert(runnerDecisionState.trailingForceOutAtFirstAdvancesLeadRunner === true, "when auto takes the out at first, the forced first-base runner should advance safely to second");
@@ -8261,54 +8142,6 @@ assert(runnerDecisionState.firstThirdHomeTagOut === true, "home throws should ou
 assert(runnerDecisionState.firstThirdHomeTagOutState === true, `a home tag out from first and third should leave the batter at first and the first-base runner at second with no run (${JSON.stringify(runnerDecisionState.firstThirdHomeTagOutActual)})`);
 assert(runnerDecisionState.firstThirdHomeSafe === true, "home throws should be safe when the runner from third arrived first");
 assert(runnerDecisionState.firstThirdHomeSafeState === true, `a safe home throw from first and third should score one and keep the batter at first and first-base runner at second (${JSON.stringify(runnerDecisionState.firstThirdHomeSafeActual)})`);
-
-const manualFieldingControlState = JSON.parse(runInGame(
-  context,
-  `(() => {
-    const originalGetActiveGamepad = getActiveGamepad;
-    getActiveGamepad = () => null;
-    keysDown.clear();
-    keysDown.add("KeyD");
-    defenseState = {
-      ...createDefenseState(),
-      active: true,
-      manualFielding: true,
-      manualFieldingComplete: false,
-      battedBall: buildBattedBall(0.55, normalize({ x: 0.1, y: -1 }), hitLabels.grounder),
-      fielders: [
-        { role: "SS", x: 500, y: 430, currentX: 500, currentY: 430, speed: 9, fielding: 9, arm: 5 },
-        { role: "2B", x: 700, y: 430, currentX: 700, currentY: 430, speed: 3, fielding: 3, arm: 5 }
-      ],
-      runner: createBatterRunner(findById(batters, "suzuki")),
-      outcome: createManualFieldingPendingOutcome({ kind: "single", scoreType: "single" }, null)
-    };
-    const beforeFast = defenseState.fielders[0].currentX;
-    const beforeSlow = defenseState.fielders[1].currentX;
-    updateManualDefenseFielders(0.5);
-    const fastMove = defenseState.fielders[0].currentX - beforeFast;
-    const slowMove = defenseState.fielders[1].currentX - beforeSlow;
-    const fielder = { ...defenseState.fielders[0], currentX: ball.x, currentY: ball.y };
-    completeManualDefenseFielding(fielder, 0.8);
-    const result = {
-      fastMove,
-      slowMove,
-      movedSameDirection: fastMove > 0 && slowMove > 0,
-      fieldingScalesMovement: fastMove > slowMove,
-      completesOnFielding: defenseState.manualFieldingComplete === true,
-      throwWaitsAfterFielding: defenseState.throw && !Number.isFinite(defenseState.throw.startTime),
-      needsThrowAfterGrounder: defenseState.outcome.needsThrow === true
-    };
-    keysDown.clear();
-    getActiveGamepad = originalGetActiveGamepad;
-    return JSON.stringify(result);
-  })()`
-));
-
-assert(manualFieldingControlState.movedSameDirection === true, "manual fielding input should move all defenders in the same direction");
-assert(manualFieldingControlState.fieldingScalesMovement === true, "manual fielding movement should scale with fielding ability");
-assert(manualFieldingControlState.completesOnFielding === true, "manual fielding should complete when a fielder reaches the ball");
-assert(manualFieldingControlState.throwWaitsAfterFielding === true, "manual grounder fielding should wait for a throw command after pickup");
-assert(manualFieldingControlState.needsThrowAfterGrounder === true, "manual grounder pickups should create a throw play");
 
 const manualGrounderRollState = JSON.parse(runInGame(
   context,
@@ -8320,7 +8153,6 @@ const manualGrounderRollState = JSON.parse(runInGame(
     bases = createEmptyBases();
     startDefensePlay(hitLabels.grounder, "hit", 0.82, 0, normalize({ x: 0.22, y: -1 }));
     return JSON.stringify({
-      manualFielding: defenseState.manualFielding,
       hasThrow: Boolean(defenseState.throw),
       throwWaitsManual: Boolean(
         defenseState.throw?.manualWait
@@ -8330,67 +8162,8 @@ const manualGrounderRollState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(manualGrounderRollState.manualFielding === false, "catch-only-auto grounders should never enter manual fielding mode");
 assert(manualGrounderRollState.hasThrow === true, "fielded catch-only-auto grounders should create a throw opportunity");
 assert(manualGrounderRollState.throwWaitsManual === true, "catch-only-auto grounder throws should wait for player input");
-
-const manualLinerRollState = JSON.parse(runInGame(
-  context,
-  `(() => {
-    const liner = {
-      origin: { x: field.plateX, y: field.plateY },
-      target: { x: field.plateX + 120, y: field.plateY - 760 },
-      direction: normalize({ x: 0.15, y: -1 }),
-      trajectory: "liner",
-      isLiner: true,
-      isGrounder: false,
-      power: 0.72,
-      ballTime: 0.8,
-      flightDistance: 760,
-      landingDistance: 760
-    };
-    const target = getManualDefenseUnfieldedTarget(liner, { kind: "single", scoreType: "single", caught: false, needsThrow: false });
-    const landing = liner.target;
-    const rollDistance = Math.hypot(target.x - landing.x, target.y - landing.y);
-    defenseState = {
-      ...createDefenseState(),
-      active: true,
-      startTime: 0,
-      duration: 5000,
-      target,
-      landingTarget: landing,
-      origin: liner.origin,
-      battedBall: liner,
-      outcome: createManualFieldingPendingOutcome({ kind: "single", scoreType: "single" }, liner),
-      throw: null
-    };
-    const rollTime = getDefenseRollDuration(liner, landing, target);
-    const p00 = getDefenseBallPoint(0, 0, liner.ballTime);
-    const p12 = getDefenseBallPoint(0, 0, liner.ballTime + rollTime * 0.12);
-    const p28 = getDefenseBallPoint(0, 0, liner.ballTime + rollTime * 0.28);
-    const p55 = getDefenseBallPoint(0, 0, liner.ballTime + rollTime * 0.55);
-    const p82 = getDefenseBallPoint(0, 0, liner.ballTime + rollTime * 0.82);
-    const p100 = getDefenseBallPoint(0, 0, liner.ballTime + rollTime);
-    const afterLanding = getDefenseBallPoint(0, 0, liner.ballTime + rollTime * 0.5);
-    const atEnd = getDefenseBallPoint(0, 0, liner.ballTime + rollTime);
-    const startStep = Math.hypot(p12.x - p00.x, p12.y - p00.y);
-    const midStep = Math.hypot(p55.x - p28.x, p55.y - p28.y);
-    const lateStep = Math.hypot(p100.x - p82.x, p100.y - p82.y);
-    return JSON.stringify({
-      rollDistance,
-      startsSmoothly: startStep < midStep * 1.05,
-      deceleratesLate: lateStep < midStep,
-      rollsAfterLanding: Math.hypot(afterLanding.x - landing.x, afterLanding.y - landing.y) > 40,
-      reachesTarget: Math.hypot(atEnd.x - target.x, atEnd.y - target.y) < 1
-    });
-  })()`
-));
-
-assert(manualLinerRollState.rollDistance > 120, "manual unfielded liners should receive an auto-style rolling target beyond first landing");
-assert(manualLinerRollState.startsSmoothly === true, "manual unfielded liners should not jump forward immediately after landing");
-assert(manualLinerRollState.deceleratesLate === true, "manual unfielded liners should decelerate naturally near the end");
-assert(manualLinerRollState.rollsAfterLanding === true, "manual unfielded liners should keep moving after landing");
-assert(manualLinerRollState.reachesTarget === true, "manual unfielded liners should finish at the rolling target");
 
 const manualAutoFlyState = JSON.parse(runInGame(
   context,
@@ -8407,8 +8180,6 @@ const manualAutoFlyState = JSON.parse(runInGame(
     startDefensePlay(hitLabels.routineFly, "out", 0.45, 0, normalize({ x: 0, y: -1 }));
     Math.random = originalRandom;
     return JSON.stringify({
-      manualFielding: defenseState.manualFielding,
-      manualFieldingComplete: defenseState.manualFieldingComplete,
       caught: defenseState.outcome.caught,
       needsThrow: defenseState.outcome.needsThrow,
       trajectory: defenseState.battedBall.trajectory
@@ -8417,140 +8188,7 @@ const manualAutoFlyState = JSON.parse(runInGame(
 ));
 
 assert(manualAutoFlyState.trajectory === "fly", "manual-defense fly test should create a fly ball");
-assert(manualAutoFlyState.manualFielding === false, "catch-only-auto fly balls should use automatic fielding");
 assert(manualAutoFlyState.caught === true && manualAutoFlyState.needsThrow === false, "catch-only-auto routine flies should be caught automatically without a throw");
-
-const manualFlyAssistState = JSON.parse(runInGame(
-  context,
-  `(() => {
-    const originalRandom = Math.random;
-    Math.random = () => 0.5;
-    const flyBall = buildBattedBall(0.72, normalize({ x: 0.05, y: -1 }), hitLabels.fly);
-    Math.random = originalRandom;
-    const landing = { ...flyBall.target };
-    const fielder = { role: "C", x: landing.x + 320, y: landing.y + 80, currentX: landing.x + 320, currentY: landing.y + 80, speed: 6, fielding: 6, arm: 6 };
-    const farFielder = { role: "R", x: landing.x + 720, y: landing.y + 260, currentX: landing.x + 720, currentY: landing.y + 260, speed: 6, fielding: 6, arm: 6 };
-    defenseState = {
-      ...createDefenseState(),
-      active: true,
-      manualFielding: true,
-      manualFieldingComplete: false,
-      battedBall: flyBall,
-      landingTarget: landing,
-      target: landing,
-      chosenFielder: fielder,
-      fielders: [fielder, farFielder],
-      outcome: createManualFieldingPendingOutcome({ kind: "single", scoreType: "single" }, flyBall)
-    };
-    keysDown.clear();
-    const beforeDistance = Math.hypot(defenseState.fielders[0].currentX - landing.x, defenseState.fielders[0].currentY - landing.y);
-    const farBeforeDistance = Math.hypot(defenseState.fielders[1].currentX - landing.x, defenseState.fielders[1].currentY - landing.y);
-    updateManualDefenseFielders(0.5);
-    const afterDistance = Math.hypot(defenseState.fielders[0].currentX - landing.x, defenseState.fielders[0].currentY - landing.y);
-    const farAfterDistance = Math.hypot(defenseState.fielders[1].currentX - landing.x, defenseState.fielders[1].currentY - landing.y);
-    defenseState.fielders[0] = { ...fielder };
-    keysDown.add("KeyW");
-    updateManualDefenseFielders(0.5);
-    const manualCorrectionY = defenseState.fielders[0].currentY;
-    keysDown.clear();
-    return JSON.stringify({
-      autoMovesTowardLanding: afterDistance < beforeDistance,
-      farFielderDoesNotGather: Math.abs(farAfterDistance - farBeforeDistance) < 1,
-      manualCorrectionChangesPath: manualCorrectionY < fielder.currentY
-    });
-  })()`
-));
-
-assert(manualFlyAssistState.autoMovesTowardLanding === true, "manual fly fielding should auto-move fielders toward the landing marker");
-assert(manualFlyAssistState.farFielderDoesNotGather === true, "manual fly auto-assist should not pull every defender to the landing marker");
-assert(manualFlyAssistState.manualCorrectionChangesPath === true, "manual fly fielding should still allow player input to correct the route");
-
-const manualFlyFieldingState = JSON.parse(runInGame(
-  context,
-  `(() => {
-    const flyBall = buildBattedBall(0.72, normalize({ x: 0.05, y: -1 }), hitLabels.fly);
-    const landing = { ...flyBall.target };
-    defenseState = {
-      ...createDefenseState(),
-      active: true,
-      startTime: performance.now(),
-      manualFielding: true,
-      manualFieldingComplete: false,
-      battedBall: flyBall,
-      landingTarget: landing,
-      target: landing,
-      chosenFielder: { role: "C", x: landing.x + 130, y: landing.y, currentX: landing.x + 130, currentY: landing.y, speed: 8, fielding: 8, arm: 6 },
-      fielders: [
-        { role: "C", x: landing.x + 12, y: landing.y + 8, currentX: landing.x + 12, currentY: landing.y + 8, speed: 8, fielding: 8, arm: 6 },
-        { role: "R", x: landing.x + 220, y: landing.y, currentX: landing.x + 220, currentY: landing.y, speed: 4, fielding: 4, arm: 5 }
-      ],
-      runner: createBatterRunner(findById(batters, "suzuki")),
-      outcome: createManualFieldingPendingOutcome({ kind: "single", scoreType: "single" }, flyBall),
-      manualCatchRadius: 0
-    };
-    const earlyCatch = getManualFlyLandingCatch(Math.max(0, flyBall.ballTime - 0.7)).caught;
-    ball.x = defenseState.fielders[0].currentX;
-    ball.y = defenseState.fielders[0].currentY;
-    resolveManualDefenseFielding(Math.max(0, flyBall.ballTime - 0.7));
-    const stillControllableBeforeLanding = defenseState.manualFieldingComplete === false;
-    const catchResult = getManualFlyLandingCatch(Math.max(0, flyBall.ballTime - 0.1));
-    if (catchResult.caught) {
-      completeManualDefenseFielding(catchResult.fielder, flyBall.ballTime, landing);
-    }
-    return JSON.stringify({
-      earlyCatch,
-      stillControllableBeforeLanding,
-      catchesNearLanding: catchResult.caught,
-      catchIsOut: defenseState.outcome.kind === "out",
-      noThrowAfterFlyCatch: defenseState.throw === null,
-      fieldingPointIsLanding: Math.hypot(defenseState.outcome.fieldingPoint.x - landing.x, defenseState.outcome.fieldingPoint.y - landing.y) < 1
-    });
-  })()`
-));
-
-assert(manualFlyFieldingState.earlyCatch === false, "manual fly catches should wait until the ball is near landing");
-assert(manualFlyFieldingState.stillControllableBeforeLanding === true, "manual fly fielding should stay controllable before the landing window");
-assert(manualFlyFieldingState.catchesNearLanding === true, "manual fly fielding should catch when a defender is at the landing marker");
-assert(manualFlyFieldingState.catchIsOut === true, "manual fly catches should resolve as outs");
-assert(manualFlyFieldingState.noThrowAfterFlyCatch === true, "manual fly catches should not require a throw");
-assert(manualFlyFieldingState.fieldingPointIsLanding === true, "manual fly catches should use the landing marker as the catch point");
-
-const manualBouncedFlyPickupState = JSON.parse(runInGame(
-  context,
-  `(() => {
-    const flyBall = buildBattedBall(0.72, normalize({ x: 0.18, y: -1 }), hitLabels.fly);
-    const landing = { ...flyBall.target };
-    const fielder = { role: "R", x: landing.x + 10, y: landing.y + 8, currentX: landing.x + 10, currentY: landing.y + 8, speed: 7, fielding: 7, arm: 6 };
-    defenseState = {
-      ...createDefenseState(),
-      active: true,
-      startTime: performance.now(),
-      manualFielding: true,
-      manualFieldingComplete: false,
-      battedBall: flyBall,
-      landingTarget: landing,
-      target: landing,
-      chosenFielder: fielder,
-      fielders: [fielder],
-      runner: createBatterRunner(findById(batters, "suzuki")),
-      outcome: createManualFieldingPendingOutcome({ kind: "single", scoreType: "single" }, flyBall),
-      manualCatchRadius: 0
-    };
-    ball.x = landing.x;
-    ball.y = landing.y;
-    resolveUnifiedFielderCircleCatch(flyBall.ballTime + 0.42);
-    return JSON.stringify({
-      pickedUpAfterBounce: defenseState.manualFieldingComplete === true,
-      needsThrowAfterBounce: defenseState.outcome.needsThrow === true,
-      throwWaitsForCommand: defenseState.throw && !Number.isFinite(defenseState.throw.startTime),
-      pickupKind: defenseState.outcome.kind
-    });
-  })()`
-));
-
-assert(manualBouncedFlyPickupState.pickedUpAfterBounce === true, "manual fielders should be able to pick up fly balls after they bounce");
-assert(manualBouncedFlyPickupState.needsThrowAfterBounce === true, "bounced fly pickups should create a throw play");
-assert(manualBouncedFlyPickupState.throwWaitsForCommand === true, "bounced fly pickups should wait for a manual throw command");
 
 const linkedRunningState = JSON.parse(runInGame(
   context,
@@ -8622,8 +8260,8 @@ const linkedRunningState = JSON.parse(runInGame(
         arrived: true
       }]
     };
-    const noPassTarget = getBatterRunnerNoPassTargetBase("third", 0);
-    setBatterRunnerManualDestination(noPassBatterRunner, noPassTarget, 0);
+    const noPassTarget = getSequentialBatterRunnerTargetBase(noPassBatterRunner, "third", "advance");
+    setBatterRunnerManualDestination(noPassBatterRunner, noPassTarget || "second", 0);
     const noPassBatterTarget = noPassBatterRunner.targetBase;
 
     bases = createEmptyBases();
@@ -8673,7 +8311,7 @@ assert(linkedRunningState.secondRunnerTarget === "third", "runner on second shou
 assert(linkedRunningState.batterOnSecond === true, "batter-runner should be placed on second after a safe manual second-base attempt");
 assert(linkedRunningState.runnerOnThird === true, "linked runner from second should be placed on third");
 assert(linkedRunningState.runsAfterSecond === 0, "second-to-third linked running should not score");
-assert(linkedRunningState.noPassTarget === "second", "batter-runners should only advance into the base vacated by the runner ahead");
+assert(linkedRunningState.noPassTarget === null, "batter-runners should not be able to skip a base to overtake the runner ahead");
 assert(linkedRunningState.noPassBatterTarget === "second", "batter-runners should be capped before overtaking a leading runner");
 assert(linkedRunningState.thirdRunnerTarget === "home", "runner on third should advance home when the batter-runner targets third");
 assert(linkedRunningState.runsAfterThird === 1, "third-to-home linked running should score one run");
@@ -9693,9 +9331,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       ballTime: 0.58,
       power: 1.08
     };
-    const hardHigh = getDifficultHardBallCatch({ ...second, fielding: 9 }, difficultGrounder, 0.78, difficultGrounder.ballTime, 0.52);
-    const hardLow = getDifficultHardBallCatch({ ...second, fielding: 2 }, difficultGrounder, 0.78, difficultGrounder.ballTime, 0.52);
-    const hardMiss = getDifficultHardBallCatch({ ...second, fielding: 10 }, difficultGrounder, 1.4, difficultGrounder.ballTime, 0.01);
     const closeHardBall = {
       ...hardGrounder,
       target: { x: second.x + 42, y: second.y + 8 },
@@ -9704,8 +9339,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       power: 1.18
     };
     const closePoint = { x: second.x + 36, y: second.y + 6 };
-    const closeHigh = getCloseHardBallCatch({ ...second, fielding: 9 }, closeHardBall, closePoint, 0.9);
-    const closeLowMiss = getCloseHardBallCatch({ ...second, fielding: 1 }, closeHardBall, closePoint, 0.9);
     const closeOutcomeFielder = { ...second, fielding: 9, distanceToTarget: 520, fieldingPoint: closePoint };
     Math.random = () => 0.99;
     const closeOutcome = resolveDefenseOutcome(closeOutcomeFielder, closeHardBall, runner);
@@ -9718,8 +9351,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       power: 0.58
     };
     const moderatePoint = { x: second.x + 48, y: second.y + 4 };
-    const moderateHigh = getCloseHardBallCatch({ ...second, fielding: 9 }, moderateGrounder, moderatePoint, 0.9);
-    const moderateLow = getCloseHardBallCatch({ ...second, fielding: 1 }, moderateGrounder, moderatePoint, 0.9);
     const moderateOutcome = resolveDefenseOutcome(
       { ...second, fielding: 9, distanceToTarget: 480, fieldingPoint: moderatePoint },
       moderateGrounder,
@@ -9734,8 +9365,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
     };
     const frontPoint = getClosestPointOnBattedBallRoute(second, frontGrounder);
     const frontRelation = getBattedBallFielderRelation(second, { ...frontGrounder, target: frontPoint });
-    const frontHighPickup = getInfielderFrontGrounderPickup({ ...second, speed: 8, fielding: 9 }, frontGrounder, frontPoint, frontRelation);
-    const frontLowPickup = getInfielderFrontGrounderPickup({ ...second, speed: 1, fielding: 1 }, frontGrounder, frontPoint, frontRelation);
     const frontHighOutcome = resolveDefenseOutcome(
       { ...second, speed: 8, fielding: 9, distanceToTarget: 430, fieldingPoint: frontPoint },
       frontGrounder,
@@ -9760,7 +9389,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       ballTime: 0.42,
       power: 0.92
     };
-    const widenedCloseCatch = getCloseHardBallCatch(second, widenedCloseGrounder, widenedClosePoint, 0.1);
     Math.random = () => 0.99;
     const routeBodyOutcome = resolveDefenseOutcome(
       { ...second, speed: 2, fielding: 2, distanceToTarget: 520, fieldingPoint: routeBodyPoint },
@@ -9776,8 +9404,6 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       power: 1.18
     };
     const errorRelation = getBattedBallFielderRelation(second, { ...errorShot, target: errorShot.target });
-    const highError = getHardShotFieldingError({ ...second, fielding: 10 }, errorShot, errorRelation, 0.08);
-    const lowError = getHardShotFieldingError({ ...second, fielding: 2 }, errorShot, errorRelation, 0.08);
     Math.random = () => 0.01;
     const errorOutcome = resolveDefenseOutcome(
       { ...second, fielding: 2, distanceToTarget: 32, fieldingPoint: errorShot.target },
@@ -9992,36 +9618,16 @@ const infieldTakeoverAndCatchState = JSON.parse(runInGame(
       marginalLinerCaught: marginalLinerOutcome.caught,
       marginalLinerScoreType: marginalLinerOutcome.scoreType,
       pitcherRouteUsesCutoff,
-      highDifficultCaught: hardHigh.caught,
-      lowDifficultCaught: hardLow.caught,
-      highDifficultChance: hardHigh.chance,
-      lowDifficultChance: hardLow.chance,
-      tooLateCaught: hardMiss.caught,
-      closeHighCaught: closeHigh.caught,
-      closeLowMissCaught: closeLowMiss.caught,
-      closeHighChance: closeHigh.chance,
-      closeLowChance: closeLowMiss.chance,
       closeOutcomeCaught: closeOutcome.caught,
       closeOutcomeLabel: closeOutcome.label,
-      moderateHighCaught: moderateHigh.caught,
-      moderateLowCaught: moderateLow.caught,
-      moderateHighChance: moderateHigh.chance,
-      moderateLowChance: moderateLow.chance,
       moderateOutcomeCaught: moderateOutcome.caught,
       moderateOutcomeNeedsThrow: moderateOutcome.needsThrow,
-      frontHighPickupCaught: frontHighPickup.caught,
-      frontLowPickupCaught: frontLowPickup.caught,
       frontHighOutcomeCaught: frontHighOutcome.caught,
       frontHighOutcomeNeedsThrow: frontHighOutcome.needsThrow,
       widenedRouteBodyCaught: widenedRouteBodyCatch.caught,
-      widenedCloseCaught: widenedCloseCatch.caught,
       routeBodyOutcomeCaught: routeBodyOutcome.caught,
       routeBodyOutcomeNeedsThrow: routeBodyOutcome.needsThrow,
       routeBodyOutcomeKind: routeBodyOutcome.kind,
-      highErrorChance: highError.chance,
-      lowErrorChance: lowError.chance,
-      highErrorTriggered: highError.error,
-      lowErrorTriggered: lowError.error,
       errorOutcomeIsError: errorOutcome.fieldingError === true,
       errorOutcomeCaught: errorOutcome.caught,
       laneHighCaught: laneHigh.caught,
@@ -10125,7 +9731,6 @@ const liveInfielderContactState = JSON.parse(runInGame(
     defenseState = {
       ...createDefenseState(),
       active: true,
-      manualFielding: false,
       startTime: performance.now() - 700,
       duration: 2400,
       battedBall,
@@ -10136,9 +9741,9 @@ const liveInfielderContactState = JSON.parse(runInGame(
       landingTarget: battedBall.target,
       runner: createBatterRunner(activeBatter)
     };
-    ball.x = second.currentX + getLiveInfielderContactRadius(second, battedBall) * 0.45;
+    ball.x = second.currentX + getFielderCatchRangeRadius(second, battedBall) * 0.45;
     ball.y = second.currentY;
-    const liveCaught = resolveLiveInfielderContactCatch(0.7);
+    const liveCaught = resolveUnifiedFielderCircleCatch(0.7);
     const weakGroundRange = getFielderCatchRangeRadius({ fielding: 1 }, { isGrounder: true, trajectory: "grounder" });
     const eliteGroundRange = getFielderCatchRangeRadius({ fielding: 10 }, { isGrounder: true, trajectory: "grounder" });
     const eliteFlyRange = getFielderCatchRangeRadius({ fielding: 10 }, { isGrounder: false, isLiner: false, trajectory: "fly" });
@@ -10149,7 +9754,6 @@ const liveInfielderContactState = JSON.parse(runInGame(
       outcomeNeedsThrow: defenseState.outcome.needsThrow,
       chosenRole: defenseState.chosenFielder.role,
       rangeDebugEnabled: showFielderCatchRangeDebug,
-      liveRadiusGreaterThanBase: getLiveInfielderContactRadius(second, battedBall) > getFielderCatchRangeRadius(second, battedBall),
       weakGroundRange,
       eliteGroundRange,
       eliteFlyRange,
@@ -10288,7 +9892,6 @@ const hardOutfieldGrounderInfielderState = JSON.parse(runInGame(
       distanceToTarget: 0
     };
     const bodyCatch = getInfielderRouteBodyCatch(routeFielder, battedBall, fieldingPoint);
-    const closeCatch = getCloseHardBallCatch(routeFielder, battedBall, fieldingPoint, 0.1);
     const originalRandom = Math.random;
     Math.random = () => 0.99;
     const outcome = resolveDefenseOutcome(routeFielder, battedBall, createBatterRunner(activeBatter));
@@ -10296,7 +9899,6 @@ const hardOutfieldGrounderInfielderState = JSON.parse(runInGame(
     return JSON.stringify({
       playable: isHardGrounderInfieldPlayable(battedBall),
       bodyCaught: bodyCatch.caught,
-      closeCaught: closeCatch.caught,
       outcomeCaught: outcome.caught,
       needsThrow: outcome.needsThrow,
       outcomeLabel: outcome.label
@@ -10305,7 +9907,7 @@ const hardOutfieldGrounderInfielderState = JSON.parse(runInGame(
 ));
 
 assert(hardOutfieldGrounderInfielderState.playable === true, "hard grounders headed into the outfield should still be playable by nearby infielders");
-assert(hardOutfieldGrounderInfielderState.bodyCaught === true || hardOutfieldGrounderInfielderState.closeCaught === true, "nearby infielders should get a catch chance on hard outfield-bound grounders");
+assert(hardOutfieldGrounderInfielderState.bodyCaught === true, "nearby infielders should get a catch chance on hard outfield-bound grounders");
 assert(hardOutfieldGrounderInfielderState.outcomeCaught === true && hardOutfieldGrounderInfielderState.needsThrow === true, "fielded hard outfield-bound grounders should become infield throw plays");
 
 const randomGrounderAndInfielderChaseState = JSON.parse(runInGame(
