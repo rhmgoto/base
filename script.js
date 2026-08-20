@@ -12,6 +12,8 @@ function byId(id) {
 const shell = document.querySelector(".game-shell");
 const menu = byId("startMenu");
 const menuButton = byId("menuButton");
+const menuBackButton = byId("menuBackButton");
+const resultMenuButton = byId("resultMenuButton");
 const startButton = byId("startButton");
 const menuModeButtons = Array.from(document.querySelectorAll(".menu-mode-button"));
 const menuModePanels = Array.from(document.querySelectorAll(".mode-panel"));
@@ -1034,13 +1036,8 @@ const defenseRollTuning = {
 const outfieldFenceFieldingInset = 36;
 
 const deepDriveTuning = {
-  minPowerHitter: 8,
   minPower: 1.34,
-  maxPower: 3.08,
-  powerStep: 0.34,
-  qualityBonus: 0.48,
-  sweetSpotBonus: 0.54,
-  timingPenaltyScale: 940
+  maxPower: 3.08
 };
 const bigOutfieldFlyHeightScale = 1.5;
 const bigOutfieldFlyDistanceScale = 0.92;
@@ -1134,12 +1131,7 @@ const infieldGrounderTuning = {
   hardPowerMax: 1.38
 };
 const defenseRangeTuning = {
-  closeHardBallRadius: 204,
-  closeHardBallBaseChance: 0.58,
-  closeHardBallFieldingChance: 0.045,
-  difficultCatchTimeWindow: 0.58,
-  difficultCatchBaseChance: 0.16,
-  difficultCatchFieldingChance: 0.084
+  closeHardBallRadius: 204
 };
 
 // 大花火球場の背景画像で、芝とフェンスが接する位置を5度刻みで採取した点列。
@@ -4990,6 +4982,7 @@ function endHomeRunDerby() {
   gamePhase = "gameover";
   shell?.classList.add("result-open");
   shell?.classList.remove("menu-open");
+  resultMenuButton.focus?.();
   ball.active = false;
   pendingPitch = null;
   isPitching = false;
@@ -7035,6 +7028,12 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
     return;
   }
 
+  if (gamePhase === "gameover") {
+    if (team === "away" && justPressed(gamepadButtons.A)) showMenu();
+    gamepadState.previousButtons[team] = pressed;
+    return;
+  }
+
   if (justPressed(gamepadButtons.PAUSE) && openPauseMenu(team)) {
     gamepadState.previousButtons[team] = pressed;
     return;
@@ -7485,11 +7484,26 @@ function getStealThrowBallColor(throwState) {
 function resolveSteal(isOut) {
   if (!stealState.active || stealState.resolved) return;
   const mvpBeforeState = captureMvpGameState();
+  const stealBattingTeam = battingTeam;
+  // 三振は捕手の送球・タッチより先に成立する。二死なら三振が3アウト目なので、
+  // その後の盗塁死を4つ目のアウトとして記録しない。
+  const pendingThirdStrike = stealState.pitchResultPending && count.strikes >= 3;
+  if (pendingThirdStrike) {
+    stealState.pitchResultPending = false;
+    checkCountEnd();
+    const inningEnded = battingTeam !== stealBattingTeam || Boolean(pendingGameEnd) || gamePhase === "gameover";
+    if (inningEnded) {
+      stealState = createStealState();
+      scheduleNextComputerPitchAfterJudgment();
+      return;
+    }
+  }
   stealState.resolved = true;
   const runner = stealState.runner;
   if (isOut) {
     bases[stealState.startBase] = null;
     count.outs += 1;
+    recordLastOutBatter(battingTeam, runner);
     recordCurrentPitcherOuts(1);
     message = `${getBaseLabel(stealState.targetBase)}盗塁アウト`;
     showEffect("盗塁アウト", "#ffcf70");
@@ -9906,7 +9920,8 @@ function createRunnerResult(runnerInfo, startBase, targetBase, options = {}) {
     startBase: start,
     targetBase: targetBase || start,
     out: Boolean(options.out),
-    forceUnearned: Boolean(options.forceUnearned)
+    forceUnearned: Boolean(options.forceUnearned),
+    scoreTime: Number.isFinite(options.scoreTime) ? options.scoreTime : null
   };
 }
 
@@ -9935,6 +9950,7 @@ function findAvailableBaseIndex(nextBases, startIndex, targetIndex) {
 
 function applyRunnerResults(results, options = {}) {
   const allowRuns = options.allowRuns !== false;
+  const scoringDeadline = Number.isFinite(options.scoringDeadline) ? options.scoringDeadline : null;
   const nextBases = createEmptyBases();
   const scoringResponsiblePitcherIds = [];
   const scoringEarnedRunFlags = [];
@@ -9949,6 +9965,9 @@ function applyRunnerResults(results, options = {}) {
       if (result.out) return;
       const targetIndex = getRunnerResultTargetIndex(result);
       if (targetIndex >= 4) {
+        const reachedBeforeThirdOut = scoringDeadline === null
+          || (Number.isFinite(result.scoreTime) && result.scoreTime < scoringDeadline);
+        if (!allowRuns || !reachedBeforeThirdOut) return;
         runs += 1;
         trackScoringRunner(result.runnerInfo, scoringResponsiblePitcherIds, scoringEarnedRunFlags, {
           forceUnearned: result.forceUnearned
@@ -9964,14 +9983,29 @@ function applyRunnerResults(results, options = {}) {
   if (options.commit === false) return { runs, bases: nextBases, scoringRunners };
 
   bases = nextBases;
-  const scoredRuns = allowRuns ? runs : 0;
-  recordScoringRunners(battingTeam, allowRuns ? scoringRunners : []);
-  addRunsToBattingTeam(scoredRuns, allowRuns ? scoringResponsiblePitcherIds : [], {
+  const scoredRuns = getCountedRunsForCurrentPlay(runs, options);
+  const countedScoringRunners = scoringRunners.slice(0, scoredRuns);
+  const countedResponsiblePitcherIds = scoringResponsiblePitcherIds.slice(0, scoredRuns);
+  const countedEarnedRunFlags = scoringEarnedRunFlags.slice(0, scoredRuns);
+  recordScoringRunners(battingTeam, countedScoringRunners);
+  addRunsToBattingTeam(scoredRuns, countedResponsiblePitcherIds, {
     homer: Boolean(options.homer),
-    earnedRunFlags: allowRuns ? scoringEarnedRunFlags : []
+    earnedRunFlags: countedEarnedRunFlags
   });
   playScoringCheer(scoredRuns);
-  return { runs: scoredRuns, bases: nextBases, scoringRunners };
+  return { runs: scoredRuns, bases: nextBases, scoringRunners: countedScoringRunners };
+}
+
+// サヨナラ本塁打以外は、勝ち越しに必要な得点が入った時点で試合終了。
+// 本塁打だけは打者走者を含む全走者の得点を認める。
+function getCountedRunsForCurrentPlay(runs, options = {}) {
+  if (runs <= 0 || options.allowRuns === false) return 0;
+  if (options.homer || isAnyPracticeMode()) return runs;
+  const secondBatTeam = getSecondBatTeam();
+  if (inning < maxInnings || half !== "bottom" || battingTeam !== secondBatTeam) return runs;
+  const runsNeededToWin = scores[firstBatTeam] - scores[secondBatTeam] + 1;
+  if (runsNeededToWin <= 0) return 0;
+  return Math.min(runs, runsNeededToWin);
 }
 
 // 打者が一塁へ走ることで、詰まっている塁の走者は進むしかない。
@@ -10126,12 +10160,30 @@ function getExtraRunnerAdvance(base, type, runner, battedBall, outcome, fielder 
   return 0;
 }
 
+// 前を走る走者を追い越すことはできないので、三塁側から順に行き先を決めて、
+// 決まった塁を後ろの走者の上限にする。以前は走者ごとに独立して決めていたため、
+// 一塁走者と二塁走者がそろって三塁を目指し、最後の占有チェックで後ろの走者が
+// 押し戻されていた (打者走者が単打扱いになる原因のひとつ)。
 function createDefenseBaseRunnerAnimations(outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
-  return [
-    createDefenseBaseRunner("first", bases.first, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState),
-    createDefenseBaseRunner("second", bases.second, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState),
-    createDefenseBaseRunner("third", bases.third, outcome, battedBall, throwState, fielder, fieldingTarget, hitAndRunState)
-  ].filter(Boolean);
+  const runners = [];
+  let maxAdvanceIndex = 4;
+  ["third", "second", "first"].forEach((baseName) => {
+    const runner = createDefenseBaseRunner(
+      baseName,
+      bases[baseName],
+      outcome,
+      battedBall,
+      throwState,
+      fielder,
+      fieldingTarget,
+      hitAndRunState,
+      maxAdvanceIndex
+    );
+    if (!runner) return;
+    runners.push(runner);
+    maxAdvanceIndex = Math.max(0, getBatterRunnerTargetIndex(runner.targetBase) - 1);
+  });
+  return runners.reverse();
 }
 
 // プレー途中で進塁の判断が変わったときに走者を丸ごと作り直すと、
@@ -10163,7 +10215,9 @@ function shouldKeepLiveDefenseBaseRunner(runner) {
   return Boolean(runner.running) && !runner.arrived;
 }
 
-function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null) {
+// maxAdvanceIndex は「前を走る走者に追いつかないための上限」。
+// 前の走者が三塁で止まるなら、後ろの走者は二塁までしか進めない。
+function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, throwState = null, fielder = null, fieldingTarget = null, hitAndRunState = null, maxAdvanceIndex = 4) {
   if (!runnerInfo) return null;
   const startBase = baseIndexByName[baseName];
   const manualBaserunning = isManualBaserunningControl();
@@ -10174,9 +10228,10 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
     ? "double"
     : manualBaserunning && automaticAdvanceType && !tagUp && !groundOutAdvance ? "single" : automaticAdvanceType;
   const extraAdvance = manualBaserunning ? 0 : getExtraRunnerAdvance(startBase, advanceType, runnerInfo, battedBall, outcome, fielder, fieldingTarget);
-  const nextBase = advanceType
+  const requestedBase = advanceType
     ? Math.min(4, startBase + getBaseAdvanceSteps(advanceType) + (advanceType === "tagup" ? 0 : extraAdvance))
     : startBase;
+  const nextBase = Math.max(startBase, Math.min(requestedBase, maxAdvanceIndex));
   const route = createBaseRunnerRoute(startBase, nextBase);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
   const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase);
@@ -15674,11 +15729,6 @@ function getSoftOutfieldDropRollProgress(progress, battedBall = defenseState.bat
   return getNaturalRollingProgress(Math.pow(t, 1.08), battedBall, 0.08);
 }
 
-function getSmoothPostLandingRollProgress(progress, easeOutExponent = 1.72, startExponent = 1.12) {
-  const t = clamp(progress, 0, 1);
-  return 1 - Math.pow(1 - Math.pow(t, startExponent), easeOutExponent);
-}
-
 function getBattedBallRollSpeedRatio(battedBall) {
   const powerRatio = clamp(battedBall?.power ?? 0.55, 0, 1.35) / 1.35;
   const exitSpeedRatio = Number.isFinite(battedBall?.exitSpeedKmh)
@@ -15897,13 +15947,22 @@ function finishDefensePlay() {
       recordLastOutFromDefense(forceOutBases, throwOutRunner);
       recordPitcherOuts(fieldingTeam(), defendingPitcher, outsToAdd);
       adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
-      // 3アウト目が成立した場合、その回の追加得点は認めない。
+      const caughtMadeThirdOut = caughtBatterOut && outsBeforePlay >= 2;
+      const forceMadeThirdOut = isForceOut && outsToAdd > 0 && count.outs >= 3;
+      const tagMadeThirdOut = !isForceOut && outsToAdd > 0 && count.outs >= 3 && !caughtMadeThirdOut;
+      // フォースアウトと打者走者のアウトでは得点なし。タッチアウトが3つ目なら、
+      // タッチより先に本塁へ到達した走者だけを得点として認める。
+      const thirdOutScoringOptions = caughtMadeThirdOut || forceMadeThirdOut
+        ? { allowRuns: false }
+        : tagMadeThirdOut
+          ? { allowRuns: true, scoringDeadline: getDefenseThirdOutTime() }
+          : { allowRuns: true };
       const runs = resolveDefensePlayBaseState({
         batterInfo: activeBatter,
         forceOutBases: isForceOut ? forceOutBases : [],
         outRunners: isForceOut ? [] : [throwOutRunner],
         batterOut: caughtBatterOut,
-        allowRuns: count.outs < 3
+        ...thirdOutScoringOptions
       });
       const batterResultType = caughtBatterOut
         ? getCaughtOutBatterResultType(runs)
@@ -15945,7 +16004,7 @@ function finishDefensePlay() {
       const useDefenseAnimation = (outcome.kind === "force" && defenseState.baseRunners?.length)
         || shouldUseAnimatedBatterRunnerBaseState();
       const runs = useDefenseAnimation
-        ? resolveDefensePlayBaseState({ batterInfo: activeBatter })
+        ? resolveDefensePlayBaseState({ batterInfo: activeBatter, homer: hitRecordType === "homer" })
         : advanceRunners(advanceType, activeBatter, defenseState.battedBall, outcome);
       recordBatterPlateAppearance(!outcome.fieldingError && outcome.kind === "force" ? hitRecordType : "fielderChoice", { runs });
       const baseLabel = defenseState.throw?.baseLabel || "一塁";
@@ -15992,7 +16051,7 @@ function finishDefensePlay() {
     if (scoringHitTypes.has(hitRecordType)) recordPitcherHitAllowed(fieldingTeam(), defendingPitcher, 1);
     if (hitRecordType === "homer") recordPitcherStat(fieldingTeam(), defendingPitcher, "homeRunsAllowed", 1);
     const runs = shouldUseAnimatedBatterRunnerBaseState()
-      ? resolveDefensePlayBaseState({ batterInfo: activeBatter })
+      ? resolveDefensePlayBaseState({ batterInfo: activeBatter, homer: hitRecordType === "homer" })
       : advanceRunners(scoreType, activeBatter, defenseState.battedBall, outcome);
     recordBatterPlateAppearance(hitRecordType, { runs });
     const label = getHitLabelByScoreType(hitRecordType);
@@ -16026,6 +16085,16 @@ function getDefensePlayElapsedSeconds() {
   if (!Number.isFinite(defenseState.startTime)) return null;
   const elapsed = (performance.now() - defenseState.startTime) / 1000;
   return Number.isFinite(elapsed) ? elapsed : null;
+}
+
+function getDefenseThirdOutTime() {
+  return defenseState.throw?.tagTime ?? defenseState.throw?.endTime ?? null;
+}
+
+function getDefenseRunnerScoreTime(runner) {
+  if (!runner) return null;
+  const arrivalTime = getRunnerArrivalTimeAtBaseIndex(runner, 4);
+  return Number.isFinite(arrivalTime) ? arrivalTime : null;
 }
 
 // 走路上のどこまで塁を踏み終えたか。到達前に判定が下りた走者を、実際には
@@ -16104,7 +16173,10 @@ function resolveDefensePlayBaseState(options = {}) {
       runner,
       runner.startBase,
       finalIndex >= 4 ? "home" : baseNameByIndex[finalIndex] || runner.startBase,
-      { out: outStartBases.has(runner.startBase) }
+      {
+        out: outStartBases.has(runner.startBase),
+        scoreTime: finalIndex >= 4 ? getDefenseRunnerScoreTime(runner) : null
+      }
     ));
   });
 
@@ -16121,10 +16193,17 @@ function resolveDefensePlayBaseState(options = {}) {
   }
 
   if (batterInfo) {
-    results.push(createRunnerResult(makeBaseRunner(batterInfo), "batter", batterBase, { out: batterOut }));
+    results.push(createRunnerResult(makeBaseRunner(batterInfo), "batter", batterBase, {
+      out: batterOut,
+      scoreTime: batterBase === "home" ? getDefenseRunnerScoreTime(defenseState.runner) : null
+    }));
   }
 
-  return applyRunnerResults(results, { allowRuns: options.allowRuns }).runs;
+  return applyRunnerResults(results, {
+    allowRuns: options.allowRuns,
+    scoringDeadline: options.scoringDeadline,
+    homer: options.homer
+  }).runs;
 }
 
 function getForcedRunnerStartBaseForTarget(targetBase) {
@@ -16206,6 +16285,7 @@ function hasDefenseOutAdvancements() {
 // プレー終了時に走り切れていない走者は踏み終えた塁で止める。
 function applyDefenseOutAdvancements() {
   if (count.outs >= 3) return 0;
+  const outsBeforeAdvancements = count.outs;
   const advancingRunners = defenseState.baseRunners?.filter((runner) => runner.tagUp || runner.groundOutAdvance) || [];
   if (!advancingRunners.length) return 0;
   const advancingByStartBase = new Map(
@@ -16229,7 +16309,10 @@ function applyDefenseOutAdvancements() {
       recordLastOutBatter(battingTeam, runner);
     }
     const targetBase = getSettledRunnerBase(runner, resolutionTime) || baseName;
-    results.push(createRunnerResult(runner, baseName, targetBase, { out: tagUpOut }));
+    results.push(createRunnerResult(runner, baseName, targetBase, {
+      out: tagUpOut,
+      scoreTime: targetBase === "home" ? getDefenseRunnerScoreTime(runner) : null
+    }));
   }
 
   if (tagUpOuts > 0) {
@@ -16239,7 +16322,11 @@ function applyDefenseOutAdvancements() {
     if (outsToAdd > 0) adjustPitcherStamina(getTeamActivePitcher(fieldingTeam()), staminaTuning.outRecovery);
     defenseState.tagUpOutsAdded = (defenseState.tagUpOutsAdded || 0) + outsToAdd;
   }
-  return applyRunnerResults(results, { allowRuns: count.outs < 3 }).runs;
+  const tagMadeThirdOut = outsBeforeAdvancements < 3 && count.outs >= 3 && tagUpOuts > 0;
+  return applyRunnerResults(results, {
+    allowRuns: true,
+    scoringDeadline: tagMadeThirdOut ? getDefenseThirdOutTime() : null
+  }).runs;
 }
 
 function isTagUpRunnerSafe(runner) {
@@ -16360,6 +16447,7 @@ function finishGameEnd(reasonLabel = "") {
   gamePhase = "gameover";
   shell?.classList.add("result-open");
   shell?.classList.remove("menu-open");
+  resultMenuButton.focus?.();
   const result = scores.away === scores.home ? "引き分け" : scores.away > scores.home ? "チームA勝利" : "チームB勝利";
   message = `${reasonLabel ? `${reasonLabel} ` : ""}試合終了 ${scores.away}-${scores.home} ${result}`;
   showEffect(result, "#ff6f61");
@@ -21637,25 +21725,6 @@ function drawBall() {
   ctx.globalAlpha = 1;
 }
 
-function drawSpecialPitchGlow(x, y, radius = ball.radius) {
-  const time = performance.now();
-  const pulse = 0.5 + Math.sin(time / 82) * 0.5;
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(255, 230, 120, ${0.52 + pulse * 0.18})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 207, 112, 0.42)";
-  ctx.lineWidth = 2;
-  drawLine(x - 18, y + 4, x - 7, y + 1);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
-  ctx.lineWidth = 1.4;
-  drawLine(x - 13, y - 3, x - 5, y - 2);
-  ctx.restore();
-}
-
 function drawBaseballIcon(x, y, radius = ball.radius, fill = "#ffffff", spin = ball.spin) {
   const leatherGradient = ctx.createRadialGradient(
     x - radius * 0.35,
@@ -23186,6 +23255,8 @@ homeRunDerbyHomeBatterSelect?.addEventListener("change", () => {
   homeRunDerbyBatterIds.home = homeRunDerbyHomeBatterSelect.value;
 });
 menuButton.addEventListener("click", showMenu);
+menuBackButton.addEventListener("click", () => updateMenuModeView("main"));
+resultMenuButton.addEventListener("click", showMenu);
 playerEditorButton?.addEventListener("click", openPlayerEditor);
 playerEditorClose?.addEventListener("click", closePlayerEditor);
 playerEditorKind?.addEventListener("change", () => {
