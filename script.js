@@ -1053,6 +1053,14 @@ const effectiveBatterPowerScale = 0.9;
 const goodContactEaseScale = 1.2;
 
 const defenseThrowResultHoldSeconds = 2.0;
+// 打球が出た時点で塁上の走者がどれだけ前に出ているか (px)。塁間は869px。
+// 走力5で 100 + 5*11 = 155px ≒ 18%。実際の野球の一次リード＋二次リードに合わせている。
+// airBallScale はフライ・ライナーのときの倍率で、戻る用意が要るぶん浅くする。
+const runnerLeadTuning = {
+  baseLead: 100,
+  perRunRating: 11,
+  airBallScale: 0.75
+};
 const runnerSpeedScale = 0.85;
 const runnerSpeedBaseRun = 3.5;
 const runnerSpeedUnit = 27.84375;
@@ -1078,8 +1086,8 @@ const cpuExtraBaseRunningTuning = {
 // ときだけ走る (守備は一塁で打者を刺す方を選ぶ)」という形にする。
 // 必要な距離は塁間を1.0とした比で、走力が低いほど遠くを要求する。
 const cpuThirdRunnerGroundOutTuning = {
-  minimumFieldingDistanceRatio: 0.6,
-  slowRunnerDistancePenalty: 0.25,
+  safetyMargin: 0.05,
+  slowRunnerMargin: 0.3,
   minimumRunRating: 4
 };
 
@@ -10211,7 +10219,9 @@ function createDefenseBaseRunnerAnimations(outcome, battedBall, throwState = nul
     );
     if (!runner) return;
     runners.push(runner);
-    maxAdvanceIndex = Math.max(0, getBatterRunnerTargetIndex(runner.targetBase) - 1);
+    // 生還した走者は塁を塞がないので、後ろの走者の上限は本塁のまま。
+    const leadIndex = getBatterRunnerTargetIndex(runner.targetBase);
+    maxAdvanceIndex = leadIndex >= 4 ? 4 : Math.max(0, leadIndex - 1);
   });
   return runners.reverse();
 }
@@ -10264,7 +10274,7 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const nextBase = Math.max(startBase, Math.min(requestedBase, maxAdvanceIndex));
   const route = createBaseRunnerRoute(startBase, nextBase);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
-  const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase);
+  const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase, tagUp);
   const leadMaxRatio = isHitAndRunRunnerForBase(baseName, runnerInfo, hitAndRunState) ? 0.995 : 0.82;
   const ledRoute = applyRunnerLeadToRoute(route, startLeadDistance, leadMaxRatio);
   const routeStartTime = tagUp ? Math.max(0, outcome.fieldingTime ?? battedBall?.ballTime ?? 0) : 0;
@@ -10372,23 +10382,39 @@ function shouldCpuThirdRunnerTryHomeOnGroundOut(runnerInfo, outcome, battedBall,
   if (outcome.kind !== "force" || outcome.fieldingError) return false;
   const runRating = getOpenEndedAbilityRating(runnerInfo?.run ?? 5);
   if (runRating < cpuThirdRunnerGroundOutTuning.minimumRunRating) return false;
-  const basePathDistance = getRunnerRouteDistance(createBaseRunnerRoute(3, 4));
-  if (!(basePathDistance > 0)) return false;
-  const home = getFenceCenter();
-  const fieldingDistance = Math.hypot(fieldingTarget.x - home.x, fieldingTarget.y - home.y);
-  const requiredRatio = cpuThirdRunnerGroundOutTuning.minimumFieldingDistanceRatio
-    + clamp((7 - runRating) / 6, 0, 1) * cpuThirdRunnerGroundOutTuning.slowRunnerDistancePenalty;
-  return fieldingDistance / basePathDistance >= requiredRatio;
+  const runnerArrival = estimateThirdRunnerHomeArrival(runnerInfo, battedBall);
+  const defenseArrival = estimateDefenseThrowArrivalFromFieldingPoint("home", outcome, battedBall, fieldingTarget, fielder);
+  if (!Number.isFinite(runnerArrival) || !Number.isFinite(defenseArrival)) return false;
+  // 走力が低い走者ほど大きな余裕を求めさせ、際どい場面では自重させる。
+  const requiredMargin = cpuThirdRunnerGroundOutTuning.safetyMargin
+    + clamp((7 - runRating) / 6, 0, 1) * cpuThirdRunnerGroundOutTuning.slowRunnerMargin;
+  return defenseArrival - runnerArrival >= requiredMargin;
 }
 
-function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null) {
+// 三塁走者はリードのぶんだけ本塁に近いところから走り出す。
+// リードを無視すると到達時刻を実際より遅く見積もり、走れる場面でも自重してしまう。
+function estimateThirdRunnerHomeArrival(runnerInfo, battedBall) {
+  const speed = getDefenseBaseRunnerSpeed(runnerInfo);
+  if (!(speed > 0)) return null;
+  const distance = getRunnerRouteDistance(createBaseRunnerRoute(3, 4));
+  const lead = getDefenseRunnerStartLeadDistance("third", runnerInfo, battedBall, null, null, 4, false);
+  return Math.max(0, distance - lead) / speed;
+}
+
+function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null, tagUp = false) {
   if (!baseName || !runnerInfo || !battedBall) return 0;
   const startBase = baseIndexByName[baseName];
   if (startBase < 1 || startBase > 3) return 0;
   if (!nextBase || nextBase <= startBase) return 0;
   const run = getOpenEndedAbilityRating(runnerInfo.run ?? 5);
-  // run=5 (平均) で塁間の約10%のリードになるよう係数を調整 (26 + 5*12.2 ≒ 87px ≒ 塁間868pxの10%)。
-  const normalLead = battedBall.isGrounder ? 26 + run * 12.2 : 0;
+  // 塁上の走者は一次リードと二次リードで、打球が出るころには塁間の2割ほど前に出ている。
+  // run=5 (平均) で 155px ≒ 塁間869pxの18%。
+  // フライとライナーは戻る用意が要るぶんリードが浅いので leadTrajectoryScale を掛ける。
+  // タッチアップだけは捕球後に塁を踏み直すので、リードを与えてはいけない。
+  const leadTrajectoryScale = battedBall.isGrounder ? 1 : runnerLeadTuning.airBallScale;
+  const normalLead = tagUp
+    ? 0
+    : (runnerLeadTuning.baseLead + run * runnerLeadTuning.perRunRating) * leadTrajectoryScale;
   const isHitAndRunRunner = hitAndRunState?.active
     && hitAndRunState.startBase === baseName
     && (!hitAndRunState.runnerId || hitAndRunState.runnerId === runnerInfo.id || hitAndRunState.runnerId === runnerInfo.name);
@@ -10883,7 +10909,7 @@ function startDefensePlay(label, kind, power, timeDiff, hitDirection = null, bat
   setBatterRunnerDestination(runner, getBatterRunnerTargetBase(outcome, battedBall, fieldingTarget, chosenFielder, runner));
   outcome = createThrowPlayForFieldedHit(chosenFielder, battedBall, outcome, fieldingTarget, runner);
   const baseRunners = createDefenseBaseRunnerAnimations(outcome, battedBall, null, chosenFielder, fieldingTarget, hitAndRunState);
-  demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners);
+  demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners, battedBall);
   const forceTargets = createForceTargetsForPlay(battedBall, outcome);
   const forceMapForPlay = new Map(forceTargets.map((target) => [target.startBase, target.targetBase]));
   runner.forceBase = forceMapForPlay.get("batter") || null;
@@ -11340,9 +11366,12 @@ function getBatterRunnerTargetBase(outcome, battedBall = null, fieldingTarget = 
 // 一塁へ押し戻される。ミニ球場では二塁へ向かって走り切ったように見えるのに
 // 記録と塁状態は単打、という食い違いはこれが原因だった。
 // 走り出す前に目標を1つ手前へ戻して、見た目と結果を一致させる。
-function demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners) {
+function demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners, battedBall = defenseState.battedBall) {
   if (!runner || !baseRunners?.length) return;
   if (isManualBaserunningControl()) return;
+  // エンタイトルツーベースは全員が2つ進む決まりなので、塁の奪い合いは起きない。
+  // ここで打者走者を一塁へ戻すと、二塁に置かれるのに記録だけ単打になってしまう。
+  if (battedBall?.groundRuleDouble) return;
   const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
   if (targetIndex <= 1 || targetIndex >= 4) return;
   const taken = baseRunners.some((baseRunner) => getBatterRunnerTargetIndex(baseRunner.targetBase) === targetIndex);
@@ -11495,10 +11524,7 @@ function getCpuThrowTargetCandidates(outcome, battedBall, batterRunner, baseRunn
 
   [...(baseRunners || []), batterRunner].forEach((entry) => {
     if (!entry || entry.isOut || entry.arrived) return;
-    // 内野ゴロで本塁へ走る三塁走者は、守備が一塁を選んだ前提で走っている。
-    // 候補に入れると本塁へ投げ返してしまうので除く。
-    if (entry.groundOutAdvance) return;
-    const targetBase = entry.manualTargetBase || entry.targetBase;
+        const targetBase = entry.manualTargetBase || entry.targetBase;
     const targetIndex = getBatterRunnerTargetIndex(targetBase);
     if (targetIndex < 1 || targetIndex > 4 || !Number.isFinite(entry.arrivalTime)) return;
     const existing = candidates.get(targetBase);
@@ -15393,9 +15419,7 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
     ...(defenseState.baseRunners || []),
     ...(caughtFly ? [] : [defenseState.runner])
   ]
-    // 内野ゴロで本塁を狙う三塁走者は「守備が一塁を選んだ」前提で走っている。
-    // ここで本塁へ投げ直すとその前提が崩れるので、送球先の候補から外す。
-    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived && !runner.groundOutAdvance)
+    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived)
     .sort((a, b) => {
       const baseDifference = getBatterRunnerTargetIndex(b.targetBase) - getBatterRunnerTargetIndex(a.targetBase);
       if (baseDifference !== 0) return baseDifference;
