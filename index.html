@@ -18,14 +18,18 @@
     <section class="play-area">
       <div class="canvas-wrap">
         <canvas id="gameCanvas" width="1280" height="860" aria-label="SIMPLEST BASEBALL ゲーム画面"></canvas>
+        <button id="resultMenuButton" class="result-menu-button" type="button">メイン画面へ戻る</button>
 
         <section id="startMenu" class="start-menu" aria-label="ゲーム開始メニュー">
           <div class="menu-card">
             <div class="title-logo" aria-label="SIMPLEST BASEBALL">SIMPLEST BASEBALL</div>
-            <p class="last-updated">
-              最終修正日時:
-              <time datetime="2026-08-19T21:32:00+09:00">2026年8月19日 21:32</time>
-            </p>
+            <div class="menu-screen-header">
+              <button id="menuBackButton" class="menu-back-button" type="button">メイン画面へ戻る</button>
+              <p class="last-updated">
+                最終修正日時:
+                <time datetime="2026-08-19T21:32:00+09:00">2026年8月19日 21:32</time>
+              </p>
+            </div>
             <nav id="menuModeTabs" class="menu-mode-tabs" aria-label="モード選択">
               <button class="menu-mode-button active" type="button" data-menu-mode="versus">通常対戦</button>
               <button class="menu-mode-button" type="button" data-menu-mode="practice">打撃練習</button>

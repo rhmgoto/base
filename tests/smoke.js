@@ -196,6 +196,8 @@ function assertHtmlShell() {
   assertIncludesAll(html, [
     'id="gameCanvas"',
     'id="startMenu"',
+    'id="menuBackButton"',
+    'id="resultMenuButton"',
     'id="startButton"',
     'id="practiceStartButton"',
     'id="soundToggleButton"',
@@ -248,6 +250,8 @@ function assertHtmlShell() {
   assert(/\.chooser-pane\.hidden\s*\{\s*display:\s*none;/.test(css), "hidden chooser panes should not cover the opposite team");
   assert(/overflow-x:\s*hidden;/.test(css), "player chooser should avoid horizontal overflow when five cards are shown");
   assert(/\.game-shell\.menu-open\s*\{[\s\S]*width:\s*100vw;[\s\S]*max-width:\s*none;/.test(css), "menu-open game shell should use the full viewport width");
+  assert(/\.start-menu\.menu-root-mode \.menu-screen-header\s*\{\s*display:\s*none;/.test(css), "selection screen back button should stay hidden on the main title screen");
+  assert(/\.game-shell\.result-open \.result-menu-button\s*\{\s*display:\s*inline-flex;/.test(css), "result screen should show the main menu return button");
   assert(/\.game-shell\s*\{[\s\S]*padding:\s*2px 0;/.test(css), "game shell should minimize vertical padding on the play screen");
   assert(/canvas\s*\{[\s\S]*height:\s*calc\(100vh - 8px\);/.test(css), "canvas should stretch vertically to use the screen height");
   assert(/\.chooser-options\s*\{[\s\S]*gap:\s*2px;/.test(css), "chooser card gaps should be tightly compressed");
@@ -265,6 +269,24 @@ const context = createGameContext();
 vm.runInContext(fs.readFileSync(path.join(root, "script.js"), "utf8"), context, {
   filename: "script.js"
 });
+
+const resultMenuGamepadState = JSON.parse(runInGame(context, `(() => {
+  const pressButton2 = () => {
+    gamePhase = "gameover";
+    gamepadState.previousButtons.away = new Set();
+    const buttons = Array.from({ length: 13 }, () => ({ pressed: false }));
+    buttons[gamepadButtons.A] = { pressed: true };
+    handleGamepadButtonPresses({ buttons, axes: [0, 0] }, "away");
+    return gamePhase;
+  };
+  gameMode = "versus";
+  const versusPhase = pressButton2();
+  gameMode = "homerDerby";
+  const derbyPhase = pressButton2();
+  return JSON.stringify({ versusPhase, derbyPhase });
+})()`));
+assert(resultMenuGamepadState.versusPhase === "menu", "button 2 should return from the versus result screen to the main menu");
+assert(resultMenuGamepadState.derbyPhase === "menu", "button 2 should return from the home run derby result screen to the main menu");
 
 // 投手成績はゲーム側では結果ボードへ直接描画している。
 // テストで文字列として検証するための整形はテスト側に置く。

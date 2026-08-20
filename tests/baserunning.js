@@ -221,6 +221,98 @@ expectBases(
   { runs: 0, third: null }
 );
 
+expectBases(
+  "非フォースの3アウト目より先に生還した走者は得点する",
+  `
+    const runs = applyRunnerResults([
+      createRunnerResult({ id: "R3", name: "RUN3", run: 5 }, "third", "home", { scoreTime: 0.4 })
+    ], { scoringDeadline: 1.0 }).runs;
+  `,
+  { runs: 1, third: null }
+);
+
+expectBases(
+  "非フォースの3アウト目より後の生還は得点しない",
+  `
+    const runs = applyRunnerResults([
+      createRunnerResult({ id: "R3", name: "RUN3", run: 5 }, "third", "home", { scoreTime: 1.2 })
+    ], { scoringDeadline: 1.0 }).runs;
+  `,
+  { runs: 0, third: null }
+);
+
+const twoOutStrikeoutSteal = JSON.parse(run(`
+  startGame();
+  gameMode = "watch";
+  count.outs = 2;
+  count.strikes = 2;
+  bases.first = makeBaseRunner({ id: "R1", name: "RUN1", run: 5 });
+  let pitcherOutsRecorded = 0;
+  const originalRecordOuts = recordCurrentPitcherOuts;
+  recordCurrentPitcherOuts = function(amount) {
+    pitcherOutsRecorded += amount;
+    return originalRecordOuts(amount);
+  };
+  stealState = createStealState();
+  stealState.active = true;
+  stealState.startBase = "first";
+  stealState.targetBase = "second";
+  stealState.runner = { ...makeBaseRunner(bases.first), arrived: false };
+  finishPitch("空振り", "strike");
+  resolveSteal(true);
+  const result = { pitcherOutsRecorded, battingTeam, outs: count.outs };
+  recordCurrentPitcherOuts = originalRecordOuts;
+  return JSON.stringify(result);
+`));
+assert(
+  twoOutStrikeoutSteal.pitcherOutsRecorded === 1,
+  `二死で三振と盗塁死が重なっても投手アウトは1つだけ (${twoOutStrikeoutSteal.pitcherOutsRecorded})`
+);
+assert(
+  twoOutStrikeoutSteal.battingTeam === "home" && twoOutStrikeoutSteal.outs === 0,
+  `三振を3アウト目として正常に攻守交代する (${JSON.stringify(twoOutStrikeoutSteal)})`
+);
+
+const walkoffScoring = JSON.parse(run(`
+  startGame();
+  battingTeam = getSecondBatTeam();
+  half = "bottom";
+  inning = maxInnings;
+  scores.away = 2;
+  scores.home = 2;
+  bases = createEmptyBases();
+  const results = [
+    createRunnerResult({ id: "R3", name: "LEAD", run: 5 }, "third", "home"),
+    createRunnerResult({ id: "R2", name: "TRAIL", run: 5 }, "second", "home"),
+    createRunnerResult({ id: "B", name: "BAT", run: 5 }, "batter", "second")
+  ];
+  const ordinaryRuns = applyRunnerResults(results).runs;
+
+  startGame();
+  battingTeam = getSecondBatTeam();
+  half = "bottom";
+  inning = maxInnings;
+  scores.away = 2;
+  scores.home = 2;
+  bases = createEmptyBases();
+  const homerRuns = applyRunnerResults([
+    createRunnerResult({ id: "R3H", name: "LEAD-H", run: 5 }, "third", "home"),
+    createRunnerResult({ id: "R2H", name: "TRAIL-H", run: 5 }, "second", "home"),
+    createRunnerResult({ id: "BH", name: "BAT-H", run: 5 }, "batter", "home")
+  ], { homer: true }).runs;
+  const result = { ordinaryRuns, homerRuns, homerFinalScore: scores.home };
+  startGame();
+  return JSON.stringify(result);
+`));
+assert(
+  walkoffScoring.ordinaryRuns === 1,
+  `サヨナラ本塁打以外は勝ち越しに必要な1点だけ (${walkoffScoring.ordinaryRuns})`
+);
+assert(
+  walkoffScoring.homerRuns === 3 && walkoffScoring.homerFinalScore === 5,
+  `サヨナラ本塁打は全走者の得点を認める (${JSON.stringify(walkoffScoring)})`
+);
+
 // --- 四球の押し出し ---
 expectBases(
   "四球: 一塁が空いていれば走者は動かない",
@@ -1311,15 +1403,15 @@ integrationSeeds.forEach((seed) => {
   const originalApplyRunnerResults = applyRunnerResults;
   applyRunnerResults = function(results, options = {}) {
     const allowRuns = !options || options.allowRuns !== false;
+    const scoringCandidates = (results || []).filter((result) => (
+      result && !result.out && getBatterRunnerTargetIndex(result.targetBase) >= 4
+    )).length;
     const elapsed = Number.isFinite(defenseState.startTime)
       ? (performance.now() - defenseState.startTime) / 1000
       : null;
     (results || []).forEach((result) => {
       if (!result || result.out || getBatterRunnerTargetIndex(result.targetBase) < 4) return;
-      if (!allowRuns) {
-        suppressedRuns += 1;
-        return;
-      }
+      if (!allowRuns) return;
       // 走路を持つのは守備アニメーション上の走者だけ。四球や本塁打の
       // 機械的な進塁は到達判定の対象外。
       const info = result.runnerInfo || {};
@@ -1328,7 +1420,9 @@ integrationSeeds.forEach((seed) => {
         || (elapsed !== null && Number.isFinite(info.arrivalTime) && info.arrivalTime <= elapsed);
       if (!settled) tally.phantomRuns += 1;
     });
-    return originalApplyRunnerResults(results, options);
+    const outcome = originalApplyRunnerResults(results, options);
+    suppressedRuns += Math.max(0, scoringCandidates - (outcome?.runs || 0));
+    return outcome;
   };
 
   const originalFinishDefensePlay = finishDefensePlay;
