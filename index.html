@@ -19,6 +19,17 @@
       <div class="canvas-wrap">
         <canvas id="gameCanvas" width="1280" height="860" aria-label="SIMPLEST BASEBALL ゲーム画面"></canvas>
         <button id="resultMenuButton" class="result-menu-button" type="button">メイン画面へ戻る</button>
+        <section id="touchControls" class="touch-controls" aria-label="タッチ操作">
+          <div id="touchStick" class="touch-stick" aria-label="仮想ジョイスティック">
+            <div id="touchStickKnob" class="touch-stick-knob"></div>
+          </div>
+          <div class="touch-buttons" aria-label="仮想ゲームパッドボタン">
+            <button class="touch-button touch-button-y" type="button" data-touch-button="0">0</button>
+            <button class="touch-button touch-button-x" type="button" data-touch-button="3">3</button>
+            <button class="touch-button touch-button-b" type="button" data-touch-button="1">1</button>
+            <button class="touch-button touch-button-a" type="button" data-touch-button="2">2</button>
+          </div>
+        </section>
 
         <section id="startMenu" class="start-menu" aria-label="ゲーム開始メニュー">
           <div class="menu-card">
@@ -27,7 +38,7 @@
               <button id="menuBackButton" class="menu-back-button" type="button">メイン画面へ戻る</button>
               <p class="last-updated">
                 最終修正日時:
-                <time datetime="2026-08-20T06:56:00+09:00">2026年8月20日 06:56</time>
+                <time datetime="2026-08-20T21:49:00+09:00">2026年8月20日 21:49</time>
               </p>
             </div>
             <nav id="menuModeTabs" class="menu-mode-tabs" aria-label="モード選択">

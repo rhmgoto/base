@@ -50,6 +50,10 @@ const chooserClose = byId("chooserClose");
 const chooserTitleHome = byId("chooserTitleHome");
 const chooserOptionsHome = byId("chooserOptionsHome");
 const chooserCloseHome = byId("chooserCloseHome");
+const touchControls = document.getElementById("touchControls");
+const touchStick = document.getElementById("touchStick");
+const touchStickKnob = document.getElementById("touchStickKnob");
+const touchButtons = Array.from(document.querySelectorAll("[data-touch-button]"));
 const pitcherChangeControls = byId("pitcherChangeControls");
 const modeSelect = byId("modeSelect");
 const firstBatSelect = byId("firstBatSelect");
@@ -1542,6 +1546,13 @@ const gamepadState = {
     away: { x: 0, y: 0, initialized: false, element: null },
     home: { x: 0, y: 0, initialized: false, element: null }
   }
+};
+const touchControlState = {
+  enabled: false,
+  wasActive: false,
+  stickPointerId: null,
+  stickVector: { x: 0, y: 0 },
+  buttons: new Set()
 };
 const gamepadButtons = {
   A: 2,
@@ -6498,6 +6509,7 @@ function pollGamepadInput() {
     });
     gamepadState.previousDirections[team] = getGamepadDirections(gamepad);
   });
+  handleTouchGamepadInput();
   releaseInactivePitchControlLockouts();
   updateMenuGamepadCursorVisibility();
 }
@@ -6556,6 +6568,57 @@ function clearGamepadVirtualKeys() {
 function addGamepadVirtualKey(key) {
   keysDown.add(key);
   gamepadState.virtualKeys.add(key);
+}
+
+function getTouchControlDirections() {
+  const directions = new Set();
+  const { x, y } = touchControlState.stickVector;
+  if (x < -0.42) directions.add("left");
+  if (x > 0.42) directions.add("right");
+  if (y < -0.42) directions.add("up");
+  if (y > 0.42) directions.add("down");
+  return directions;
+}
+
+function addTouchDirectionVirtualKeys(directions) {
+  if (directions.has("left")) {
+    addGamepadVirtualKey("ArrowLeft");
+    addGamepadVirtualKey("4");
+  }
+  if (directions.has("right")) {
+    addGamepadVirtualKey("ArrowRight");
+    addGamepadVirtualKey("6");
+  }
+  if (directions.has("up")) {
+    addGamepadVirtualKey("ArrowUp");
+    addGamepadVirtualKey("1");
+  }
+  if (directions.has("down")) {
+    addGamepadVirtualKey("ArrowDown");
+    addGamepadVirtualKey("3");
+  }
+}
+
+function getTouchVirtualGamepad() {
+  const buttons = Array.from({ length: 16 }, (_, index) => ({
+    pressed: touchControlState.buttons.has(index),
+    value: touchControlState.buttons.has(index) ? 1 : 0
+  }));
+  return {
+    axes: [touchControlState.stickVector.x, touchControlState.stickVector.y],
+    buttons
+  };
+}
+
+function handleTouchGamepadInput() {
+  const directions = getTouchControlDirections();
+  const active = touchControlState.enabled || touchControlState.wasActive || directions.size > 0 || touchControlState.buttons.size > 0;
+  if (!active) return;
+  addTouchDirectionVirtualKeys(directions);
+  handleGamepadButtonPresses(getTouchVirtualGamepad(), "away");
+  gamepadState.previousDirections.away = directions;
+  touchControlState.wasActive = directions.size > 0 || touchControlState.buttons.size > 0;
+  if (!touchControlState.wasActive) touchControlState.enabled = false;
 }
 
 function isTwoPlayerMenuModeActive() {
@@ -23220,6 +23283,84 @@ function getCanvasPoint(event) {
   };
 }
 
+function resetTouchStick() {
+  touchControlState.stickPointerId = null;
+  touchControlState.stickVector = { x: 0, y: 0 };
+  if (touchStickKnob) touchStickKnob.style.transform = "translate(-50%, -50%)";
+}
+
+function updateTouchStickFromPointer(event) {
+  if (!touchStick) return;
+  const rect = touchStick.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const maxDistance = rect.width * 0.34;
+  const rawX = event.clientX - centerX;
+  const rawY = event.clientY - centerY;
+  const distance = Math.hypot(rawX, rawY);
+  const scale = distance > maxDistance ? maxDistance / distance : 1;
+  const knobX = rawX * scale;
+  const knobY = rawY * scale;
+  touchControlState.stickVector = {
+    x: clamp(knobX / maxDistance, -1, 1),
+    y: clamp(knobY / maxDistance, -1, 1)
+  };
+  if (touchStickKnob) {
+    touchStickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+  }
+}
+
+function setTouchButtonPressed(button, pressed) {
+  const index = Number(button?.dataset?.touchButton);
+  if (!Number.isFinite(index)) return;
+  touchControlState.enabled = true;
+  if (pressed) {
+    touchControlState.buttons.add(index);
+    button.classList.add("pressed");
+  } else {
+    touchControlState.buttons.delete(index);
+    button.classList.remove("pressed");
+  }
+}
+
+function setupTouchControls() {
+  if (!touchControls) return;
+  touchStick?.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    unlockBgmAfterUserGesture();
+    touchControlState.enabled = true;
+    touchControlState.stickPointerId = event.pointerId;
+    touchStick.setPointerCapture?.(event.pointerId);
+    updateTouchStickFromPointer(event);
+  });
+  touchStick?.addEventListener("pointermove", (event) => {
+    if (touchControlState.stickPointerId !== event.pointerId) return;
+    event.preventDefault();
+    updateTouchStickFromPointer(event);
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((eventName) => {
+    touchStick?.addEventListener(eventName, (event) => {
+      if (touchControlState.stickPointerId !== null && event.pointerId !== touchControlState.stickPointerId) return;
+      event.preventDefault?.();
+      resetTouchStick();
+    });
+  });
+  touchButtons.forEach((button) => {
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      unlockBgmAfterUserGesture();
+      button.setPointerCapture?.(event.pointerId);
+      setTouchButtonPressed(button, true);
+    });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((eventName) => {
+      button.addEventListener(eventName, (event) => {
+        event.preventDefault?.();
+        setTouchButtonPressed(button, false);
+      });
+    });
+  });
+}
+
 function isPointInRect(point, rect) {
   return Boolean(
     point && rect
@@ -23606,6 +23747,7 @@ pitcherChangeControls?.addEventListener("click", (event) => {
 populateSelects();
 loadRosterFromPersistentStorage();
 updateAudioToggleButtons();
+setupTouchControls();
 showMenu();
 setTimeout(() => updateCurrentBgm(true), 0);
 requestAnimationFrame(gameLoop);
