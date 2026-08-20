@@ -596,7 +596,7 @@ const dropChances = JSON.parse(run(`
   });
 `));
 
-assert(Math.abs(dropChances.ライナー - 0.05) < 0.001, `守備力が平均のライナーは5% (${dropChances.ライナー})`);
+assert(dropChances.ライナー > 0.07 && dropChances.ライナー < 0.1, `守備力が平均のライナーは約8% (${dropChances.ライナー})`);
 assert(dropChances.弱いゴロ === 0, `弱い打球では落球しない (${dropChances.弱いゴロ})`);
 assert(dropChances.バント === 0, "バントは落球の対象外");
 assert(dropChances.強いゴロ > 0 && dropChances.強いフライ > 0, "強い打球はライナー以外でも落球しうる");
@@ -1439,6 +1439,22 @@ integrationSeeds.forEach((seed) => {
 // CPU攻撃では打者走者が一塁で止まるので、二塁打・三塁打は記録されない。
 // (エンタイトルツーベースだけは例外的に二塁が与えられる)
 const totalTriples = integrationReport.reduce((sum, entry) => sum + entry.triples, 0);
+const grounderErrorChances = JSON.parse(run(`
+  const ball = { isGrounder: true, power: 1.1 };
+  return JSON.stringify({
+    low: getInfielderGrounderErrorChance(ball, { role: "SS", fielding: 1 }),
+    average: getInfielderGrounderErrorChance(ball, { role: "SS", fielding: 5 }),
+    elite: getInfielderGrounderErrorChance(ball, { role: "SS", fielding: 10 }),
+    outfielder: getInfielderGrounderErrorChance(ball, { role: "L", fielding: 1 }),
+    fumble: getInfielderGrounderErrorType(ball, { role: "SS", fielding: 1 }, () => 0.01),
+    misplay: getInfielderGrounderErrorType(ball, { role: "SS", fielding: 1 }, () => 0.18)
+  });
+`));
+assert(grounderErrorChances.low >= 0.2, `low fielding should cause frequent grounder errors (${grounderErrorChances.low})`);
+assert(grounderErrorChances.elite < 0.01, `elite fielding should almost never cause grounder errors (${grounderErrorChances.elite})`);
+assert(grounderErrorChances.low > grounderErrorChances.average && grounderErrorChances.average > grounderErrorChances.elite, "grounder error chance should fall with fielding ability");
+assert(grounderErrorChances.outfielder === 0, "grounder fumbles and misplays should be limited to infielders");
+assert(grounderErrorChances.fumble === "fumble" && grounderErrorChances.misplay === "misplay", "grounder errors should include both fumbles and misplays");
 assert(
   totalTriples === 0,
   `CPU攻撃では三塁打は記録されないはず ${JSON.stringify(integrationReport)}`

@@ -2367,6 +2367,11 @@ assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break
 assert(latestSpreadsheetRosterState.darvish.cost === 6, "Darvish cost should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.yamamoto.control === 9, "Yamamoto control should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.yamaoka.slowChange === 9 && latestSpreadsheetRosterState.yamaoka.fastChange === 7 && latestSpreadsheetRosterState.yamaoka.control === 8 && latestSpreadsheetRosterState.yamaoka.stuff === 8 && latestSpreadsheetRosterState.yamaoka.fielding === 6, "Yamaoka should match the latest spreadsheet");
+const yamaokaMinimum = createMatchPitcher(latestSpreadsheetRosterState.yamaoka, () => 0);
+const yamaokaMaximum = createMatchPitcher(latestSpreadsheetRosterState.yamaoka, () => 0.999999);
+assert(yamaokaMinimum.fastKmh === 142 && yamaokaMaximum.fastKmh === 148, "Yamaoka fastball should vary by plus or minus 3 each game");
+assert(yamaokaMinimum.rightBreak === 7 && yamaokaMaximum.rightBreak === 7 && yamaokaMinimum.control === 8 && yamaokaMaximum.control === 8, "Yamaoka non-fastball abilities should stay fixed");
+assert(yamaokaMinimum.stamina === 7 && yamaokaMaximum.stamina === 7 && yamaokaMinimum.cost === 6 && yamaokaMaximum.cost === 6, "Yamaoka stamina and cost should stay fixed");
 assert(latestSpreadsheetRosterState.wheeler.throws === "R" && latestSpreadsheetRosterState.wheeler.fastKmh === 159 && latestSpreadsheetRosterState.wheeler.cost === 7, "Wheeler should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.valdes.throws === "L" && latestSpreadsheetRosterState.valdes.fastKmh === 158 && latestSpreadsheetRosterState.valdes.cost === 7, "Valdes should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRosterState.rojas.fastKmh === 77 && latestSpreadsheetRosterState.rojas.cost === 1, "Rojas should be available as a new pitcher");

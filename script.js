@@ -1105,14 +1105,26 @@ const battedBallDropTuning = {
   fullPower: 1.25,
   minChance: 0.02,
   maxChance: 0.1,
-  // 守備力による増減の幅。守備5が基準で、守備10なら -fieldingSwing/2 される。
-  fieldingSwing: 0.045,
-  chanceFloor: 0.005,
-  chanceCeiling: 0.16,
+  // 守備力が低いほど大きく、高いほどほぼ落球しない倍率にする。
+  lowFieldingMultiplier: 3.4,
+  eliteFieldingMultiplier: 0.06,
+  chanceFloor: 0.001,
+  chanceCeiling: 0.3,
   // 弾いたあと動けない時間
   freezeSeconds: 0.9,
   // 強い打球ほど長く弾む
   freezePowerBonus: 0.5
+};
+
+const infielderGrounderErrorTuning = {
+  baseChance: 0.06,
+  hardHitBonus: 0.025,
+  lowFieldingMultiplier: 3.4,
+  eliteFieldingMultiplier: 0.06,
+  chanceCeiling: 0.32,
+  fumbleShare: 0.58,
+  fumbleDelay: 0.72,
+  misplayDelay: 1.08
 };
 
 const wallReboundTuning = {
@@ -2269,11 +2281,26 @@ function getMenuLineupOrder(team) {
   return order;
 }
 
-function createMatchPitcher(player) {
-  const pitcherInfo = { ...player };
+function createMatchPitcher(player, random = Math.random) {
+  const pitcherInfo = player?.id === "yamaoka"
+    ? createRandomizedYamaokaPitcher(player, random)
+    : { ...player };
   pitcherInfo.currentStamina = getPitcherMaxStamina(pitcherInfo);
   pitcherInfo.pitchCount = 0;
   return pitcherInfo;
+}
+
+function createRandomizedYamaokaPitcher(player, random = Math.random) {
+  const randomized = { ...player };
+  const abilitySpreads = {
+    fastKmh: 3
+  };
+  Object.entries(abilitySpreads).forEach(([ability, spread]) => {
+    const baseValue = Number(player?.[ability]);
+    if (!Number.isFinite(baseValue)) return;
+    randomized[ability] = baseValue + Math.floor(clamp(random(), 0, 0.999999) * (spread * 2 + 1)) - spread;
+  });
+  return randomized;
 }
 
 function getPitcherMaxStamina(player) {
@@ -14603,6 +14630,8 @@ function updateDefensePlay(now) {
       currentY: current.y
     };
   });
+  defenseState.fielders = defenseState.fielders.map((fielder) =>
+    smoothDefenseFielderRenderPosition(fielder, movementDeltaSeconds));
   defenseState.lastMovementElapsedSeconds = elapsedSeconds;
 
   resolveUnifiedFielderCircleCatch(elapsedSeconds);
@@ -14652,7 +14681,7 @@ function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
   const ballRadius = ball?.radius ?? 8;
   const candidates = (defenseState.fielders || [])
     .map((fielder) => {
-      const current = getDefenseFielderDrawPosition(fielder);
+      const current = getDefenseFielderSimulationPosition(fielder);
       const circleRadius = getFielderCatchRangeRadius(fielder, battedBall);
       const distance = Math.hypot(current.x - ball.x, current.y - ball.y);
       return { fielder, current, distance, circleRadius };
@@ -14818,11 +14847,12 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight);
   // 強い打球を弾いた場合はアウトにならず、拾い直すまで動けない
   const droppedLiner = caughtInAir && shouldDropBattedBallOnCatch(battedBall, fielder);
+  const grounderErrorType = !caughtInAir ? getInfielderGrounderErrorType(battedBall, fielder) : null;
   const outcome = droppedLiner
     ? {
-      kind: "force",
+      kind: "error",
       label: `${fielder.role} 落球`,
-      caught: true,
+      caught: false,
       needsThrow: true,
       targetBase: "first",
       fieldingTime: elapsedSeconds + getBattedBallDropFreezeSeconds(battedBall),
@@ -14831,8 +14861,26 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
       // エフェクトは硬直明けではなく「弾いた瞬間」から出す
       dropTime: elapsedSeconds,
       linerDrop: true,
-      droppedBall: true
+      droppedBall: true,
+      fieldingError: true
     }
+    : grounderErrorType
+      ? {
+        kind: "error",
+        label: `${fielder.role} ${grounderErrorType === "fumble" ? "ファンブル" : "後逸"}`,
+        caught: false,
+        needsThrow: true,
+        targetBase: "first",
+        fieldingTime: elapsedSeconds + (grounderErrorType === "fumble"
+          ? infielderGrounderErrorTuning.fumbleDelay
+          : infielderGrounderErrorTuning.misplayDelay),
+        fieldingPoint,
+        errorPoint: fieldingPoint,
+        dropTime: elapsedSeconds,
+        droppedBall: true,
+        grounderErrorType,
+        fieldingError: true
+      }
     : {
       kind: caughtInAir ? "out" : "force",
       label: `${fielder.role} 捕球処理`,
@@ -14852,6 +14900,7 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
     distanceToTarget: 0
   };
   if (droppedLiner) showEffect("落球", "#ff6f61");
+  if (grounderErrorType) showEffect(grounderErrorType === "fumble" ? "ファンブル" : "後逸", "#ff6f61");
   defenseState.liveInfielderContactCatchComplete = true;
   defenseState.chosenFielder = chosenFielder;
   defenseState.target = fieldingPoint;
@@ -14921,10 +14970,34 @@ function getBattedBallDropChance(battedBall, fielder) {
     ? battedBallDropTuning.linerChance
     : battedBallDropTuning.minChance
       + (battedBallDropTuning.maxChance - battedBallDropTuning.minChance) * powerScore;
-  // 守備力5を基準にして増減する (5なら補正なし)
-  const fieldingSkill = clamp((getFielderFieldingRating(fielder) - 5) / 5, -1, 1);
-  const fieldingAdjust = -fieldingSkill * (battedBallDropTuning.fieldingSwing / 2);
-  return clamp(base + fieldingAdjust, battedBallDropTuning.chanceFloor, battedBallDropTuning.chanceCeiling);
+  const reliability = clamp((getFielderFieldingRating(fielder) - 1) / 9, 0, 1);
+  const fieldingMultiplier = lerp(
+    battedBallDropTuning.lowFieldingMultiplier,
+    battedBallDropTuning.eliteFieldingMultiplier,
+    Math.pow(reliability, 0.8)
+  );
+  return clamp(base * fieldingMultiplier, battedBallDropTuning.chanceFloor, battedBallDropTuning.chanceCeiling);
+}
+
+function getInfielderGrounderErrorChance(battedBall, fielder) {
+  if (!battedBall?.isGrounder || battedBall.isBunt || !isInfielderRole(fielder?.role)) return 0;
+  const reliability = clamp((getFielderFieldingRating(fielder) - 1) / 9, 0, 1);
+  const fieldingMultiplier = lerp(
+    infielderGrounderErrorTuning.lowFieldingMultiplier,
+    infielderGrounderErrorTuning.eliteFieldingMultiplier,
+    Math.pow(reliability, 0.8)
+  );
+  const hardHitScore = clamp(((battedBall.power ?? 0) - 0.65) / 0.55, 0, 1);
+  const baseChance = infielderGrounderErrorTuning.baseChance
+    + infielderGrounderErrorTuning.hardHitBonus * hardHitScore;
+  return clamp(baseChance * fieldingMultiplier, 0, infielderGrounderErrorTuning.chanceCeiling);
+}
+
+function getInfielderGrounderErrorType(battedBall, fielder, random = Math.random) {
+  const chance = getInfielderGrounderErrorChance(battedBall, fielder);
+  const roll = random();
+  if (chance <= 0 || roll >= chance) return null;
+  return roll / chance < infielderGrounderErrorTuning.fumbleShare ? "fumble" : "misplay";
 }
 
 function getBattedBallDropFreezeSeconds(battedBall) {
@@ -14967,8 +15040,25 @@ function initializeFielderCatchRanges(fielders) {
     ...fielder,
     currentX: fielder.x,
     currentY: fielder.y,
+    renderX: fielder.x,
+    renderY: fielder.y,
     catchRangeRadius: calculateFielderCatchRangeRadius(fielder)
   }));
+}
+
+function smoothDefenseFielderRenderPosition(fielder, deltaSeconds) {
+  const targetX = fielder.currentX ?? fielder.x;
+  const targetY = fielder.currentY ?? fielder.y;
+  const renderX = fielder.renderX ?? fielder.x;
+  const renderY = fielder.renderY ?? fielder.y;
+  const distance = Math.hypot(targetX - renderX, targetY - renderY);
+  if (distance < 0.75) return { ...fielder, renderX: targetX, renderY: targetY };
+  const follow = 1 - Math.exp(-18 * Math.max(0, deltaSeconds));
+  return {
+    ...fielder,
+    renderX: lerp(renderX, targetX, follow),
+    renderY: lerp(renderY, targetY, follow)
+  };
 }
 
 function getFielderRangeFieldingRating(fielder) {
@@ -15707,9 +15797,10 @@ function getDefenseRollProgress(elapsedSeconds, ballTime) {
 function getBattedBallTravelProgress(progress) {
   const clamped = clamp(progress, 0, 1);
   const trajectory = defenseState.battedBall?.trajectory;
-  if (trajectory === "fly") return clamped;
-  if (trajectory === "liner") return clamped;
-  if (trajectory === "grounder") return clamped;
+  const smooth = clamped * clamped * (3 - 2 * clamped);
+  if (trajectory === "fly" || trajectory === "liner" || trajectory === "grounder") {
+    return lerp(clamped, smooth, 0.22);
+  }
   return 1 - Math.pow(1 - clamped, 1.35);
 }
 
@@ -20719,6 +20810,13 @@ function drawFielderCatchRanges() {
 }
 
 function getDefenseFielderDrawPosition(fielder) {
+  return {
+    x: fielder.renderX ?? fielder.currentX ?? fielder.x,
+    y: fielder.renderY ?? fielder.currentY ?? fielder.y
+  };
+}
+
+function getDefenseFielderSimulationPosition(fielder) {
   return {
     x: fielder.currentX ?? fielder.x,
     y: fielder.currentY ?? fielder.y
