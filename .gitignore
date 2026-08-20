@@ -1,3 +1,7 @@
 edge-profile/
 .DS_Store
 Thumbs.db
+~$*
+/backups/
+/.codex/backups/
+/script.before-*.js

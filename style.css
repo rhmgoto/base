@@ -218,6 +218,46 @@ h1 {
   position: relative;
 }
 
+.result-menu-button {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 190px;
+  min-height: 48px;
+  padding: 8px 18px;
+  border: 3px solid #7e251a;
+  border-radius: 6px;
+  color: #fff;
+  background: #c74632;
+  box-shadow: 0 4px 0 #7e251a;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.game-shell.result-open .result-menu-button {
+  display: inline-flex;
+}
+
+.result-menu-button:hover {
+  background: #df573f;
+}
+
+.result-menu-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #7e251a;
+}
+
+.result-menu-button:focus-visible {
+  outline: 4px solid #ffe08a;
+  outline-offset: 3px;
+}
+
 canvas {
   display: block;
   width: 100%;
@@ -305,7 +345,7 @@ canvas {
 }
 
 .last-updated {
-  margin-bottom: 4px;
+  margin: 0 0 0 auto;
   color: rgba(35, 48, 71, 0.68);
   font-size: 10px;
   line-height: 1.2;
@@ -314,6 +354,44 @@ canvas {
 
 .last-updated time {
   font-variant-numeric: tabular-nums;
+}
+
+.menu-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  margin-bottom: 4px;
+}
+
+.menu-back-button {
+  width: auto;
+  min-width: 210px;
+  min-height: 34px;
+  margin: 0;
+  padding: 4px 18px;
+  border: 3px solid #173e72;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #2f6fb2;
+  box-shadow: 0 3px 0 #173e72;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.menu-back-button:hover {
+  background: #3e84cc;
+}
+
+.menu-back-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #173e72;
+}
+
+.menu-back-button:focus-visible {
+  outline: 4px solid #ffe08a;
+  outline-offset: 2px;
 }
 
 .menu-card label {
@@ -2207,7 +2285,7 @@ button {
   }
 }
 
-.start-menu.menu-root-mode .last-updated {
+.start-menu.menu-root-mode .menu-screen-header {
   display: none;
 }
 
