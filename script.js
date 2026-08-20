@@ -1067,6 +1067,36 @@ const cpuExtraBaseRunningTuning = {
   trailingAggressiveBonus: 0.07,
   twoOutAggressiveBonus: 0.04
 };
+
+// 無死・一死三塁の内野ゴロで、三塁走者が本塁を狙うかどうかの基準。
+// 無条件に走らせると鈍足の走者が刺されるので、走者の到達時刻が本塁送球の
+// 到達時刻より safetyMargin 秒ぶん早いときだけ走らせる。
+// 走力が低いほど必要な余裕を slowRunnerPenalty ぶん上乗せする。
+// 内野ゴロで三塁走者が本塁を狙うかの基準。
+// この球場の時間感覚では本塁送球は走者より速いので、送球と競走させると鈍足の
+// 走者はまず刺される。実際の野球と同じく「打球が本塁から十分遠くで処理された
+// ときだけ走る (守備は一塁で打者を刺す方を選ぶ)」という形にする。
+// 必要な距離は塁間を1.0とした比で、走力が低いほど遠くを要求する。
+const cpuThirdRunnerGroundOutTuning = {
+  minimumFieldingDistanceRatio: 0.6,
+  slowRunnerDistancePenalty: 0.25,
+  minimumRunRating: 4
+};
+
+// 強い打球はグラブで弾くことがある。弾いた打球はエラーとして記録する。
+// minPower 未満の打球では起きず、basePower で圧力が最大になる。
+// 守備力1につき fieldingReduction ぶん確率が下がる。
+const fieldingErrorTuning = {
+  minPower: 0.88,
+  basePower: 1.5,
+  maxChance: 0.3,
+  pressureExponent: 0.65,
+  fieldingReduction: 0.055,
+  minimumFieldingScale: 0.34,
+  linerScale: 1.2,
+  grounderScale: 1,
+  flyScale: 0.5
+};
 // 手動守備で、捕球や送球到達のあと次の送球指示を待つ時間 (秒)。
 // これを過ぎて指示がなければ次のプレーへ進む。
 const manualThrowIdleSeconds = 2;
@@ -10222,7 +10252,7 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const startBase = baseIndexByName[baseName];
   const manualBaserunning = isManualBaserunningControl();
   const tagUp = shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
-  const groundOutAdvance = shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall);
+  const groundOutAdvance = shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
   const automaticAdvanceType = tagUp ? "tagup" : groundOutAdvance ? "groundout" : getDefenseBaseRunnerAdvanceType(outcome, throwState);
   const advanceType = battedBall?.groundRuleDouble
     ? "double"
@@ -10320,12 +10350,35 @@ function getTagUpDepthThreshold(startBase) {
   return defenseField.fenceDistance * ratio;
 }
 
-function shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall) {
+function shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall, fielder = null, fieldingTarget = null) {
   if (!baseName || !runnerInfo || !outcome || !battedBall) return false;
-  if (outcome.kind !== "out" || !outcome.caught || outcome.needsThrow) return false;
   if (!battedBall.isGrounder) return false;
   const startBase = baseIndexByName[baseName];
-  return startBase >= 1 && startBase <= 3;
+  if (startBase < 1 || startBase > 3) return false;
+  // 送球なしで打者がアウトになるゴロ (投手の直接タッチなど) では全員が1つ進む。
+  if (outcome.kind === "out" && outcome.caught && !outcome.needsThrow) return true;
+  if (baseName !== "third") return false;
+  return shouldCpuThirdRunnerTryHomeOnGroundOut(runnerInfo, outcome, battedBall, fielder, fieldingTarget);
+}
+
+// 無死・一死三塁の内野ゴロ。守備が一塁で打者を刺すあいだに本塁を狙えるか。
+// 無条件に走らせると鈍足の走者が刺されるので、走者が本塁へ着く時刻と
+// 本塁送球が届く時刻を比べ、余裕があるときだけ走らせる。
+function shouldCpuThirdRunnerTryHomeOnGroundOut(runnerInfo, outcome, battedBall, fielder, fieldingTarget) {
+  if (!isCpuAutoBaserunningActive()) return false;
+  if (count.outs >= 2) return false;
+  if (!fielder || !fieldingTarget || battedBall.isBunt) return false;
+  if (!isInfielderRole(fielder.role)) return false;
+  if (outcome.kind !== "force" || outcome.fieldingError) return false;
+  const runRating = getOpenEndedAbilityRating(runnerInfo?.run ?? 5);
+  if (runRating < cpuThirdRunnerGroundOutTuning.minimumRunRating) return false;
+  const basePathDistance = getRunnerRouteDistance(createBaseRunnerRoute(3, 4));
+  if (!(basePathDistance > 0)) return false;
+  const home = getFenceCenter();
+  const fieldingDistance = Math.hypot(fieldingTarget.x - home.x, fieldingTarget.y - home.y);
+  const requiredRatio = cpuThirdRunnerGroundOutTuning.minimumFieldingDistanceRatio
+    + clamp((7 - runRating) / 6, 0, 1) * cpuThirdRunnerGroundOutTuning.slowRunnerDistancePenalty;
+  return fieldingDistance / basePathDistance >= requiredRatio;
 }
 
 function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null) {
@@ -11442,6 +11495,9 @@ function getCpuThrowTargetCandidates(outcome, battedBall, batterRunner, baseRunn
 
   [...(baseRunners || []), batterRunner].forEach((entry) => {
     if (!entry || entry.isOut || entry.arrived) return;
+    // 内野ゴロで本塁へ走る三塁走者は、守備が一塁を選んだ前提で走っている。
+    // 候補に入れると本塁へ投げ返してしまうので除く。
+    if (entry.groundOutAdvance) return;
     const targetBase = entry.manualTargetBase || entry.targetBase;
     const targetIndex = getBatterRunnerTargetIndex(targetBase);
     if (targetIndex < 1 || targetIndex > 4 || !Number.isFinite(entry.arrivalTime)) return;
@@ -14497,7 +14553,50 @@ function getInfielderRouteBodyCatch(fielder, battedBall, fieldingPoint) {
   };
 }
 
+// 追いついた強い打球をグラブで弾く。打者は一塁へ生き、記録はエラーになる。
+function resolveHardHitFieldingError(fielder, battedBall, fieldingPoint, fieldingTime) {
+  if (!fielder || !battedBall) return null;
+  if (battedBall.isBunt || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return null;
+  const power = battedBall.power ?? 0;
+  if (power < fieldingErrorTuning.minPower) return null;
+  const pressure = Math.pow(clamp(
+    (power - fieldingErrorTuning.minPower) / Math.max(0.01, fieldingErrorTuning.basePower - fieldingErrorTuning.minPower),
+    0,
+    1
+  ), fieldingErrorTuning.pressureExponent);
+  const trajectoryScale = battedBall.isLiner || battedBall.isLineDrop
+    ? fieldingErrorTuning.linerScale
+    : battedBall.isGrounder
+      ? fieldingErrorTuning.grounderScale
+      : fieldingErrorTuning.flyScale;
+  const fielding = getFielderFieldingRating(fielder);
+  // 守備力は掛け算で効かせる。引き算だと平凡なフライで確率が0に張り付いてしまう。
+  const fieldingScale = clamp(
+    1 - fielding * fieldingErrorTuning.fieldingReduction,
+    fieldingErrorTuning.minimumFieldingScale,
+    1
+  );
+  const chance = clamp(
+    fieldingErrorTuning.maxChance * pressure * trajectoryScale * fieldingScale,
+    0,
+    fieldingErrorTuning.maxChance
+  );
+  if (chance <= 0 || Math.random() >= chance) return null;
+  return {
+    kind: "single",
+    label: `${fielder.role} 落球`,
+    scoreType: "single",
+    caught: false,
+    needsThrow: false,
+    fieldingError: true,
+    fieldingTime,
+    fieldingPoint
+  };
+}
+
 function makeStrictCircleCatchOutcome(fielder, battedBall, fieldingPoint, fieldingTime, runner = null) {
+  const droppedBall = resolveHardHitFieldingError(fielder, battedBall, fieldingPoint, fieldingTime);
+  if (droppedBall) return droppedBall;
   if (battedBall.isGrounder && runner) {
     return { kind: "force", label: `${fielder.role} 捕球`, caught: true, needsThrow: true, fieldingTime, fieldingPoint };
   }
@@ -14723,6 +14822,8 @@ function getCompletedInfieldCatchHoldPoint(fielder, elapsedSeconds) {
 
 function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
   if (!defenseState.active || defenseState.resolved || defenseState.unifiedCircleCatchComplete) return false;
+  // 落球と決まった打球は、野手が追いついても捕らない。
+  if (defenseState.outcome?.fieldingError) return false;
   const battedBall = defenseState.battedBall;
   if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
   if (defenseState.throw?.active) return false;
@@ -15292,7 +15393,9 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
     ...(defenseState.baseRunners || []),
     ...(caughtFly ? [] : [defenseState.runner])
   ]
-    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived)
+    // 内野ゴロで本塁を狙う三塁走者は「守備が一塁を選んだ」前提で走っている。
+    // ここで本塁へ投げ直すとその前提が崩れるので、送球先の候補から外す。
+    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived && !runner.groundOutAdvance)
     .sort((a, b) => {
       const baseDifference = getBatterRunnerTargetIndex(b.targetBase) - getBatterRunnerTargetIndex(a.targetBase);
       if (baseDifference !== 0) return baseDifference;
@@ -16266,11 +16369,13 @@ function getForcePlayBatterResultType(options = {}) {
 }
 
 function getCaughtOutBatterResultType(runs = 0) {
+  // 捕ったのが内野手でも、走者が還れば犠飛として記録する。
+  // 以前は外野手の捕球に限っていたため、外野まで下がった内野手が捕ると
+  // 得点しているのに打者の記録が凡打のままになっていた。
   const isSacrificeFly = runs > 0
     && defenseState.outcome?.caught
     && !defenseState.battedBall?.isBunt
-    && !defenseState.battedBall?.isGrounder
-    && outfielderRoles.includes(defenseState.chosenFielder?.role);
+    && !defenseState.battedBall?.isGrounder;
   return isSacrificeFly ? "sacrificeFly" : "out";
 }
 

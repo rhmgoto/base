@@ -8588,7 +8588,7 @@ assert(sacrificeBattingRecordState.afterOrdinaryOut.atBats === 1, "an ordinary o
 assert(sacrificeBattingRecordState.buntType === "sacrificeBunt", "a bunt that retires the batter and advances another runner should be scored as a sacrifice bunt");
 assert(sacrificeBattingRecordState.failedBuntType === "out", "a bunt without a successful runner advance should remain an ordinary out");
 assert(sacrificeBattingRecordState.sacrificeFlyType === "sacrificeFly", "an outfield catch that scores a runner should be scored as a sacrifice fly");
-assert(sacrificeBattingRecordState.infieldFlyType === "out", "an infield catch should not be scored as a sacrifice fly");
+assert(sacrificeBattingRecordState.infieldFlyType === "sacrificeFly", "an infield catch that scores a runner should also be scored as a sacrifice fly");
 
 const defenseOutAdvancementState = JSON.parse(runInGame(
   context,
