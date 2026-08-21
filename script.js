@@ -1003,9 +1003,13 @@ function applyStadiumPreset(stadiumId = currentStadiumId) {
   defenseField.foulLineInset = getFoulLineInsetForTopY(defenseField.foulLineTopY);
 }
 
+// 打球の速さ (滞空時間の逆数) の軌道別倍率。
+// ライナーは以前 3.2 で、同じ距離を飛ぶフライの4倍の速さになっていた。
+// 140mを1.2秒で横切るため目で追えず、フェンス直撃やライナー本塁打が
+// 一瞬で終わっていたので、フライとの差を残しつつ落ち着かせている。
 const battedBallSpeedMultiplier = {
   grounder: 1.62,
-  liner: 3.2,
+  liner: 1.7,
   fly: 1
 };
 const battedBallPaceMultiplier = 1.3;
@@ -1101,7 +1105,7 @@ const cpuThirdRunnerGroundOutTuning = {
 const fieldingErrorTuning = {
   minPower: 0.88,
   basePower: 1.5,
-  maxChance: 0.3,
+  maxChance: 0.1,
   pressureExponent: 0.65,
   fieldingReduction: 0.055,
   minimumFieldingScale: 0.34,
@@ -13471,6 +13475,7 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
       isToweringFly,
       isChaseFly,
       isDeepDrive,
+      isDeepDriveLiner: isDeepDrive && deepDriveTrajectory === "liner",
       isFenceLiner,
       power,
       contactScore,
@@ -13918,14 +13923,14 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
     + Math.pow(exitQuality, 1.3) * 3 * modestFlyFactor
     + Math.pow(carryQuality, 1.25) * 2.5 * modestFlyFactor
     + Math.pow(powerQuality, 1.2) * 2.5 * modestFlyFactor
-    + Math.pow(eliteQuality, 1.55) * 18
+    + Math.pow(eliteQuality, 1.55) * 12
     + batterPowerCarryMeters * modestFlyFactor
     - lowPowerCarryPenaltyMeters * modestFlyFactor
     + batterHomeRunPower.carryBonusMeters * modestFlyFactor;
   const styleBonus = traits.isFenceEdgeFly
     ? -7
     : traits.isFenceLiner
-      ? -1 + exitQuality * 2.5
+      ? 5 + exitQuality * 2.5
       : traits.isChaseFly
         ? -4 + quality * 2
         : traits.isToweringFly
@@ -13933,14 +13938,22 @@ function getPossibleHomeRunFlightDistance(distance, fenceTravelDistance, traits 
           : traits.isDeepDrive
             ? -2 + quality * 3
             : 0;
-  const scoreLimitedMaximumMeters = contactScore < 0.7
-    ? 136 + clamp((contactScore - 0.55) / 0.15, 0, 1) * 7 + exitQuality * 2 + carryQuality * 2
+  // 物理計算した飛距離のほうがこの上限より大きいので、本塁打はほぼ全球がここに
+  // 張り付く。つまりこの表がそのまま「本塁打の飛距離」になる。
+  // 以前は 136/145/154m で、中堅118mのフェンスに対して常に2〜3割余裕がある
+  // 特大の当たりばかりになっていた。ミートの質なりの飛距離が出るように下げている。
+  // ライナーはもともと飛距離に余裕がなく、上限を下げるとフェンスを越えられなく
+  // なってライナー本塁打が消える。特大の当たりは山なりのフライなので、圧縮は
+  // フライだけに効かせて、ライナーには従来ぶんの余裕を残す。
+  const linerCarryAllowance = traits.isFenceLiner || traits.isDeepDriveLiner ? 14 : 0;
+  const scoreLimitedMaximumMeters = linerCarryAllowance + (contactScore < 0.7
+    ? 124 + clamp((contactScore - 0.55) / 0.15, 0, 1) * 6 + exitQuality * 2 + carryQuality * 2
     : contactScore < 0.8
-      ? 145 + clamp((contactScore - 0.7) / 0.1, 0, 1) * 10 + exitQuality * 3 + carryQuality * 3
-      : 154 + clamp((contactScore - 0.8) / 0.2, 0, 1) * 18 + exitQuality * 4 + carryQuality * 4;
+      ? 130 + clamp((contactScore - 0.7) / 0.1, 0, 1) * 8 + exitQuality * 3 + carryQuality * 3
+      : 138 + clamp((contactScore - 0.8) / 0.2, 0, 1) * 16 + exitQuality * 4 + carryQuality * 4);
   const minimumOverFenceMeters = fenceMeters + (contactScore >= 0.8 ? 4 : 2);
   const absoluteMaximumMeters =
-    138
+    126 + (traits.isFenceLiner || traits.isDeepDriveLiner ? 14 : 0)
     + batterHomeRunPower.standardDrive * 22
     + batterHomeRunPower.superPower * 2;
   const maximumMeters = clamp(

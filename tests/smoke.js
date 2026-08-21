@@ -2387,8 +2387,22 @@ assert(latestSpreadsheetRosterState.darvish.leftBreak === 8, "Darvish left break
 assert(latestSpreadsheetRosterState.darvish.cost === 6, "Darvish cost should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.yamamoto.control === 9, "Yamamoto control should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.yamaoka.slowChange === 9 && latestSpreadsheetRosterState.yamaoka.fastChange === 7 && latestSpreadsheetRosterState.yamaoka.control === 8 && latestSpreadsheetRosterState.yamaoka.stuff === 8 && latestSpreadsheetRosterState.yamaoka.fielding === 6, "Yamaoka should match the latest spreadsheet");
-const yamaokaMinimum = createMatchPitcher(latestSpreadsheetRosterState.yamaoka, () => 0);
-const yamaokaMaximum = createMatchPitcher(latestSpreadsheetRosterState.yamaoka, () => 0.999999);
+// createMatchPitcher はゲーム側の関数なので、テスト直下ではなく vm の中で呼ぶ。
+const yamaokaVariance = JSON.parse(runInGame(context, `(() => {
+  const yamaoka = findById(pitchers, "yamaoka");
+  const minimum = createMatchPitcher(yamaoka, () => 0);
+  const maximum = createMatchPitcher(yamaoka, () => 0.999999);
+  const pick = (pitcher) => ({
+    fastKmh: pitcher.fastKmh,
+    rightBreak: pitcher.rightBreak,
+    control: pitcher.control,
+    stamina: pitcher.stamina,
+    cost: pitcher.cost
+  });
+  return JSON.stringify({ minimum: pick(minimum), maximum: pick(maximum) });
+})()`));
+const yamaokaMinimum = yamaokaVariance.minimum;
+const yamaokaMaximum = yamaokaVariance.maximum;
 assert(yamaokaMinimum.fastKmh === 142 && yamaokaMaximum.fastKmh === 148, "Yamaoka fastball should vary by plus or minus 3 each game");
 assert(yamaokaMinimum.rightBreak === 7 && yamaokaMaximum.rightBreak === 7 && yamaokaMinimum.control === 8 && yamaokaMaximum.control === 8, "Yamaoka non-fastball abilities should stay fixed");
 assert(yamaokaMinimum.stamina === 7 && yamaokaMaximum.stamina === 7 && yamaokaMinimum.cost === 6 && yamaokaMaximum.cost === 6, "Yamaoka stamina and cost should stay fixed");
@@ -4511,12 +4525,12 @@ const homeRunDistanceVarietyState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(homeRunDistanceVarietyState.nearWall >= 124 && homeRunDistanceVarietyState.nearWall <= 138, "modest home runs should land in the common 120-140m range");
-assert(homeRunDistanceVarietyState.solid >= 136 && homeRunDistanceVarietyState.solid <= 150, "solid homers should still usually stay below the monster range");
-assert(homeRunDistanceVarietyState.strong >= 140 && homeRunDistanceVarietyState.strong <= 154, "strong homers should reach the upper part of the ordinary home-run range");
-assert(homeRunDistanceVarietyState.veryStrong >= 144 && homeRunDistanceVarietyState.veryStrong <= 160, "very strong homers should be long without always hitting the cap");
+assert(homeRunDistanceVarietyState.nearWall >= 120 && homeRunDistanceVarietyState.nearWall <= 132, "modest home runs should land just over the fence");
+assert(homeRunDistanceVarietyState.solid >= 128 && homeRunDistanceVarietyState.solid <= 140, "solid homers should still usually stay below the monster range");
+assert(homeRunDistanceVarietyState.strong >= 132 && homeRunDistanceVarietyState.strong <= 144, "strong homers should reach the upper part of the ordinary home-run range");
+assert(homeRunDistanceVarietyState.veryStrong >= 136 && homeRunDistanceVarietyState.veryStrong <= 148, "very strong homers should be long without always hitting the cap");
 assert(homeRunDistanceVarietyState.elite > homeRunDistanceVarietyState.veryStrong, "elite homers should carry beyond ordinary strong homers");
-assert(homeRunDistanceVarietyState.perfect >= 156 && homeRunDistanceVarietyState.perfect <= 162, "normal power ratings should cap near-perfect contact around 160m");
+assert(homeRunDistanceVarietyState.perfect >= 142 && homeRunDistanceVarietyState.perfect <= 154, "normal power ratings should cap near-perfect contact around 150m");
 
 const stadiumFenceOutcomeState = JSON.parse(runInGame(
   context,
@@ -5797,7 +5811,7 @@ assert(variedBattedBallState.hardOutfieldBounceReactionRoute === false, "hard ou
 assert(variedBattedBallState.hardOutfieldBounceAttemptRoute === false, "hard outfield-bounce liners should not invite an infielder attempt route");
 assert(variedBattedBallState.hardOutfieldBouncePostLandingRoll >= 300, "uncaught hard outfield-bounce liners should keep rolling after the first landing");
 assert(variedBattedBallState.hardOutfieldBounceRollDuration >= 1, "uncaught hard outfield-bounce liners should show a visible post-landing roll duration");
-assert(Math.abs(variedBattedBallState.linerSpeedMultiplier - 3.2) < 0.001, "liner batted balls should use the twenty-percent slower speed multiplier");
+assert(Math.abs(variedBattedBallState.linerSpeedMultiplier - 1.7) < 0.001, "liner batted balls should stay clearly faster than flies without blurring past the fielders");
 assert(variedBattedBallState.builtLineBallTime > variedBattedBallState.oldLinerBallTimeEstimate, "line-liner travel time should be slower than the previous multiplier");
 assert(variedBattedBallState.builtDropFlag === true, "line-drop labels should create line-drop batted balls");
 assert(variedBattedBallState.builtFrontDropFlag === true, "front-drop labels should create front-drop batted balls");
@@ -10198,7 +10212,7 @@ assert(outfieldPositionAndRollState.shallowLinerRollDistance <= 460, "shallow ou
 assert(outfieldPositionAndRollState.shallowLinerBounceHeight < 5, "shallow outfield liners should roll low after landing");
 assert(outfieldPositionAndRollState.deepDriveFrontLanding === true, "front-landing deep drives should use the hard front-roll treatment");
 assert(outfieldPositionAndRollState.deepDriveFrontHeight <= 135, "front-landing deep drives should use a lower, more forceful liner arc");
-assert(outfieldPositionAndRollState.deepDriveFrontBallTime < 0.82, "front-landing deep drives should reach the turf quickly");
+assert(outfieldPositionAndRollState.deepDriveFrontBallTime < 0.95, "front-landing deep drives should reach the turf quickly");
 assert(outfieldPositionAndRollState.deepDriveFrontExitSpeed >= 140, "front-landing deep drives should display a forceful real-scale exit velocity");
 assert(outfieldPositionAndRollState.deepDriveFrontRollDistance >= 520, "front-landing deep drives should keep rolling after the first bounce");
 assert(outfieldPositionAndRollState.deepDriveFrontRollDuration >= 1.25 && outfieldPositionAndRollState.deepDriveFrontRollDuration <= 4.2, "front-landing deep drives should roll naturally after landing");
