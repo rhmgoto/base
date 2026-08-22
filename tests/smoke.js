@@ -4360,8 +4360,8 @@ assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder
 assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
 assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10) < 0.001, "fielding speed 10 should keep the previous top speed");
 assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && defenseTuningState.fielderSpeed < defenseTuningState.fielderSpeed10, "fielding movement should be redistributed across ten steps");
-assert(Math.abs(defenseTuningState.throwSpeed1 - 800) < 0.001, "arm 1 throw speed should be 800");
-assert(Math.abs(defenseTuningState.throwSpeed10 - 1100) < 0.001, "arm 10 throw speed should be 1100");
+assert(Math.abs(defenseTuningState.throwSpeed1 - 860) < 0.001, "arm 1 throw speed should be 860");
+assert(Math.abs(defenseTuningState.throwSpeed10 - 1040) < 0.001, "arm 10 throw speed should be 1040");
 assert(defenseTuningState.throwSpeed5 > defenseTuningState.throwSpeed1 && defenseTuningState.throwSpeed5 < defenseTuningState.throwSpeed10, "throw speed should be redistributed between arm 1 and arm 10");
 assert(defenseTuningState.reaction5 > 0.2, "average fielders should hesitate briefly before moving");
 assert(defenseTuningState.reaction10 < defenseTuningState.reaction5, "elite fielders should react sooner than average fielders");
@@ -5335,9 +5335,9 @@ assert(throwProfileState.normalLongTime > throwProfileState.normalShortTime, "lo
 assert(throwProfileState.normalLongArc > throwProfileState.normalShortArc, "long throws should have a higher arc");
 assert(throwProfileState.strongLongTime < throwProfileState.weakLongTime, "strong-arm fielders should throw long balls faster");
 assert(throwProfileState.strongLongArc < throwProfileState.weakLongArc, "strong-arm fielders should throw long balls on a lower arc");
-assert(Math.abs(throwProfileState.normalShortSpeed - (800 + (4 / 9) * 300)) < 0.001, "arm 5 should use the linear speed between 800 and 1100");
-assert(Math.abs(throwProfileState.strongShortSpeed - 1100) < 0.001, "arm 10 should throw at speed 1100");
-assert(Math.abs(throwProfileState.weakShortSpeed - 800) < 0.001, "arm 1 should throw at speed 800");
+assert(Math.abs(throwProfileState.normalShortSpeed - 940) < 0.001, "arm 5 should use the linear speed between 860 and 1040");
+assert(Math.abs(throwProfileState.strongShortSpeed - 1040) < 0.001, "arm 10 should throw at speed 1040");
+assert(Math.abs(throwProfileState.weakShortSpeed - 860) < 0.001, "arm 1 should throw at speed 860");
 assert(throwProfileState.weakLongBounce === true, "weak arms should bounce deep outfield throws");
 assert(throwProfileState.normalLongBounce === true, "average arms should bounce deep outfield throws");
 assert(throwProfileState.strongLongBounce === false, "strong arms should be able to reach deep throws without a bounce");

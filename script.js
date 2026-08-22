@@ -656,6 +656,7 @@ const batLengthMultiplier = 0.648 * 0.85 * 0.9;
 const batInnerTrimRatio = 0.65 * 1.1;
 const batOuterTrimRatio = -0.05;
 const batThicknessMultiplier = 1.5;
+const maxRegularSwingContactProgress = 0.82;
 const meetZoneWidthScale = 0.8;
 const sweetSpotWidthScale = 0.85 * 0.8;
 const sweetSpotScoreEaseScale = 1.3;
@@ -8293,12 +8294,13 @@ function findBestSwingContact() {
   for (let i = 0; i <= samples; i += 1) {
     const sampleRatio = i / samples;
     const progress = previousProgress + sweep * sampleRatio;
+    if (!isBuntStanceActive() && progress > maxRegularSwingContactProgress) continue;
     const sampleX = ball.prevX + (ball.x - ball.prevX) * sampleRatio;
     const sampleY = ball.prevY + (ball.y - ball.prevY) * sampleRatio;
     const bat = getBatSegment(progress);
     const batContact = closestPointOnSegment(sampleX, sampleY, bat.x1, bat.y1, bat.x2, bat.y2);
     if (!bestHit || batContact.distance < bestHit.distanceToBat) {
-      bestHit = { batContact, distanceToBat: batContact.distance, x: sampleX, y: sampleY };
+      bestHit = { batContact, distanceToBat: batContact.distance, x: sampleX, y: sampleY, swingProgress: progress };
     }
   }
   swingState.lastCheckProgress = swingProgress;
@@ -12764,8 +12766,8 @@ function getThrowBouncePoint(throwState) {
 
 function getArmThrowSpeed(armRating) {
   const value = getOpenEndedAbilityRating(armRating);
-  const minThrowSpeed = 800;
-  const maxThrowSpeed = 1100;
+  const minThrowSpeed = 860;
+  const maxThrowSpeed = 1040;
   return minThrowSpeed + ((value - 1) / 9) * (maxThrowSpeed - minThrowSpeed);
 }
 
