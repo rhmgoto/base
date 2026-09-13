@@ -1592,7 +1592,9 @@ assert(teamResetState.autoCost > 0 && teamResetState.autoCost <= 68, "auto fill 
 const rosterAndPointState = JSON.parse(runInGame(
   context,
   `(() => {
+    const otani = findById(batters, "otani");
     const shuto = findById(batters, "shuto");
+    const suzuki = findById(batters, "suzuki");
     const kimhyesong = findById(batters, "kimhyesong");
     const trout = findById(batters, "trout");
     const freeman = findById(batters, "freeman");
@@ -1628,7 +1630,9 @@ const rosterAndPointState = JSON.parse(runInGame(
     const maddux = findById(pitchers, "maddux");
     const ediaz = findById(pitchers, "ediaz");
     const jansen = findById(pitchers, "jansen");
+    const phillips = findById(pitchers, "phillips");
     const enriquez = findById(pitchers, "enriquez");
+    const glasnow = findById(pitchers, "glasnow");
     const wheeler = findById(pitchers, "wheeler");
     const valdes = findById(pitchers, "valdes");
     const ichiro = findById(batters, "ichiro");
@@ -1784,6 +1788,16 @@ const rosterAndPointState = JSON.parse(runInGame(
     batters.pop();
     renderPracticePlayerSelects();
     return JSON.stringify({
+      otani: {
+        bats: otani.bats,
+        power: otani.power,
+        meet: otani.meet,
+        run: otani.run,
+        infieldDefense: otani.infieldDefense,
+        outfieldDefense: otani.outfieldDefense,
+        arm: otani.arm,
+        cost: otani.cost
+      },
       shuto: {
         bats: shuto.bats,
         power: shuto.power,
@@ -1793,6 +1807,16 @@ const rosterAndPointState = JSON.parse(runInGame(
         outfieldDefense: shuto.outfieldDefense,
         arm: shuto.arm,
         cost: shuto.cost
+      },
+      suzuki: {
+        bats: suzuki.bats,
+        power: suzuki.power,
+        meet: suzuki.meet,
+        run: suzuki.run,
+        infieldDefense: suzuki.infieldDefense,
+        outfieldDefense: suzuki.outfieldDefense,
+        arm: suzuki.arm,
+        cost: suzuki.cost
       },
       kimhyesong: {
         bats: kimhyesong.bats,
@@ -2257,6 +2281,32 @@ const rosterAndPointState = JSON.parse(runInGame(
         stamina: enriquez.stamina,
         cost: enriquez.cost
       },
+      phillips: {
+        throws: phillips.throws,
+        fastKmh: phillips.fastKmh,
+        rightBreak: phillips.rightBreak,
+        leftBreak: phillips.leftBreak,
+        slowChange: phillips.slowChange,
+        fastChange: phillips.fastChange,
+        control: phillips.control,
+        stuff: phillips.stuff,
+        fielding: phillips.fielding,
+        stamina: phillips.stamina,
+        cost: phillips.cost
+      },
+      glasnow: {
+        throws: glasnow.throws,
+        fastKmh: glasnow.fastKmh,
+        rightBreak: glasnow.rightBreak,
+        leftBreak: glasnow.leftBreak,
+        slowChange: glasnow.slowChange,
+        fastChange: glasnow.fastChange,
+        control: glasnow.control,
+        stuff: glasnow.stuff,
+        fielding: glasnow.fielding,
+        stamina: glasnow.stamina,
+        cost: glasnow.cost
+      },
       wheeler: {
         throws: wheeler.throws,
         fastKmh: wheeler.fastKmh,
@@ -2377,7 +2427,7 @@ assert(latestSpreadsheetRosterState.sato.arm === 6, "Sato arm should match the l
 assert(latestSpreadsheetRosterState.harper.outfieldDefense === 5 && latestSpreadsheetRosterState.harper.arm === 7, "Harper should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.arraez.power === 1 && latestSpreadsheetRosterState.arraez.meet === 10, "Arraez should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.carpenter.arm === 4, "Carpenter arm should match the latest spreadsheet");
-assert(latestSpreadsheetRosterState.zaiahope.bats === "L" && latestSpreadsheetRosterState.zaiahope.power === 4 && latestSpreadsheetRosterState.zaiahope.meet === 3 && latestSpreadsheetRosterState.zaiahope.run === 7 && latestSpreadsheetRosterState.zaiahope.infieldDefense === 3 && latestSpreadsheetRosterState.zaiahope.outfieldDefense === 6 && latestSpreadsheetRosterState.zaiahope.arm === 6 && latestSpreadsheetRosterState.zaiahope.cost === 4, "Zaia Hope should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.zaiahope.bats === "L" && latestSpreadsheetRosterState.zaiahope.power === 4 && latestSpreadsheetRosterState.zaiahope.meet === 3 && latestSpreadsheetRosterState.zaiahope.run === 7 && latestSpreadsheetRosterState.zaiahope.infieldDefense === 3 && latestSpreadsheetRosterState.zaiahope.outfieldDefense === 7 && latestSpreadsheetRosterState.zaiahope.arm === 6 && latestSpreadsheetRosterState.zaiahope.cost === 4, "Zaia Hope should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.alvarez.bats === "L" && latestSpreadsheetRosterState.alvarez.power === 8 && latestSpreadsheetRosterState.alvarez.meet === 9 && latestSpreadsheetRosterState.alvarez.run === 3 && latestSpreadsheetRosterState.alvarez.infieldDefense === 1 && latestSpreadsheetRosterState.alvarez.outfieldDefense === 1 && latestSpreadsheetRosterState.alvarez.arm === 2 && latestSpreadsheetRosterState.alvarez.cost === 6, "Alvarez should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.caminero.bats === "R" && latestSpreadsheetRosterState.caminero.power === 8 && latestSpreadsheetRosterState.caminero.meet === 6 && latestSpreadsheetRosterState.caminero.run === 4 && latestSpreadsheetRosterState.caminero.infieldDefense === 4 && latestSpreadsheetRosterState.caminero.outfieldDefense === 2 && latestSpreadsheetRosterState.caminero.arm === 6 && latestSpreadsheetRosterState.caminero.cost === 7, "Caminero should match the latest spreadsheet");
 assert(latestSpreadsheetRosterState.pca.bats === "L" && latestSpreadsheetRosterState.pca.power === 7 && latestSpreadsheetRosterState.pca.meet === 7 && latestSpreadsheetRosterState.pca.run === 9 && latestSpreadsheetRosterState.pca.infieldDefense === 4 && latestSpreadsheetRosterState.pca.outfieldDefense === 9 && latestSpreadsheetRosterState.pca.arm === 9 && latestSpreadsheetRosterState.pca.cost === 8, "PCA should match the latest spreadsheet");
@@ -2412,17 +2462,33 @@ assert(latestSpreadsheetRosterState.rojas.throws === "R" && latestSpreadsheetRos
 assert(latestSpreadsheetRosterState.summers.throws === "L" && latestSpreadsheetRosterState.summers.fastKmh === 152 && latestSpreadsheetRosterState.summers.cost === 1, "Summers should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.enriquez.throws === "R" && latestSpreadsheetRosterState.enriquez.fastKmh === 166 && latestSpreadsheetRosterState.enriquez.cost === 1, "Enriquez should be available as a new pitcher");
 assert(latestSpreadsheetRosterState.kelly.stamina === 9 && latestSpreadsheetRosterState.kelly.cost === 4, "Kelly should match the latest spreadsheet");
-assert(latestSpreadsheetRosterState.riverryan.throws === "R" && latestSpreadsheetRosterState.riverryan.fastKmh === 162 && latestSpreadsheetRosterState.riverryan.rightBreak === 4 && latestSpreadsheetRosterState.riverryan.leftBreak === 3 && latestSpreadsheetRosterState.riverryan.slowChange === 6 && latestSpreadsheetRosterState.riverryan.fastChange === 6 && latestSpreadsheetRosterState.riverryan.control === 3 && latestSpreadsheetRosterState.riverryan.stuff === 8 && latestSpreadsheetRosterState.riverryan.fielding === 4 && latestSpreadsheetRosterState.riverryan.stamina === 5 && latestSpreadsheetRosterState.riverryan.cost === 4, "River Ryan should match the latest spreadsheet");
-assert(latestSpreadsheetRosterState.bsmith.throws === "R" && latestSpreadsheetRosterState.bsmith.fastKmh === 158 && latestSpreadsheetRosterState.bsmith.rightBreak === 3 && latestSpreadsheetRosterState.bsmith.leftBreak === 1 && latestSpreadsheetRosterState.bsmith.slowChange === 8 && latestSpreadsheetRosterState.bsmith.fastChange === 5 && latestSpreadsheetRosterState.bsmith.control === 3 && latestSpreadsheetRosterState.bsmith.stuff === 6 && latestSpreadsheetRosterState.bsmith.fielding === 4 && latestSpreadsheetRosterState.bsmith.stamina === 5 && latestSpreadsheetRosterState.bsmith.cost === 3, "B. Smith should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.riverryan.throws === "R" && latestSpreadsheetRosterState.riverryan.fastKmh === 162 && latestSpreadsheetRosterState.riverryan.rightBreak === 4 && latestSpreadsheetRosterState.riverryan.leftBreak === 3 && latestSpreadsheetRosterState.riverryan.slowChange === 6 && latestSpreadsheetRosterState.riverryan.fastChange === 6 && latestSpreadsheetRosterState.riverryan.control === 5 && latestSpreadsheetRosterState.riverryan.stuff === 8 && latestSpreadsheetRosterState.riverryan.fielding === 4 && latestSpreadsheetRosterState.riverryan.stamina === 5 && latestSpreadsheetRosterState.riverryan.cost === 4, "River Ryan should match the latest spreadsheet");
+assert(latestSpreadsheetRosterState.bsmith.throws === "R" && latestSpreadsheetRosterState.bsmith.fastKmh === 158 && latestSpreadsheetRosterState.bsmith.rightBreak === 3 && latestSpreadsheetRosterState.bsmith.leftBreak === 1 && latestSpreadsheetRosterState.bsmith.slowChange === 8 && latestSpreadsheetRosterState.bsmith.fastChange === 5 && latestSpreadsheetRosterState.bsmith.control === 5 && latestSpreadsheetRosterState.bsmith.stuff === 6 && latestSpreadsheetRosterState.bsmith.fielding === 4 && latestSpreadsheetRosterState.bsmith.stamina === 5 && latestSpreadsheetRosterState.bsmith.cost === 3, "B. Smith should match the latest spreadsheet");
 
+assert(rosterAndPointState.otani.bats === "L", "Ohtani should be a left-handed batter");
+assert(rosterAndPointState.otani.power === 9, "Ohtani power should match the roster table");
+assert(rosterAndPointState.otani.meet === 8, "Ohtani meet should match the roster table");
+assert(rosterAndPointState.otani.run === 8, "Ohtani run should match the roster table");
+assert(rosterAndPointState.otani.infieldDefense === 4, "Ohtani infield defense should match the roster table");
+assert(rosterAndPointState.otani.outfieldDefense === 7, "Ohtani outfield defense should match the roster table");
+assert(rosterAndPointState.otani.arm === 8, "Ohtani arm should match the roster table");
+assert(rosterAndPointState.otani.cost === 9, "Ohtani cost should match the roster table");
 assert(rosterAndPointState.shuto.bats === "L", "Shuto should be a left-handed batter");
 assert(rosterAndPointState.shuto.power === 2, "Shuto power should match the roster table");
 assert(rosterAndPointState.shuto.meet === 4, "Shuto meet should match the roster table");
 assert(rosterAndPointState.shuto.run === 10, "Shuto run should match the roster table");
 assert(rosterAndPointState.shuto.infieldDefense === 3, "Shuto infield defense should match the roster table");
-assert(rosterAndPointState.shuto.outfieldDefense === 8, "Shuto outfield defense should match the roster table");
-assert(rosterAndPointState.shuto.arm === 7, "Shuto arm should match the roster table");
+assert(rosterAndPointState.shuto.outfieldDefense === 7, "Shuto outfield defense should match the roster table");
+assert(rosterAndPointState.shuto.arm === 6, "Shuto arm should match the roster table");
 assert(rosterAndPointState.shuto.cost === 5, "Shuto cost should match the roster table");
+assert(rosterAndPointState.suzuki.bats === "R", "Suzuki should be a right-handed batter");
+assert(rosterAndPointState.suzuki.power === 6, "Suzuki power should match the roster table");
+assert(rosterAndPointState.suzuki.meet === 5, "Suzuki meet should match the roster table");
+assert(rosterAndPointState.suzuki.run === 6, "Suzuki run should match the roster table");
+assert(rosterAndPointState.suzuki.infieldDefense === 3, "Suzuki infield defense should match the roster table");
+assert(rosterAndPointState.suzuki.outfieldDefense === 8, "Suzuki outfield defense should match the roster table");
+assert(rosterAndPointState.suzuki.arm === 8, "Suzuki arm should match the roster table");
+assert(rosterAndPointState.suzuki.cost === 5, "Suzuki cost should match the roster table");
 assert(rosterAndPointState.kimhyesong.bats === "L", "Kim Hye-seong should be a left-handed batter");
 assert(rosterAndPointState.kimhyesong.power === 4, "Kim Hye-seong power should match the roster table");
 assert(rosterAndPointState.kimhyesong.meet === 4, "Kim Hye-seong meet should match the roster table");
@@ -2497,9 +2563,9 @@ assert(rosterAndPointState.arraez.bats === "L", "Arraez should be a left-handed 
 assert(rosterAndPointState.arraez.power === 1, "Arraez power should match the roster table");
 assert(rosterAndPointState.arraez.meet === 10, "Arraez meet should match the roster table");
 assert(rosterAndPointState.arraez.run === 5, "Arraez run should match the roster table");
-assert(rosterAndPointState.arraez.infieldDefense === 3, "Arraez infield defense should match the roster table");
+assert(rosterAndPointState.arraez.infieldDefense === 6, "Arraez infield defense should match the roster table");
 assert(rosterAndPointState.arraez.outfieldDefense === 2, "Arraez outfield defense should match the roster table");
-assert(rosterAndPointState.arraez.arm === 5, "Arraez arm should match the roster table");
+assert(rosterAndPointState.arraez.arm === 7, "Arraez arm should match the roster table");
 assert(rosterAndPointState.arraez.cost === 5, "Arraez cost should match the roster table");
 assert(rosterAndPointState.wittjr.bats === "R", "Witt Jr. should be a right-handed batter");
 assert(rosterAndPointState.wittjr.power === 6, "Witt Jr. power should match the roster table");
@@ -2737,17 +2803,39 @@ assert(rosterAndPointState.jansen.stuff === 13, "Jansen stuff should match the p
 assert(rosterAndPointState.jansen.fielding === 5, "Jansen fielding should match the pitcher roster table");
 assert(rosterAndPointState.jansen.stamina === 3, "Jansen stamina should match the pitcher roster table");
 assert(rosterAndPointState.jansen.cost === 4, "Jansen pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.phillips.throws === "R", "Phillips should be a right-handed pitcher");
+assert(rosterAndPointState.phillips.fastKmh === 158, "Phillips fastball should match the pitcher roster table");
+assert(rosterAndPointState.phillips.rightBreak === 8, "Phillips right break should match the pitcher roster table");
+assert(rosterAndPointState.phillips.leftBreak === 3, "Phillips left break should match the pitcher roster table");
+assert(rosterAndPointState.phillips.slowChange === 3, "Phillips slow change should match the pitcher roster table");
+assert(rosterAndPointState.phillips.fastChange === 6, "Phillips fast change should match the pitcher roster table");
+assert(rosterAndPointState.phillips.control === 7, "Phillips control should match the pitcher roster table");
+assert(rosterAndPointState.phillips.stuff === 8, "Phillips stuff should match the pitcher roster table");
+assert(rosterAndPointState.phillips.fielding === 5, "Phillips fielding should match the pitcher roster table");
+assert(rosterAndPointState.phillips.stamina === 3, "Phillips stamina should match the pitcher roster table");
+assert(rosterAndPointState.phillips.cost === 3, "Phillips pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.throws === "R", "Enriquez should be a right-handed pitcher");
 assert(rosterAndPointState.enriquez.fastKmh === 166, "Enriquez fastball should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.rightBreak === 3, "Enriquez right break should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.leftBreak === 2, "Enriquez left break should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.slowChange === 2, "Enriquez slow change should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.fastChange === 4, "Enriquez fast change should match the pitcher roster table");
-assert(rosterAndPointState.enriquez.control === 3, "Enriquez control should match the pitcher roster table");
+assert(rosterAndPointState.enriquez.control === 5, "Enriquez control should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.stuff === 6, "Enriquez stuff should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.fielding === 3, "Enriquez fielding should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.stamina === 3, "Enriquez stamina should match the pitcher roster table");
 assert(rosterAndPointState.enriquez.cost === 1, "Enriquez pitcher cost should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.throws === "R", "Glasnow should be a right-handed pitcher");
+assert(rosterAndPointState.glasnow.fastKmh === 158, "Glasnow fastball should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.rightBreak === 8, "Glasnow right break should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.leftBreak === 3, "Glasnow left break should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.slowChange === 8, "Glasnow slow change should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.fastChange === 4, "Glasnow fast change should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.control === 5, "Glasnow control should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.stuff === 7, "Glasnow stuff should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.fielding === 7, "Glasnow fielding should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.stamina === 6, "Glasnow stamina should match the pitcher roster table");
+assert(rosterAndPointState.glasnow.cost === 6, "Glasnow pitcher cost should match the pitcher roster table");
 assert(rosterAndPointState.wheeler.fastKmh === 159 && rosterAndPointState.wheeler.rightBreak === 8 && rosterAndPointState.wheeler.leftBreak === 8 && rosterAndPointState.wheeler.cost === 7, "Wheeler pitcher should match the pitcher roster table");
 assert(rosterAndPointState.valdes.throws === "L" && rosterAndPointState.valdes.fastKmh === 158 && rosterAndPointState.valdes.rightBreak === 9 && rosterAndPointState.valdes.leftBreak === 7 && rosterAndPointState.valdes.cost === 7, "Valdes pitcher should match the pitcher roster table");
 assert(rosterAndPointState.pitcherIncludedCost > rosterAndPointState.baseCost, "pitcher cost should affect the combined team point total");

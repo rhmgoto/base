@@ -295,14 +295,14 @@ const pitchControlTuning = {
 const showHbpHitBox = false;
 
 const batters = [
-  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 9 },
+  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 8, infieldDefense: 4, outfieldDefense: 7, arm: 8, cost: 9 },
   { id: "ichiro", name: "イチロー", bats: "L", power: 4, meet: 20, run: 10, infieldDefense: 3, outfieldDefense: 11, arm: 11, cost: 28 },
   { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 6, cost: 5 },
   { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 9, run: 6, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
   { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
-  { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 4, run: 10, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 5 },
+  { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 4, run: 10, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
   { id: "shinjo", name: "シンジョウ", bats: "R", power: 4, meet: 3, run: 6, infieldDefense: 3, outfieldDefense: 10, arm: 10, cost: 4 },
-  { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 5, arm: 7, cost: 5 },
+  { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 8, arm: 8, cost: 5 },
   { id: "trout", name: "トラウト", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 3, outfieldDefense: 6, arm: 5, cost: 6 },
   { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 8, run: 5, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 9 },
   { id: "ruth", name: "ルース", bats: "R", power: 20, meet: 15, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
@@ -314,7 +314,7 @@ const batters = [
   { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 7, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
   { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
   { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 5, arm: 7, cost: 8 },
-  { id: "arraez", name: "アラエス", bats: "L", power: 1, meet: 10, run: 5, infieldDefense: 3, outfieldDefense: 2, arm: 5, cost: 5 },
+  { id: "arraez", name: "アラエス", bats: "L", power: 1, meet: 10, run: 5, infieldDefense: 6, outfieldDefense: 2, arm: 7, cost: 5 },
   { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
   { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
   { id: "bonds", name: "ボンズ", bats: "L", power: 19, meet: 14, run: 8, infieldDefense: 3, outfieldDefense: 10, arm: 10, cost: 28 },
@@ -331,7 +331,7 @@ const batters = [
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 20, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 26 },
   { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 18, run: 20, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 24 },
   { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
-  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 6, arm: 6, cost: 4 },
+  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 4 },
   { id: "alvarez", name: "アルバレス", bats: "L", power: 8, meet: 9, run: 3, infieldDefense: 1, outfieldDefense: 1, arm: 2, cost: 6 },
   { id: "caminero", name: "カミネロ", bats: "R", power: 8, meet: 6, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 7 },
   { id: "pca", name: "PCA", bats: "L", power: 7, meet: 7, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 8 }
@@ -373,14 +373,14 @@ const pitchers = [
   { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 18, leftBreak: 17, slowChange: 27, fastChange: 17, control: 27, stuff: 33, fielding: 7, stamina: 16, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 22, leftBreak: 20, slowChange: 29, fastChange: 18, control: 29, stuff: 32, fielding: 7, stamina: 15, cost: 32 },
-  { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 7, leftBreak: 3, slowChange: 3, fastChange: 3, control: 4, stuff: 6, fielding: 5, stamina: 3, cost: 3 },
+  { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 3, fastChange: 6, control: 7, stuff: 8, fielding: 5, stamina: 3, cost: 3 },
   { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 9, fastChange: 7, control: 8, stuff: 8, fielding: 6, stamina: 7, cost: 6 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 8, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 9, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 3, cost: 1 },
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 3, cost: 1 },
-  { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 3, stuff: 6, fielding: 3, stamina: 3, cost: 1 },
-  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 3, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
+  { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 5, stuff: 6, fielding: 3, stamina: 3, cost: 1 },
+  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 5, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
   { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
   { id: "wheeler", name: "ウィーラー", throws: "R", fastKmh: 159, rightBreak: 8, leftBreak: 8, slowChange: 5, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 7 },
   { id: "valdes", name: "バルデス", throws: "L", fastKmh: 158, rightBreak: 9, leftBreak: 7, slowChange: 7, fastChange: 6, control: 5, stuff: 7, fielding: 4, stamina: 7, cost: 7 },
@@ -388,10 +388,10 @@ const pitchers = [
   { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 17, control: 27, stuff: 33, fielding: 7, stamina: 15, cost: 29 },
   { id: "sabrowski", name: "\u30b5\u30d6\u30ed\u30a6\u30b9\u30ad", throws: "L", fastKmh: 151, rightBreak: 4, leftBreak: 10, slowChange: 10, fastChange: 10, control: 2, stuff: 10, fielding: 4, stamina: 1, cost: 2 },
   { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 4 },
-  { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 3, stuff: 8, fielding: 4, stamina: 5, cost: 4 },
+  { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 5, stuff: 8, fielding: 4, stamina: 5, cost: 4 },
   { id: "anderson", name: "アンダーソン", throws: "R", fastKmh: 157, rightBreak: 5, leftBreak: 2, slowChange: 7, fastChange: 5, control: 5, stuff: 6, fielding: 5, stamina: 4, cost: 3 },
   { id: "tscott", name: "T.スコット", throws: "L", fastKmh: 160, rightBreak: 3, leftBreak: 9, slowChange: 3, fastChange: 9, control: 7, stuff: 9, fielding: 7, stamina: 4, cost: 3 },
-  { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 3, stuff: 6, fielding: 4, stamina: 5, cost: 3 }
+  { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 5, stuff: 6, fielding: 4, stamina: 5, cost: 3 }
 ];
 
 const pitchTypes = {
