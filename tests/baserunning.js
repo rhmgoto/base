@@ -1366,6 +1366,110 @@ assert(manualTwoOutTagUpState.command.tagUp === false, "2アウト捕球後の�
 assert(manualTwoOutTagUpState.command.throwTarget === null, "2アウト捕球後の手動タッチアップ指示で本塁送球を作らない");
 assert(manualTwoOutTagUpState.runs === 0, "2アウト満塁の外野フライ捕球後に手動タッチアップ得点を認めない");
 
+// 複数塁の途中到達、生還後の操作、封殺とタッチアウトが連続する場合。
+const partialRouteBases = JSON.parse(run(`
+  startGame();
+  const runner = {
+    id: "PARTIAL", startBase: "first", currentBase: "first", targetBase: "home",
+    route: createBaseRunnerRoute(1, 4), speed: 100, routeStartTime: 0,
+    arrived: false
+  };
+  runner.routeDuration = getRunnerRouteDistance(runner.route) / runner.speed;
+  runner.arrivalTime = runner.routeDuration;
+  defenseState.baseRunners = [runner];
+  const secondTime = getRunnerArrivalTimeAtBaseIndex(runner, 2);
+  const thirdTime = getRunnerArrivalTimeAtBaseIndex(runner, 3);
+  const samples = [secondTime + 0.1, thirdTime + 0.1, runner.arrivalTime - 0.1];
+  return JSON.stringify(samples.map((time) => {
+    updateDefenseBaseRunners(time);
+    return getSettledRunnerBase(runner, time);
+  }));
+`));
+
+const scoredBatterCommand = JSON.parse(run(`
+  startGame();
+  defenseState.runner = createBatterRunner(activeBatter);
+  setBatterRunnerDestination(defenseState.runner, "home");
+  const arrival = defenseState.runner.arrivalTime;
+  updateBatterRunner(arrival);
+  const canAdvance = canBatterRunnerTargetBase(defenseState.runner, "first", "advance");
+  advanceBatterRunnerOneBase(arrival + 0.1);
+  return JSON.stringify({ canAdvance, target: defenseState.runner.targetBase, arrived: defenseState.runner.arrived });
+`));
+
+const forceThenTagScoring = JSON.parse(run(`
+  function play(scoreTime) {
+    startGame();
+    gameMode = "watch";
+    battingTeam = "away";
+    gamePhase = "defense";
+    count.outs = 1;
+    bases.first = makeBaseRunner({ id: "R1", name: "RUN1", run: 5 });
+    bases.second = makeBaseRunner({ id: "R2", name: "RUN2", run: 5 });
+    bases.third = makeBaseRunner({ id: "R3", name: "RUN3", run: 5 });
+    defenseState = {
+      ...createDefenseState(), active: true, startTime: performance.now() - 10000,
+      outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 1 },
+      battedBall: { isGrounder: true, ballTime: 1 },
+      runner: { ...activeBatter, startBase: "batter", currentBase: "first", targetBase: "first", arrived: true, arrivalTime: 3 },
+      baseRunners: [
+        { ...bases.second, startBase: "second", currentBase: "third", targetBase: "third", arrived: true, arrivalTime: 8 },
+        { ...bases.third, startBase: "third", currentBase: "home", targetBase: "home", arrived: true, arrivalTime: scoreTime }
+      ],
+      completedForceOutBases: ["second"],
+      throw: { targetBase: "third", baseLabel: "三塁", startTime: 4, endTime: 7, tagTime: 7, safe: false }
+    };
+    let finalOuts = null;
+    const originalChangeSide = changeSide;
+    changeSide = function() { finalOuts = count.outs; return originalChangeSide(); };
+    finishDefensePlay();
+    changeSide = originalChangeSide;
+    return { outs: finalOuts ?? count.outs, runs: scores.away, team: battingTeam };
+  }
+  return JSON.stringify([play(6), play(7), play(8)]);
+`));
+
+assert(JSON.stringify(partialRouteBases) === JSON.stringify(["second", "third", "third"]),
+  `複数塁を進む途中では実際に踏んだ塁まで確定する (${JSON.stringify(partialRouteBases)})`);
+assert(!scoredBatterCommand.canAdvance && scoredBatterCommand.target === "home" && scoredBatterCommand.arrived,
+  `生還した打者走者は進塁指示で再び一塁へ走り出さない (${JSON.stringify(scoredBatterCommand)})`);
+forceThenTagScoring.forEach((result, index) => {
+  assert(result.outs === 3 && result.team === "home" && result.runs === (index === 0 ? 1 : 0),
+    `二塁封殺後の三塁タッチアウトは第3アウトになり、その前の生還だけ得点する (${JSON.stringify(result)})`);
+});
+
+const manualHitScoring = JSON.parse(run(`
+  function play(batterScored) {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    gamePhase = "defense";
+    const runnerInfo = makeBaseRunner({ id: "R1", name: "RUN1", run: 5 });
+    if (!batterScored) bases.first = runnerInfo;
+    defenseState = {
+      ...createDefenseState(), active: true, startTime: performance.now() - 10000,
+      outcome: { kind: "hit", scoreType: "single", caught: false, needsThrow: false },
+      battedBall: { isGrounder: true, ballTime: 1 },
+      runner: {
+        ...activeBatter, startBase: "batter", currentBase: batterScored ? "home" : "first",
+        targetBase: batterScored ? "home" : "first", arrived: true, arrivalTime: 8,
+        manualControlled: batterScored
+      },
+      baseRunners: batterScored ? [] : [{
+        ...runnerInfo, startBase: "first", currentBase: "home", targetBase: "home",
+        manualTargetBase: "home", arrived: true, arrivalTime: 8
+      }]
+    };
+    finishDefensePlay();
+    return { runs: scores.away, first: bases.first?.id || null, second: bases.second?.id || null, third: bases.third?.id || null };
+  }
+  return JSON.stringify({ runnerScored: play(false), batterScored: play(true) });
+`));
+assert(manualHitScoring.runnerScored.runs === 1 && manualHitScoring.runnerScored.second === null && manualHitScoring.runnerScored.third === null,
+  `手動で生還した走者を単打の自動進塁で塁上に戻さない (${JSON.stringify(manualHitScoring.runnerScored)})`);
+assert(manualHitScoring.batterScored.runs === 1 && manualHitScoring.batterScored.first === null,
+  `手動で生還した打者走者を単打の自動進塁で一塁に戻さない (${JSON.stringify(manualHitScoring.batterScored)})`);
+
 // ---------------------------------------------------------------------------
 // 統合テスト: シード固定の観戦試合で走塁の不変条件を検査する
 // ---------------------------------------------------------------------------

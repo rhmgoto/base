@@ -11475,16 +11475,18 @@ function demoteBatterRunnerTargetIfBaseTaken(runner, baseRunners, battedBall = d
   setBatterRunnerDestination(runner, baseNameByIndex[targetIndex - 1] || "first");
 }
 
-// 打者走者がアニメーション上で一塁より先へ走ったときは、その到達塁が正。
-// 打球の種類から機械的に進塁させると (normalizeAutoHitAdvanceType が長打を単打に
-// 丸めるため)、二塁まで走り切った打者走者が一塁へ置き直されてしまう。
+// 打者の長打や手動走塁は、走者ごとの到達塁を使う。
+// 打球の種類から進塁を作り直すと、生還した走者まで塁上に戻ってしまう。
 function shouldUseAnimatedBatterRunnerBaseState() {
   const runner = defenseState.runner;
   if (!runner) return false;
+  // 柵越えとエンタイトルツーベースは、走り切るのを待たず規定の塁を与える。
+  if (defenseState.battedBall?.fenceOver || defenseState.battedBall?.groundRuleDouble
+    || defenseState.outcome?.scoreType === "homer" || defenseState.outcome?.kind === "homer") return false;
   const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
-  // 本塁打は走り切るのを待たずに全員が生還する。ここはアニメーションではなく
-  // 機械的な進塁が正しいので、二塁・三塁で止まる打者走者だけを対象にする。
-  return targetIndex > 1 && targetIndex < 4;
+  return (targetIndex > 1 && targetIndex <= 4)
+    || Boolean(runner.manualControlled)
+    || Boolean(defenseState.baseRunners?.some((baseRunner) => baseRunner.manualTargetBase));
 }
 
 function isCpuAutoBaserunningActive() {
@@ -11820,6 +11822,7 @@ function setBatterRunnerManualDestination(runner, targetBase, elapsedSeconds, mo
 
 function canBatterRunnerTargetBase(runner, targetBase, mode = "advance") {
   if (!runner || !targetBase) return false;
+  if (runner.isOut || runner.forceOut || (runner.arrived && runner.targetBase === "home")) return false;
   const targetIndex = getBatterRunnerTargetIndex(targetBase);
   const currentIndex = getRunnerBaseIndex(runner.currentBase ?? "home");
   if (mode === "return") {
@@ -16196,10 +16199,13 @@ function finishDefensePlay() {
         removeCompletedForceOutRunnersFromDefenseDisplay();
       }
       const forceOutBases = defenseState.completedForceOutBases || [];
-      const isForceOut = forceOutBases.length > 0;
+      // 先の封殺と、最後の送球によるタッチアウトを別々に集計する。
+      // 封殺済みの走者を再計上したり、後のタッチアウトを封殺に変えてはいけない。
+      const forceOutStartBases = getDefensePlayOutStartBases(forceOutBases);
+      const throwOutStartBase = throwOutRunner === defenseState.runner ? "batter" : throwOutRunner?.startBase;
+      const tagOutRunner = throwOutRunner && !forceOutStartBases.has(throwOutStartBase) ? throwOutRunner : null;
       const outsBeforePlay = count.outs;
       const runnerSnapshot = captureBaseRunnerAdvanceSnapshot();
-      if (isForceOut) recordCompletedForceOut(defenseState.throw);
       // 捕球アウト (打者) と送球アウトは同じプレーで同時に起こる。
       // 以前は throwOut が真だと捕球アウトを扱う else if に入れず、打者のアウトが
       // 数えられないうえ、アウトのはずの打者が一塁に置かれて満塁が維持されていた。
@@ -16219,9 +16225,11 @@ function finishDefensePlay() {
       }
       // clamp は min > max のとき min を返すので、残りアウト数が 0 でも 1 を足してしまう。
       const remainingOuts = Math.max(0, 3 - count.outs);
-      const outsToAdd = Math.min(isForceOut ? Math.max(1, forceOutBases.length) : 1, remainingOuts);
-      if (isForceOut) {
-        forceOutBases.slice(0, outsToAdd).forEach((base) => {
+      const forceOutsToAdd = Math.min(forceOutBases.length, remainingOuts);
+      const tagOutsToAdd = tagOutRunner && remainingOuts > forceOutsToAdd ? 1 : 0;
+      const outsToAdd = forceOutsToAdd + tagOutsToAdd;
+      if (forceOutsToAdd > 0) {
+        forceOutBases.slice(0, forceOutsToAdd).forEach((base) => {
           recordDefenseOutEvent({
             runner: getForcedRunnerForThrowTarget(base, defenseState.runner, defenseState.baseRunners),
             base,
@@ -16230,9 +16238,10 @@ function finishDefensePlay() {
             reason: "Force play recorded at forced base"
           });
         });
-      } else {
+      }
+      if (tagOutsToAdd > 0) {
         recordDefenseOutEvent({
-          runner: throwOutRunner,
+          runner: tagOutRunner,
           base: defenseState.throw?.targetBase,
           outType: "tag",
           time: defenseState.throw?.endTime,
@@ -16240,12 +16249,13 @@ function finishDefensePlay() {
         });
       }
       count.outs += outsToAdd;
-      recordLastOutFromDefense(forceOutBases, throwOutRunner);
+      if (tagOutsToAdd > 0) recordLastOutBatter(battingTeam, tagOutRunner);
+      else if (forceOutsToAdd > 0) recordLastOutFromDefense(forceOutBases.slice(0, forceOutsToAdd));
       recordPitcherOuts(fieldingTeam(), defendingPitcher, outsToAdd);
       adjustPitcherStamina(defendingPitcher, staminaTuning.outRecovery);
       const caughtMadeThirdOut = caughtBatterOut && outsBeforePlay >= 2;
-      const forceMadeThirdOut = isForceOut && outsToAdd > 0 && count.outs >= 3;
-      const tagMadeThirdOut = !isForceOut && outsToAdd > 0 && count.outs >= 3 && !caughtMadeThirdOut;
+      const forceMadeThirdOut = forceOutsToAdd > 0 && tagOutsToAdd === 0 && count.outs >= 3;
+      const tagMadeThirdOut = tagOutsToAdd > 0 && count.outs >= 3;
       // フォースアウトと打者走者のアウトでは得点なし。タッチアウトが3つ目なら、
       // タッチより先に本塁へ到達した走者だけを得点として認める。
       const thirdOutScoringOptions = caughtMadeThirdOut || forceMadeThirdOut
@@ -16255,15 +16265,15 @@ function finishDefensePlay() {
           : { allowRuns: true };
       const runs = resolveDefensePlayBaseState({
         batterInfo: activeBatter,
-        forceOutBases: isForceOut ? forceOutBases : [],
-        outRunners: isForceOut ? [] : [throwOutRunner],
+        forceOutBases,
+        outRunners: tagOutRunner ? [tagOutRunner] : [],
         batterOut: caughtBatterOut,
         ...thirdOutScoringOptions
       });
       const batterResultType = caughtBatterOut
         ? getCaughtOutBatterResultType(runs)
         : getForcePlayBatterResultType({
-            forceOutBases: isForceOut ? forceOutBases : [],
+            forceOutBases,
             outsBeforePlay,
             outsToAdd,
             runnerSnapshot,
@@ -16395,20 +16405,28 @@ function getDefenseRunnerScoreTime(runner) {
 
 // 走路上のどこまで塁を踏み終えたか。到達前に判定が下りた走者を、実際には
 // 踏んでいない塁へ進めてしまわないために使う。
-function getDefenseRunnerCompletedBaseIndex(runner) {
-  // 走路の起点は「いま踏んでいる塁」。手動指示で走路を引き直した場合もこれに合う。
+function getDefenseRunnerCompletedBaseIndex(runner, resolutionTime = getDefensePlayElapsedSeconds()) {
+  // currentBase は途中の塁を通るたびに更新される。そこへ走路の点数を足すと
+  // 通過済みの塁を二重に数えるので、通過点の座標から塁を特定する。
   const originBase = runner?.currentBase ?? runner?.startBase;
-  const startIndex = originBase === "batter" ? 0 : baseIndexByName[originBase] ?? 0;
+  const startIndex = originBase === "home" && runner?.startBase !== "batter"
+    ? 4 : baseIndexByName[originBase] ?? 0;
   const route = runner?.route;
   if (!route || route.length < 2) return startIndex;
+  const totalDistance = getRunnerRouteDistance(route);
+  const duration = runner.routeDuration ?? (runner.speed > 0 ? totalDistance / runner.speed : null);
+  if (!Number.isFinite(duration) || !Number.isFinite(resolutionTime)) return startIndex;
+  const progress = duration > 0 ? clamp((resolutionTime - (runner.routeStartTime ?? 0)) / duration, 0, 1) : 1;
+  const traveled = totalDistance * progress;
+  let distanceToPoint = 0;
   let completed = startIndex;
   for (let index = 1; index < route.length; index += 1) {
     const previous = route[index - 1];
     const current = route[index];
-    const segment = Math.hypot(current.x - previous.x, current.y - previous.y);
-    const traveled = Math.hypot((runner.x ?? previous.x) - previous.x, (runner.y ?? previous.y) - previous.y);
-    if (traveled + 1 < segment) break;
-    completed = startIndex + index;
+    distanceToPoint += Math.hypot(current.x - previous.x, current.y - previous.y);
+    if (traveled < distanceToPoint) break;
+    const baseIndex = getDefenseRunnerBaseIndexForPoint(current);
+    if (baseIndex >= 1) completed = baseIndex;
   }
   return Math.min(4, completed);
 }
@@ -16422,7 +16440,7 @@ function getSettledRunnerBase(runner, resolutionTime = getDefensePlayElapsedSeco
   if (Number.isFinite(runner.arrivalTime) && Number.isFinite(resolutionTime) && runner.arrivalTime <= resolutionTime) {
     return target;
   }
-  const completedIndex = getDefenseRunnerCompletedBaseIndex(runner);
+  const completedIndex = getDefenseRunnerCompletedBaseIndex(runner, resolutionTime);
   if (completedIndex >= 4) return "home";
   // 打者走者は本塁が出発点なので、踏み終えた塁が 0 でも「生還」ではなく一塁扱いにする。
   return baseNameByIndex[Math.max(1, completedIndex)] || runner.startBase || null;
