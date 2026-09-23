@@ -4446,7 +4446,7 @@ assert(Math.abs(defenseTuningState.grassRadius - 2014.8) < 0.001, "outfield gras
 assert(defenseTuningState.hardBattedBallSpeedScale === 0.8, "hard-hit batted balls should be about twenty percent slower");
 assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder movement should be another ten percent faster");
 assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
-assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10) < 0.001, "fielding speed 10 should keep the previous top speed");
+assert(Math.abs(defenseTuningState.fielderSpeed10 - defenseTuningState.oldFielderSpeed10 * 0.85) < 0.001, "fielding speed 10 should be 85 percent of the previous top speed");
 assert(defenseTuningState.fielderSpeed > defenseTuningState.fielderSpeed1 && defenseTuningState.fielderSpeed < defenseTuningState.fielderSpeed10, "fielding movement should be redistributed across ten steps");
 assert(Math.abs(defenseTuningState.throwSpeed1 - 860) < 0.001, "arm 1 throw speed should be 860");
 assert(Math.abs(defenseTuningState.throwSpeed10 - 1040) < 0.001, "arm 10 throw speed should be 1040");

@@ -1014,6 +1014,8 @@ const battedBallSpeedMultiplier = {
   fly: 1
 };
 const battedBallPaceMultiplier = 1.3;
+// 飛距離・高さは保ち、内外野・ファウルを含むフライの滞空時間だけ5%短縮する。
+const flyBallFlightTimeScale = 0.95;
 
 const hardGrounderTuning = {
   minPower: 0.58,
@@ -1121,6 +1123,7 @@ const abilitySpeedBaseRating = 3.5;
 const lowAbilityActualBoost = 1.2;
 const fielderSpeedUnit = 21.176470588235293;
 const defenseFielderMoveSpeedScale = 0.880308;
+const defenseFielderTopRatingSpeedScale = 0.85;
 const throwSpeedUnit = 89.29411764705881;
 const fielderReactionDelayTuning = {
   slowest: 1.5,
@@ -13658,7 +13661,8 @@ function buildBattedBall(power, direction, label, battedProfile = null) {
   const lowGravityTimeScale = !isGrounder && !isBunt ? (getCurrentStadium().lowGravityTimeScale ?? 1) : 1;
   const ballTime = (baseBallTime / (ballSpeedMultiplier * battedBallPaceMultiplier) + flightDistance / baseBallSpeed)
     * lowGravityTimeScale
-    * (battedProfile?.unifiedFlightTimeScale ?? 1);
+    * (battedProfile?.unifiedFlightTimeScale ?? 1)
+    * (trajectory === "fly" ? flyBallFlightTimeScale : 1);
   const flightDistanceMeters = getBattedBallDistanceMeters(flightDistance, {
     direction,
     fenceTravelDistance
@@ -14494,7 +14498,11 @@ function getFielderSpeedRating(fielder) {
 }
 
 function getFieldingMoveSpeed(fieldingRating) {
-  return (abilitySpeedBaseRating + getRedistributedFieldingMovementRating(fieldingRating)) * fielderSpeedUnit * defenseFielderMoveSpeedScale;
+  // 守備力1は従来どおり、10は85%。間の能力値は補正倍率を線形補間する。
+  const ratingProgress = clamp((getOpenEndedAbilityRating(fieldingRating) - 1) / 9, 0, 1);
+  const ratingSpeedScale = lerp(1, defenseFielderTopRatingSpeedScale, ratingProgress);
+  return (abilitySpeedBaseRating + getRedistributedFieldingMovementRating(fieldingRating))
+    * fielderSpeedUnit * defenseFielderMoveSpeedScale * ratingSpeedScale;
 }
 
 function getFielderReactionDelay(fielder) {
