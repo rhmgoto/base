@@ -644,11 +644,13 @@ const nextDomeStadiumState = JSON.parse(runInGame(
       ballTime: 0.8,
       target: { x: field.plateX, y: defenseField.bases.home.y - defenseField.fenceDistance - 220 }
     });
+    const centerMeters = getActualFenceDistanceMetersForDirection({ x: 0, y: -1 });
+    const lineMeters = getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 }));
     stadiumSelect.value = "fireworks";
     readMenu();
     return JSON.stringify({
-      centerMeters: getActualFenceDistanceMetersForDirection({ x: 0, y: -1 }),
-      lineMeters: getActualFenceDistanceMetersForDirection(normalize({ x: Math.sin(degreesToRadians(realFieldMetrics.fairLineAngleDegrees)), y: -0.2 })),
+      centerMeters,
+      lineMeters,
       surface: stadiumPresets.nextDome.surface,
       hasDome: stadiumPresets.nextDome.hasDome,
       fireworkScale: stadiumPresets.nextDome.fireworkScale,
@@ -4440,9 +4442,9 @@ const defenseTuningState = JSON.parse(runInGame(
   })()`
 ));
 
-assert(Math.abs(defenseTuningState.fenceDistance - 2097.6) < 0.001, "fence distance should be 15% longer than the compact field");
+assert(Math.abs(defenseTuningState.fenceDistance - 2097.6 * 121 / 118) < 0.001, "Ohanabi center fence should extend from 118m to 121m");
 assert(Math.abs(defenseTuningState.fenceHeight - 138) < 0.001, "fence height should be 15% taller");
-assert(Math.abs(defenseTuningState.grassRadius - 2014.8) < 0.001, "outfield grass should match the wider field scale");
+assert(Math.abs(defenseTuningState.grassRadius - 2014.8 * 121 / 118) < 0.001, "outfield grass should match the expanded Ohanabi field");
 assert(defenseTuningState.hardBattedBallSpeedScale === 0.8, "hard-hit batted balls should be about twenty percent slower");
 assert(defenseTuningState.fielderMoveSpeedScale === 0.880308, "defensive fielder movement should be another ten percent faster");
 assert(Math.abs(defenseTuningState.fielderSpeed1 - defenseTuningState.oldFielderSpeed36 * 1.2) < 0.001, "fielding speed 1 should be twenty percent faster than the previous low-end baseline");
@@ -4591,6 +4593,55 @@ assert(fireworksFenceGeometryState.battedLineDistanceDifference < 18, "line-side
 assert(Math.abs(fireworksFenceGeometryState.fenceHeight - fireworksFenceGeometryState.expectedFenceHeight) < 0.001, "the sampled fence should carry the stadium's configured wall height");
 assert(fireworksFenceGeometryState.clampedNearLineDistance <= fireworksFenceGeometryState.clampedNearLineBoundary - 35, "fielders should clamp inside the sampled near-line fence");
 assert(Math.abs(fireworksFenceGeometryState.circularDistance - fireworksFenceGeometryState.circularFenceDistance) < 1, "other stadiums should keep their circular fence collision");
+
+const fireworksExpansionState = JSON.parse(runInGame(context, `(() => {
+  const previous = currentStadiumId;
+  const infield = () => ({
+    bases: JSON.parse(JSON.stringify(defenseField.bases)),
+    second: infielderStartPoint("2B"), short: infielderStartPoint("SS"),
+    pitcherAdvance: getFieldUnitsForMeters(pitcherDefenseStartAdvanceMeters)
+  });
+  // 元の大花火球場の縮尺で比較する。他球場の設定は変えない。
+  const preset = stadiumPresets.fireworks;
+  const expandedCenter = preset.centerFenceMeters;
+  const expandedLine = preset.lineFenceMeters;
+  preset.centerFenceMeters = 118;
+  preset.lineFenceMeters = 95;
+  applyStadiumPreset("fireworks");
+  const before = infield();
+  const oldFence = getActiveFencePolyline();
+  preset.centerFenceMeters = expandedCenter;
+  preset.lineFenceMeters = expandedLine;
+  applyStadiumPreset("fireworks");
+  const after = infield();
+  const expansion = defenseField.fenceDistance / baseDefenseField.fenceDistance;
+  const layout = fireworksDefenseBackgroundLayout;
+  const transform = getFireworksDefenseBackgroundTransform();
+  const fence = getActiveFencePolyline();
+  const paintedFenceError = Math.max(...layout.fenceSourcePoints.map((p, i) => {
+    const radius = Math.hypot(p.x - layout.sourceHomeX, p.y - layout.sourceHomeY);
+    const scale = getFireworksBackgroundScale(radius, expansion);
+    const x = transform.home.x + (p.x - layout.sourceHomeX) * transform.horizontalScale / expansion * scale;
+    const y = transform.home.y + (p.y - layout.sourceHomeY) * transform.verticalScale / expansion * scale;
+    return Math.hypot(x - fence[i].x, y - fence[i].y);
+  }));
+  const allFencePointsMovedOut = fence.every((p, i) => getFenceDistance(p) > getFenceDistance(oldFence[i]));
+  const innerScales = [0, 200, 400, 600].map(r => getFireworksBackgroundScale(r, expansion));
+  const centerMeters = getActualFenceDistanceMetersForDirection({x: 0, y: -1});
+  const lineMeters = getActualFenceDistanceMetersForDirection({
+    x: Math.sin(degreesToRadians(55)), y: -Math.cos(degreesToRadians(55))
+  });
+  applyStadiumPreset(previous);
+  return JSON.stringify({before, after, paintedFenceError, allFencePointsMovedOut, innerScales, centerMeters, lineMeters});
+})()`));
+assert(JSON.stringify(fireworksExpansionState.before.bases) === JSON.stringify(fireworksExpansionState.after.bases), "outfield expansion must preserve every base and base-path distance");
+assert(JSON.stringify(fireworksExpansionState.before.second) === JSON.stringify(fireworksExpansionState.after.second)
+  && JSON.stringify(fireworksExpansionState.before.short) === JSON.stringify(fireworksExpansionState.after.short)
+  && Math.abs(fireworksExpansionState.before.pitcherAdvance - fireworksExpansionState.after.pitcherAdvance) < 1e-8,
+  "outfield expansion must preserve pitcher and infielder positions");
+assert(fireworksExpansionState.centerMeters === 121 && fireworksExpansionState.lineMeters === 98, "Ohanabi center and foul-line fences must both move three meters farther away");
+assert(fireworksExpansionState.allFencePointsMovedOut && fireworksExpansionState.paintedFenceError < 1e-8, "every painted fence point must coincide with the expanded collision boundary");
+assert(fireworksExpansionState.innerScales.every(scale => scale === 1), "the painted infield must keep its original scale");
 
 const homeRunDistanceVarietyState = JSON.parse(runInGame(
   context,
@@ -5949,7 +6000,7 @@ assert(variedBattedBallState.deepDriveHomerOver === false, "strong but imperfect
 assert(variedBattedBallState.deepDriveHomerWallHit === true, "strong but imperfect deep drives can now threaten the wall instead of clearing it");
 assert(variedBattedBallState.perfectDeepDriveHomerOver === true, "perfect deep drives should still become home runs");
 assert(variedBattedBallState.perfectDeepDriveHomerFlightOverFence > variedBattedBallState.deepDriveHomerFlightOverFence + 240, "perfect deep drives should keep a clearly larger home-run ceiling");
-assert(variedBattedBallState.displayedFenceDistanceMeters === 118, "displayed center-field fence distance should match the 118m field reference");
+assert(variedBattedBallState.displayedFenceDistanceMeters === 121, "displayed center-field fence distance should match the expanded 121m field");
 assert(variedBattedBallState.marginalHomeRunOverFence < variedBattedBallState.solidHomeRunOverFence, "barely-cleared home runs should not all carry to the same distance");
 assert(variedBattedBallState.solidHomeRunOverFence < variedBattedBallState.monsterHomeRunOverFence, "monster contact should still create the longest home runs");
 assert(variedBattedBallState.marginalHomeRunMeters < variedBattedBallState.solidHomeRunMeters, "displayed home-run distances should vary with contact quality");

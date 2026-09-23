@@ -798,8 +798,8 @@ const stadiumPresets = {
     surface: "grass",
     // 芝の刈り込み、内野の土、ベースパス、ウォーニングトラックを描く
     realisticField: true,
-    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters,
-    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters,
+    centerFenceMeters: realFieldMetrics.centerFieldFenceMeters + 3,
+    lineFenceMeters: realFieldMetrics.leftRightFieldFenceMeters + 3,
     fenceHeight: baseDefenseField.fenceHeight,
     grassRadiusScale: 1,
     hasFoulGroundDetails: false,
@@ -1204,6 +1204,9 @@ const fireworksDefenseBackgroundLayout = Object.freeze({
   sourceHomeY: 2468,
   horizontalScaleRatio: 1.12,
   fenceHeightScale: 1,
+  // 本塁から600px以内の内野は固定。800px以遠のフェンスと観客席は一体で広げる。
+  sourceInfieldFixedRadius: 600,
+  sourceOutfieldFullScaleRadius: 800,
   fenceSourcePoints: Object.freeze([
     Object.freeze({ x: 1153, y: 1830 }),
     Object.freeze({ x: 1240, y: 1785 }),
@@ -14505,6 +14508,58 @@ function getFieldingMoveSpeed(fieldingRating) {
     * fielderSpeedUnit * defenseFielderMoveSpeedScale * ratingSpeedScale;
 }
 
+// 背景の内野は固定し、芝だけを滑らかに伸ばして外野・観客席を遠ざける。
+// フェンス上では従来の画像座標変換と一致し、描画と衝突判定を揃える。
+function getFireworksBackgroundScale(sourceRadius, expansion) {
+  const layout = fireworksDefenseBackgroundLayout;
+  const t = clamp((sourceRadius - layout.sourceInfieldFixedRadius)
+    / (layout.sourceOutfieldFullScaleRadius - layout.sourceInfieldFixedRadius), 0, 1);
+  return lerp(1, expansion, t * t * (3 - 2 * t));
+}
+
+let fireworksExpandedBackgroundCache = null;
+
+function getExpandedFireworksBackground() {
+  const source = fireworksDefenseBackground;
+  if (!source.naturalHeight || typeof document.createElement !== "function") return null;
+  const expansion = defenseField.fenceDistance / baseDefenseField.fenceDistance;
+  if (fireworksExpandedBackgroundCache?.expansion === expansion
+    && fireworksExpandedBackgroundCache.source === source) return fireworksExpandedBackgroundCache;
+  const layout = fireworksDefenseBackgroundLayout;
+  const surface = document.createElement("canvas");
+  surface.width = Math.ceil(source.naturalWidth * expansion);
+  surface.height = Math.ceil(source.naturalHeight + layout.sourceHomeY * (expansion - 1));
+  const painter = surface.getContext("2d");
+  if (!painter) return null;
+  const homeX = layout.sourceHomeX * expansion;
+  const homeY = layout.sourceHomeY * expansion;
+  function drawAtScale(scale) {
+    painter.drawImage(source, homeX - layout.sourceHomeX * scale, homeY - layout.sourceHomeY * scale,
+      source.naturalWidth * scale, source.naturalHeight * scale);
+  }
+  drawAtScale(expansion);
+  // 同心円の細い帯で芝を伸ばす。横一列の伸縮と違い、両側の観客席を曲げない。
+  for (let radius = layout.sourceOutfieldFullScaleRadius; radius > layout.sourceInfieldFixedRadius; radius -= 1) {
+    const outer = radius * getFireworksBackgroundScale(radius, expansion);
+    const inner = (radius - 1) * getFireworksBackgroundScale(radius - 1, expansion);
+    painter.save();
+    painter.beginPath();
+    painter.arc(homeX, homeY, outer + 0.5, 0, Math.PI * 2);
+    painter.arc(homeX, homeY, Math.max(0, inner - 0.5), 0, Math.PI * 2, true);
+    painter.clip();
+    drawAtScale(getFireworksBackgroundScale(radius - 0.5, expansion));
+    painter.restore();
+  }
+  painter.save();
+  painter.beginPath();
+  painter.arc(homeX, homeY, layout.sourceInfieldFixedRadius + 0.5, 0, Math.PI * 2);
+  painter.clip();
+  drawAtScale(1);
+  painter.restore();
+  fireworksExpandedBackgroundCache = { surface, source, expansion };
+  return fireworksExpandedBackgroundCache;
+}
+
 function getFielderReactionDelay(fielder) {
   if (fielder?.quickBuntReaction) return 0.04;
   const fielding = getOpenEndedAbilityRating(fielder?.fielding ?? fielder?.speed ?? 5);
@@ -19723,10 +19778,19 @@ function drawFireworksDefenseBackground(stadium = getCurrentStadium()) {
   if (stadium?.id !== "fireworks") return false;
   if (!fireworksDefenseBackground.complete || !fireworksDefenseBackground.naturalWidth) return false;
 
-  // The expanded background keeps the detailed field at its original scale,
-  // with extra sky and side scenery for the out-of-stadium homer camera.
   const layout = fireworksDefenseBackgroundLayout;
   const { verticalScale, horizontalScale, home } = getFireworksDefenseBackgroundTransform();
+  const expanded = getExpandedFireworksBackground();
+  if (expanded) {
+    const originalVerticalScale = verticalScale / expanded.expansion;
+    const originalHorizontalScale = horizontalScale / expanded.expansion;
+    ctx.drawImage(expanded.surface,
+      home.x - layout.sourceHomeX * horizontalScale,
+      home.y - layout.sourceHomeY * verticalScale,
+      expanded.surface.width * originalHorizontalScale,
+      expanded.surface.height * originalVerticalScale);
+    return true;
+  }
   const drawWidth = fireworksDefenseBackground.naturalWidth * horizontalScale;
   const drawHeight = fireworksDefenseBackground.naturalHeight * verticalScale;
   ctx.drawImage(
