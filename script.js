@@ -5315,7 +5315,10 @@ function startPitch(typeKey, options = {}) {
     : getPitchControlMiss(controlProfile, intendedX, intendedY);
   const lockTarget = options.lockTarget === true;
   const fatigueDrift = lockTarget ? 0 : getStaminaFatigueDrift(activePitcher);
-  const targetX = controlMiss.x + (lockTarget ? 0 : randomBetween(-targetSpread, targetSpread)) + fatigueDrift;
+  let targetX = controlMiss.x + (lockTarget ? 0 : randomBetween(-targetSpread, targetSpread)) + fatigueDrift;
+  if (options.avoidCenter && Math.abs(targetX - field.plateX) < 24 * field.plateScale) {
+    targetX = field.plateX + (course.direction || -getPullSide()) * 24 * field.plateScale;
+  }
   const targetY = getPitchVerticalTarget();
   const speedKmh = Math.max(40, Math.round((getEffectivePitcherFastKmh(activePitcher) - getStaminaSpeedDrop(activePitcher)) * pitch.baseKmhFactor * randomBetween(0.9, 1.1)));
   const referenceKmh = 150 * pitch.baseKmhFactor;
@@ -5796,7 +5799,7 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
     const allowPlainEdge = type === "fast";
     if (prioritizeStrike) {
       if (allowPlainEdge && roll < 0.32) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 46) * strikeOffsetScale, intent: "plainEdge" };
-      if (roll < 0.32 + pressure * 0.16) return { direction: 0, offset: randomBetween(-10, 10), intent: "earlyBrakeStrike" };
+      if (roll < 0.32 + pressure * 0.16) return { direction: awayFromBatter, offset: awayFromBatter * 48, intent: "earlyBrakeStrike" };
       if (roll < 0.56 + pressure * 0.1) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "awayEdge" };
       if (roll < 0.74) {
         const side = Math.random() < 0.5 ? -1 : 1;
@@ -5809,7 +5812,7 @@ function getComputerPitchCornerCourse(type, player = activePitcher) {
         : { direction: awayFromBatter, offset: awayFromBatter * randomBetween(32, 50) * strikeOffsetScale, intent: "awayEdge" };
     }
     if (allowPlainEdge && roll < 0.34) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(28, 44) * strikeOffsetScale, intent: "plainEdge" };
-    if (roll < 0.38 + pressure * 0.18) return { direction: 0, offset: randomBetween(-12, 12), intent: "earlyBrakeStrike" };
+    if (roll < 0.38 + pressure * 0.18) return { direction: awayFromBatter, offset: awayFromBatter * 48, intent: "earlyBrakeStrike" };
     if (roll < 0.62 + pressure * 0.08) return { direction: awayFromBatter, offset: awayFromBatter * randomBetween(30, 48) * strikeOffsetScale, intent: "awayEdge" };
     if (roll < 0.82) {
       const side = Math.random() < 0.5 ? -1 : 1;
@@ -5872,6 +5875,16 @@ function buildComputerPitchShape(plan, player = activePitcher) {
   const addLateBurst = (power = 1) => speedChangeSegments.push(createComputerPitchSegment(1, randomBetween(0.58, 0.74), randomBetween(0.88, 0.99), 0.98, power + fastChangeSkill * 0.06));
   const addMiddleChange = (direction, power = 1) => bendSegments.push(createComputerPitchSegment(direction, randomBetween(0.34, 0.48), randomBetween(0.72, 0.9), 0.96, power + shapeSkill * 0.42));
   const slowCommandShapeScale = type === "slow" ? (pressure >= 0.8 ? 0.62 : pressure >= 0.55 ? 0.72 : 0.84) : 1;
+
+  if (course.intent === "lateInsideCut" || course.intent === "lateHardBrake") {
+    // 専用軌道を使い、既存の左右変化・加速を重ねない。
+    plan.lateInsideCut = course.intent === "lateInsideCut";
+    plan.lateHardBrake = course.intent === "lateHardBrake";
+    plan.avoidCenter = true;
+    plan.bendSegments = [];
+    plan.speedChangeSegments = [];
+    return syncComputerPitchPlanLegacyFields(plan);
+  }
 
   if (course.intent === "plainEdge") {
     plan.bendSegments = bendSegments;
@@ -5979,11 +5992,13 @@ function choosePracticePitchPlan() {
   const type = isHomeRunDerbyMode() ? "A" : getPracticePitcherType();
   if (type === "A") {
     const pitchType = Math.random() < 0.82 ? "normal" : "fast";
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const aim = getSharedPitchCourseAim({ direction: side }, getPitchRadius(pitchType), pitchType, pitchTypes[pitchType]);
     return syncComputerPitchPlanLegacyFields({
       type: pitchType,
-      course: { direction: 0, offset: 0, intent: "practiceCenter" },
-      targetX: field.plateX + randomBetween(-8, 8),
-      targetSpread: 3,
+      course: { direction: side, offset: side * 48, intent: "plainEdge" },
+      ...aim,
+      avoidCenter: true,
       bendSegments: [],
       speedChangeSegments: []
     });
@@ -5999,6 +6014,7 @@ function choosePracticePitchPlan() {
       targetY: sharedAim.targetY,
       targetSpread: sharedAim.targetSpread,
       lockTarget: false,
+      avoidCenter: true,
       bendSegments: [],
       speedChangeSegments: []
     });
@@ -6031,10 +6047,11 @@ function chooseComputerPitchPlan() {
   if (activePitcher?.practiceOnly && !(gameMode === "practice" && getPracticePitcherType() === "C")) {
     return syncComputerPitchPlanLegacyFields({
       type: "fast",
-      course: { direction: 0, offset: 0, intent: "center" },
-      targetX: field.plateX,
+      course: { direction: -getPullSide(), offset: -getPullSide() * 48, intent: "plainEdge" },
+      targetX: getPitchCourseTargetX({ direction: -getPullSide() }, getPitchRadius("fast"), "fast"),
       targetY: field.plateY,
       targetSpread: 0,
+      avoidCenter: true,
       bendSegments: [],
       speedChangeSegments: []
     });
@@ -6054,13 +6071,21 @@ function chooseComputerPitchPlan() {
   } else if (countPressure >= 0.55 && type === "slow" && Math.random() < 0.48) {
     type = "normal";
   }
-  const course = normalizeComputerPitchCourseForCount(getComputerPitchCornerCourse(type, planPitcher), type);
+  let course = normalizeComputerPitchCourseForCount(getComputerPitchCornerCourse(type, planPitcher), type);
+  const variationRoll = Math.random();
+  if (variationRoll > 0.88) {
+    course = { direction: getPullSide(), offset: getPullSide() * 48, intent: "lateInsideCut" };
+  } else if (variationRoll > 0.72 && (type === "fast" || type === "special")) {
+    course = { direction: course.direction || -getPullSide(), offset: 48 * (course.direction || -getPullSide()), intent: "lateHardBrake" };
+  }
+  if (!course.direction) course = { ...course, direction: -getPullSide(), offset: -getPullSide() * 48 };
   const awayFromBatter = -getPullSide();
   const dangerousDirection = getPullSide();
 
   const plan = {
     type,
     course,
+    avoidCenter: true,
     countPressure,
     pitcherX: getComputerPitcherPlateX(course, planPitcher),
     targetSpread: type === "special" ? (countPressure >= 0.55 ? 6 : 10) : type === "slow" ? (countPressure >= 0.55 ? 5 : 12) : type === "fast" ? (countPressure >= 0.55 ? 5 : 9) : (countPressure >= 0.55 ? 6 : 12),
@@ -6092,8 +6117,8 @@ function chooseComputerPitchPlan() {
     plan.targetSpread = 0;
     plan.lockTarget = true;
   } else if (type === "fast" && course.intent === "earlyBrakeStrike") {
-    plan.targetX = field.plateX + randomBetween(-18, 18);
-    plan.targetSpread = 7;
+    plan.targetX = edgeTargetX(course.direction || awayFromBatter);
+    plan.targetSpread = 1;
   }
   applySharedComputerPitchAim(plan);
   constrainComputerPitchPlanToPlayerReach(plan);
@@ -6151,6 +6176,7 @@ function getComputerSpecialPitchChance() {
 
 function computerBendPitch() {
   if (!isComputerControlledGameMode() || isPlayerPitching() || !computerPitchPlan || !isPitching || !ball.inPitch || ball.crossedPlate) return;
+  if (computerPitchPlan.lateInsideCut || computerPitchPlan.lateHardBrake) return;
   const progress = getPitchProgress();
   const bendSegments = computerPitchPlan.bendSegments?.length
     ? computerPitchPlan.bendSegments
@@ -7874,6 +7900,32 @@ function updateBall(delta) {
   }
   ball.x += ball.vx * frameScale;
   ball.y += ball.vy * frameScale;
+  if (ball.inPitch && isComputerControlledGameMode() && !isPlayerPitching() && computerPitchPlan) {
+    const releaseY = pitcher.y + 96;
+    const travel = clamp((ball.y - releaseY) / (field.plateY - releaseY), 0, 1);
+    if (computerPitchPlan.lateInsideCut) {
+      const side = computerPitchPlan.course.direction;
+      const nearCenterX = field.plateX + side * 12 * field.plateScale;
+      const cutProgress = clamp((travel - 0.74) / 0.26, 0, 1);
+      const cut = cutProgress * cutProgress * (3 - 2 * cutProgress);
+      if (cutProgress > 0) consumePitchVariationStamina("horizontal");
+      const edgeX = getHomePlateEdgeXAtY(field.plateY, side) + side * Math.max(1.5, ball.radius - 3.5);
+      const nextX = pitcher.x + (nearCenterX - pitcher.x) * travel + (edgeX - nearCenterX) * cut;
+      ball.vx = (nextX - prevX) / Math.max(frameScale, 0.001);
+      ball.x = nextX;
+    } else if (computerPitchPlan.lateHardBrake) {
+      const brakeProgress = clamp((travel - 0.76) / 0.12, 0, 1);
+      const rating = getOpenEndedAbilityRating(activePitcher.slowChange ?? 5);
+      const finalScale = clamp(0.48 - rating * 0.012, 0.24, 0.46);
+      const nextScale = 1 - brakeProgress * (1 - finalScale);
+      const multiplier = nextScale / ball.speedScale;
+      ball.vx *= multiplier;
+      ball.vy *= multiplier;
+      ball.speedScale = nextScale;
+      if (brakeProgress > 0) consumePitchVariationStamina("vertical");
+      updateDynamicPlateTime();
+    }
+  }
   ball.spin += 0.18 * frameScale;
   if (ball.inPitch) markPlateTouch(prevX, prevY, ball.x, ball.y);
   if (!ball.inPitch) ball.vy += 0.18 * frameScale;
@@ -12092,7 +12144,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
     ? elapsedSeconds
     : Math.max(elapsedSeconds, previousThrow?.prepareStartTime ?? elapsedSeconds);
   const thrower = isBaseRelay
-    ? { ...(defenseState.chosenFielder || {}), arm: 5, fielding: 5 }
+    ? { ...(defenseState.chosenFielder || {}), arm: previousThrow.targetBase === "home" ? getTeamCatcherArm(fieldingTeam()) : 5, fielding: 5 }
     : defenseState.chosenFielder;
   // 捕球アウト後など needsThrow が立たない場面でも送球状態を作れるようにする
   const throwOutcome = { ...(defenseState.outcome || {}), caught: true, needsThrow: true };
@@ -12693,17 +12745,27 @@ function getForceTargetsForCurrentPlay() {
 }
 
 function getThrowProfile(fielder, distance, options = {}) {
-  const arm = getOpenEndedAbilityRating(fielder?.arm ?? 5);
+  const fromBase = options.from && ["first", "second", "third", "home"].find((base) => {
+    const point = getDefenseBasePointByName(base);
+    return Math.hypot(options.from.x - point.x, options.from.y - point.y) <= 1;
+  });
+  const betweenBases = fromBase && options.targetBase && fromBase !== options.targetBase
+    && ["first", "second", "third", "home"].includes(options.targetBase);
+  const baseThrowSpeedScale = betweenBases && fromBase !== "home" ? 1.2 : 1;
+  const arm = getOpenEndedAbilityRating(betweenBases && fromBase === "home"
+    ? getTeamCatcherArm(fieldingTeam())
+    : fielder?.arm ?? 5);
   const legacyArm = clamp(arm, 1, 10);
   const longThrowFactor = clamp((distance - 420) / 1180, 0, 1);
   const longOutfieldHomeThrow = isLongOutfieldHomeThrow(fielder, distance, options);
   const baseSpeed = getArmThrowSpeed(arm);
+  const minimumTimeScale = betweenBases && fromBase === "home" ? baseSpeed / getArmThrowSpeed(5) : baseThrowSpeedScale;
   const outfieldArmSpeedScale = longOutfieldHomeThrow
     ? 1 - ((legacyArm - 1) / 9) * 0.2
     : 1;
   const longThrowPenalty = Math.max(0.08, 0.76 - arm * 0.045 + (longOutfieldHomeThrow ? ((legacyArm - 1) / 9) * 0.14 : 0));
   const speedMultiplier = clamp(1 - longThrowFactor * longThrowPenalty, longOutfieldHomeThrow ? 0.28 : 0.22, 1);
-  const throwSpeed = baseSpeed * outfieldArmSpeedScale * speedMultiplier;
+  const throwSpeed = baseSpeed * outfieldArmSpeedScale * speedMultiplier * baseThrowSpeedScale;
   const minimumTime = Math.max(0.42, 0.78
     + longThrowFactor * (1.35 - arm * 0.055)
     + (longOutfieldHomeThrow ? longThrowFactor * 0.16 : 0));
@@ -12718,7 +12780,7 @@ function getThrowProfile(fielder, distance, options = {}) {
   const bounceTimePenalty = needsBounce && longOutfieldHomeThrow
     ? clamp((9 - arm) * 0.12 + longThrowFactor * 0.28, 0.24, 1.12)
     : 0;
-  const throwTime = Math.max(distance / throwSpeed, minimumTime + bounceTimePenalty) * (1 + bounceDrag);
+  const throwTime = Math.max(distance / throwSpeed, (minimumTime + bounceTimePenalty) / minimumTimeScale) * (1 + bounceDrag);
   const arcHeight = Math.max(28, 38 + longThrowFactor * (210 - arm * 7 + (longOutfieldHomeThrow ? 28 : 0)));
   const bounce = needsBounce
     ? {

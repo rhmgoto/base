@@ -3963,7 +3963,7 @@ assert(battingPracticeModeState.battingPracticeNotRosterPitcher === true, "batti
 assert(battingPracticeModeState.testPitcherANotRosterPitcher === true, "test pitcher A should not be added to the regular pitcher roster");
 assert(battingPracticeModeState.battingPracticePitcher.id === "battingpractice" && battingPracticeModeState.battingPracticePitcher.throws === "L" && battingPracticeModeState.battingPracticePitcher.fastKmh === 120 && battingPracticeModeState.battingPracticePitcher.control === 18 && battingPracticeModeState.battingPracticePitcher.stuff === -64 && battingPracticeModeState.battingPracticePitcher.fielding === 5 && battingPracticeModeState.battingPracticePitcher.practiceOnly === true, "batting practice pitcher should use the requested simple left-handed practice-only ratings");
 assert(battingPracticeModeState.testPitcherA.id === "testpitchera" && battingPracticeModeState.testPitcherA.throws === "R" && battingPracticeModeState.testPitcherA.fastKmh === 150 && battingPracticeModeState.testPitcherA.rightBreak === 5 && battingPracticeModeState.testPitcherA.leftBreak === 5 && battingPracticeModeState.testPitcherA.slowChange === 5 && battingPracticeModeState.testPitcherA.fastChange === 5 && battingPracticeModeState.testPitcherA.control === 5 && battingPracticeModeState.testPitcherA.stuff === 4096 && battingPracticeModeState.testPitcherA.fielding === 5 && battingPracticeModeState.testPitcherA.stamina === 5 && battingPracticeModeState.testPitcherA.cost === 5 && battingPracticeModeState.testPitcherA.practiceOnly === true, "test pitcher A should use the spreadsheet practice-only ratings");
-assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticePlanType) && Math.abs(battingPracticeModeState.battingPracticePlanTargetX - 640) <= 8 && battingPracticeModeState.battingPracticePlanTargetSpread === 3 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher type A should throw simple center-zone fastballs or straight balls");
+assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticePlanType) && Math.abs(battingPracticeModeState.battingPracticePlanTargetX - 640) >= 32 && battingPracticeModeState.battingPracticePlanTargetSpread === 1 && battingPracticeModeState.battingPracticePlanHasShape === false, "batting practice pitcher type A should throw simple edge-zone fastballs or straight balls");
 assert(["normal", "fast"].includes(battingPracticeModeState.battingPracticeTypeBType) && battingPracticeModeState.battingPracticeTypeBTargetAwayFromCenter >= 32 && battingPracticeModeState.battingPracticeTypeBHasShape === false, "batting practice pitcher type B should attack the edges without breaking balls");
 assert(battingPracticeModeState.battingPracticeTypeCHasShape === true, "batting practice pitcher type C should use normal CPU pitch variation with movement");
 assert(battingPracticeModeState.battingPracticeHomerBoostMultiplier === 4.2, "batting practice pitcher home-run boost should be set to 4.2x");
@@ -5423,6 +5423,115 @@ const immediateCatchOutCallState = JSON.parse(runInGame(
 assert(immediateCatchOutCallState.afterOutCallShown === true, "caught fly out call should be shown as soon as the catch happens");
 assert(immediateCatchOutCallState.afterOutCallShown === true, "caught fly out message should appear immediately");
 assert(immediateCatchOutCallState.stillActive === true, "immediate out call should not skip the remaining defense resolution");
+
+const latePitchContext = createGameContext();
+vm.runInContext(fs.readFileSync(path.join(root, "script.js"), "utf8"), latePitchContext);
+const latePitchChecks = JSON.parse(runInGame(latePitchContext, `(() => {
+  gameMode = "watch";
+  activePitcher = { ...activePitcher, practiceOnly: false, slowChange: 5 };
+  const results = [];
+  for (const balls of [0, 1, 2, 3]) {
+    for (const strikes of [0, 1, 2]) {
+      count.balls = balls;
+      count.strikes = strikes;
+      for (let i = 0; i < 150; i += 1) {
+        const plan = chooseComputerPitchPlan();
+        if (!plan.course.direction || !plan.avoidCenter || Math.abs(plan.targetX - field.plateX) < 24 * field.plateScale) {
+          throw new Error("every CPU pitch must aim away from the center in every count");
+        }
+      }
+    }
+  }
+  for (const side of ["R", "L"]) {
+    activeBatterSide = side;
+    for (const type of ["normal", "slow", "fast", "special"]) {
+      for (const fps of [30, 60, 120]) {
+        pitcher.x = field.plateX;
+        const releaseY = pitcher.y + 96;
+        const direction = getPullSide();
+        const plan = buildComputerPitchShape({ type, course: { direction, intent: "lateInsideCut" } });
+        computerPitchPlan = plan;
+        currentPitchType = type;
+        isPitching = true;
+        Object.assign(ball, { x: pitcher.x, y: releaseY, vx: 0, vy: 10, baseVy: 10, radius: getPitchRadius(type), curvePower: 0, speedScale: 1, inPitch: true, crossedPlate: false, staminaMistake: false, trail: [] });
+        let beforeCut = null;
+        let steps = 0;
+        while (ball.y < field.plateY && steps++ < 1000) {
+          const travel = (ball.y - releaseY) / (field.plateY - releaseY);
+          if (travel <= 0.74) beforeCut = ball.x;
+          computerBendPitch();
+          updateBall(1000 / fps);
+        }
+        const edge = getHomePlateEdgeXAtY(field.plateY, direction) + direction * Math.max(1.5, ball.radius - 3.5);
+        results.push({ cut: true, centerDistance: Math.abs(beforeCut - field.plateX), edgeError: Math.abs(ball.x - edge), completed: steps < 1000 });
+      }
+    }
+  }
+  for (const type of ["fast", "special"]) {
+    for (const fps of [30, 60, 120]) {
+      const releaseY = pitcher.y + 96;
+      computerPitchPlan = buildComputerPitchShape({ type, course: { direction: 1, intent: "lateHardBrake" } });
+      currentPitchType = type;
+      Object.assign(ball, { x: pitcher.x, y: releaseY, vx: 1, vy: 10, baseVy: 10, speedScale: 1, radius: 8, curvePower: 0, inPitch: true, crossedPlate: false, trail: [] });
+      let earlyScale = 1;
+      let steps = 0;
+      while (ball.y < field.plateY && steps++ < 1000) {
+        const travel = (ball.y - releaseY) / (field.plateY - releaseY);
+        if (travel < 0.74) earlyScale = ball.speedScale;
+        computerBendPitch();
+        updateBall(1000 / fps);
+      }
+      results.push({ cut: false, earlyScale, finalScale: ball.speedScale, completed: steps < 1000 });
+    }
+  }
+  return JSON.stringify(results);
+})()`));
+latePitchChecks.forEach((result) => {
+  assert(result.completed, "late-changing pitches must reach the plate");
+  if (result.cut) {
+    assert(result.centerDistance < 12 && result.edgeError < 0.001, "late inside cuts should stay near center early and finish at the inside edge for both batter sides and all frame rates");
+  } else {
+    assert(result.earlyScale === 1 && Math.abs(result.finalScale - 0.42) < 0.001, "fast and special pitches should brake sharply only near the batter");
+  }
+});
+
+const baseThrowProfiles = JSON.parse(runInGame(context, `(() => {
+  const results = [];
+  for (const source of ["first", "second", "third"]) {
+    for (const targetBase of ["first", "second", "third", "home"]) {
+      if (source === targetBase) continue;
+      const from = getDefenseBasePointByName(source);
+      const to = getDefenseBasePointByName(targetBase);
+      const distance = Math.hypot(to.x - from.x, to.y - from.y);
+      const original = getThrowProfile({ arm: 5 }, distance);
+      const updated = getThrowProfile({ arm: 5 }, distance, { from, targetBase });
+      results.push({ speedRatio: updated.throwSpeed / original.throwSpeed, timeRatio: updated.throwTime / original.throwTime });
+    }
+  }
+  const originalGetCatcherArm = getTeamCatcherArm;
+  const catcherResults = [];
+  try {
+    for (const targetBase of ["first", "second", "third"]) {
+      const from = getDefenseBasePointByName("home");
+      const to = getDefenseBasePointByName(targetBase);
+      const distance = Math.hypot(to.x - from.x, to.y - from.y);
+      getTeamCatcherArm = () => 1;
+      const weak = getThrowProfile({ arm: 5 }, distance, { from, targetBase });
+      getTeamCatcherArm = () => 10;
+      const strong = getThrowProfile({ arm: 5 }, distance, { from, targetBase });
+      catcherResults.push({ weak, strong });
+    }
+  } finally { getTeamCatcherArm = originalGetCatcherArm; }
+  return JSON.stringify({ results, catcherResults });
+})()`));
+assert(baseThrowProfiles.results.length === 9, "check all nine infield base-to-base throws");
+baseThrowProfiles.results.forEach(({ speedRatio, timeRatio }) => {
+  assert(Math.abs(speedRatio - 1.2) < 0.00001, "base-to-base speed should increase twenty percent");
+  assert(Math.abs(timeRatio - 1 / 1.2) < 0.00001, "base-to-base flight should reflect the speed increase");
+});
+baseThrowProfiles.catcherResults.forEach(({ weak, strong }) => {
+  assert(strong.throwSpeed > weak.throwSpeed && strong.throwTime < weak.throwTime, "catcher arm should affect speed and arrival at every base");
+});
 
 const throwProfileState = JSON.parse(runInGame(
   context,
