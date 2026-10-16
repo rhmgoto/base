@@ -1229,6 +1229,97 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
+// 捕球済みの打者を一塁送球で再度アウトにせず、手動進塁は捕球予定変更でも維持する。
+const reportedRunnerBugs = JSON.parse(run(`
+  function setup(withRunner = false) {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    gamePhase = "defense";
+    defenseControlMode = { away: "manual", home: "manual" };
+    bases = createEmptyBases();
+    count.outs = 1;
+    activeBatter = findById(batters, "suzuki");
+    if (withRunner) bases.first = makeBaseRunner(findById(batters, "sato"));
+    const target = { x: field.plateX + 100, y: field.plateY - 200 };
+    const hit = { target, direction: normalize({ x: 0.2, y: -1 }), ballTime: 2,
+      isDeep: true, distance: 1600, landingDistance: 1600, flightDistance: 1600,
+      isGrounder: false, isLiner: false, isPopupFly: true, trajectory: "fly",
+      fenceOver: false, wallHit: false, groundRuleDouble: false };
+    const fielder = { role: "SS", ...target, speed: 5, fielding: 10, arm: 5 };
+    defenseState = { ...createDefenseState(), active: true, startTime: performance.now(),
+      duration: 30000, runner: createBatterRunner(activeBatter), battedBall: hit,
+      outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 2 },
+      fielders: [fielder], chosenFielder: fielder, target };
+    return { fielder, target, hit };
+  }
+  const { fielder, target } = setup(true);
+  completeLiveInfielderContactCatch(fielder, target, 0.4, true);
+  defenseState.unifiedCircleCatchComplete = true;
+  __advanceTime(450);
+  handleDefenseThrowCommand("first");
+  const throwRunner = getThrowOutRunner(defenseState.throw);
+  const catchJudgment = {
+    throwAccepted: Boolean(defenseState.throw),
+    batterSelected: throwRunner === defenseState.runner,
+    batterOut: defenseState.runner.isOut,
+    judgedOut: judgeOutPlay(defenseState.runner, "first", defenseState.throw).out
+  };
+  finishDefensePlay();
+  const caught = { ...catchJudgment, outs: count.outs, first: bases.first?.name, message };
+
+  const extraBases = [false, true].map((withRunner) => {
+    setup(withRunner);
+    const runner = defenseState.runner;
+    const firstTime = runner.arrivalTime;
+    __advanceTime((firstTime + 0.05) * 1000);
+    updateBatterRunner(firstTime + 0.05);
+    handleBatterRunnerBaseCommand("second", "advance");
+    // 既存の一塁走者は三塁へ到達済み。
+    if (withRunner) {
+      const lead = bases.first;
+      defenseState.baseRunners = [{ ...lead, startBase: "first", currentBase: "third", targetBase: "third",
+        manualTargetBase: "third", arrived: true, arrivalTime: firstTime, route: [{ ...defenseField.bases.third }],
+        x: defenseField.bases.third.x, y: defenseField.bases.third.y }];
+    }
+    defenseState.throw = null;
+    defenseState.outcome = { kind: "force", caught: true, needsThrow: true, fieldingTime: firstTime - 0.2 };
+    const routeBefore = JSON.stringify(runner.route);
+    const arrivalBefore = runner.arrivalTime;
+    const missed = resolveUnifiedCircleMissAfterArrival(firstTime + 0.15);
+    const preserved = runner.targetBase === "second" && runner.arrivalTime === arrivalBefore
+      && JSON.stringify(runner.route) === routeBefore;
+    const midway = firstTime + 1.4;
+    updateBatterRunner(midway);
+    const earlyFinish = shouldResolveDefensePlayNow(midway);
+    __advanceTime((arrivalBefore + 0.1 - firstTime - 0.05) * 1000);
+    updateBatterRunner(arrivalBefore + 0.1);
+    finishDefensePlay();
+    return { missed, preserved, earlyFinish, second: bases.second?.name, third: bases.third?.name, message };
+  });
+
+  setup();
+  defenseState.outcome = { kind: "double", scoreType: "double", caught: false, needsThrow: false, fieldingTime: 1 };
+  __advanceTime((defenseState.runner.arrivalTime + 1) * 1000);
+  updateBatterRunner(defenseState.runner.arrivalTime + 1);
+  finishDefensePlay();
+  const stoppedAtFirst = { first: bases.first?.name, message };
+  return JSON.stringify({ caught, extraBases, stoppedAtFirst });
+`));
+assert(reportedRunnerBugs.caught.throwAccepted, "フライ捕球後も一塁へ送球できる");
+assert(!reportedRunnerBugs.caught.batterSelected && !reportedRunnerBugs.caught.judgedOut,
+  "捕球アウトの打者を一塁送球の対象にして二重アウトにしてはいけない");
+assert(reportedRunnerBugs.caught.batterOut && reportedRunnerBugs.caught.outs === 2 && reportedRunnerBugs.caught.first === "サトウ",
+  "1アウト一塁の内野フライは捕球による1アウトだけを加算し、元の一塁走者を残す");
+reportedRunnerBugs.extraBases.forEach((play, index) => {
+  assert(play.missed && play.preserved, "捕球予定が変わっても二塁への走路と到着時刻を維持する");
+  assert(!play.earlyFinish, "二塁へ走っている途中でプレーを終了しない");
+  assert(play.second === "スズキ" && play.message.includes("ツーベース"), "二塁への到達と二塁打表示が一致する " + JSON.stringify(play));
+  if (index === 1) assert(play.third === "サトウ", "先行走者が三塁にいる場合も打者走者を一塁に戻さない");
+});
+assert(reportedRunnerBugs.stoppedAtFirst.first === "スズキ" && reportedRunnerBugs.stoppedAtFirst.message.includes("ヒット")
+  && !reportedRunnerBugs.stoppedAtFirst.message.includes("ツーベース"), "一塁で止まった打者を二塁打と表示しない");
+
 // 捕球アウトと送球アウトが同じプレーで重なる場合。
 // 以前は finishDefensePlay が「送球アウトの枝」に入ると捕球アウトの枝に到達せず、
 // 打者のアウトが数えられないうえ、アウトのはずの打者が一塁に置かれていた。
@@ -1471,6 +1562,155 @@ assert(manualHitScoring.batterScored.runs === 1 && manualHitScoring.batterScored
   `手動で生還した打者走者を単打の自動進塁で一塁に戻さない (${JSON.stringify(manualHitScoring.batterScored)})`);
 
 // ---------------------------------------------------------------------------
+// 全アウトカウント・塁配置での捕球後送球と、連続送球・走者再生成を検査する。
+const expandedRunnerChecks = JSON.parse(run(`
+  function setup(outs, mask = 0) {
+    startGame();
+    gameMode = "versus";
+    battingTeam = "away";
+    gamePhase = "defense";
+    defenseControlMode = { away: "manual", home: "manual" };
+    count.outs = outs;
+    bases = createEmptyBases();
+    ["first", "second", "third"].forEach((base, i) => {
+      if (mask & (1 << i)) bases[base] = makeBaseRunner({ id: "R" + i, name: "RUN" + i, run: 5 });
+    });
+    const target = { x: field.plateX + 100, y: field.plateY - 200 };
+    const hit = { target, direction: normalize({ x: 0.2, y: -1 }), ballTime: 2,
+      isGrounder: false, isLiner: false, isPopupFly: true, trajectory: "fly", isDeep: true,
+      distance: 1600, landingDistance: 1600, flightDistance: 1600, fenceOver: false, wallHit: false };
+    const fielder = { role: "SS", ...target, fielding: 10, speed: 5, arm: 5 };
+    defenseState = { ...createDefenseState(), active: true, startTime: performance.now(), duration: 30000,
+      runner: createBatterRunner(activeBatter), battedBall: hit,
+      outcome: { kind: "force", caught: true, needsThrow: true, fieldingTime: 2 },
+      fielders: [fielder], chosenFielder: fielder, target };
+    return { fielder, target, hit };
+  }
+  function finish() {
+    const before = battingTeam;
+    const originalChangeSide = changeSide;
+    let outs = null;
+    changeSide = function() { outs = count.outs; return originalChangeSide(); };
+    try {
+      finishDefensePlay();
+      const snapshot = JSON.stringify({ outs: count.outs, scores, bases, events: defenseState.outEvents });
+      finishDefensePlay();
+      if (snapshot !== JSON.stringify({ outs: count.outs, scores, bases, events: defenseState.outEvents })) throw new Error("play resolved twice");
+    } finally { changeSide = originalChangeSide; }
+    return { outs: outs ?? count.outs, changedSide: battingTeam !== before };
+  }
+  let catches = 0;
+  for (const outs of [0, 1, 2]) for (let mask = 0; mask < 8; mask += 1) {
+    for (const destination of ["first", "second", "third", "home"]) {
+      const { fielder, target } = setup(outs, mask);
+      completeLiveInfielderContactCatch(fielder, target, 0.4, true);
+      defenseState.unifiedCircleCatchComplete = true;
+      __advanceTime(450);
+      handleDefenseThrowCommand(destination);
+      const result = finish();
+      if (result.outs !== outs + 1 || result.changedSide !== (outs === 2)) {
+        throw new Error("catch counted more than once: " + JSON.stringify({ outs, mask, destination, result }));
+      }
+      if (outs < 2) ["first", "second", "third"].forEach((base, i) => {
+        if ((bases[base]?.id || null) !== (mask & (1 << i) ? "R" + i : null)) throw new Error("catch changed a stationary runner");
+      });
+      catches += 1;
+    }
+  }
+  let paths = 0;
+  for (const outs of [0, 1, 2]) for (const start of [1, 2, 3]) for (const returning of [false, true]) {
+    const { hit } = setup(outs, 1 << (start - 1));
+    const baseName = baseNameByIndex[start];
+    defenseState.baseRunners = [createDefenseBaseRunner(baseName, bases[baseName], defenseState.outcome, hit)];
+    const runner = defenseState.baseRunners[0];
+    Object.assign(runner, { currentBase: baseName, targetBase: baseName, arrived: true, x: getDefenseBasePoint(start).x, y: getDefenseBasePoint(start).y });
+    setDefenseBaseRunnerManualDestination(runner, start + 1, 3);
+    updateDefenseBaseRunnerPosition(runner, 3.1);
+    if (returning) setDefenseBaseRunnerReturnDestination(runner, start, 3.1);
+    const snapshot = JSON.stringify({ route: runner.route, target: runner.targetBase, arrival: runner.arrivalTime, x: runner.x, y: runner.y });
+    defenseState.baseRunners = refreshDefenseBaseRunnerAnimations({ kind: "double", scoreType: "double" }, hit);
+    const after = defenseState.baseRunners.find((entry) => entry.startBase === baseName);
+    if (snapshot !== JSON.stringify({ route: after.route, target: after.targetBase, arrival: after.arrivalTime, x: after.x, y: after.y })) throw new Error("base-runner path rewound");
+    paths += 1;
+  }
+  let tagRelays = 0;
+  // 打者走者も一塁・二塁・三塁から先へ進む場合と、指示で帰塁する場合を検査する。
+  for (const outs of [0, 1, 2]) for (const start of [1, 2, 3]) for (const returning of [false, true]) {
+    setup(outs);
+    const runner = defenseState.runner;
+    const point = getDefenseBasePoint(start);
+    Object.assign(runner, { currentBase: baseNameByIndex[start], targetBase: baseNameByIndex[start], arrived: true, x: point.x, y: point.y });
+    const targetBase = start === 3 ? "home" : baseNameByIndex[start + 1];
+    setBatterRunnerManualDestination(runner, targetBase, 3);
+    updateBatterRunner(3.1);
+    if (returning) setBatterRunnerManualDestination(runner, baseNameByIndex[start], 3.1, "return");
+    const snapshot = JSON.stringify({ route: runner.route, target: runner.targetBase, arrival: runner.arrivalTime, x: runner.x, y: runner.y });
+    const missed = resolveUnifiedCircleMissAfterArrival(3.2);
+    if (!missed || snapshot !== JSON.stringify({ route: runner.route, target: runner.targetBase, arrival: runner.arrivalTime, x: runner.x, y: runner.y })) throw new Error("batter-runner path rewound");
+    updateBatterRunner(runner.arrivalTime + 0.01);
+    if (getSettledRunnerBase(runner) !== (returning ? baseNameByIndex[start] : targetBase)) throw new Error("batter-runner settled at wrong base");
+    paths += 1;
+  }
+  for (const outs of [0, 1, 2]) for (const start of [1, 2, 3]) {
+    const { hit } = setup(outs, 1 << (start - 1));
+    defenseState.outcome = { kind: "single", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 1 };
+    const runner = createDefenseBaseRunner(baseNameByIndex[start], bases[baseNameByIndex[start]], defenseState.outcome, hit);
+    const current = Math.max(2, start);
+    const point = getDefenseBasePoint(current);
+    Object.assign(runner, { currentBase: baseNameByIndex[current], targetBase: baseNameByIndex[current], arrived: true, x: point.x, y: point.y });
+    defenseState.baseRunners = [runner];
+    setDefenseBaseRunnerManualDestination(runner, current + 1, 3);
+    defenseState.runner.arrivalTime = 1;
+    defenseState.runner.arrived = true;
+    defenseState.runner.currentBase = "first";
+    const targetBase = current === 3 ? "home" : baseNameByIndex[current + 1];
+    // 二塁は踏み終えてから三塁へ向かうなど、封殺が解けた状態。
+    defenseState.forceTargets = [];
+    defenseState.throw = { targetBase, baseLabel: getBaseLabel(targetBase), startTime: 3, endTime: 3.1, tagTime: 3.1, holdDeadline: 4, to: getDefenseBasePoint(current + 1) };
+    updateThrowState(3.2);
+    // タッチアウト後に送球先が変わっても、アウトと走者の退場を保持する。
+    const retired = runner.isOut;
+    const commandBlocked = setDefenseBaseRunnerManualDestination(runner, Math.min(4, start + 1), 3.3) === false;
+    defenseState.throw = { targetBase: "first", baseLabel: "一塁", startTime: 4, endTime: 5, tagTime: 5, holdDeadline: 6 };
+    const result = finish();
+    if (!retired || !commandBlocked || result.outs !== outs + 1) throw new Error("tag out lost or runner reused during relay: " + JSON.stringify({ outs, start, retired, commandBlocked, result }));
+    tagRelays += 1;
+  }
+  setup(0, 1);
+  defenseState.completedForceOutBases = ["second"];
+  defenseState.baseRunners = [];
+  const refreshed = refreshDefenseBaseRunnerAnimations({ kind: "single", scoreType: "single" }, defenseState.battedBall);
+  if (refreshed.some((runner) => runner.startBase === "first")) throw new Error("force-out runner resurrected during rebuild");
+  // 別々の走者のタッチアウトは両方を保持し、3アウトを超えて加算しない。
+  let doubleTags = 0;
+  for (const outs of [0, 1, 2]) {
+    setup(outs, 6);
+    const runnerAtSecond = { ...bases.second, startBase: "second", currentBase: "second", targetBase: "third", arrivalTime: 10, arrived: false };
+    const runnerAtThird = { ...bases.third, startBase: "third", currentBase: "third", targetBase: "home", arrivalTime: 10, arrived: false };
+    defenseState.baseRunners = [runnerAtSecond, runnerAtThird];
+    defenseState.outcome = { kind: "single", scoreType: "single", caught: false, needsThrow: false, fieldingTime: 1 };
+    defenseState.runner.arrivalTime = 1;
+    defenseState.runner.arrived = true;
+    const throwTo = (targetBase, time) => {
+      defenseState.throw = { targetBase, baseLabel: getBaseLabel(targetBase), startTime: time - 0.2, endTime: time, tagTime: time, holdDeadline: time + 1 };
+      updateThrowState(time + 0.01);
+      updateThrowState(time + 0.02);
+    };
+    throwTo("home", 3);
+    throwTo("third", 4);
+    throwTo("home", 5);
+    const results = getDefenseThrowOutResults(defenseState.throw);
+    const finished = finish();
+    if (results.length !== 2 || finished.outs !== Math.min(3, outs + 2)) throw new Error("distinct tag outs lost or same runner counted twice");
+    const events = defenseState.outEvents || [];
+    if (new Set(events.map((entry) => entry.runnerId)).size !== events.length) throw new Error("duplicate runner in out events");
+    doubleTags += 1;
+  }
+  return JSON.stringify({ catches, paths, tagRelays, doubleTags });
+`));
+assert(expandedRunnerChecks.catches === 96 && expandedRunnerChecks.paths === 36 && expandedRunnerChecks.tagRelays === 9 && expandedRunnerChecks.doubleTags === 3,
+  "全アウトカウント・塁配置・送球先と、各塁からの進塁／帰塁・タッチアウト後の送球を検査する");
+
 // 統合テスト: シード固定の観戦試合で走塁の不変条件を検査する
 // ---------------------------------------------------------------------------
 const integrationSeeds = [260717, 991143, 20260802];

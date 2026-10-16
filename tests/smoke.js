@@ -8788,7 +8788,7 @@ const manualHitRecordUpgradeState = JSON.parse(runInGame(
       initializeBatterGameRecords();
       defenseState = {
         ...createDefenseState(),
-        runner: { targetBase }
+        runner: { targetBase, currentBase: targetBase, arrived: true }
       };
       const recordType = getBatterFinalHitRecordType("single");
       recordBatterPlateAppearance(recordType, { runs: targetBase === "home" ? 1 : 0 });
