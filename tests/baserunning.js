@@ -1891,7 +1891,7 @@ const grounderErrorChances = JSON.parse(run(`
 assert(grounderErrorChances.low >= 0.2, `low fielding should cause frequent grounder errors (${grounderErrorChances.low})`);
 assert(grounderErrorChances.elite < 0.01, `elite fielding should almost never cause grounder errors (${grounderErrorChances.elite})`);
 assert(grounderErrorChances.low > grounderErrorChances.average && grounderErrorChances.average > grounderErrorChances.elite, "grounder error chance should fall with fielding ability");
-assert(grounderErrorChances.outfielder === 0, "grounder fumbles and misplays should be limited to infielders");
+assert(grounderErrorChances.outfielder > 0, "outfielders can also let grounders through");
 assert(grounderErrorChances.fumble === "fumble" && grounderErrorChances.misplay === "misplay", "grounder errors should include both fumbles and misplays");
 assert(
   totalTriples === 0,
@@ -1901,6 +1901,54 @@ assert(
   integrationReport.every((entry) => entry.singles > 0),
   `安打が1本も記録されていない試合がある ${JSON.stringify(integrationReport)}`
 );
+
+const recoveryChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame();
+  const results = [];
+  for (const [type, role] of [["misplay", "SS"], ["misplay", "C"], ["drop", "L"], ["drop", "SS"], ["fumble", "SS"]]) {
+    defenseState = createDefenseState();
+    defenseState.active = true;
+    const start = { x: field.plateX, y: field.plateY - 500 };
+    const original = { role, ...start, speed: 5, fielding: 5, arm: 5 };
+    defenseState.fielders = initializeFielderCatchRanges([
+      original,
+      { role: "R", x: start.x + 60, y: start.y - 150, speed: 5, fielding: 5, arm: 5 }
+    ]);
+    defenseState.chosenFielder = original;
+    defenseState.battedBall = { isGrounder: true, trajectory: "grounder", power: 0.9, ballTime: 1, target: start, distance: 500 };
+    defenseState.landingTarget = start;
+    ball.x = start.x;
+    ball.y = start.y;
+    startFieldingErrorRecovery(original, start, 1, type);
+    const atContact = getDefenseBallPoint(0, 0, 1);
+    const continuous = Math.hypot(atContact.x - start.x, atContact.y - start.y) < 0.001;
+    const behind = defenseState.errorRecovery.target.y < start.y;
+    updateDefensePlay(1100);
+    const waits = defenseState.throw === null && !!defenseState.errorRecovery;
+    let t = 1.1;
+    while (defenseState.errorRecovery && t < 25) {
+      t += 0.04;
+      updateDefensePlay(t * 1000);
+    }
+    results.push({ type, role, continuous, behind, waits,
+      recovered: !defenseState.errorRecovery,
+      collector: defenseState.chosenFielder.role,
+      error: defenseState.outcome.fieldingError,
+      throwAfterPickup: !defenseState.throw || defenseState.throw.startTime >= defenseState.outcome.fieldingTime,
+      noOut: !defenseState.outcome.caught
+    });
+  }
+  return JSON.stringify(results);
+`));
+for (const check of recoveryChecks) {
+  assert(check.continuous && check.behind && check.waits && check.recovered && check.error && check.throwAfterPickup && check.noOut,
+    `error recovery must keep the ball live until pickup: ${JSON.stringify(check)}`);
+  assert(check.type === "fumble" ? check.collector === check.role
+    : check.type === "drop" && ["2B", "SS", "L", "C", "R"].includes(check.role)
+      ? ["2B", "SS", "L", "C", "R"].includes(check.collector)
+      : ["L", "C", "R"].includes(check.collector),
+    `error recovery must use the appropriate fielder: ${JSON.stringify(check)}`);
+}
 
 process.stdout.write(`${JSON.stringify(integrationReport)}\n`);
 process.stdout.write("Baserunning check passed\n");

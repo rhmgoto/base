@@ -295,103 +295,105 @@ const pitchControlTuning = {
 const showHbpHitBox = false;
 
 const batters = [
-  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 8, infieldDefense: 4, outfieldDefense: 7, arm: 8, cost: 9 },
+  { id: "otani", name: "オオタニ", bats: "L", power: 9, meet: 8, run: 9, infieldDefense: 4, outfieldDefense: 8, arm: 8, cost: 10 },
   { id: "ichiro", name: "イチロー", bats: "L", power: 4, meet: 20, run: 10, infieldDefense: 3, outfieldDefense: 11, arm: 11, cost: 28 },
-  { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 6, cost: 5 },
-  { id: "freeman", name: "フリーマン", bats: "L", power: 6, meet: 9, run: 6, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
-  { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 5 },
-  { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 4, run: 10, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
+  { id: "sato", name: "サトウ", bats: "L", power: 6, meet: 5, run: 4, infieldDefense: 4, outfieldDefense: 4, arm: 6, cost: 4 },
+  { id: "freeman", name: "フリーマン", bats: "L", power: 5, meet: 9, run: 6, infieldDefense: 7, outfieldDefense: 2, arm: 7, cost: 6 },
+  { id: "schwarber", name: "シュワバー", bats: "L", power: 10, meet: 1, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 4 },
+  { id: "shuto", name: "シュウトウ", bats: "L", power: 2, meet: 4, run: 10, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 4 },
   { id: "shinjo", name: "シンジョウ", bats: "R", power: 4, meet: 3, run: 6, infieldDefense: 3, outfieldDefense: 10, arm: 10, cost: 4 },
-  { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 8, arm: 8, cost: 5 },
-  { id: "trout", name: "トラウト", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 3, outfieldDefense: 6, arm: 5, cost: 6 },
-  { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 8, run: 5, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 9 },
-  { id: "ruth", name: "ルース", bats: "R", power: 20, meet: 15, run: 6, infieldDefense: 3, outfieldDefense: 4, arm: 4, cost: 30 },
-  { id: "kimhyesong", name: "キムヘソン", bats: "L", power: 4, meet: 4, run: 5, infieldDefense: 5, outfieldDefense: 5, arm: 5, cost: 3 },
-  { id: "betts", name: "ベッツ", bats: "R", power: 7, meet: 5, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 5 },
-  { id: "okamoto", name: "オカモト", bats: "R", power: 5, meet: 5, run: 6, infieldDefense: 6, outfieldDefense: 5, arm: 7, cost: 5 },
-  { id: "murakami", name: "ムラカミ", bats: "L", power: 7, meet: 4, run: 3, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 5 },
+  { id: "suzuki", name: "スズキ", bats: "R", power: 6, meet: 5, run: 6, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 4 },
+  { id: "trout", name: "トラウト", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 3, outfieldDefense: 5, arm: 5, cost: 6 },
+  { id: "judge", name: "ジャッジ", bats: "R", power: 10, meet: 9, run: 6, infieldDefense: 3, outfieldDefense: 6, arm: 6, cost: 10 },
+  { id: "ruth", name: "ルース", bats: "R", power: 20, meet: 15, run: 6, infieldDefense: 3, outfieldDefense: 3, arm: 3, cost: 30 },
+  { id: "kimhyesong", name: "キムヘソン", bats: "L", power: 4, meet: 4, run: 5, infieldDefense: 5, outfieldDefense: 5, arm: 5, cost: 2 },
+  { id: "betts", name: "ベッツ", bats: "R", power: 7, meet: 5, run: 6, infieldDefense: 9, outfieldDefense: 9, arm: 9, cost: 5 },
+  { id: "okamoto", name: "オカモト", bats: "R", power: 5, meet: 5, run: 6, infieldDefense: 6, outfieldDefense: 5, arm: 7, cost: 4 },
+  { id: "murakami", name: "ムラカミ", bats: "L", power: 7, meet: 4, run: 3, infieldDefense: 3, outfieldDefense: 2, arm: 3, cost: 4 },
   { id: "nagashima", name: "ナガシマ", bats: "R", power: 15, meet: 13, run: 8, infieldDefense: 11, outfieldDefense: 2, arm: 11, cost: 25 },
-  { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 7, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 5 },
-  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 3 },
-  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 5, arm: 7, cost: 8 },
+  { id: "leejunghoo", name: "イジョンフ", bats: "L", power: 4, meet: 7, run: 5, infieldDefense: 2, outfieldDefense: 6, arm: 6, cost: 4 },
+  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, infieldDefense: 3, outfieldDefense: 3, arm: 6, cost: 2 },
+  { id: "harper", name: "ハーパー", bats: "L", power: 8, meet: 6, run: 6, infieldDefense: 5, outfieldDefense: 5, arm: 7, cost: 7 },
   { id: "arraez", name: "アラエス", bats: "L", power: 1, meet: 10, run: 5, infieldDefense: 6, outfieldDefense: 2, arm: 7, cost: 5 },
-  { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 7 },
-  { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 6 },
+  { id: "wittjr", name: "ウィットJr．", bats: "R", power: 6, meet: 5, run: 9, infieldDefense: 8, outfieldDefense: 4, arm: 7, cost: 6 },
+  { id: "goldschmidt", name: "ゴールドシュミット", bats: "R", power: 7, meet: 6, run: 6, infieldDefense: 6, outfieldDefense: 2, arm: 6, cost: 5 },
   { id: "bonds", name: "ボンズ", bats: "L", power: 19, meet: 14, run: 8, infieldDefense: 3, outfieldDefense: 10, arm: 10, cost: 28 },
-  { id: "outman", name: "アウトマン", bats: "L", power: 6, meet: 2, run: 5, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 4 },
-  { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 2 },
-  { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 5 },
+  { id: "outman", name: "アウトマン", bats: "L", power: 6, meet: 2, run: 5, infieldDefense: 3, outfieldDefense: 7, arm: 7, cost: 3 },
+  { id: "jones", name: "ジョーンズ", bats: "R", power: 6, meet: 2, run: 3, infieldDefense: 1, outfieldDefense: 2, arm: 2, cost: 1 },
+  { id: "greene", name: "グリーン", bats: "L", power: 5, meet: 6, run: 4, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 4 },
   { id: "sadaharu", name: "サダハル", bats: "L", power: 20, meet: 11, run: 5, infieldDefense: 6, outfieldDefense: 2, arm: 7, cost: 25 },
-  { id: "carpenter", name: "カーペンター", bats: "L", power: 6, meet: 6, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
+  { id: "carpenter", name: "カーペンター", bats: "L", power: 5, meet: 5, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 3 },
   { id: "tucker", name: "タッカー", bats: "L", power: 6, meet: 5, run: 7, infieldDefense: 2, outfieldDefense: 6, arm: 7, cost: 5 },
-  { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 5 },
-  { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 4 },
-  { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 7 },
-  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 5 },
+  { id: "mcgonigle", name: "マクゴニグル", bats: "L", power: 4, meet: 7, run: 6, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 4 },
+  { id: "torkelson", name: "トーケルソン", bats: "R", power: 6, meet: 3, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 3, cost: 2 },
+  { id: "acunajr", name: "アクーニャJr.", bats: "R", power: 6, meet: 6, run: 10, infieldDefense: 2, outfieldDefense: 3, arm: 8, cost: 6 },
+  { id: "ydiaz", name: "Y.ディアス", bats: "R", power: 5, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 2, arm: 3, cost: 4 },
   { id: "rose", name: "ローズ", bats: "S", power: 4, meet: 20, run: 6, infieldDefense: 8, outfieldDefense: 8, arm: 8, cost: 26 },
   { id: "henderson", name: "ヘンダーソン", bats: "R", power: 4, meet: 18, run: 20, infieldDefense: 3, outfieldDefense: 8, arm: 7, cost: 24 },
   { id: "yoshida", name: "ヨシダ", bats: "L", power: 3, meet: 7, run: 4, infieldDefense: 1, outfieldDefense: 3, arm: 4, cost: 4 },
-  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 4 },
+  { id: "zaiahope", name: "ザイア・ホープ", bats: "L", power: 4, meet: 3, run: 7, infieldDefense: 3, outfieldDefense: 7, arm: 6, cost: 3 },
   { id: "alvarez", name: "アルバレス", bats: "L", power: 8, meet: 9, run: 3, infieldDefense: 1, outfieldDefense: 1, arm: 2, cost: 6 },
-  { id: "caminero", name: "カミネロ", bats: "R", power: 8, meet: 6, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 7 },
-  { id: "pca", name: "PCA", bats: "L", power: 7, meet: 7, run: 9, infieldDefense: 4, outfieldDefense: 9, arm: 9, cost: 8 }
+  { id: "caminero", name: "カミネロ", bats: "R", power: 8, meet: 6, run: 4, infieldDefense: 4, outfieldDefense: 2, arm: 6, cost: 6 },
+  { id: "pca", name: "PCA", bats: "L", power: 7, meet: 7, run: 9, infieldDefense: 4, outfieldDefense: 10, arm: 7, cost: 7 },
+  { id: "simpson", name: "シンプソン", bats: "L", power: 1, meet: 8, run: 9, infieldDefense: 3, outfieldDefense: 5, arm: 4, cost: 4 }
 ];
 
 const catchers = [
-  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 6, meet: 2, run: 3, arm: 8, cost: 5 },
+  { id: "calraleigh", name: "カル・ローリー", bats: "R", power: 7, meet: 2, run: 3, arm: 8, cost: 5 },
   { id: "willsmith", name: "ウィル・スミス", bats: "R", power: 5, meet: 7, run: 6, arm: 8, cost: 6 },
   { id: "nomura", name: "ノムラ", bats: "R", power: 15, meet: 12, run: 5, arm: 13, cost: 27 },
-  { id: "kaicannon", name: "カイキャノン", bats: "R", power: 3, meet: 4, run: 4, arm: 10, cost: 4 },
-  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 6, run: 3, arm: 9, cost: 7 },
-  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 3 },
+  { id: "kaicannon", name: "カイキャノン", bats: "R", power: 3, meet: 3, run: 4, arm: 10, cost: 3 },
+  { id: "dingler", name: "ディングラー", bats: "R", power: 7, meet: 6, run: 3, arm: 9, cost: 6 },
+  { id: "rodgers", name: "ロジャース", bats: "R", power: 6, meet: 1, run: 3, arm: 7, cost: 2 },
   { id: "johnnybench", name: "ジョニーベンチ", bats: "R", power: 17, meet: 14, run: 5, arm: 15, cost: 29 },
   { id: "rushing", name: "ラッシング", bats: "L", power: 6, meet: 3, run: 3, arm: 6, cost: 4 },
   { id: "wakatsuki", name: "ワカツキ", bats: "R", power: 3, meet: 3, run: 3, arm: 5, cost: 2 }
 ];
 
 const pitchers = [
-  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 8, fastChange: 8, control: 6, stuff: 8, fielding: 7, stamina: 6, cost: 9 },
-  { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 8, leftBreak: 3, slowChange: 7, fastChange: 7, control: 9, stuff: 7, fielding: 6, stamina: 7, cost: 8 },
-  { id: "saiki", name: "サイキ", throws: "R", fastKmh: 155, rightBreak: 5, leftBreak: 2, slowChange: 10, fastChange: 6, control: 6, stuff: 6, fielding: 5, stamina: 7, cost: 6 },
-  { id: "kershaw", name: "カーショウ", throws: "L", fastKmh: 148, rightBreak: 4, leftBreak: 10, slowChange: 6, fastChange: 4, control: 8, stuff: 5, fielding: 4, stamina: 5, cost: 6 },
-  { id: "hikari", name: "ヒカリ", throws: "L", fastKmh: 220, rightBreak: 1, leftBreak: 1, slowChange: 9, fastChange: 1, control: 3, stuff: 6, fielding: 4, stamina: 6, cost: 5 },
-  { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 5 },
-  { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 6 },
-  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 6 },
+  { id: "shohei", name: "ショウヘイ", throws: "R", fastKmh: 165, rightBreak: 9, leftBreak: 5, slowChange: 8, fastChange: 8, control: 7, stuff: 9, fielding: 7, stamina: 6, cost: 10 },
+  { id: "yamamoto", name: "ヤマモト", throws: "R", fastKmh: 157, rightBreak: 9, leftBreak: 4, slowChange: 7, fastChange: 7, control: 9, stuff: 7, fielding: 7, stamina: 7, cost: 10 },
+  { id: "saiki", name: "サイキ", throws: "R", fastKmh: 155, rightBreak: 5, leftBreak: 2, slowChange: 10, fastChange: 6, control: 6, stuff: 6, fielding: 5, stamina: 7, cost: 5 },
+  { id: "kershaw", name: "カーショウ", throws: "L", fastKmh: 148, rightBreak: 4, leftBreak: 10, slowChange: 6, fastChange: 4, control: 8, stuff: 5, fielding: 4, stamina: 5, cost: 5 },
+  { id: "hikari", name: "ヒカリ", throws: "L", fastKmh: 220, rightBreak: 1, leftBreak: 1, slowChange: 9, fastChange: 1, control: 3, stuff: 6, fielding: 4, stamina: 6, cost: 4 },
+  { id: "magari", name: "マガリ", throws: "R", fastKmh: 100, rightBreak: 9, leftBreak: 9, slowChange: 9, fastChange: 9, control: 9, stuff: 6, fielding: 8, stamina: 4, cost: 4 },
+  { id: "imanaga", name: "イマナガ", throws: "L", fastKmh: 149, rightBreak: 3, leftBreak: 6, slowChange: 5, fastChange: 10, control: 5, stuff: 8, fielding: 5, stamina: 6, cost: 5 },
+  { id: "darvish", name: "ダルビッシュ", throws: "R", fastKmh: 158, rightBreak: 9, leftBreak: 8, slowChange: 6, fastChange: 5, control: 7, stuff: 4, fielding: 5, stamina: 5, cost: 5 },
   { id: "sawamura", name: "サワムラ", throws: "R", fastKmh: 172, rightBreak: 17, leftBreak: 16, slowChange: 24, fastChange: 17, control: 25, stuff: 32, fielding: 7, stamina: 16, cost: 30 },
   { id: "miller", name: "ミラー", throws: "R", fastKmh: 171, rightBreak: 8, leftBreak: 6, slowChange: 8, fastChange: 3, control: 8, stuff: 14, fielding: 6, stamina: 3, cost: 4 },
-  { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 6 },
-  { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 7, leftBreak: 4, slowChange: 5, fastChange: 9, control: 5, stuff: 9, fielding: 4, stamina: 7, cost: 8 },
+  { id: "ootake", name: "オオタケ", throws: "L", fastKmh: 143, rightBreak: 4, leftBreak: 4, slowChange: 5, fastChange: 5, control: 10, stuff: 7, fielding: 8, stamina: 6, cost: 5 },
+  { id: "misiorowski", name: "ミジオロスキー", throws: "R", fastKmh: 169, rightBreak: 9, leftBreak: 5, slowChange: 6, fastChange: 9, control: 8, stuff: 10, fielding: 5, stamina: 7, cost: 10 },
   { id: "hanifee", name: "ハニフィー", throws: "R", fastKmh: 156, rightBreak: 2, leftBreak: 10, slowChange: 2, fastChange: 2, control: 5, stuff: 2, fielding: 5, stamina: 3, cost: 1 },
-  { id: "sugiyama", name: "スギヤマ", throws: "R", fastKmh: 158, rightBreak: 2, leftBreak: 1, slowChange: 9, fastChange: 7, control: 3, stuff: 9, fielding: 3, stamina: 3, cost: 3 },
-  { id: "sasaki", name: "ササキ", throws: "R", fastKmh: 165, rightBreak: 5, leftBreak: 2, slowChange: 6, fastChange: 4, control: 4, stuff: 7, fielding: 4, stamina: 5, cost: 6 },
-  { id: "matsui", name: "マツイ", throws: "L", fastKmh: 150, rightBreak: 2, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 5, fielding: 5, stamina: 3, cost: 3 },
-  { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 3, cost: 3 },
-  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 7, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 5 },
-  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 6, leftBreak: 8, slowChange: 8, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 8 },
-  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 4, leftBreak: 6, slowChange: 4, fastChange: 4, control: 4, stuff: 5, fielding: 5, stamina: 4, cost: 3 },
-  { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 6 },
+  { id: "sugiyama", name: "スギヤマ", throws: "R", fastKmh: 158, rightBreak: 2, leftBreak: 1, slowChange: 9, fastChange: 7, control: 3, stuff: 9, fielding: 3, stamina: 3, cost: 2 },
+  { id: "sasaki", name: "ササキ", throws: "R", fastKmh: 165, rightBreak: 7, leftBreak: 3, slowChange: 8, fastChange: 7, control: 4, stuff: 8, fielding: 4, stamina: 5, cost: 5 },
+  { id: "matsui", name: "マツイ", throws: "L", fastKmh: 150, rightBreak: 2, leftBreak: 5, slowChange: 5, fastChange: 5, control: 5, stuff: 5, fielding: 5, stamina: 3, cost: 2 },
+  { id: "rodgers", name: "ロジャース", throws: "R", fastKmh: 125, rightBreak: 2, leftBreak: 2, slowChange: 3, fastChange: 1, control: 3, stuff: 3, fielding: 3, stamina: 3, cost: 2 },
+  { id: "fujinami", name: "フジナミ", throws: "R", fastKmh: 159, rightBreak: 7, leftBreak: 3, slowChange: 5, fastChange: 5, control: 0, stuff: 9, fielding: 3, stamina: 6, cost: 4 },
+  { id: "skubal", name: "スクバル", throws: "L", fastKmh: 164, rightBreak: 7, leftBreak: 9, slowChange: 9, fastChange: 8, control: 8, stuff: 8, fielding: 6, stamina: 7, cost: 10 },
+  { id: "ashby", name: "アシュビー", throws: "L", fastKmh: 157, rightBreak: 4, leftBreak: 7, slowChange: 5, fastChange: 5, control: 6, stuff: 6, fielding: 5, stamina: 4, cost: 3 },
+  { id: "melton", name: "メルトン", throws: "R", fastKmh: 155, rightBreak: 4, leftBreak: 3, slowChange: 8, fastChange: 3, control: 9, stuff: 5, fielding: 8, stamina: 6, cost: 5 },
   { id: "cyyoung", name: "サイヤング", throws: "R", fastKmh: 175, rightBreak: 18, leftBreak: 17, slowChange: 27, fastChange: 17, control: 27, stuff: 33, fielding: 7, stamina: 16, cost: 32 },
   { id: "maddux", name: "マダックス", throws: "R", fastKmh: 155, rightBreak: 22, leftBreak: 20, slowChange: 29, fastChange: 18, control: 29, stuff: 32, fielding: 7, stamina: 15, cost: 32 },
-  { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 3, fastChange: 6, control: 7, stuff: 8, fielding: 5, stamina: 3, cost: 3 },
-  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 7, leftBreak: 3, slowChange: 9, fastChange: 7, control: 8, stuff: 8, fielding: 6, stamina: 7, cost: 6 },
+  { id: "phillips", name: "フィリップス", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 3, fastChange: 6, control: 7, stuff: 8, fielding: 5, stamina: 3, cost: 2 },
+  { id: "yamaoka", name: "ヤマオカ", throws: "R", fastKmh: 145, rightBreak: 6, leftBreak: 4, slowChange: 9, fastChange: 7, control: 7, stuff: 7, fielding: 6, stamina: 7, cost: 5 },
   { id: "ediaz", name: "E.ディアス", throws: "R", fastKmh: 164, rightBreak: 8, leftBreak: 1, slowChange: 4, fastChange: 9, control: 8, stuff: 15, fielding: 6, stamina: 3, cost: 4 },
   { id: "jansen", name: "ジャンセン", throws: "R", fastKmh: 161, rightBreak: 9, leftBreak: 7, slowChange: 3, fastChange: 6, control: 9, stuff: 13, fielding: 5, stamina: 3, cost: 4 },
   { id: "rojas", name: "ロハス", throws: "R", fastKmh: 77, rightBreak: 3, leftBreak: 1, slowChange: 3, fastChange: 1, control: 6, stuff: 2, fielding: 3, stamina: 3, cost: 1 },
   { id: "summers", name: "サマーズ", throws: "L", fastKmh: 152, rightBreak: 2, leftBreak: 4, slowChange: 4, fastChange: 2, control: 3, stuff: 3, fielding: 4, stamina: 3, cost: 1 },
   { id: "enriquez", name: "エンリケス", throws: "R", fastKmh: 166, rightBreak: 3, leftBreak: 2, slowChange: 2, fastChange: 4, control: 5, stuff: 6, fielding: 3, stamina: 3, cost: 1 },
-  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 5, stuff: 7, fielding: 7, stamina: 6, cost: 6 },
-  { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 5 },
-  { id: "wheeler", name: "ウィーラー", throws: "R", fastKmh: 159, rightBreak: 8, leftBreak: 8, slowChange: 5, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 7 },
-  { id: "valdes", name: "バルデス", throws: "L", fastKmh: 158, rightBreak: 9, leftBreak: 7, slowChange: 7, fastChange: 6, control: 5, stuff: 7, fielding: 4, stamina: 7, cost: 7 },
+  { id: "glasnow", name: "グラスノー", throws: "R", fastKmh: 158, rightBreak: 8, leftBreak: 3, slowChange: 8, fastChange: 4, control: 5, stuff: 7, fielding: 7, stamina: 6, cost: 5 },
+  { id: "robleski", name: "ロブレスキー", throws: "L", fastKmh: 156, rightBreak: 3, leftBreak: 6, slowChange: 4, fastChange: 3, control: 7, stuff: 4, fielding: 7, stamina: 7, cost: 4 },
+  { id: "wheeler", name: "ウィーラー", throws: "R", fastKmh: 159, rightBreak: 8, leftBreak: 8, slowChange: 5, fastChange: 6, control: 6, stuff: 8, fielding: 5, stamina: 7, cost: 6 },
+  { id: "valdes", name: "バルデス", throws: "L", fastKmh: 158, rightBreak: 9, leftBreak: 7, slowChange: 7, fastChange: 6, control: 5, stuff: 7, fielding: 4, stamina: 7, cost: 6 },
   { id: "clemens", name: "\u30af\u30ec\u30e1\u30f3\u30b9", throws: "R", fastKmh: 161, rightBreak: 18, leftBreak: 13, slowChange: 32, fastChange: 14, control: 30, stuff: 31, fielding: 7, stamina: 16, cost: 30 },
   { id: "johnson", name: "\u30b8\u30e7\u30f3\u30bd\u30f3", throws: "L", fastKmh: 164, rightBreak: 10, leftBreak: 40, slowChange: 10, fastChange: 17, control: 27, stuff: 33, fielding: 7, stamina: 15, cost: 29 },
-  { id: "sabrowski", name: "\u30b5\u30d6\u30ed\u30a6\u30b9\u30ad", throws: "L", fastKmh: 151, rightBreak: 4, leftBreak: 10, slowChange: 10, fastChange: 10, control: 2, stuff: 10, fielding: 4, stamina: 1, cost: 2 },
-  { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 4 },
-  { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 5, stuff: 8, fielding: 4, stamina: 5, cost: 4 },
-  { id: "anderson", name: "アンダーソン", throws: "R", fastKmh: 157, rightBreak: 5, leftBreak: 2, slowChange: 7, fastChange: 5, control: 5, stuff: 6, fielding: 5, stamina: 4, cost: 3 },
+  { id: "sabrowski", name: "\u30b5\u30d6\u30ed\u30a6\u30b9\u30ad", throws: "L", fastKmh: 151, rightBreak: 4, leftBreak: 10, slowChange: 10, fastChange: 10, control: 5, stuff: 10, fielding: 4, stamina: 1, cost: 2 },
+  { id: "kelly", name: "\u30b1\u30ea\u30fc", throws: "R", fastKmh: 148, rightBreak: 5, leftBreak: 3, slowChange: 5, fastChange: 4, control: 6, stuff: 4, fielding: 5, stamina: 9, cost: 3 },
+  { id: "riverryan", name: "リバーライアン", throws: "R", fastKmh: 162, rightBreak: 4, leftBreak: 3, slowChange: 6, fastChange: 6, control: 5, stuff: 8, fielding: 4, stamina: 5, cost: 3 },
+  { id: "anderson", name: "アンダーソン", throws: "R", fastKmh: 157, rightBreak: 5, leftBreak: 2, slowChange: 7, fastChange: 5, control: 5, stuff: 6, fielding: 5, stamina: 4, cost: 2 },
   { id: "tscott", name: "T.スコット", throws: "L", fastKmh: 160, rightBreak: 3, leftBreak: 9, slowChange: 3, fastChange: 9, control: 7, stuff: 9, fielding: 7, stamina: 4, cost: 3 },
-  { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 5, stuff: 6, fielding: 4, stamina: 5, cost: 3 }
+  { id: "bsmith", name: "B.スミス", throws: "R", fastKmh: 158, rightBreak: 3, leftBreak: 1, slowChange: 8, fastChange: 5, control: 5, stuff: 6, fielding: 4, stamina: 5, cost: 2 },
+  { id: "schlittler", name: "シュリトラー", throws: "R", fastKmh: 163, rightBreak: 3, leftBreak: 4, slowChange: 4, fastChange: 10, control: 8, stuff: 9, fielding: 6, stamina: 7, cost: 7 }
 ];
 
 const pitchTypes = {
@@ -691,7 +693,6 @@ const lineupOrderKey = "lineupOrder";
 const baseNames = ["first", "second", "third"];
 const baseIndexByName = { home: 0, first: 1, second: 2, third: 3 };
 const baseNameByIndex = ["home", "first", "second", "third"];
-const teamPointLimit = 68;
 const awayRegularLineupOrder = ["2B", "CA", "R", "L", "SS", "C", "DH"];
 const homeRegularLineupOrder = ["R", "L", "2B", "CA", "C", "SS", "DH"];
 const teamPresets = {
@@ -721,6 +722,18 @@ const teamPresets = {
   }
 };
 const defaultTeamPresetBySide = { away: "dodgers", home: "dodgers" };
+// デフォルトの上限はドジャースの全登録選手（控えを含む）の合計に合わせる。
+const teamPointLimit = getDefaultTeamPointLimit();
+
+function getDefaultTeamPointLimit() {
+  const selection = teamPresets.dodgers.selection;
+  return [...pitcherRoles, ...batterRoles, ...benchRoles].reduce((total, role) => {
+    const list = pitcherRoles.includes(role) ? pitchers : [...batters, ...catchers];
+    const player = list.find((entry) => entry.id === selection[role]);
+    return total + (player?.cost ?? 0);
+  }, 0);
+}
+
 const defaultMenuSelection = {
   away: cloneTeamSelection(teamPresets[defaultTeamPresetBySide.away].selection),
   home: cloneTeamSelection(teamPresets[defaultTeamPresetBySide.home].selection)
@@ -2448,6 +2461,7 @@ function createDefenseState() {
     baseRunners: [],
     throw: null,
     heldBallBase: null,
+    errorRecovery: null,
     heldBallSince: null,
     lastManualThrowCommandTime: null,
     homeRunFireworks: null,
@@ -14993,6 +15007,10 @@ function updateDefensePlay(now) {
 
   updateBatterRunner(elapsedSeconds);
   updateDefenseBaseRunners(elapsedSeconds);
+  if (defenseState.errorRecovery) {
+    updateFieldingErrorRecovery(elapsedSeconds);
+    return;
+  }
   if (defenseState.unifiedCircleCatchComplete || !defenseState.outcome?.caught) {
     updateThrowState(elapsedSeconds);
   }
@@ -15097,8 +15115,8 @@ function getCompletedInfieldCatchHoldPoint(fielder, elapsedSeconds) {
 
 function resolveUnifiedFielderCircleCatch(elapsedSeconds) {
   if (!defenseState.active || defenseState.resolved || defenseState.unifiedCircleCatchComplete) return false;
-  // 落球と決まった打球は、野手が追いついても捕らない。
-  if (defenseState.outcome?.fieldingError) return false;
+  // エラー後の回収は専用処理で接近とバウンドを確認する。
+  if (defenseState.errorRecovery) return false;
   const battedBall = defenseState.battedBall;
   if (!battedBall || battedBall.fenceOver || battedBall.wallHit || battedBall.groundRuleDouble) return false;
   if (defenseState.throw?.active) return false;
@@ -15275,54 +15293,29 @@ function getLiveCircleCatchMaxHeight(battedBall) {
   return 104;
 }
 
-function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null, contactHeight = null) {
+function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSeconds, caughtInAirOverride = null, contactHeight = null, recoveredError = null) {
   const battedBall = defenseState.battedBall;
   const caughtInAir = caughtInAirOverride ?? isCaughtAirBattedBallAtTime(battedBall, elapsedSeconds, contactHeight);
   // 強い打球を弾いた場合はアウトにならず、拾い直すまで動けない
-  const droppedLiner = caughtInAir && shouldDropBattedBallOnCatch(battedBall, fielder);
-  const grounderErrorType = !caughtInAir ? getInfielderGrounderErrorType(battedBall, fielder) : null;
-  const outcome = droppedLiner
-    ? {
-      kind: "error",
-      label: `${fielder.role} 落球`,
-      caught: false,
-      needsThrow: true,
-      targetBase: "first",
-      fieldingTime: elapsedSeconds + getBattedBallDropFreezeSeconds(battedBall),
-      fieldingPoint,
-      errorPoint: fieldingPoint,
-      // エフェクトは硬直明けではなく「弾いた瞬間」から出す
-      dropTime: elapsedSeconds,
-      linerDrop: true,
-      droppedBall: true,
-      fieldingError: true
-    }
-    : grounderErrorType
-      ? {
-        kind: "error",
-        label: `${fielder.role} ${grounderErrorType === "fumble" ? "ファンブル" : "後逸"}`,
-        caught: false,
-        needsThrow: true,
-        targetBase: "first",
-        fieldingTime: elapsedSeconds + (grounderErrorType === "fumble"
-          ? infielderGrounderErrorTuning.fumbleDelay
-          : infielderGrounderErrorTuning.misplayDelay),
-        fieldingPoint,
-        errorPoint: fieldingPoint,
-        dropTime: elapsedSeconds,
-        droppedBall: true,
-        grounderErrorType,
-        fieldingError: true
-      }
-    : {
-      kind: caughtInAir ? "out" : "force",
-      label: `${fielder.role} 捕球処理`,
-      caught: true,
-      needsThrow: !caughtInAir,
-      targetBase: "first",
-      fieldingTime: elapsedSeconds,
-      fieldingPoint
-    };
+  const droppedLiner = !recoveredError && (defenseState.outcome?.fieldingError || (caughtInAir && shouldDropBattedBallOnCatch(battedBall, fielder)));
+  const grounderErrorType = !recoveredError && !caughtInAir ? getInfielderGrounderErrorType(battedBall, fielder) : null;
+  if (droppedLiner || grounderErrorType) {
+    startFieldingErrorRecovery(fielder, fieldingPoint, elapsedSeconds, grounderErrorType || "drop");
+    return;
+  }
+  const outcome = {
+    kind: caughtInAir ? "out" : "force",
+    label: `${fielder.role} 捕球処理`,
+    caught: true,
+    needsThrow: !caughtInAir,
+    targetBase: "first",
+    fieldingTime: elapsedSeconds,
+    fieldingPoint
+  };
+  if (recoveredError) Object.assign(outcome, recoveredError, {
+    kind: "error", caught: false, needsThrow: true,
+    fieldingTime: elapsedSeconds, fieldingPoint, errorRecovered: true
+  });
   const chosenFielder = {
     ...fielder,
     x: fieldingPoint.x,
@@ -15332,8 +15325,6 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
     fieldingPoint,
     distanceToTarget: 0
   };
-  if (droppedLiner) showEffect("落球", "#ff6f61");
-  if (grounderErrorType) showEffect(grounderErrorType === "fumble" ? "ファンブル" : "後逸", "#ff6f61");
   defenseState.liveInfielderContactCatchComplete = true;
   defenseState.chosenFielder = chosenFielder;
   defenseState.target = fieldingPoint;
@@ -15373,6 +15364,96 @@ function completeLiveInfielderContactCatch(fielder, fieldingPoint, elapsedSecond
   );
   const metricText = getBattedBallMetricText(battedBall);
   message = metricText ? `${outcome.label} / ${metricText}` : outcome.label;
+}
+
+// エラー後もボールと野手を同じ時間軸で動かし、接近してから回収する。
+function startFieldingErrorRecovery(fielder, point, elapsedSeconds, type) {
+  const initialHeight = getDefenseBallHeightAtPoint(0, elapsedSeconds);
+  const origin = defenseState.origin;
+  const length = Math.hypot(ball.x - origin.x, ball.y - origin.y) || 1;
+  const direction = { x: (ball.x - origin.x) / length, y: (ball.y - origin.y) / length };
+  const start = { x: ball.x, y: ball.y };
+  const distance = type === "misplay" ? 260 + 180 * clamp(defenseState.battedBall.power ?? 0.7, 0, 1.5)
+    : type === "drop" ? 85 : 22;
+  const target = clampPointInsideFence({ x: start.x + direction.x * distance, y: start.y + direction.y * distance }, 36);
+  const label = type === "misplay" ? "後逸" : type === "drop" ? "落球" : "ファンブル";
+  defenseState.errorRecovery = {
+    type, start, target, startTime: elapsedSeconds, lastTime: elapsedSeconds,
+    duration: type === "misplay" ? 2.1 : type === "drop" ? 1 : 0.85,
+    initialHeight: Math.max(0, initialHeight),
+    originalRole: fielder.role
+  };
+  defenseState.outcome = {
+    kind: "error", label: `${fielder.role} ${label}`, caught: false, needsThrow: false,
+    fieldingError: true, droppedBall: true, grounderErrorType: type,
+    errorPoint: start, dropTime: elapsedSeconds, fieldingTime: Infinity
+  };
+  defenseState.throw = null;
+  defenseState.catchVisual = null;
+  defenseState.unifiedCircleCatchComplete = false;
+  defenseState.target = target;
+  ball.trail = [];
+  showEffect(label, "#ff6f61");
+  message = `${fielder.role} ${label}`;
+}
+
+function getFieldingErrorBallPoint(elapsedSeconds) {
+  const recovery = defenseState.errorRecovery;
+  const t = clamp((elapsedSeconds - recovery.startTime) / recovery.duration, 0, 1);
+  const travel = 1 - (1 - t) * (1 - t);
+  const bobble = recovery.type === "fumble" ? Math.sin(t * Math.PI * 6) * 9 * (1 - t) : 0;
+  return { x: lerp(recovery.start.x, recovery.target.x, travel) + bobble,
+    y: lerp(recovery.start.y, recovery.target.y, travel) };
+}
+
+function getFieldingErrorBallHeight(elapsedSeconds) {
+  const recovery = defenseState.errorRecovery;
+  const age = Math.max(0, elapsedSeconds - recovery.startTime);
+  if (age < 0.25) return recovery.initialHeight * (1 - Math.pow(age / 0.25, 2));
+  const t = clamp((age - 0.25) / recovery.duration, 0, 1);
+  return Math.abs(Math.sin(t * Math.PI * (recovery.type === "fumble" ? 5 : 3))) * 14 * (1 - t) ** 2;
+}
+
+function updateFieldingErrorRecovery(elapsedSeconds) {
+  const recovery = defenseState.errorRecovery;
+  const age = elapsedSeconds - recovery.startTime;
+  const dt = clamp(elapsedSeconds - recovery.lastTime, 0, 0.08);
+  recovery.lastTime = elapsedSeconds;
+  const point = getFieldingErrorBallPoint(elapsedSeconds);
+  ball.x = point.x;
+  ball.y = point.y;
+  ball.trail.push({ ...point, elapsedSeconds, progress: 0 });
+  if (ball.trail.length > 26) ball.trail.shift();
+  const outfielders = defenseState.fielders.filter((entry) => ["L", "C", "R"].includes(entry.role));
+  const candidates = recovery.type === "fumble"
+    ? defenseState.fielders.filter((entry) => entry.role === recovery.originalRole)
+    : recovery.type === "drop" && isInfielderRole(recovery.originalRole)
+      ? defenseState.fielders
+    : outfielders.length ? outfielders : defenseState.fielders;
+  const roles = new Set(candidates.map((entry) => entry.role));
+  defenseState.fielders = defenseState.fielders.map((entry) => {
+    if (!roles.has(entry.role) || age < 0.2) return entry;
+    const current = getDefenseFielderSimulationPosition(entry);
+    const distance = Math.hypot(point.x - current.x, point.y - current.y);
+    const step = Math.min(1, getFielderSpeed(entry) * dt / Math.max(1, distance));
+    const next = clampFielderOutsideRiversideRiver(clampPointInsideFence({
+      x: lerp(current.x, point.x, step), y: lerp(current.y, point.y, step)
+    }, 36), entry.role);
+    return smoothDefenseFielderRenderPosition({ ...entry, currentX: next.x, currentY: next.y }, dt);
+  });
+  defenseState.lastMovementElapsedSeconds = elapsedSeconds;
+  defenseState.duration = Math.max(defenseState.duration, elapsedSeconds * 1000 + 2000);
+  // 後逸直後の再捕球、落とす前の回収、ファンブル中の送球を防ぐ。
+  const minimumAge = recovery.type === "misplay" ? 0.7 : recovery.type === "drop" ? 0.65 : recovery.duration;
+  if (age < minimumAge || getFieldingErrorBallHeight(elapsedSeconds) > 12) return;
+  const collector = defenseState.fielders.filter((entry) => roles.has(entry.role))
+    .map((entry) => ({ entry, distance: Math.hypot(entry.currentX - point.x, entry.currentY - point.y) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+  if (!collector || collector.distance > 24) return;
+  const error = defenseState.outcome;
+  defenseState.errorRecovery = null;
+  defenseState.unifiedCircleCatchComplete = true;
+  completeLiveInfielderContactCatch(collector.entry, point, elapsedSeconds, false, 0, error);
 }
 
 function isCaughtAirBattedBall(battedBall) {
@@ -15420,7 +15501,8 @@ function getBattedBallDropChance(battedBall, fielder) {
 }
 
 function getInfielderGrounderErrorChance(battedBall, fielder) {
-  if (!battedBall?.isGrounder || battedBall.isBunt || !isInfielderRole(fielder?.role)) return 0;
+  if (!battedBall?.isGrounder || battedBall.isBunt || !fielder) return 0;
+  if (!isInfielderRole(fielder.role) && !["L", "C", "R"].includes(fielder.role)) return 0;
   const reliability = clamp((getFielderFieldingRating(fielder) - 1) / 9, 0, 1);
   const fieldingMultiplier = lerp(
     infielderGrounderErrorTuning.lowFieldingMultiplier,
@@ -15437,7 +15519,7 @@ function getInfielderGrounderErrorType(battedBall, fielder, random = Math.random
   const chance = getInfielderGrounderErrorChance(battedBall, fielder);
   const roll = random();
   if (chance <= 0 || roll >= chance) return null;
-  return roll / chance < infielderGrounderErrorTuning.fumbleShare ? "fumble" : "misplay";
+  return isInfielderRole(fielder.role) && roll / chance < infielderGrounderErrorTuning.fumbleShare ? "fumble" : "misplay";
 }
 
 function getBattedBallDropFreezeSeconds(battedBall) {
@@ -16102,6 +16184,10 @@ function getDefenseThrowOutResults(throwState) {
 }
 
 function getDefenseBallPoint(progress, eased, elapsedSeconds = 0) {
+  if (defenseState.errorRecovery) return getFieldingErrorBallPoint(elapsedSeconds);
+  if (defenseState.outcome?.errorRecovered && (!defenseState.throw || elapsedSeconds < defenseState.throw.startTime)) {
+    return defenseState.outcome.fieldingPoint;
+  }
   const throwState = defenseState.throw;
   if (throwState && elapsedSeconds >= throwState.startTime) {
     const throwProgress = clamp((elapsedSeconds - throwState.startTime) / throwState.throwTime, 0, 1);
@@ -16327,7 +16413,7 @@ function handleXStadiumPromptChoice(goToXStadium) {
 }
 
 function finishDefensePlay() {
-  if (defenseState.resolved) return;
+  if (defenseState.resolved || defenseState.errorRecovery) return;
   const outcome = defenseState.outcome;
   if (shouldOfferXStadiumPromptBeforeDefenseFinish(outcome)) {
     showXStadiumPrompt();
@@ -22464,6 +22550,8 @@ function drawWallImpactEffect(elapsedSeconds, heightOffset) {
 }
 
 function getDefenseBallHeightAtPoint(progress, elapsedSeconds = 0) {
+  if (defenseState.errorRecovery) return getFieldingErrorBallHeight(elapsedSeconds);
+  if (defenseState.outcome?.errorRecovered && (!defenseState.throw || elapsedSeconds < defenseState.throw.startTime)) return 0;
   const throwState = defenseState.throw;
   if (throwState && elapsedSeconds >= throwState.startTime) {
     return getDefenseThrowHeight(elapsedSeconds);
