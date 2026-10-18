@@ -268,7 +268,7 @@ function getComputerPitchReadScore() {
 const edgeStrikeContactTuning = {
   // ベースをかすめる球の空振りが多すぎたので届く範囲を広げる。外角側だけ少し厚めに補助する。
   reachBonus: 54,
-  outsideReachBonus: 78,
+  outsideReachBonus: 104,
   meetScale: 0.4,
   // 広げる前の基準。reachBonus をこれより大きくした分が「広げた帯」になる。
   referenceReachBonus: 36,
@@ -5195,6 +5195,7 @@ function resetBall() {
   ball.active = false;
   ball.inPitch = false;
   ball.crossedPlate = false;
+  ball.judgmentDeadline = null;
   ball.touchedPlate = false;
   ball.wasHit = false;
   ball.pitchStartTime = 0;
@@ -5279,6 +5280,7 @@ function canDeclareIntentionalWalk() {
 function declareIntentionalWalk() {
   resetBall();
   resetSwing();
+  defenseState = createDefenseState();
   const runs = advanceRunners("walk", activeBatter);
   recordBatterPlateAppearance("walk", { runs });
   recordCurrentPitcherWalkAllowed(1);
@@ -6219,6 +6221,7 @@ function swingBat(type = "strong") {
 }
 
 function startSwing(now = performance.now(), type = "strong") {
+  if (ball.crossedPlate && !ball.inPitch) return;
   if (swingState.didSwingThisPitch && (isPitching || pendingPitch || ball.inPitch)) return;
   if (now < swingState.cooldownUntil || swingState.isSwinging) return;
   swingState.isSwinging = true;
@@ -7776,9 +7779,14 @@ function update(delta) {
   if (isPitching && ball.inPitch && isBatInJudgmentWindow(now) && !swingState.madeContact) {
     checkSwingContact();
   }
-  if (isPitching && ball.inPitch && !ball.crossedPlate && hasBallPassedHomePlate()) {
-    ball.crossedPlate = true;
-    judgePitchAtPlate();
+  if (isPitching && ball.inPitch && !ball.crossedPlate
+    && (hasBallPassedHomePlate() || isPitchOutOfHorizontalBounds())) {
+    // 通過フレームと入力フレームのずれを吸収してから、空振りを優先して判定する。
+    if (!Number.isFinite(ball.judgmentDeadline)) ball.judgmentDeadline = now + 100;
+    if (now >= ball.judgmentDeadline) {
+      ball.crossedPlate = true;
+      judgePitchAtPlate();
+    }
   }
   if (!isBuntStanceActive() && swingState.isSwinging && now - swingState.startTime > swingState.duration + swingState.followHoldDuration) swingState.isSwinging = false;
   if (hitEffect.active && now - hitEffect.startTime > 1000) hitEffect.active = false;
@@ -7944,11 +7952,6 @@ function updateBall(delta) {
   ball.spin += 0.18 * frameScale;
   if (ball.inPitch) markPlateTouch(prevX, prevY, ball.x, ball.y);
   if (!ball.inPitch) ball.vy += 0.18 * frameScale;
-  if (ball.inPitch && isPitchOutOfHorizontalBounds()) {
-    ball.crossedPlate = true;
-    finishPitch("ボール", "ball", 0, 0);
-    return;
-  }
   if (ball.y < -80 || ball.y > canvas.height + 90 || ball.x < -140 || ball.x > canvas.width + 140) {
     ball.active = false;
   }
@@ -10015,6 +10018,11 @@ function makeRoutineFlyResult(power) {
 }
 
 function finishPitch(label, kind, power = 0, timeDiff = 0, hitDirection = null, battedProfile = null) {
+  if ((kind === "ball" || kind === "hbp") && swingState.didSwingThisPitch && !swingState.madeContact) {
+    label = "空振り";
+    kind = "strike";
+  }
+  if (isPitching && ["strike", "ball", "hbp"].includes(kind)) ball.crossedPlate = true;
   isPitching = false;
   ball.inPitch = false;
   pendingPitch = null;

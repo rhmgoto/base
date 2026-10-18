@@ -314,6 +314,39 @@ assert(
 );
 
 // --- 四球の押し出し ---
+for (let outs = 0; outs < 3; outs += 1) {
+  for (let mask = 0; mask < 8; mask += 1) {
+    const actual = JSON.parse(makeRunner(createGameContext(), `
+      startGame();
+      count.outs = ${outs};
+      bases = createEmptyBases();
+      ["first", "second", "third"].forEach((base, i) => {
+        if (${mask} & (1 << i)) bases[base] = makeBaseRunner({ id: base, name: base });
+      });
+      declareIntentionalWalk();
+      return JSON.stringify({ outs: count.outs, first: !!bases.first,
+        second: bases.second?.id ?? null, third: bases.third?.id ?? null });
+    `));
+    const first = Boolean(mask & 1), second = Boolean(mask & 2), third = Boolean(mask & 4);
+    assert(actual.outs === outs && actual.first
+      && actual.second === (first ? "first" : second ? "second" : null)
+      && actual.third === (first && second ? "second" : third ? "third" : null),
+      `敬遠の強制進塁: outs=${outs}, bases=${mask}, ${JSON.stringify(actual)}`);
+  }
+}
+for (const kind of ["ball", "hbp"]) {
+  const actual = JSON.parse(makeRunner(createGameContext(), `
+    startGame();
+    count.strikes = 0; count.balls = 0;
+    swingState.didSwingThisPitch = true;
+    swingState.madeContact = false;
+    finishPitch("判定", "${kind}");
+    return JSON.stringify({ strikes: count.strikes, balls: count.balls, first: bases.first });
+  `));
+  assert(actual.strikes === 1 && actual.balls === 0 && !actual.first,
+    `空振り後の${kind}はストライク: ${JSON.stringify(actual)}`);
+}
+
 expectBases(
   "四球: 一塁が空いていれば走者は動かない",
   `
