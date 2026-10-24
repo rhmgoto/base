@@ -4,6 +4,7 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $suite = @(
   (Join-Path $root "tests\smoke.js"),
   (Join-Path $root "tests\baserunning.js"),
+  (Join-Path $root "tests\scenario-test.js"),
   (Join-Path $root "tests\mvp.js"),
   (Join-Path $root "tests\static-checks.js")
 )

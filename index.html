@@ -39,10 +39,11 @@
               <button id="menuBackButton" class="menu-back-button" type="button">メイン画面へ戻る</button>
               <p class="last-updated">
                 最終修正日時:
-                <time datetime="2026-10-24T14:03:00+09:00">2026年10月24日 14:03</time>
+                <time datetime="2026-10-24T14:31:00+09:00">2026年10月24日 14:31</time>
               </p>
             </div>
             <nav id="menuModeTabs" class="menu-mode-tabs" aria-label="モード選択">
+              <button id="scenarioOpen" type="button">場面テスト</button>
               <button class="menu-mode-button active" type="button" data-menu-mode="versus">通常対戦</button>
               <button class="menu-mode-button" type="button" data-menu-mode="practice">打撃練習</button>
               <button class="menu-mode-button" type="button" data-menu-mode="pitchPractice">投球練習</button>
@@ -373,6 +374,15 @@
       </div>
 
       <aside class="side-panel">
+        <section id="scenarioStatus" class="scenario-status" hidden>
+          <strong>場面テスト</strong>
+          <p id="scenarioSummary"></p>
+          <button id="scenarioExecute" type="button">設定の行動を開始</button>
+          <button id="scenarioRetry" type="button">同じ場面を再試行</button>
+          <button id="scenarioEdit" type="button">場面設定を変更</button>
+          <p>投球・打球開始を0秒とした時刻。判定は通常の試合と共通です。</p>
+          <ol id="scenarioEvents" aria-live="polite"></ol>
+        </section>
         <section class="side-actions">
           <button id="menuButton" class="menu-button" type="button">メインメニューに戻る</button>
           <div class="audio-controls" aria-label="音声設定">
@@ -398,6 +408,7 @@
   </main>
 
   <script src="script.js"></script>
+  <script src="scenario-test.js"></script>
 </body>
 </html>
 

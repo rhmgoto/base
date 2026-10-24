@@ -1441,7 +1441,7 @@ let defenseControlMode = { away: "manual", home: "manual" };
 let gamePhase = "menu";
 let maxInnings = 1;
 let firstBatTeam = "away";
-const playerTeam = "away";
+let playerTeam = "away";
 let battingTeam = "away";
 let inning = 1;
 let half = "top";
@@ -4741,6 +4741,7 @@ function startGame(modeOverride = null) {
 }
 
 function showMenu() {
+  if (typeof scenarioStop === "function") scenarioStop();
   gamePhase = "menu";
   inputLockedUntil = 0;
   clearPendingGameEnd();
@@ -5118,7 +5119,12 @@ function isComputerControlledGameMode() {
   return gameMode === "single" || isAnyPracticeMode() || gameMode === "watch";
 }
 
+function isPlayerRunning() {
+  return typeof getScenarioControl === "function" && getScenarioControl("runner") !== null ? getScenarioControl("runner") : isPlayerBatting();
+}
+
 function isPlayerBatting() {
+  if (typeof getScenarioControl === "function" && getScenarioControl("batter") !== null) return getScenarioControl("batter");
   if (isBattingPracticeMode()) return true;
   if (isHomeRunDerbyMode()) return homeRunDerbyState.playerCount === 2 || battingTeam === "away";
   if (isPitchingPracticeMode()) return false;
@@ -5127,6 +5133,7 @@ function isPlayerBatting() {
 }
 
 function isPlayerPitching() {
+  if (typeof getScenarioControl === "function" && getScenarioControl("defense") !== null) return getScenarioControl("defense");
   if (isBattingPracticeMode()) return practicePitcherControl === "manual";
   if (isHomeRunDerbyMode()) return false;
   if (isPitchingPracticeMode()) return true;
@@ -5146,6 +5153,7 @@ function isManualThrowControl() {
 }
 
 function isManualBaserunningControl(team = battingTeam) {
+  if (typeof getScenarioControl === "function" && getScenarioControl("runner") !== null) return team === battingTeam && isPlayerRunning();
   if (isAnyPracticeMode()) return false;
   if (gameMode === "watch") return false;
   if (gameMode === "single" && team !== playerTeam) return false;
@@ -6678,8 +6686,9 @@ function handleTouchGamepadInput() {
   const active = touchControlState.enabled || touchControlState.wasActive || directions.size > 0 || touchControlState.buttons.size > 0;
   if (!active) return;
   addTouchDirectionVirtualKeys(directions);
-  handleGamepadButtonPresses(getTouchVirtualGamepad(), "away");
-  gamepadState.previousDirections.away = directions;
+  const team = typeof getScenarioControl === "function" && getScenarioControl("defense") === true ? fieldingTeam() : "away";
+  handleGamepadButtonPresses(getTouchVirtualGamepad(), team);
+  gamepadState.previousDirections[team] = directions;
   touchControlState.wasActive = directions.size > 0 || touchControlState.buttons.size > 0;
   if (!touchControlState.wasActive) touchControlState.enabled = false;
 }
@@ -7230,22 +7239,22 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
     return;
   }
 
-  if (!options.suppressBattingButtons && gamePhase === "playing" && isPlayerBatting() && team === battingTeam) {
-    if (stealState.active && !stealState.resolved && justPressed(gamepadButtons.B) && directions.size > 0) {
+  if (!options.suppressBattingButtons && gamePhase === "playing" && team === battingTeam) {
+    if (isPlayerRunning() && stealState.active && !stealState.resolved && justPressed(gamepadButtons.B) && directions.size > 0) {
       returnStealingRunner();
       gamepadState.previousButtons[team] = pressed;
       return;
     }
-    if (justPressed(gamepadButtons.A)) {
+    if (isPlayerBatting() && justPressed(gamepadButtons.A)) {
       swingBat("strong");
     }
-    if (justPressed(gamepadButtons.B)) {
+    if (isPlayerBatting() && justPressed(gamepadButtons.B)) {
       swingBat("weak");
     }
     if (justPressed(gamepadButtons.Y)) {
       if (directions.size > 0) {
-        tryStartSteal(getGamepadThrowTarget(directions));
-      } else {
+        if (isPlayerRunning()) tryStartSteal(getGamepadThrowTarget(directions));
+      } else if (isPlayerBatting()) {
         swingBat("grounder");
       }
     }
@@ -7505,7 +7514,7 @@ function transferStealToRundown(now = performance.now()) {
 
 function tryStartSteal(targetBase, now = performance.now()) {
   if (!stealTuning.enabled || stealState.active) return false;
-  if (gamePhase !== "playing" || !isPlayerBatting() || ball.crossedPlate) return false;
+  if (gamePhase !== "playing" || !isPlayerRunning() || ball.crossedPlate) return false;
   const candidate = getStealCandidate(targetBase);
   if (!candidate) return false;
   if (!isPitching && !pendingPitch) {
@@ -7585,7 +7594,7 @@ function getComputerStealChance(runnerInfo, targetBase) {
 function planComputerSteal(now = performance.now()) {
   computerStealPlan = null;
   if (!computerStealTuning.enabled || !stealTuning.enabled) return false;
-  if (gamePhase !== "playing" || isPlayerBatting()) return false;
+  if (gamePhase !== "playing" || isPlayerRunning()) return false;
   if (stealState.active || stealState.earlyRequest) return false;
   if (!computerStealTuning.attemptWithTwoOuts && count.outs >= 2) return false;
   const candidate = getStealCandidate("second") || getStealCandidate("third");
@@ -7600,7 +7609,7 @@ function planComputerSteal(now = performance.now()) {
 
 function updateComputerSteal(now = performance.now()) {
   if (!computerStealPlan) return false;
-  if (stealState.active || isPlayerBatting() || ball.crossedPlate || gamePhase !== "playing") {
+  if (stealState.active || isPlayerRunning() || ball.crossedPlate || gamePhase !== "playing") {
     computerStealPlan = null;
     return false;
   }
@@ -7892,10 +7901,8 @@ function update(delta) {
     return;
   }
   if (gamePhase === "playing" && isPlayerBatting()) updateBatter(delta);
-  else if (gamePhase === "playing") {
-    updateComputerSteal(now);
-    updateComputerBatterPosition(delta);
-  }
+  else if (gamePhase === "playing") updateComputerBatterPosition(delta);
+  if (gamePhase === "playing" && !isPlayerRunning()) updateComputerSteal(now);
   updateBuntStance(now);
   if (shouldAutoScheduleComputerPitch() && !isInputLocked(now) && !isPitching && !pendingPitch && !ball.active && !stealState.active && !Number.isFinite(autoPitchTimer)) {
     scheduleNextComputerPitchAfterJudgment();
@@ -12325,7 +12332,7 @@ function canControlBatterRunner() {
   return gamePhase === "defense"
     && !(defenseState.tagPresentation && !defenseState.tagPresentation.resumed && !defenseState.tagPresentation.live)
     && !defenseState.resultHoldUntil
-    && isPlayerBatting()
+    && isPlayerRunning()
     && defenseState.active
     && !defenseState.resolved
     && (defenseState.runner || defenseState.pickoff || defenseState.baseRunners?.length)
@@ -15320,7 +15327,7 @@ function updateFlyReturnRequirements(elapsed) {
       else {
         runner.scored = false;
         message = "フライ捕球：ボタン0で全走者帰塁、塁指定＋1で個別帰塁";
-        if (!isPlayerBatting()) setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[runner.startBase], elapsed);
+        if (!isPlayerRunning()) setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[runner.startBase], elapsed);
       }
     }
     if (runner.flyReturnRequired && runner.arrived && runner.targetBase === runner.startBase) {
@@ -24785,6 +24792,10 @@ window.addEventListener("keydown", (event) => {
   if (!event.repeat && gamePhase === "defense" && event.key === "8") handleDefenseThrowCommand("second");
   if (!event.repeat && gamePhase === "defense" && event.key === "4") handleDefenseThrowCommand("third");
   if (!event.repeat && gamePhase === "defense" && event.key === "2") handleDefenseThrowCommand("home");
+  if (gamePhase === "playing" && canManualStealCatcherThrow() && ["6", "8", "4"].includes(event.key)) {
+    if (!event.repeat) handleManualStealCatcherThrow({ "6":"first", "8":"second", "4":"third" }[event.key]);
+    return;
+  }
   if (event.code === "Enter") nextPitch();
   if (event.key === "r" || event.key === "R") showMenu();
   if (event.key === "o" || event.key === "O") {
