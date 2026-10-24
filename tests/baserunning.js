@@ -2071,11 +2071,11 @@ const pickoffChecks = JSON.parse(makeRunner(createGameContext(), `
   bases = createEmptyBases();
   bases.first = makeBaseRunner({ id: "pickoff-runner", name: "runner", run: 7 });
   const now = performance.now();
-  const early = tryStartSteal("second", now);
+  const early = (pitcherReady = true, tryStartSteal)("second", now);
   const normalSpeed = Math.abs(stealState.arrivalTime - getRunnerRouteDistance(stealState.route) / getRunnerSpeed(stealState.runner)) < 0.001;
   updateStealState(now + 200);
   const position = { x: stealState.runner.x, y: stealState.runner.y };
-  const started = startPickoff("first", now + 200);
+  const started = (pitcherReady = true, startPickoff)("first", now + 200);
   draw();
   const continuous = defenseState.baseRunners[0].x === position.x && defenseState.baseRunners[0].y === position.y;
   updateThrowState(10);
@@ -2114,7 +2114,7 @@ const returnStealCompletionChecks = JSON.parse(makeRunner(createGameContext(), `
     bases = createEmptyBases();
     bases.first = makeBaseRunner({ id: "return-runner", name: "runner", run: 7 });
     const now = performance.now();
-    tryStartSteal("second", now);
+    (pitcherReady = true, tryStartSteal)("second", now);
     updateStealState(now + 200);
     returnStealingRunner(now + 200);
     ball.crossedPlate = true;
@@ -2127,7 +2127,7 @@ const returnStealCompletionChecks = JSON.parse(makeRunner(createGameContext(), `
     const held = !!stealState.decision && !stealState.decision.out;
     if (stealState.decision) updateStealState(stealState.decision.until + 1);
     const cleared = !stealState.active && bases.first?.id === "return-runner" && count.outs === 0;
-    startPitch("fast");
+    (pitcherReady = true, startPitch)("fast");
     results.push(sent && held && cleared && !!pendingPitch);
   }
   return JSON.stringify(results);
@@ -2227,7 +2227,7 @@ const flyReturnLifecycle = JSON.parse(makeRunner(createGameContext(), `
         && (battingTeam !== battingBefore) === (expected === 3);
       const baseCorrect = expected === 3 || (result === "appeal" ? !bases[base] : bases[base]?.id === "return-check");
       __advanceTime(10000);
-      startPitch("fast");
+      (pitcherReady = true, startPitch)("fast");
       reports.push({ base, outs, result, stable, outsCorrect, baseCorrect, automaticallyFinished,
         canPitch: !!pendingPitch, ledger: defenseState.completedThrowOuts.length <= 1 });
     }
@@ -2268,7 +2268,7 @@ const infieldCameraChecks = JSON.parse(makeRunner(createGameContext(), `
   defenseControlMode[fieldingTeam()] = "manual";
   bases.first = makeBaseRunner({ id: "camera-runner", run: 5 });
   const before = !isInfieldOverviewActive();
-  startPickoff("first");
+  (pitcherReady = true, startPickoff)("first");
   const camera = getDefenseCameraOffset();
   const allBasesVisible = Object.values(defenseField.bases).every(point => {
     const x = camera.x + point.x * camera.scale;
@@ -2333,7 +2333,7 @@ const stealOverviewChecks = JSON.parse(makeRunner(createGameContext(), `
     bases = createEmptyBases(); count.outs = 0; count.balls = 0;
     const origin = target === "second" ? "first" : target === "third" ? "second" : "third";
     bases[origin] = makeBaseRunner({ id: "overview-steal", run: 5 });
-    tryStartSteal(target);
+    (pitcherReady = true, tryStartSteal)(target);
     ball.inPitch = true; ball.crossedPlate = true;
     const duringPitch = !isStealOverviewActive();
     finishPitch("ボール", "ball"); updateStealState(performance.now());
@@ -2348,7 +2348,7 @@ const stealOverviewChecks = JSON.parse(makeRunner(createGameContext(), `
     const holds = !!stealState.decision && isStealOverviewActive();
     __advanceTime(901); updateStealState(performance.now());
     const restored = !isStealOverviewActive() && !stealState.active;
-    __advanceTime(10000); startPitch("fast");
+    __advanceTime(10000); (pitcherReady = true, startPitch)("fast");
     reports.push({ target, duringPitch, caught, pureDraw, holds, restored, nextPitch: !!pendingPitch });
   }
   return JSON.stringify(reports);
@@ -2362,7 +2362,7 @@ const stealDecisionChecks = JSON.parse(makeRunner(createGameContext(), `
     bases = createEmptyBases();
     bases[base] = makeBaseRunner({ id: "decision-runner", run: 5 });
     const next = base === "first" ? "second" : base === "second" ? "third" : "home";
-    tryStartSteal(next);
+    (pitcherReady = true, tryStartSteal)(next);
     __advanceTime(300); updateStealState(performance.now());
     returnStealingRunner();
     finishPitch("ボール", "ball"); updateStealState(performance.now());
@@ -2379,7 +2379,7 @@ const stealDecisionChecks = JSON.parse(makeRunner(createGameContext(), `
   for (const target of ["first", "second", "third"]) {
     startGame(); gameMode = "versus"; resetBall();
     bases = createEmptyBases(); bases.first = makeBaseRunner({ id: "arrival-check", run: 5 });
-    tryStartSteal("second");
+    (pitcherReady = true, tryStartSteal)("second");
     stealState.plateReached = true;
     handleStealDefenseThrow(target);
     checks.push(stealState.throw.tagTime >= stealState.arrivalTime);
@@ -2417,7 +2417,7 @@ const stealRundownTransferChecks = JSON.parse(makeRunner(createGameContext(), `
     bases[base] = makeBaseRunner({ id: "transfer-runner", run: 5 });
     const side = battingTeam;
     const target = base === "first" ? "second" : base === "second" ? "third" : "home";
-    tryStartSteal(target); __advanceTime(200); updateStealState(performance.now());
+    (pitcherReady = true, tryStartSteal)(target); __advanceTime(200); updateStealState(performance.now());
     finishPitch("空振り", "strike"); updateStealState(performance.now());
     if (target !== "home") handleManualStealCatcherThrow(target);
     const toss = { ...stealState.throw }, start = stealState.startTime;
@@ -2449,7 +2449,7 @@ const stealRundownTransferChecks = JSON.parse(makeRunner(createGameContext(), `
       && (battingTeam !== side) === (outs === 2);
     const settled = !defenseState.active && gamePhase === "playing"
       && (outs === 2 || bases[base]?.id === "transfer-runner");
-    __advanceTime(10000); startPitch("fast");
+    __advanceTime(10000); (pitcherReady = true, startPitch)("fast");
     checks.push({ base, outs, transferred, continuous, canRelay, canChase, strikeCounted, settled, nextPitch: !!pendingPitch });
   }
   return JSON.stringify(checks);
@@ -2469,7 +2469,7 @@ const homeStealChecks = JSON.parse(makeRunner(createGameContext(), `
     bases.third = makeBaseRunner({ id: "home-stealer", run: 8 });
     const before = scores[battingTeam];
     const now = performance.now();
-    results.push(tryStartSteal("home", now));
+    results.push((pitcherReady = true, tryStartSteal)("home", now));
     const arrival = stealState.arrivalTime;
     ball.crossedPlate = true;
     ball.plateTime = now + (arrival + (ballFirst ? -0.2 : 0.2)) * 1000;
@@ -2484,7 +2484,7 @@ const homeStealChecks = JSON.parse(makeRunner(createGameContext(), `
   bases = createEmptyBases();
   bases.third = makeBaseRunner({ id: "squeeze", run: 8 });
   const now = performance.now();
-  tryStartSteal("home", now);
+  (pitcherReady = true, tryStartSteal)("home", now);
   __advanceTime(stealState.arrivalTime * 500);
   const lead = getHitAndRunLeadState();
   const grounder = { isGrounder: true, ballTime: 1, power: 0.3, target: getDefenseBasePointByName("first") };
@@ -2504,16 +2504,16 @@ const defenseReviewChecks = JSON.parse(makeRunner(createGameContext(), `
   const results = [];
   for (const flag of ["crossedPlate", "active"]) {
     ball[flag] = true;
-    results.push(!startPickoff("first"));
+    results.push(!(pitcherReady = true, startPickoff)("first"));
     ball[flag] = false;
   }
   stealState.pitchResultPending = true;
-  results.push(!startPickoff("first"));
+  results.push(!(pitcherReady = true, startPickoff)("first"));
   stealState.pitchResultPending = false;
   stealState.decision = { out: false, until: performance.now() + 900 };
-  results.push(!startPickoff("first"));
+  results.push(!(pitcherReady = true, startPickoff)("first"));
   stealState = createStealState();
-  results.push(startPickoff("first"));
+  results.push((pitcherReady = true, startPickoff)("first"));
   const oldStart = defenseState.startTime;
   defenseState.tagPresentation = { startedAt: performance.now(), contactAt: performance.now() + 320,
     until: performance.now() + 1220 };

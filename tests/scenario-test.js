@@ -16,7 +16,7 @@ const result=vm.runInContext(`(() => {
  const original=scenarioTest.savedSelected;
  const originalJson=JSON.stringify(original);
  const setup=count.outs===1&&count.balls===2&&bases.first.run===9&&getTeamCatcherArm(fieldingTeam())===6;
- if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else startPitch('fast');
+ if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else {setPitcherReady();startPitch('fast');}
  __advanceTime(250);update(16.667);
  const started=stealState.active&&scenarioTest.seen.has('steal-start');
  finishPitch('ボール','ball');updateStealState(performance.now());scenarioObserve();
@@ -30,13 +30,13 @@ const result=vm.runInContext(`(() => {
  let invalid=false;try{prepareScenario({...config,second:true});}catch(e){invalid=true;}
  const plays=[];
  for(const action of ['grounder','fly']){
-  prepareScenario({...config,action});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else startPitch('fast');
+  prepareScenario({...config,action});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else {setPitcherReady();startPitch('fast');}
   plays.push(gamePhase==='defense'&&defenseState.active&&!!defenseState.battedBall);
   for(let i=0;i<1400&&gamePhase==='defense';i++){__advanceTime(16.667);update(16.667);}
  }
  const controls=[];
  for(const control of ['both','batting','fielding','watch']){
-  prepareScenario({...config,control,action:'return'});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else startPitch('fast');
+  prepareScenario({...config,control,action:'return'});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else {setPitcherReady();startPitch('fast');}
   __advanceTime(250);update(16.667);
   const ordered=stealState.active;
   finishPitch('ボール','ball');updateStealState(performance.now());
@@ -53,6 +53,7 @@ const result=vm.runInContext(`(() => {
   executeScenario();
   const noAutomaticPitch=!pendingPitch&&!isPitching;
   const pad={axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false}))};
+  setPitcherReady();
   pad.buttons[gamepadButtons.A].pressed=true;
   handleGamepadButtonPresses(pad,fieldingTeam());
   pad.buttons[gamepadButtons.A].pressed=false;
@@ -70,6 +71,37 @@ const result=vm.runInContext(`(() => {
  prepareScenario({...config,batterControl:'cpu',runnerControl:'cpu',defenseControl:'player'});
  const padRouting=getGamepadForTeam(fieldingTeam())===firstPad&&getGamepadForTeam(battingTeam)===null;
  navigator.getGamepads=savedPads;
+ prepareScenario({...config,batterControl:'cpu',runnerControl:'player',defenseControl:'player',action:'manual'});
+ const blockedBeforeReady=!tryStartSteal('second')&&!startPickoff('first');
+ const readyPad={axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false}))};
+ readyPad.buttons[gamepadButtons.READY].pressed=true;
+ handleGamepadButtonPresses(readyPad,fieldingTeam());
+ const readyGate=blockedBeforeReady&&pitcherReady&&tryStartSteal('second')&&startPickoff('first');
+ const savedRandom=Math.random;
+ Math.random=()=>0;
+ const cpuConfig={...config,action:'manual',batterControl:'cpu',runnerControl:'cpu',defenseControl:'player'};
+ prepareScenario(cpuConfig);
+ const cpuBlocked=!planComputerSteal(performance.now(),{beforeMotion:true})&&!stealState.active;
+ setPitcherReady();
+ __advanceTime(100);updateComputerSteal(performance.now());
+ const earlyWaiting=!stealState.active;
+ __advanceTime(600);updateComputerSteal(performance.now());
+ const cpuEarly=stealState.active&&!pendingPitch&&!isPitching;
+ prepareScenario(cpuConfig);setPitcherReady();startPitch('fast');
+ __advanceTime(500);updateComputerSteal(performance.now());
+ const cpuMotion=stealState.active&&isPitching;
+ prepareScenario(cpuConfig);
+ const home=getDefenseBasePointByName('home');
+ const shallow={x:home.x,y:home.y-defenseField.fenceDistance*0.4};
+ const deep={x:home.x,y:home.y-defenseField.fenceDistance*0.9};
+ const out={kind:'out',caught:true,needsThrow:false,fieldingTime:10};
+ const air={ballTime:10,isGrounder:false,isLiner:false,isPopupFly:false};
+ const fast={run:30};const of={role:outfielderRoles[0],arm:1};
+ const tagSafety=!shouldTagUpFromBase('third',fast,out,air,of,shallow)
+   &&!shouldTagUpFromBase('third',fast,out,air,{...of,role:'SS'},deep)
+   &&shouldTagUpFromBase('third',fast,out,air,of,deep)===shouldTagUpFromBase('third',fast,{...out,fieldingTime:1},{...air,ballTime:1},of,deep);
+ Math.random=savedRandom;
+ const cpuChecks=cpuBlocked&&earlyWaiting&&cpuEarly&&cpuMotion&&tagSafety;
  const earlyTests=[];
  for(const runnerBase of ['first','second','third']) {
   const early={...config,first:false,second:false,third:false,[runnerBase]:true,runnerBase,
@@ -78,28 +110,33 @@ const result=vm.runInContext(`(() => {
   startPitch('fast');
   const waits=!pendingPitch&&!isPitching;
   executeScenario();
+  const blocked=!stealState.active;
+  setPitcherReady();__advanceTime(16);update(16.667);
+  if(scenarioTest.seen.has("settled")) throw Error("early timer settled before running");
+  __advanceTime(234);update(16.667);
   const startedEarly=stealState.active&&!pendingPitch&&!isPitching&&scenarioTest.seen.has('steal-start');
   __advanceTime(100);update(16.667);
   startPitch('fast');
   const pitched=!!pendingPitch&&scenarioTest.events.find(e=>e.label==='投球動作開始')?.seconds>0;
   prepareScenario(early);
-  earlyTests.push(waits&&startedEarly&&pitched&&!stealState.active&&!pendingPitch);
+  earlyTests.push(waits&&blocked&&startedEarly&&pitched&&!stealState.active&&!pendingPitch);
  }
  const splitControls=[];
  for(const batterControl of ['player','cpu']) for(const runnerControl of ['player','cpu']) for(const defenseControl of ['player','cpu']) {
   prepareScenario({...config,batterControl,runnerControl,defenseControl,action:'manual'});
   const roles=isPlayerBatting()===(batterControl==='player')&&isPlayerRunning()===(runnerControl==='player')
    &&isManualBaserunningControl()===(runnerControl==='player')&&isManualThrowControl()===(defenseControl==='player');
+  setPitcherReady();
   const steal=tryStartSteal('second')===(runnerControl==='player');
-  prepareScenario({...config,batterControl,runnerControl,defenseControl,action:'grounder'});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else startPitch('fast');
+  prepareScenario({...config,batterControl,runnerControl,defenseControl,action:'grounder'});if (['grounder','fly'].includes(scenarioTest.config.action)) executeScenario(); else {setPitcherReady();startPitch('fast');}
   const running=!!canControlBatterRunner()===(runnerControl==='player');
   splitControls.push(roles&&steal&&running);
  }
  showMenu();
  const restored=!scenarioTest.active&&JSON.stringify(original)===originalJson;
- return {setup,started,logged,retry,invalid,plays,controls,splitControls,catcherTests,padRouting,earlyTests,restored};
+ return {setup,started,logged,retry,invalid,plays,controls,splitControls,catcherTests,padRouting,earlyTests,readyGate,cpuChecks,restored};
 })()`,context,{timeout:30000});
-assert(result.setup&&result.started&&result.logged&&result.retry&&result.invalid&&result.plays.every(Boolean)&&result.controls.every(Boolean)&&result.splitControls.every(Boolean)&&result.catcherTests.every(Boolean)&&result.padRouting&&result.earlyTests.every(Boolean)&&result.restored,JSON.stringify(result));
+assert(result.setup&&result.started&&result.logged&&result.retry&&result.invalid&&result.plays.every(Boolean)&&result.controls.every(Boolean)&&result.splitControls.every(Boolean)&&result.catcherTests.every(Boolean)&&result.padRouting&&result.earlyTests.every(Boolean)&&result.readyGate&&result.cpuChecks&&result.restored,JSON.stringify(result));
 console.log('Scenario tests passed',result);
 
 

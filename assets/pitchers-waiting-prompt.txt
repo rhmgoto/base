@@ -1,0 +1,2 @@
+Built-in image_gen edit. References: team-a-pitcher.png, team-b-pitcher.png.
+Prompt: Two transparent full-body front-facing pitchers, blue on left and red B-cap on right. Preserve original anime/chibi style, faces, uniforms, proportions and shoes. Change only arms to relaxed down at sides, glove at thigh and ball in other hand. Same baseline, no floor, text or external shadows.

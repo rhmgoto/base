@@ -276,7 +276,7 @@ const resultMenuGamepadState = JSON.parse(runInGame(context, `(() => {
     gamepadState.previousButtons.away = new Set();
     const buttons = Array.from({ length: 13 }, () => ({ pressed: false }));
     buttons[gamepadButtons.A] = { pressed: true };
-    handleGamepadButtonPresses({ buttons, axes: [0, 0] }, "away");
+    (pitcherReady = true, handleGamepadButtonPresses)({ buttons, axes: [0, 0] }, "away");
     return gamePhase;
   };
   gameMode = "versus";
@@ -968,7 +968,7 @@ const swingLockState = JSON.parse(runInGame(
     gameMode = "practice";
     showMenu();
     startGame();
-    startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+    (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY });
     __advanceTime(10);
     startSwing();
     const firstStart = swingState.startTime;
@@ -1224,7 +1224,7 @@ const weakSwingState = JSON.parse(runInGame(
     };
     resetSwing();
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
       axes: [0, 0]
     }, "away");
@@ -1233,7 +1233,7 @@ const weakSwingState = JSON.parse(runInGame(
     bases = createEmptyBases();
     stealState = createStealState();
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
       axes: [0, -1]
     }, "away");
@@ -1241,21 +1241,21 @@ const weakSwingState = JSON.parse(runInGame(
     const button1WithStickStealActive = stealState.active;
     resetSwing();
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: false }, { pressed: false }, { pressed: true }, { pressed: false }],
       axes: [0, 0]
     }, "away");
     const button2Type = swingState.type;
     resetSwing();
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }],
       axes: [0, 0]
     }, "away");
     const button3Type = swingState.type;
     resetSwing();
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: true }, { pressed: false }, { pressed: false }, { pressed: false }],
       axes: [0, 0]
     }, "away");
@@ -1268,7 +1268,7 @@ const weakSwingState = JSON.parse(runInGame(
     pendingPitch = { releaseTime: performance.now() + 200, typeKey: "normal" };
     currentPitchType = "normal";
     gamepadState.previousButtons.away = new Set();
-    handleGamepadButtonPresses({
+    (pitcherReady = true, handleGamepadButtonPresses)({
       buttons: [{ pressed: true }, { pressed: false }, { pressed: false }, { pressed: false }],
       axes: [0, -1]
     }, "away");
@@ -1294,8 +1294,8 @@ const weakSwingState = JSON.parse(runInGame(
     addGamepadVirtualKey("3");
     const pitcherButton1VirtualKeyBuntHeld = isBuntButtonHeld();
     clearGamepadVirtualKeys();
-    handleGamepadButtonPresses(sharedPitcherButtonOnePad, "away", { suppressBattingButtons: true });
-    handleGamepadButtonPresses(sharedPitcherButtonOnePad, "home");
+    (pitcherReady = true, handleGamepadButtonPresses)(sharedPitcherButtonOnePad, "away", { suppressBattingButtons: true });
+    (pitcherReady = true, handleGamepadButtonPresses)(sharedPitcherButtonOnePad, "home");
     const sharedButton1PitchType = pendingPitch?.typeKey;
     const sharedButton1BatterSwung = swingState.didSwingThisPitch;
     const batterButton3Pad = {
@@ -3288,12 +3288,12 @@ const pitcherStaminaState = JSON.parse(runInGame(
     const max = getPitcherMaxStamina(pitcherInfo);
     const initial = pitcherInfo.currentStamina;
     const initialPitchCount = pitcherInfo.pitchCount;
-    startPitch("fast", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
+    (pitcherReady = true, startPitch)("fast", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
     const afterFast = pitcherInfo.currentStamina;
     const afterFastPitchCount = pitcherInfo.pitchCount;
     resetBall();
     const beforeSpecial = pitcherInfo.currentStamina;
-    startPitch("special", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
+    (pitcherReady = true, startPitch)("special", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
     const afterSpecial = pitcherInfo.currentStamina;
     const specialPendingMultiplier = pendingPitch.pitchAbilityMultiplier;
     const specialStuffMultiplier = pitchTypes.special.stuffMultiplier;
@@ -3721,7 +3721,7 @@ const battingPracticeModeState = JSON.parse(runInGame(
     const selectedPracticePitcher = activePitcher.id;
     const practiceStaminaBeforePitch = activePitcher.currentStamina;
     const practicePitchCountBeforePitch = activePitcher.pitchCount;
-    startPitch("special", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
+    (pitcherReady = true, startPitch)("special", { course: { direction: 0, offset: 0 }, targetSpread: 0, targetX: field.plateX, targetY: field.plateY });
     const practiceStaminaAfterPitch = activePitcher.currentStamina;
     const practicePitchCountAfterPitch = activePitcher.pitchCount;
     resetBall();
@@ -4019,7 +4019,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: cpuAutoBaseNow + pitchWindupDuration, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const normalStarted = tryStartSteal("second", cpuAutoBaseNow);
+    const normalStarted = (pitcherReady = true, tryStartSteal)("second", cpuAutoBaseNow);
     const normalArrival = stealState.arrivalTime;
     stealState.plateReached = true;
     updateStealState(cpuAutoBaseNow + 1350);
@@ -4043,7 +4043,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: manualBaseNow, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const manualStarted = tryStartSteal("second", manualBaseNow);
+    const manualStarted = (pitcherReady = true, tryStartSteal)("second", manualBaseNow);
     stealState.plateReached = true;
     updateStealState(manualBaseNow + 1350);
     const manualWaitsForThrow = manualStarted && !stealState.throw && stealState.catcherThrowReady === true && stealState.manualThrowRequired === true;
@@ -4052,7 +4052,7 @@ const stealStateCheck = JSON.parse(runInGame(
     gamepadState.lastDirectionPress.home = { time: 0, directions: new Set() };
     const manualButtons = Array.from({ length: 13 }, () => ({ pressed: false }));
     manualButtons[gamepadButtons.A] = { pressed: true };
-    handleGamepadButtonPresses({ buttons: manualButtons, axes: [0, -1] }, "home");
+    (pitcherReady = true, handleGamepadButtonPresses)({ buttons: manualButtons, axes: [0, -1] }, "home");
     const manualThrowStarted = Boolean(stealState.throw);
     const manualThrowTarget = stealState.throw?.targetBase;
     const manualThrowRank = stealState.throw?.timingRank;
@@ -4082,7 +4082,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 11000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    tryStartSteal("second", 11000);
+    (pitcherReady = true, tryStartSteal)("second", 11000);
     stealState.plateReached = true;
     finishPitch("空振り", "strike", 0, 0);
     updateStealState(12350);
@@ -4097,7 +4097,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 2000 + pitchWindupDuration, typeKey: "slow" };
     ball.crossedPlate = false;
     currentPitchType = "slow";
-    tryStartSteal("second", 2000);
+    (pitcherReady = true, tryStartSteal)("second", 2000);
     const slowArrival = stealState.arrivalTime;
     stealState.plateReached = true;
     updateStealState(3350);
@@ -4110,7 +4110,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 3000 + pitchWindupDuration, typeKey: "fast" };
     ball.crossedPlate = false;
     currentPitchType = "fast";
-    tryStartSteal("second", 3000);
+    (pitcherReady = true, tryStartSteal)("second", 3000);
     const fastArrival = stealState.arrivalTime;
     stealState.plateReached = true;
     updateStealState(4350);
@@ -4123,12 +4123,12 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 6000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const blockedPitchStealStarted = tryStartSteal("second", 6000);
+    const blockedPitchStealStarted = (pitcherReady = true, tryStartSteal)("second", 6000);
     isPitching = false;
     pendingPitch = null;
     ball.active = false;
     const beforeBlockedPitchCount = activePitcher.pitchCount ?? 0;
-    startPitch("fast");
+    (pitcherReady = true, startPitch)("fast");
     const nextPitchBlocked = (activePitcher.pitchCount ?? 0) === beforeBlockedPitchCount && blockedPitchStealStarted && stealState.active;
 
     bases = createEmptyBases();
@@ -4138,7 +4138,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 7000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    tryStartSteal("second", 6060);
+    (pitcherReady = true, tryStartSteal)("second", 6060);
     const quickJumpLead = stealState.jumpLead;
     const quickArrival = stealState.arrivalTime;
 
@@ -4149,7 +4149,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 8000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    tryStartSteal("second", 7900);
+    (pitcherReady = true, tryStartSteal)("second", 7900);
     const lateJumpLead = stealState.jumpLead;
     const lateArrival = stealState.arrivalTime;
 
@@ -4161,8 +4161,8 @@ const stealStateCheck = JSON.parse(runInGame(
     ball.active = false;
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const earlyRequestAccepted = tryStartSteal("second", 9000);
-    startPitch("normal");
+    const earlyRequestAccepted = (pitcherReady = true, tryStartSteal)("second", 9000);
+    (pitcherReady = true, startPitch)("normal");
     const earlyRequestStarted = stealState.active;
     const earlyRequestPenalty = stealState.jumpLead;
     const earlyRequestArrival = stealState.arrivalTime;
@@ -4174,7 +4174,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 4000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const thirdStarted = tryStartSteal("third", 4000);
+    const thirdStarted = (pitcherReady = true, tryStartSteal)("third", 4000);
 
     bases = createEmptyBases();
     bases.first = makeBaseRunner(runner);
@@ -4184,7 +4184,7 @@ const stealStateCheck = JSON.parse(runInGame(
     pendingPitch = { releaseTime: 5000, typeKey: "normal" };
     ball.crossedPlate = false;
     currentPitchType = "normal";
-    const blockedStarted = tryStartSteal("second", 5000);
+    const blockedStarted = (pitcherReady = true, tryStartSteal)("second", 5000);
     stealTuning.enabled = originalEnabled;
     stealState = createStealState();
     isPitching = false;
@@ -10941,7 +10941,7 @@ const stalePitchKeyState = JSON.parse(runInGame(
     gameMode = "versus";
     activePitcher = { ...activePitcher, control: 10 };
     keysDown.add("4");
-    startPitch("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });
+    (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });
     __advanceTime(pitchWindupDuration + 1);
     releasePendingPitch();
     const lockedBend = getHeldBendDirection();
@@ -10974,7 +10974,7 @@ const controlMissPitchKeyState = JSON.parse(runInGame(
     keysDown.add("4");
     const originalRandom = Math.random;
     Math.random = () => 0;
-    startPitch("normal", { targetX: field.plateX + 96, targetY: field.plateY - 36, targetSpread: 0 });
+    (pitcherReady = true, startPitch)("normal", { targetX: field.plateX + 96, targetY: field.plateY - 36, targetSpread: 0 });
     Math.random = originalRandom;
     __advanceTime(pitchWindupDuration + 1);
     releasePendingPitch();
@@ -11243,7 +11243,7 @@ const pitcherGameRecordState = JSON.parse(runInGame(
     battingTeam = "away";
     setMatchup();
     const homeStarter = activePitcher.name;
-    startPitch("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });
+    (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });
     resetBall();
     count.strikes = 3;
     checkCountEnd();
@@ -11539,7 +11539,7 @@ assert(nineInningRulesState.qualifiedStarterLines.some((line) => line.includes(`
 assert(nineInningRulesState.extraTop.gamePhase === "playing" && nineInningRulesState.extraTop.inning === 10 && nineInningRulesState.extraTop.half === "top", "nine-inning ties should continue into a tenth-inning tiebreaker");
 assert(nineInningRulesState.extraTop.outs === 0 && nineInningRulesState.extraTop.second === "otani", "nine-inning tiebreakers should start with no outs and the previous last-out batter on second");
 
-runInGame(context, 'startGame(); activePitcher = { ...activePitcher, control: 10 }; startPitch("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });');
+runInGame(context, 'startGame(); activePitcher = { ...activePitcher, control: 10 }; (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY, targetSpread: 0 });');
 
 for (let i = 0; i < 180; i += 1) {
   context.__advanceTime(16);
@@ -11556,7 +11556,7 @@ assert(state.strikes + state.balls + state.outs > 0, "pitch should be judged");
 assert(state.ballActive === false, "judged pitch should reset the active ball");
 assert(!state.message.includes("ジャスト(0ms)"), "called strike should not show swing timing");
 
-runInGame(context, 'startPitch("invalid");');
+runInGame(context, '(pitcherReady = true, startPitch)("invalid");');
 const invalidPitchState = JSON.parse(runInGame(
   context,
   "JSON.stringify({ pendingPitch: Boolean(pendingPitch), isPitching, message })"
@@ -11725,19 +11725,19 @@ const defenseThrowTimingState = JSON.parse(runInGame(
     gamepadState.lastThrowButtonPress.away = 0;
     const button1 = Array.from({ length: 13 }, () => ({ pressed: false }));
     button1[gamepadButtons.B] = { pressed: true };
-    handleGamepadButtonPresses({ buttons: button1, axes: [0, -1] }, "away");
+    (pitcherReady = true, handleGamepadButtonPresses)({ buttons: button1, axes: [0, -1] }, "away");
     const button1Ignored = !Number.isFinite(defenseState.throw?.startTime);
     gamepadState.previousButtons.away = new Set();
     const button3 = Array.from({ length: 13 }, () => ({ pressed: false }));
     button3[gamepadButtons.X] = { pressed: true };
-    handleGamepadButtonPresses({ buttons: button3, axes: [0, -1] }, "away");
+    (pitcherReady = true, handleGamepadButtonPresses)({ buttons: button3, axes: [0, -1] }, "away");
     const button3Ignored = !Number.isFinite(defenseState.throw?.startTime);
     gamepadState.previousButtons.away = new Set();
     gamepadState.previousDirections.away = new Set();
     gamepadState.lastDirectionPress.away = { time: 0, directions: new Set() };
     const liveButtons = Array.from({ length: 13 }, () => ({ pressed: false }));
     liveButtons[gamepadButtons.A] = { pressed: true };
-    handleGamepadButtonPresses({ buttons: liveButtons, axes: [0, -1] }, "away");
+    (pitcherReady = true, handleGamepadButtonPresses)({ buttons: liveButtons, axes: [0, -1] }, "away");
     const liveQuickThrow = {
       success: defenseState.throw?.throwTimingSuccess === true,
       label: defenseState.throw?.throwTimingLabel,
@@ -12236,7 +12236,7 @@ console.log("Smoke check passed");
 
 const swingLifecycleRegression = JSON.parse(runInGame(context, `(() => {
  gameMode = "practice"; showMenu(); startGame(); resetSwing();
- startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY });
  __advanceTime(10); startSwing();
  const warmupStarted = swingState.isSwinging;
  __advanceTime(1000); releasePendingPitch();
@@ -12246,11 +12246,11 @@ const swingLifecycleRegression = JSON.parse(runInGame(context, `(() => {
  const liveDoubleSwingBlocked = swingState.startTime === liveStart;
  finishPitch("空振り", "strike"); __advanceTime(1000); swingState.isSwinging = false;
  startSwing(); const idleSwingAllowed = swingState.startTime > liveStart;
- startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY });
  __advanceTime(1000); releasePendingPitch(); startSwing();
  const nextPitchAllowed = swingState.didSwingThisPitch && swingState.isSwinging;
  finishPitch("空振り", "strike");
- startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ (pitcherReady = true, startPitch)("normal", { targetX: field.plateX, targetY: field.plateY });
  startBuntStance(); __advanceTime(1000); releasePendingPitch();
  return JSON.stringify({warmupStarted,clearedOnRelease,liveDoubleSwingBlocked,idleSwingAllowed,nextPitchAllowed,buntPreserved:isBuntStanceActive()});
 })()`));

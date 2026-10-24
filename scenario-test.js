@@ -13,16 +13,16 @@ scenarioDialog.innerHTML = `
       <label>ボール数<input name="balls" type="number" min="0" max="3" value="0" required></label>
       <label>ストライク数<input name="strikes" type="number" min="0" max="2" value="0" required></label>
       <fieldset><legend>塁上走者</legend><label><input type="checkbox" name="first" checked>一塁</label><label><input type="checkbox" name="second">二塁</label><label><input type="checkbox" name="third">三塁</label></fieldset>
-      <label>全走者・打者の走力<input name="run" type="number" min="1" max="30" value="9" required></label>
-      <label>捕手の肩<input name="arm" type="number" min="1" max="30" value="6" required></label>
+      <label>全走者・打者の走力<input name="run" type="number" min="1" max="30" value="8" required></label>
+      <label>捕手の肩<input name="arm" type="number" min="1" max="30" value="8" required></label>
       <label>投手の球速基準（km/h）<input name="kmh" type="number" min="80" max="200" value="150" required></label>
-      <label>打者の操作<select name="batterControl"><option value="player">プレイヤー操作</option><option value="cpu">CPU操作</option></select></label>
-      <label>CPU打者の行動<select name="batterAction"><option value="normal">通常の打撃</option><option value="take">見逃し</option><option value="miss">空振り（テスト用）</option></select></label>
-      <label>走者の操作<select name="runnerControl"><option value="player">プレイヤー操作</option><option value="cpu">CPU操作</option></select></label>
+      <label>打者の操作<select name="batterControl"><option value="player">プレイヤー操作</option><option value="cpu" selected>CPU操作</option></select></label>
+      <label>CPU打者の行動<select name="batterAction"><option value="normal">通常の打撃</option><option value="take" selected>見逃し</option><option value="miss">空振り（テスト用）</option></select></label>
+      <label>走者の操作<select name="runnerControl"><option value="player">プレイヤー操作</option><option value="cpu" selected>CPU操作</option></select></label>
       <label>投手・守備の操作<select name="defenseControl"><option value="player">プレイヤー操作</option><option value="cpu">CPU操作</option></select></label>
       <label>次の行動<select name="action"><option value="steal">指定走者が必ず盗塁</option><option value="early">投球開始前に走り出す</option><option value="return">盗塁し、送球開始後に帰塁</option><option value="manual">通常の投球・操作担当に従う</option><option value="grounder">内野ゴロを発生</option><option value="fly">内野フライを発生</option></select></label>
       <label>盗塁する走者<select name="runnerBase"><option value="first">一塁走者（二盗）</option><option value="second">二塁走者（三盗）</option><option value="third">三塁走者（本盗）</option></select></label>
-      <label>投球動作開始から盗塁まで（秒）<input name="delay" type="number" min="0" max="3" step="0.05" value="0.2" required></label>
+      <label>盗塁開始まで（秒／フライングは準備完了から）<input name="delay" type="number" min="0" max="3" step="0.05" value="0.1" required></label>
       <label>指定する投球<select name="pitch"><option value="fast">速球</option><option value="normal">直球</option><option value="slow">遅い球</option><option value="special">決め球</option></select></label>
       <label>指定打球の方向<select name="direction"><option value="-0.35">三塁・遊撃側</option><option value="0">中央</option><option value="0.35">二塁・一塁側</option></select></label>
     </div>
@@ -107,26 +107,30 @@ function prepareScenario(config) {
   autoPitchTimer = Infinity; computerPitchPlan = null;
   document.getElementById('scenarioEvents').replaceChildren();
   document.getElementById('scenarioStatus').hidden = false;
-  document.getElementById('scenarioSummary').textContent = `${config.outs}アウト／走力${config.run}／捕手の肩${config.arm}。準備完了`;
+  document.getElementById('scenarioSummary').textContent = `${config.outs}アウト／走力${config.run}／捕手の肩${config.arm}。場面設定済み`;
   const manualPitch = config.defenseControl === 'player' && !['grounder','fly','early'].includes(config.action);
   document.getElementById('scenarioExecute').disabled = manualPitch;
-  document.getElementById('scenarioExecute').textContent = manualPitch ? '投球操作待ち（ボタン2／キー2など）' : '設定の行動を開始';
+  document.getElementById('scenarioExecute').textContent = manualPitch ? '投球操作待ち（ボタン7／Pで準備完了）' : '設定の行動を開始';
   if (config.action === 'early') {
-    document.getElementById('scenarioExecute').textContent = '投球前に走者をスタート';
-    document.getElementById('scenarioSummary').textContent += '。「投球前に走者をスタート」を押してから、投球または牽制してください（盗塁までの秒数は使用しません）。';
+    document.getElementById('scenarioExecute').disabled = config.defenseControl === 'player';
+    document.getElementById('scenarioExecute').textContent = config.defenseControl === 'player'
+      ? '準備完了待ち（ボタン7／P）' : 'CPU投手を準備完了にする';
+    document.getElementById('scenarioSummary').textContent += '。ボタン7／Pで準備完了後、指定秒数で走者がスタートします。';
   }
   clearTeamGamepadHistory();
   scenarioTest.waitForInputRelease = true;
   document.getElementById('scenarioEdit').disabled = false;
   message = '場面テスト：通常の操作で投球すると、指定の行動が始まります';
-  if (config.defenseControl === 'player') document.getElementById('scenarioSummary').textContent += '。通常の操作で投球してください。捕手の送球も手動です。';
+  if (config.defenseControl === 'player') document.getElementById('scenarioSummary').textContent += '。ボタン7／Pで準備完了にしてから投球してください。捕手の送球も手動です。';
   updateSidebarAbilityPanels();
 }
 
 function executeScenario() {
-  if (!scenarioTest.active || scenarioTest.executed || gamePhase !== 'playing' || isPitching || pendingPitch) return;
+  if (!scenarioTest.active || scenarioTest.executed || pauseMenuState.active || gamePhase !== 'playing' || isPitching || pendingPitch) return;
   const config = scenarioTest.config;
   if (config.action === 'early') {
+    if (config.defenseControl === 'cpu' && !pitcherReady) { setPitcherReady(); return; }
+    if (!pitcherReady) return;
     const target = {first:'second',second:'third',third:'home'}[config.runnerBase];
     const candidate = getStealCandidate(target);
     const now = performance.now();
@@ -147,7 +151,13 @@ function executeScenario() {
       0.35, 0, normalize({x:config.direction,y:-1}), {unifiedDistanceRatio:0.23,quality:0.5});
     scenarioRecord('start', fly ? '指定した内野フライ発生' : '指定した内野ゴロ発生');
     document.getElementById('scenarioExecute').disabled = true;
-  } else if (config.defenseControl !== 'player') startPitch(config.pitch);
+  } else if (config.defenseControl !== 'player') { setPitcherReady(); startPitch(config.pitch); }
+}
+
+function scenarioResumeTimers(pausedFor) {
+  if (!scenarioTest.active) return;
+  if (scenarioTest.epoch != null) scenarioTest.epoch += pausedFor;
+  if (scenarioTest.actionAt != null) scenarioTest.actionAt += pausedFor;
 }
 
 function scenarioObserve(recordOnly = false) {
@@ -190,7 +200,7 @@ function scenarioObserve(recordOnly = false) {
   if (defenseState.active && defenseState.outcome?.caught && !defenseState.outcome?.needsThrow
       && now >= defenseState.startTime+defenseState.outcome.fieldingTime*1000)
     scenarioRecord('fly-catch','フライ捕球アウト',defenseState.startTime+defenseState.outcome.fieldingTime*1000);
-  if (scenarioTest.executed && !isPitching && !pendingPitch && !ball.active && !stealState.active && !defenseState.active) {
+  if (scenarioTest.executed && scenarioTest.actionAt == null && !isPitching && !pendingPitch && !ball.active && !stealState.active && !defenseState.active) {
     scenarioRecord('settled','プレー終了：同じ場面を再試行できます');
     autoPitchTimer = Infinity;
   }
@@ -243,12 +253,24 @@ pollGamepadInput = function() {
   }
   return scenarioOriginalPollInput();
 };
+const scenarioOriginalReady = setPitcherReady;
+setPitcherReady = function() {
+  if (scenarioTest.active && scenarioTest.seen.has('settled')) return false;
+  const result = scenarioOriginalReady();
+  if (result && scenarioTest.active && scenarioTest.config.action === 'early') {
+    scenarioTest.epoch = performance.now();
+    scenarioTest.actionAt = scenarioTest.epoch + scenarioTest.config.delay * 1000;
+    scenarioTest.executed = true;
+    scenarioRecord('ready','投球準備完了：走塁可能');
+  }
+  return result;
+};
 const scenarioOriginalStartPitch = startPitch;
 startPitch = function(type, options) {
   if (scenarioTest.active && scenarioTest.seen.has('settled')) return;
   const wasPending = pendingPitch;
   if (scenarioTest.active && scenarioTest.config.action === 'early' && !scenarioTest.executed) {
-    message = '先に「投球前に走者をスタート」を押してください';
+    message = '先にボタン7／Pで投球準備完了にしてください';
     return;
   }
   const result = scenarioOriginalStartPitch(type, options);
@@ -287,7 +309,7 @@ resolveSteal = function(...args) { scenarioObserve(true); return scenarioOrigina
 document.getElementById('scenarioStealPreset').addEventListener('click', () => {
   const fields = document.getElementById('scenarioForm').elements;
   const preset = { outs:0, balls:0, strikes:0, batterControl:'cpu', runnerControl:'cpu',
-    defenseControl:'player', batterAction:'take', action:'steal', runnerBase:'first', delay:0.2 };
+    defenseControl:'player', batterAction:'take', action:'steal', runnerBase:'first', delay:0.1, run:8, arm:8 };
   for (const [key,value] of Object.entries(preset)) fields.namedItem(key).value = String(value);
   for (const base of ['first','second','third']) fields.namedItem(base).checked = base === 'first';
 });

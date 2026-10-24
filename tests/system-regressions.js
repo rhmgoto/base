@@ -1,0 +1,37 @@
+const fs=require('fs'),path=require('path'),vm=require('vm');
+const {assert}=require('./check-utils');
+const harness=fs.readFileSync(path.join(__dirname,'baserunning.js'),'utf8').split('const unit = createGameContext();')[0];
+const context=new Function('require','__dirname',harness+'\nreturn createGameContext();')(require,__dirname);
+context.document.createElement=()=>({appendChild(){},replaceChildren(){},addEventListener(){},showModal(){this.open=true},close(){this.open=false}});
+context.document.body={appendChild(){}};
+const getElement=context.document.getElementById;
+context.document.getElementById=id=>Object.assign(getElement(id),{appendChild(){},replaceChildren(){}});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../scenario-test.js'),'utf8'),context);
+const result=vm.runInContext(`(() => {
+ const config={outs:0,balls:0,strikes:0,first:true,second:false,third:false,run:8,arm:8,kmh:150,
+  batterControl:'player',runnerControl:'player',defenseControl:'player',action:'manual',runnerBase:'first',delay:0.2,pitch:'fast',direction:0};
+ prepareScenario(config);setPitcherReady();startPitch('fast');finishPitch('ボール','ball');
+ const nextPreparation=!pitcherReady;
+ const readyAgain=setPitcherReady();
+ const nextPitchSteal=readyAgain&&tryStartSteal('second');
+ prepareScenario({...config,runnerControl:'cpu'});setPitcherReady();
+ computerStealPlan={targetBase:'second',earlyStartAt:performance.now()+300,startDelaySeconds:0.2};
+ const paused=openPauseMenu(fieldingTeam());
+ startPitch('fast');startSwing();
+ const pauseBlocksInputs=!pendingPitch&&!isPitching&&!swingState.isSwinging&&!startPickoff('first');
+ __advanceTime(5000);closePauseMenu();
+ const cpuWaitsAfterPause=!updateComputerSteal(performance.now())&&!stealState.active;
+ __advanceTime(301);const cpuResumes=updateComputerSteal(performance.now())&&stealState.active;
+ prepareScenario({...config,action:'early'});setPitcherReady();
+ openPauseMenu(fieldingTeam());__advanceTime(5000);closePauseMenu();scenarioObserve();
+ const testWaitsAfterPause=!stealState.active;
+ __advanceTime(201);scenarioObserve();const testResumes=stealState.active;
+ prepareScenario({...config,action:'early',defenseControl:'cpu',runnerControl:'cpu'});
+ const cpuTestAvailable=!document.getElementById('scenarioExecute').disabled;
+ executeScenario();__advanceTime(201);scenarioObserve();
+ const cpuEarlyTest=cpuTestAvailable&&pitcherReady&&stealState.active&&!isPitching&&!pendingPitch;
+ showMenu();
+ return {nextPreparation,nextPitchSteal,paused,pauseBlocksInputs,cpuWaitsAfterPause,cpuResumes,testWaitsAfterPause,testResumes,cpuEarlyTest};
+})()`,context);
+assert(Object.values(result).every(Boolean),JSON.stringify(result));
+console.log('System regression checks passed',result);
