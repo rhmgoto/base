@@ -2257,6 +2257,37 @@ const manualFlyChecks = JSON.parse(makeRunner(createGameContext(), `
 `));
 assert(Object.values(manualFlyChecks).every(Boolean), '手動進塁・自動帰塁・落球時の継続: ' + JSON.stringify(manualFlyChecks));
 
+const infieldCameraChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame(); gameMode = "versus"; resetBall();
+  defenseControlMode[fieldingTeam()] = "manual";
+  bases.first = makeBaseRunner({ id: "camera-runner", run: 5 });
+  const before = !isInfieldOverviewActive();
+  startPickoff("first");
+  const camera = getDefenseCameraOffset();
+  const allBasesVisible = Object.values(defenseField.bases).every(point => {
+    const x = camera.x + point.x * camera.scale;
+    const y = camera.y + point.y * camera.scale;
+    return x > 50 && x < canvas.width - 50 && y > 180 && y < canvas.height - 65;
+  });
+  const state = JSON.stringify({ count, bases, runner: defenseState.baseRunners, throw: defenseState.throw });
+  draw();
+  const drawDoesNotChangePlay = state === JSON.stringify({ count, bases, runner: defenseState.baseRunners, throw: defenseState.throw });
+  ball.x += 500; ball.y -= 300;
+  const fixed = JSON.stringify(camera) === JSON.stringify(getDefenseCameraOffset());
+  defenseState.startTime = performance.now() - 5000;
+  updateThrowState(5);
+  handleRundownCommand("second");
+  defenseState.pickoff = false;
+  const rundown = isInfieldOverviewActive();
+  handleDefenseThrowCommand("third");
+  const relay = isInfieldOverviewActive() && !defenseState.rundown;
+  draw();
+  defenseState.active = false; gamePhase = "playing";
+  const restored = !isInfieldOverviewActive() && !getDefenseCameraOffset().scale;
+  return JSON.stringify({ before, allBasesVisible, drawDoesNotChangePlay, fixed, rundown, relay, restored });
+`));
+assert(Object.values(infieldCameraChecks).every(Boolean), '内野専用画面・全塁表示・送球後維持・復帰: ' + JSON.stringify(infieldCameraChecks));
+
 const homeStealChecks = JSON.parse(makeRunner(createGameContext(), `
   const results = [];
   for (const ballFirst of [true, false]) {

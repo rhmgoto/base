@@ -7447,6 +7447,7 @@ function startPickoff(targetBase, now = performance.now()) {
     defenseState.outcome, null, { targetBase, immediate: true, startTime: 0.28, minStartTime: 0.28,
       baseRunners: defenseState.baseRunners });
   message = `${getBaseLabel(targetBase)}へ牽制`;
+  hitEffect.active = false;
   return true;
 }
 
@@ -12279,6 +12280,7 @@ function handleRundownCommand(targetBase) {
     fielder: previous?.fielder || { role: "SS", name: "持球者", speed: 5, fielding: 5,
       arm: heldBase === "home" ? getTeamCatcherArm(fieldingTeam()) : 5 }
   };
+  defenseState.infieldOverview = true;
   defenseState.throw = null;
   defenseState.heldBallBase = null;
   defenseState.heldBallSince = null;
@@ -20405,6 +20407,7 @@ function drawDefenseView() {
   const camera = getDefenseCameraOffset();
   ctx.save();
   ctx.translate(camera.x, camera.y);
+  ctx.scale(camera.scale ?? 1, camera.scale ?? 1);
 
   drawHyperOceanBeyondOutfield();
   drawNextDomeBeyondOutfield();
@@ -20455,6 +20458,7 @@ function drawDefenseView() {
   ctx.lineWidth = 5;
   drawLine(field.plateX, field.plateY + 42, defenseField.foulLineInset, defenseField.foulLineTopY);
   drawLine(field.plateX, field.plateY + 42, canvas.width - defenseField.foulLineInset, defenseField.foulLineTopY);
+  if (isInfieldOverviewActive()) drawInfieldSurfaceDetails();
   drawDefenseBases();
 
   if (!hasPaintedField) {
@@ -20466,17 +20470,19 @@ function drawDefenseView() {
     drawOutfieldWall();
   }
 
-  drawDefenseTarget();
+  if (!isInfieldOverviewActive()) drawDefenseTarget();
   drawHomeRunFireworks();
-  drawGrounderBounceMarks();
-  drawPostLandingBounceMarker();
-  drawLandingImpactMarker();
+  if (!isInfieldOverviewActive()) {
+    drawGrounderBounceMarks();
+    drawPostLandingBounceMarker();
+    drawLandingImpactMarker();
+  }
   drawThrowPath();
   drawFielderCatchRanges();
   drawDefenseFielders();
   drawDefenseBaseRunners();
   drawBatterRunner();
-  drawBallTrail();
+  if (!isInfieldOverviewActive()) drawBallTrail();
   drawBall();
   drawDefenseCatchEffect();
   drawDefenseLandingMissEffect();
@@ -21526,8 +21532,86 @@ function shouldHoldCameraForShortDefenseThrow(throwState, elapsedSeconds) {
   return distance <= 820 && elapsedSeconds <= (throwState.endTime ?? throwState.startTime) + 0.2;
 }
 
+function isInfieldOverviewActive() {
+  return gamePhase === "defense" && defenseState.active
+    && Boolean(defenseState.pickoff || defenseState.infieldOverview || defenseState.rundown);
+}
+
+function drawInfieldSurfaceDetails() {
+  const { home, first, second, third } = defenseField.bases;
+  const center = { x: home.x, y: (home.y + second.y) / 2 };
+  const corners = [home, first, second, third];
+  ctx.save();
+  ctx.beginPath();
+  corners.forEach((point, i) => {
+    const x = lerp(center.x, point.x, 0.82);
+    const y = lerp(center.y, point.y, 0.82);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  drawSurfaceFinish(third.x, second.y, first.x - third.x, home.y - second.y, "grass");
+  ctx.clip();
+  ctx.strokeStyle = "rgba(224,247,185,0.055)"; ctx.lineWidth = 36;
+  for (let x = third.x - 1000; x < first.x + 1000; x += 100) {
+    drawLine(x, home.y, x + 650, second.y);
+  }
+  ctx.restore();
+  for (let i = 0; i < corners.length; i += 1) {
+    const a = corners[i], b = corners[(i + 1) % corners.length];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    const nx = -(b.y - a.y) / length * 15;
+    const ny = (b.x - a.x) / length * 15;
+    ctx.save(); ctx.beginPath();
+    ctx.moveTo(a.x + nx, a.y + ny); ctx.lineTo(b.x + nx, b.y + ny);
+    ctx.lineTo(b.x - nx, b.y - ny); ctx.lineTo(a.x - nx, a.y - ny); ctx.closePath();
+    ctx.fillStyle = "rgba(190,133,63,0.16)"; ctx.fill();
+    drawSurfaceFinish(Math.min(a.x,b.x)-20, Math.min(a.y,b.y)-20,
+      Math.abs(a.x-b.x)+40, Math.abs(a.y-b.y)+40, "dirt");
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = "rgba(80,53,23,0.20)";
+    ctx.beginPath(); ctx.ellipse(a.x + 6, a.y + 7, 21, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(141,91,41,0.22)"; ctx.lineWidth = 2;
+    for (let j = 0; j < 7; j += 1) {
+      const dx = ((j * 29) % 70) - 35;
+      const dy = ((j * 17) % 44) - 22;
+      drawLine(a.x + dx, a.y + dy, a.x + dx + 9, a.y + dy - 3);
+    }
+    ctx.restore();
+  }
+  // ベースまわりとマウンドの土に細かい粒と整地跡を重ねる。
+  for (const point of [...corners, center]) {
+    const mound = point === center;
+    const rx = mound ? 128 : 65;
+    const ry = mound ? 85 : 44;
+    ctx.save(); ctx.beginPath();
+    ctx.ellipse(point.x, point.y, rx, ry, 0, 0, Math.PI * 2);
+    drawSurfaceFinish(point.x - rx, point.y - ry, rx * 2, ry * 2, "dirt");
+    ctx.clip(); ctx.strokeStyle = "rgba(111,72,32,0.11)"; ctx.lineWidth = 2;
+    for (let r = 20; r < rx; r += 14) {
+      ctx.beginPath(); ctx.ellipse(point.x, point.y + 12, r, r * 0.6, 0, 0.08, Math.PI - 0.08); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function getInfieldOverviewCamera() {
+  const points = Object.values(defenseField.bases);
+  const minX = Math.min(...points.map(point => point.x)) - 100;
+  const maxX = Math.max(...points.map(point => point.x)) + 100;
+  const minY = Math.min(...points.map(point => point.y)) - 125;
+  const maxY = Math.max(...points.map(point => point.y)) + 100;
+  // スコアと操作案内を上に置き、全塁を収める固定の画角。
+  const top = 145;
+  const bottom = canvas.height - 30;
+  const scale = Math.min((canvas.width - 100) / (maxX - minX), (bottom - top) / (maxY - minY));
+  return { scale, x: canvas.width / 2 - (minX + maxX) / 2 * scale,
+    y: (top + bottom) / 2 - (minY + maxY) / 2 * scale };
+}
+
 function getDefenseCameraOffset() {
   if (!defenseState.active) return { x: 0, y: 0 };
+  if (isInfieldOverviewActive()) return getInfieldOverviewCamera();
   if (defenseState.battedBall?.fenceOver) return getHomeRunCameraOffset();
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
   const chosen = defenseState.fielders.find((fielder) => fielder.role === defenseState.chosenFielder.role);
@@ -21893,11 +21977,11 @@ function drawDefenseFielders() {
   const receiverBase = defenseState.throw?.targetBase || (!defenseState.rundown ? defenseState.heldBallBase : null);
   if (receiverBase && !defenseState.rundown) {
     const receiver = getDefenseBasePointByName(receiverBase);
-    drawDefenseFielder(receiver.x, receiver.y, "SS", "受け手", false, 0, getFielderArmPose(receiver.x, receiver.y));
+    drawDefenseFielder(receiver.x + (isInfieldOverviewActive() ? 64 : 0), receiver.y - (isInfieldOverviewActive() ? 31 : 0), "SS", "受け手", false, 0, getFielderArmPose(receiver.x, receiver.y));
   }
   if (defenseState.rundown) {
     const carrier = defenseState.rundown;
-    drawDefenseFielder(carrier.x, carrier.y, "SS", "持球者", true,
+    drawDefenseFielder(carrier.x + (isInfieldOverviewActive() ? 64 : 0), carrier.y - (isInfieldOverviewActive() ? 31 : 0), "SS", "持球者", true,
       carrier.moving ? (performance.now() / 1000) % 1 : 0, getFielderArmPose(carrier.x, carrier.y));
   }
   if (!defenseState.active) return;
@@ -22132,7 +22216,8 @@ function drawDefenseBaseRunners() {
 }
 
 function getVisibleDefenseBaseRunners() {
-  return (defenseState.baseRunners || []).filter((runner) => !isBaseRunnerOutOnCompletedForce(runner));
+  return (defenseState.baseRunners || []).filter((runner) => !isBaseRunnerOutOnCompletedForce(runner)
+    || (isInfieldOverviewActive() && defenseState.tagPresentation?.runner === runner && !defenseState.tagPresentation.resumed));
 }
 
 function isBatterRunnerOutOnCompletedForce() {
@@ -22275,7 +22360,7 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose
   const accentColor = isChosen ? "#ffcf70" : "#ffffff";
   const bob = isChosen ? Math.sin(runProgress * Math.PI * 10) * 3 : 0;
   const stride = isChosen ? Math.sin(runProgress * Math.PI * 12) : 0;
-  const scale = isChosen ? 1.08 : 0.96;
+  const scale = (isChosen ? 1.08 : 0.96) * (isInfieldOverviewActive() ? 1.28 : 1);
   const groundY = y + 34 * scale;
 
   ctx.save();
@@ -22443,11 +22528,12 @@ function getDefenseFielderNameLabelRect(x, y, label, isChosen) {
 
 function getDefenseVisibleWorldBounds() {
   const camera = getDefenseCameraOffset();
+  const scale = camera.scale ?? 1;
   return {
-    left: -camera.x + 14,
-    right: canvas.width - camera.x - 14,
-    top: -camera.y + 16,
-    bottom: canvas.height - camera.y - 16
+    left: (-camera.x + 14) / scale,
+    right: (canvas.width - camera.x - 14) / scale,
+    top: (-camera.y + 16) / scale,
+    bottom: (canvas.height - camera.y - 16) / scale
   };
 }
 
@@ -23016,6 +23102,27 @@ function drawBaseballStitches(x, y, width, height, direction, radius) {
 }
 
 function drawDefenseBall() {
+  if (isInfieldOverviewActive()) {
+    const elapsed = (performance.now() - defenseState.startTime) / 1000;
+    const point = getDefenseBallPoint(0, 0, elapsed);
+    const carrier = defenseState.rundown;
+    let x = point.x;
+    let y = point.y - getDefenseBallHeightAtPoint(0, elapsed) * 0.35;
+    if (carrier) {
+      const pose = getFielderArmPose(carrier.x, carrier.y);
+      const length = Math.max(1, Math.hypot(pose?.dx || 0, pose?.dy || 0));
+      const reach = pose ? 25 + 28 * pose.amount : 0;
+      x = carrier.x + 64 + (pose ? pose.dx / length * reach : -33) * 1.08 * 1.28;
+      y = carrier.y - 31 + (pose ? 9 + pose.dy / length * reach : 25) * 1.08 * 1.28;
+    }
+    const scale = getInfieldOverviewCamera().scale;
+    ctx.save();
+    ctx.strokeStyle = "#163047"; ctx.lineWidth = 3 / scale;
+    ctx.beginPath(); ctx.arc(x, y, 9 / scale, 0, Math.PI * 2); ctx.stroke();
+    drawBaseballIcon(x, y, 6 / scale);
+    ctx.restore();
+    return;
+  }
   const progress = defenseState.active
     ? clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1)
     : 0;
@@ -23024,7 +23131,8 @@ function drawDefenseBall() {
   const battedBall = defenseState.battedBall;
   const highFlyAmount = getHighFlyVisualAmount(battedBall, heightOffset);
   const visualHeightOffset = getDefenseBallVisualHeightOffset(heightOffset, battedBall);
-  const radius = battedBall?.trajectory === "fly" ? ball.radius + 2 - highFlyAmount * 1.8 : ball.radius;
+  const normalRadius = battedBall?.trajectory === "fly" ? ball.radius + 2 - highFlyAmount * 1.8 : ball.radius;
+  const radius = isInfieldOverviewActive() ? Math.max(normalRadius, 6 / getInfieldOverviewCamera().scale) : normalRadius;
   drawWallImpactEffect(elapsedSeconds, visualHeightOffset);
   if (drawDefenseCatchBallTransition(elapsedSeconds, radius)) return;
 
@@ -23494,6 +23602,50 @@ function drawHudBaseDiamond(x, y, size, occupied) {
 
 function drawDefenseHud() {
   if (!defenseState.active) return;
+  if (isInfieldOverviewActive()) {
+    ctx.save();
+    ctx.fillStyle = "rgba(18,32,42,0.88)";
+    roundRect(canvas.width - 390, 20, 370, 125, 10); ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#fff2a8"; ctx.font = "bold 20px sans-serif";
+    ctx.fillText(defenseState.pickoff ? "内野全体：牽制・ランダン" : "内野全体：ランダン", canvas.width - 374, 49);
+    ctx.fillStyle = "#ffffff"; ctx.font = "bold 14px sans-serif";
+    ctx.fillText("守備　塁＋1：持球移動　塁＋2：送球", canvas.width - 374, 78);
+    ctx.fillText("走塁　塁＋2：進塁　塁＋1：帰塁", canvas.width - 374, 103);
+    ctx.fillText("走塁　3：全員進塁　0：全員帰塁", canvas.width - 374, 128);
+    const tag = defenseState.tagPresentation;
+    const elapsed = (performance.now() - defenseState.startTime) / 1000;
+    const toss = defenseState.throw;
+    const overviewCamera = getInfieldOverviewCamera();
+    for (const [name, base] of Object.entries(defenseField.bases)) {
+      const labelX = overviewCamera.x + base.x * overviewCamera.scale;
+      const labelY = overviewCamera.y + base.y * overviewCamera.scale + 44;
+      ctx.fillStyle = "rgba(18,32,42,0.85)";
+      roundRect(labelX - 25, labelY - 15, 50, 23, 5); ctx.fill();
+      ctx.fillStyle = "#fff8df"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(getBaseLabel(name), labelX, labelY);
+    }
+    const focus = tag && !tag.resumed ? getDefenseBasePointByName(tag.base)
+      : defenseState.rundown || (toss ? toss.to : null);
+    const status = tag && !tag.resumed
+      ? (performance.now() < tag.contactAt ? "タッチ" : "アウト")
+      : toss && elapsed >= toss.endTime ? (elapsed < toss.endTime + 0.5 ? "捕球！" : "持球")
+      : defenseState.rundown ? "持球移動" : "送球中";
+    if (focus) {
+      const camera = getInfieldOverviewCamera();
+      const x = clamp(camera.x + focus.x * camera.scale, 85, canvas.width - 85);
+      const y = clamp(camera.y + focus.y * camera.scale - 110, 130, canvas.height - 100);
+      ctx.fillStyle = "rgba(18,32,42,0.94)";
+      roundRect(x - 65, y - 24, 130, 34, 8); ctx.fill();
+      ctx.textAlign = "center"; ctx.font = "bold 20px sans-serif";
+      ctx.fillStyle = status === "アウト" ? "#ffcf70" : "#aee7ff";
+      ctx.fillText(status, x, y);
+      ctx.strokeStyle = status === "アウト" ? "#ffcf70" : "#aee7ff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(camera.x + focus.x * camera.scale, camera.y + focus.y * camera.scale + 18, 27, 9, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   if (defenseState.pickoff || defenseState.rundown) {
     const target = defenseState.throw?.targetBase || defenseState.rundown?.targetBase;
     const runner = (!defenseState.tagPresentation?.resumed && defenseState.tagPresentation?.runner)
@@ -24081,6 +24233,7 @@ function drawFittedBoardText(text, x, y, maxWidth, startSize = 14, weight = "nor
 
 function drawHitEffect() {
   if (!hitEffect.active) return;
+  if (isInfieldOverviewActive()) return;
   const t = (performance.now() - hitEffect.startTime) / 1000;
   ctx.save();
   ctx.globalAlpha = 1 - t * 0.34;
