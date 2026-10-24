@@ -15041,6 +15041,7 @@ function updateDefensePlay(now) {
 
   const previousMovementElapsed = defenseState.lastMovementElapsedSeconds ?? elapsedSeconds;
   const movementDeltaSeconds = clamp(elapsedSeconds - previousMovementElapsed, 0, 0.08);
+  defenseState.outfieldPursuit = getLiveOutfieldPursuit(elapsedSeconds);
   defenseState.fielders = defenseState.fielders.map((fielder) => {
     const heldAtCatchPoint = getCompletedInfieldCatchHoldPoint(fielder, elapsedSeconds);
     if (heldAtCatchPoint) {
@@ -15052,7 +15053,8 @@ function updateDefensePlay(now) {
     }
     const chaseTarget = getDefenseFielderMovementTarget(fielder, elapsedSeconds);
     if (!chaseTarget) return fielder;
-    if (shouldUseIncrementalPostLandingChase(elapsedSeconds, chaseTarget)) {
+    if ((defenseState.outfieldPursuit && ["L", "C", "R"].includes(fielder.role))
+      || shouldUseIncrementalPostLandingChase(elapsedSeconds, chaseTarget)) {
       const currentX = fielder.currentX ?? fielder.x;
       const currentY = fielder.currentY ?? fielder.y;
       const dx = chaseTarget.x - currentX;
@@ -15620,6 +15622,11 @@ function getCurrentDefenseRatingForRole(role) {
 
 function getDefenseFielderMovementTarget(fielder, elapsedSeconds) {
   if (!fielder || !defenseState.active || !defenseState.battedBall) return null;
+  if (defenseState.outfieldPursuit && ["L", "C", "R"].includes(fielder.role)) {
+    const pursuit = defenseState.outfieldPursuit;
+    const target = fielder.role === pursuit.role ? pursuit.ball : pursuit.cover;
+    return clampOutfielderBeyondRiversideRiver(target, fielder.role);
+  }
   if (fielder.role === defenseState.chosenFielder?.role) {
     return clampOutfielderBeyondRiversideRiver(getDefenseFielderChaseTarget(elapsedSeconds), fielder.role);
   }
@@ -15639,13 +15646,32 @@ function getDefenseFielderMovementTarget(fielder, elapsedSeconds) {
 }
 
 // 打球の落下点にいちばん近い外野手。担当エリアの持ち主を決める。
-function getResponsibleOutfielderRole(landingPoint = defenseState.landingTarget || defenseState.battedBall?.target || defenseState.target) {
+function getLiveOutfieldPursuit(elapsedSeconds) {
+  const hit = defenseState.battedBall;
+  if (!hit || defenseState.resolved || defenseState.unifiedCircleCatchComplete || defenseState.errorRecovery
+    || (defenseState.throw && elapsedSeconds >= defenseState.throw.startTime)
+    || hit.fenceOver || hit.groundRuleDouble || hit.isFoulBall) return null;
+  if (elapsedSeconds <= (hit.ballTime ?? 0)) return null;
+  if (defenseState.outcome?.caught && !defenseState.outcome.needsThrow) return null;
+  const origin = defenseState.origin;
+  const distance = Math.hypot(ball.x - origin.x, ball.y - origin.y);
+  if (distance < 620) return null;
+  const point = { x: ball.x, y: ball.y };
+  const role = getResponsibleOutfielderRole(point, true);
+  if (!role) return null;
+  const direction = normalize(hit.direction || { x: point.x - origin.x, y: point.y - origin.y });
+  const cover = clampPointInsideFence({ x: point.x + direction.x * 180, y: point.y + direction.y * 180 }, 36);
+  return { role, ball: point, cover };
+}
+
+function getResponsibleOutfielderRole(landingPoint = defenseState.landingTarget || defenseState.battedBall?.target || defenseState.target, useCurrentPosition = false) {
   if (!landingPoint) return null;
   let bestRole = null;
   let bestDistance = Infinity;
   (defenseState.fielders || []).forEach((entry) => {
-    if (isInfielderRole(entry.role)) return;
-    const distance = Math.hypot(landingPoint.x - entry.x, landingPoint.y - entry.y);
+    if (!["L", "C", "R"].includes(entry.role)) return;
+    const current = useCurrentPosition ? getDefenseFielderSimulationPosition(entry) : entry;
+    const distance = Math.hypot(landingPoint.x - current.x, landingPoint.y - current.y);
     if (distance < bestDistance) {
       bestDistance = distance;
       bestRole = entry.role;
@@ -21624,8 +21650,9 @@ function drawBatterRunner() {
   const runner = defenseState.runner;
   if (!runner || runner.isOut) return;
   if (isBatterRunnerOutOnCompletedForce()) return;
-  const runProgress = clamp((performance.now() - defenseState.startTime) / Math.max(1, runner.arrivalTime * 1000), 0, 1);
-  drawMiniRunner(runner.x, runner.y, runProgress, { jersey: "#d84e5f", cap: "#bf4331", facing: getRunnerFacingDirection(runner) });
+  const elapsed = (performance.now() - defenseState.startTime) / 1000;
+  const runProgress = clamp((elapsed - (runner.routeStartTime ?? 0)) / Math.max(0.001, runner.routeDuration ?? runner.arrivalTime), 0, 1);
+  drawMiniRunner(runner.x, runner.y, runProgress, { jersey: "#d84e5f", cap: "#bf4331", facing: getRunnerFacingDirection(runner), slide: runner.targetBase !== "first" });
   if (isPinchHitBoostActive(activeBatter) && runner.id === activeBatter?.id) {
     drawTemporaryBoostAura(runner.x, runner.y - 22, {
       radiusX: 31,
@@ -21647,7 +21674,7 @@ function drawStealPlay() {
   const end = stealState.route[1];
   if (start && end) drawLine(start.x, start.y, end.x, end.y);
   ctx.setLineDash([]);
-  drawMiniRunner(stealState.runner.x, stealState.runner.y, runProgress, { jersey: "#ffcf70", cap: "#c76c20", scale: 0.88, facing: getRunnerFacingDirection(stealState.runner) });
+  drawMiniRunner(stealState.runner.x, stealState.runner.y, runProgress, { jersey: "#ffcf70", cap: "#c76c20", scale: 0.88, facing: getRunnerFacingDirection(stealState.runner), slide: true });
 
   if (stealState.throw) {
     const throwState = stealState.throw;
@@ -21684,7 +21711,9 @@ function drawDefenseBaseRunners() {
     drawMiniRunner(runner.x, runner.y, runProgress, {
       jersey: runner.scored && runner.arrived ? "#ffcf70" : "#ff9f43",
       cap: "#c76c20",
-      scale: 0.76
+      scale: 0.76,
+      facing: getRunnerFacingDirection(runner),
+      slide: runner.targetBase !== "first"
     });
   });
 }
@@ -21735,6 +21764,23 @@ function getRunnerFacingDirection(runner) {
   return runner.facing || 1;
 }
 
+function drawRunnerDust(x, y, facing, scale, slide) {
+  const surface = getCurrentStadium().surface;
+  if (["obsidian", "spaceGlow", "artificialTurf"].includes(surface)) return;
+  const time = performance.now() / 1000;
+  ctx.save();
+  for (let i = 0; i < 7; i += 1) {
+    const age = (time * 2.2 + i / 7) % 1;
+    const spread = (14 + slide * 32) * age;
+    ctx.fillStyle = `rgba(213,176,121,${(1 - age) * (0.13 + slide * 0.09)})`;
+    ctx.beginPath();
+    ctx.ellipse(x - facing * spread * scale, y - age * 9,
+      (3 + age * (7 + slide * 8)) * scale, (2 + age * 4) * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawMiniRunner(x, y, runProgress, options = {}) {
   const bob = Math.sin(runProgress * Math.PI * 12) * 3;
   const stride = Math.sin(runProgress * Math.PI * 14);
@@ -21743,6 +21789,9 @@ function drawMiniRunner(x, y, runProgress, options = {}) {
   const jersey = options.jersey || "#d84e5f";
   const cap = options.cap || "#bf4331";
   const facing = options.facing && options.facing < 0 ? -1 : 1;
+  const moving = runProgress > 0 && runProgress < 1;
+  const slide = options.slide && moving ? clamp((runProgress - 0.87) / 0.1, 0, 1) : 0;
+  if (moving) drawRunnerDust(x, y + 30, facing, scale, slide);
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.beginPath();
@@ -21750,6 +21799,11 @@ function drawMiniRunner(x, y, runProgress, options = {}) {
   ctx.fill();
   ctx.translate(x, y + bob);
   ctx.scale(scale * facing, scale);
+  if (slide > 0) {
+    ctx.translate(0, 30);
+    ctx.rotate(-slide * 0.85);
+    ctx.translate(0, -30);
+  }
 
   ctx.strokeStyle = "#233047";
   ctx.lineWidth = 4;

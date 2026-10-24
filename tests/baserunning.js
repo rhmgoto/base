@@ -1983,5 +1983,33 @@ for (const check of recoveryChecks) {
     `error recovery must use the appropriate fielder: ${JSON.stringify(check)}`);
 }
 
+const pursuitChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame();
+  return JSON.stringify([-1, 1].map(side => {
+    defenseState = createDefenseState();
+    defenseState.active = true;
+    defenseState.origin = { x: 640, y: 800 };
+    defenseState.battedBall = { ballTime: 1, direction: normalize({ x: side, y: -1 }) };
+    defenseState.outcome = { caught: false };
+    defenseState.fielders = [
+      { role: "L", x: 200, y: 100, currentX: 200, currentY: 100 },
+      { role: "C", x: 640, y: 0, currentX: 640, currentY: 0 },
+      { role: "R", x: 1080, y: 100, currentX: 1080, currentY: 100 }
+    ];
+    defenseState.chosenFielder = defenseState.fielders[1];
+    ball.x = side < 0 ? 220 : 1060;
+    ball.y = 120;
+    const plan = getLiveOutfieldPursuit(2);
+    defenseState.outfieldPursuit = plan;
+    const center = getDefenseFielderMovementTarget(defenseState.fielders[1], 2);
+    return { role: plan.role, expected: side < 0 ? "L" : "R",
+      coverDistance: Math.hypot(center.x - ball.x, center.y - ball.y) };
+  }));
+`));
+for (const check of pursuitChecks) {
+  assert(check.role === check.expected && check.coverDistance > 50,
+    `近い両翼が追球し、センターはカバーする: ${JSON.stringify(check)}`);
+}
+
 process.stdout.write(`${JSON.stringify(integrationReport)}\n`);
 process.stdout.write("Baserunning check passed\n");

@@ -10472,7 +10472,7 @@ assert(
   outfieldPositionAndRollState.outfieldStartDepthRatio <= 0.88,
   `外野が深すぎると手前に落ちる打球へ物理的に届かなくなる (${outfieldPositionAndRollState.outfieldStartDepthRatio})`
 );
-assert(outfieldPositionAndRollState.frontDropRollDistance >= 160 && outfieldPositionAndRollState.frontDropRollDistance <= 460, "front-of-outfield line drops should roll naturally after landing instead of racing deep");
+assert(outfieldPositionAndRollState.frontDropRollDistance >= 360 && outfieldPositionAndRollState.frontDropRollDistance <= 850, "outfield line drops should carry beyond their landing point while staying within the fence");
 assert(outfieldPositionAndRollState.frontDropRollDuration >= 1.35 && outfieldPositionAndRollState.frontDropRollDuration <= 4.8, "front-of-outfield line drops should settle into a short natural roll after landing");
 assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < 0.42, "front-of-outfield line drops should not shoot forward immediately after landing");
 assert(outfieldPositionAndRollState.frontDropEarlyRollProgress < outfieldPositionAndRollState.frontDropMidRollProgress && outfieldPositionAndRollState.frontDropMidRollProgress < outfieldPositionAndRollState.frontDropLateRollProgress, "front-of-outfield drops should keep rolling forward after the first bounce");
@@ -10481,7 +10481,7 @@ assert(outfieldPositionAndRollState.frontDropLateRollProgress < 0.9, "front-of-o
 assert(outfieldPositionAndRollState.frontDropFinishRollProgress === 1, "front-of-outfield drops should still finish at the rolling target");
 assert(outfieldPositionAndRollState.frontDropBounceHeight < 5, "front-of-outfield line drops should stay low after the first bounce");
 assert(outfieldPositionAndRollState.shallowFrontLanding === true, "shallow outfield liners should use the natural front-of-outfield roll");
-assert(outfieldPositionAndRollState.shallowLinerRollDistance <= 460, "shallow outfield liners should not race deep after landing");
+assert(outfieldPositionAndRollState.shallowLinerRollDistance >= 360 && outfieldPositionAndRollState.shallowLinerRollDistance <= 850, "shallow liners should retain momentum after landing");
 assert(outfieldPositionAndRollState.shallowLinerBounceHeight < 5, "shallow outfield liners should roll low after landing");
 assert(outfieldPositionAndRollState.deepDriveFrontLanding === true, "front-landing deep drives should use the hard front-roll treatment");
 assert(outfieldPositionAndRollState.deepDriveFrontHeight <= 135, "front-landing deep drives should use a lower, more forceful liner arc");
