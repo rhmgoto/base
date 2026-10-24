@@ -70,6 +70,21 @@ const result=vm.runInContext(`(() => {
  prepareScenario({...config,batterControl:'cpu',runnerControl:'cpu',defenseControl:'player'});
  const padRouting=getGamepadForTeam(fieldingTeam())===firstPad&&getGamepadForTeam(battingTeam)===null;
  navigator.getGamepads=savedPads;
+ const earlyTests=[];
+ for(const runnerBase of ['first','second','third']) {
+  const early={...config,first:false,second:false,third:false,[runnerBase]:true,runnerBase,
+    action:'early',batterControl:'cpu',runnerControl:'cpu',defenseControl:'player'};
+  prepareScenario(early);
+  startPitch('fast');
+  const waits=!pendingPitch&&!isPitching;
+  executeScenario();
+  const startedEarly=stealState.active&&!pendingPitch&&!isPitching&&scenarioTest.seen.has('steal-start');
+  __advanceTime(100);update(16.667);
+  startPitch('fast');
+  const pitched=!!pendingPitch&&scenarioTest.events.find(e=>e.label==='投球動作開始')?.seconds>0;
+  prepareScenario(early);
+  earlyTests.push(waits&&startedEarly&&pitched&&!stealState.active&&!pendingPitch);
+ }
  const splitControls=[];
  for(const batterControl of ['player','cpu']) for(const runnerControl of ['player','cpu']) for(const defenseControl of ['player','cpu']) {
   prepareScenario({...config,batterControl,runnerControl,defenseControl,action:'manual'});
@@ -82,9 +97,9 @@ const result=vm.runInContext(`(() => {
  }
  showMenu();
  const restored=!scenarioTest.active&&JSON.stringify(original)===originalJson;
- return {setup,started,logged,retry,invalid,plays,controls,splitControls,catcherTests,padRouting,restored};
+ return {setup,started,logged,retry,invalid,plays,controls,splitControls,catcherTests,padRouting,earlyTests,restored};
 })()`,context,{timeout:30000});
-assert(result.setup&&result.started&&result.logged&&result.retry&&result.invalid&&result.plays.every(Boolean)&&result.controls.every(Boolean)&&result.splitControls.every(Boolean)&&result.catcherTests.every(Boolean)&&result.padRouting&&result.restored,JSON.stringify(result));
+assert(result.setup&&result.started&&result.logged&&result.retry&&result.invalid&&result.plays.every(Boolean)&&result.controls.every(Boolean)&&result.splitControls.every(Boolean)&&result.catcherTests.every(Boolean)&&result.padRouting&&result.earlyTests.every(Boolean)&&result.restored,JSON.stringify(result));
 console.log('Scenario tests passed',result);
 
 
