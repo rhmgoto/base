@@ -20,10 +20,63 @@ window.addEventListener('load', () => {
     bases.first = makeBaseRunner({ id: 'qa-runner', name: '走者', run: 5 });
     bases.third = makeBaseRunner({ id: 'qa-third', name: '三塁走者', run: 5 });
     tryStartSteal('second', clock);
+    const stealPhase = location.hash.slice(1);
+    if (stealPhase.startsWith('steal-')) {
+      clock += 250; updateStealState(clock);
+      finishPitch('ボール', 'ball'); updateStealState(clock);
+      if (stealPhase !== 'steal-catch') {
+        handleManualStealCatcherThrow('second', {}, clock);
+        const toss = stealState.throw;
+        clock = stealState.startTime + (['steal-throw', 'steal-return', 'steal-chase'].includes(stealPhase)
+          ? (toss.startTime + toss.endTime) / 2 : toss.tagTime + 0.01) * 1000;
+        updateStealState(clock);
+        if (['steal-return', 'steal-chase'].includes(stealPhase)) {
+          returnStealingRunner(clock);
+          if (stealPhase === 'steal-chase') {
+            clock = defenseState.startTime + (toss.endTime + 0.01) * 1000;
+            const elapsed = (clock - defenseState.startTime) / 1000;
+            updateDefenseBaseRunners(elapsed); updateThrowState(elapsed);
+            handleRundownCommand('first'); updateRundown(elapsed + 0.08);
+          }
+        }
+      }
+      draw(); document.body.dataset.visualCheck = stealPhase; return;
+    }
     clock += 200; updateStealState(clock); startPickoff('second', clock);
     const start = clock;
     const runner = defenseState.baseRunners.find(r => r.startBase === 'first');
     const phase = location.hash.slice(1) || 'throw';
+    if (['grounder', 'fly-return', 'relay'].includes(phase)) {
+      const target = { x: field.plateX - 190, y: field.plateY - 470 };
+      const origin = { x: field.plateX, y: field.plateY };
+      const fielders = initializeFielderCatchRanges(getDefensiveLineup(fieldingTeam()));
+      const fielder = fielders.find(f => f.role === 'SS');
+      Object.assign(fielder, target);
+      const hit = { target, origin, direction: normalize({ x: -0.3, y: -1 }),
+        trajectory: phase === 'grounder' ? 'grounder' : 'fly', isGrounder: phase === 'grounder',
+        ballTime: 1, power: 0.3, distance: 500, landingDistance: 500, flightDistance: 500 };
+      const outcome = { kind: 'out', caught: true, needsThrow: phase === 'grounder', fieldingTime: 1 };
+      const returning = createDefenseBaseRunner('first', bases.first, outcome, hit, null, fielder, target,
+        { active: true, startBase: 'first', targetBase: 'second', runnerId: bases.first.id, leadDistance: 220 });
+      defenseState = { ...createDefenseState(), active: true, startTime: clock - 1200,
+        duration: 30000, origin, target, landingTarget: target, battedBall: hit, outcome,
+        fielders, chosenFielder: fielder, runner: createBatterRunner(activeBatter), baseRunners: [returning],
+        unifiedCircleCatchComplete: true };
+      updateDefenseBaseRunners(1.2); updateFlyReturnRequirements(1.2);
+      if (phase === 'grounder') defenseState.startTime = clock - 500;
+      if (phase === 'relay') {
+        defenseState.throw = { from: target, to: defenseField.bases.second, targetBase: 'second',
+          startTime: 1, endTime: 1.4, throwTime: 0.4 };
+        defenseState.defensePreview = { base: 'first', label: '送球先' };
+      } else defenseState.defensePreview = { base: 'first', label: '送球先' };
+      if (phase === 'fly-return') {
+        defenseState.runnerPreview = { base: 'first', label: '帰塁先' };
+        addDefenseVisualEvent('捕球！', target, '#aee7ff', 650);
+      }
+      const point = getDefenseBallPoint(0, 0, (clock - defenseState.startTime) / 1000);
+      ball.x = point.x; ball.y = point.y;
+      draw(); document.body.dataset.visualCheck = phase; return;
+    }
     const toss = defenseState.throw;
     const elapsed = phase === 'throw' ? toss.startTime + toss.throwTime * 0.5
       : phase === 'catch' ? toss.endTime + 0.01 : runner.arrivalTime + 0.01;
@@ -50,7 +103,8 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
   .replace('</body>', '<script>' + setup + '</script></body>');
 const fixture = path.join(output, 'fixture.html');
 fs.writeFileSync(fixture, html);
-for (const phase of ['throw', 'catch', 'tag', 'out', 'rundown']) {
+for (const phase of ['throw', 'catch', 'tag', 'out', 'rundown', 'grounder', 'fly-return', 'relay', 'steal-catch', 'steal-throw', 'steal-out', 'steal-return', 'steal-chase']) {
+  if (process.argv[4] && !phase.startsWith(process.argv[4])) continue;
   const screenshot = path.join(output, phase + '.png');
   const result = spawnSync(chrome, ['--headless', '--disable-gpu', '--no-first-run',
     '--allow-file-access-from-files', '--hide-scrollbars', '--window-size=' + viewport,

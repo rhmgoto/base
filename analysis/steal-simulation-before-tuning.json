@@ -1,0 +1,4342 @@
+{
+  "seed": 20261024,
+  "samplesPerCombination": 10000,
+  "totalTrials": 960000,
+  "conditions": {
+    "base": "first to second",
+    "fastKmh": 150,
+    "pitchSpeedRandom": "0.9–1.1, rounded km/h",
+    "jumpSeconds": "uniform 0–0.5 after motion starts",
+    "catcherInputDelay": 0,
+    "judgmentGraceSeconds": 0.1,
+    "frameRate": 60,
+    "catchPoint": "whole ball past plate back edge",
+    "swingMiss": false,
+    "pitchMovement": false,
+    "pickoff": false,
+    "return": false,
+    "injuryOrBoost": false
+  },
+  "rows": [
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.6365919282511212,
+      "minMargin": -0.8724164173455642,
+      "maxMargin": -0.2633281941819048,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.6097155361050326,
+      "minMargin": -0.8992928094916524,
+      "maxMargin": -0.2902045863279934,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.5841025641025641,
+      "minMargin": -0.9249057814941208,
+      "maxMargin": -0.3158175583304619,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.5596659707724425,
+      "minMargin": -0.9493423748242424,
+      "maxMargin": -0.3402541516605835,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.6365919282511212,
+      "minMargin": -0.7103975709571255,
+      "maxMargin": -0.10130934779346612,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.6097155361050326,
+      "minMargin": -0.7372739631032137,
+      "maxMargin": -0.12818573993955473,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.5841025641025641,
+      "minMargin": -0.7628869351056822,
+      "maxMargin": -0.15379871194202321,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.5596659707724425,
+      "minMargin": -0.7873235284358038,
+      "maxMargin": -0.17823530527214482,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 194,
+      "rate": 1.94,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.6365919282511212,
+      "minMargin": -0.5621665185829667,
+      "maxMargin": 0.04692170458069267,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 9.77329974811083
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 50,
+      "rate": 0.5,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.6097155361050326,
+      "minMargin": -0.5890429107290549,
+      "maxMargin": 0.020045312434604057,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 2.518891687657431
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.5841025641025641,
+      "minMargin": -0.6146558827315234,
+      "maxMargin": -0.005567659567864425,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.5596659707724425,
+      "minMargin": -0.639092476061645,
+      "maxMargin": -0.030004252897986028,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 2573,
+      "rate": 25.729999999999997,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.6365919282511212,
+      "minMargin": -0.42603508152242764,
+      "maxMargin": 0.18305314164123176,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 97.53148614609572
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 31.59722222222222
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 2032,
+      "rate": 20.32,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.6097155361050326,
+      "minMargin": -0.4529114736685158,
+      "maxMargin": 0.15617674949514315,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 88.61460957178842
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 13.541666666666666
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 1506,
+      "rate": 15.06,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.5841025641025641,
+      "minMargin": -0.4785244456709843,
+      "maxMargin": 0.13056377749267467,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 72.544080604534
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 3.273809523809524
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "good",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 1031,
+      "rate": 10.31,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.5596659707724425,
+      "minMargin": -0.5029610390011059,
+      "maxMargin": 0.10612718416255307,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 51.63727959697732
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0.2976190476190476
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.006731564717216365,
+      "maxMargin": 0.6158197878808753,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 9959,
+      "rate": 99.59,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": -0.026863925465394622,
+      "maxMargin": 0.5822242976982652,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 97.92824658918646
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 9691,
+      "rate": 96.91,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": -0.05888014046847978,
+      "maxMargin": 0.5502080826951792,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 84.38605356240525
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 9301,
+      "rate": 93.01,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": -0.089425882131132,
+      "maxMargin": 0.519662341032527,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 64.67913087417888
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.16875041110565503,
+      "maxMargin": 0.777838634269314,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.13515492092304404,
+      "maxMargin": 0.7442431440867039,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.10313870591995888,
+      "maxMargin": 0.7122269290836178,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.07259296425730666,
+      "maxMargin": 0.6816811874209656,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.3169814634798138,
+      "maxMargin": 0.9260696866434728,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.28338597329720283,
+      "maxMargin": 0.8924741964608627,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.2513697582941177,
+      "maxMargin": 0.8604579814577766,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.22082401663146545,
+      "maxMargin": 0.8299122397951244,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.4531129005403529,
+      "maxMargin": 1.0622011237040119,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.4195174103577419,
+      "maxMargin": 1.0286056335214018,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.38750119535465677,
+      "maxMargin": 0.9965894185183157,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "fast",
+      "throw": "bad",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.35695545369200454,
+      "maxMargin": 0.9660436768556635,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.6724164173455645,
+      "maxMargin": -0.0400644658737237,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.6992928094916522,
+      "maxMargin": -0.06694085801981231,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.5841025641025643,
+      "minMargin": -0.7249057814941211,
+      "maxMargin": -0.09255383002228079,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 0,
+      "rate": 0,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.5596659707724427,
+      "minMargin": -0.7493423748242427,
+      "maxMargin": -0.1169904233524024,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 1001,
+      "rate": 10.01,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.5103975709571258,
+      "maxMargin": 0.12195438051471497,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 48.56423173803526
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 1.8353174603174605
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 609,
+      "rate": 6.09,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.5372739631032135,
+      "maxMargin": 0.09507798836862635,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 30.680100755667507
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 337,
+      "rate": 3.37,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.5841025641025643,
+      "minMargin": -0.5628869351056824,
+      "maxMargin": 0.06946501636615787,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 16.977329974811084
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 157,
+      "rate": 1.5699999999999998,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.5596659707724427,
+      "minMargin": -0.587323528435804,
+      "maxMargin": 0.04502842303603627,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 7.909319899244332
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 3981,
+      "rate": 39.81,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.362166518582967,
+      "maxMargin": 0.27018543288887376,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 82.04365079365078
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 17.53846153846154
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 3422,
+      "rate": 34.22,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.3890429107290547,
+      "maxMargin": 0.24330904074278514,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 99.94962216624685
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 64.43452380952381
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 7.128205128205129
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 2928,
+      "rate": 29.28,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.5841025641025643,
+      "minMargin": -0.41465588273152365,
+      "maxMargin": 0.21769606874031666,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 98.38790931989925
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 46.676587301587304
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 1.7435897435897436
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 2451,
+      "rate": 24.51,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.5596659707724427,
+      "minMargin": -0.43909247606164525,
+      "maxMargin": 0.19325947541019506,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 91.68765743073047
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 31.299603174603174
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 6639,
+      "rate": 66.39,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.2260350815224279,
+      "maxMargin": 0.40631686994941285,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 95.17948717948718
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 37.34299516908213
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0.4547751389590703
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 6079,
+      "rate": 60.79,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.25291147366851563,
+      "maxMargin": 0.37944047780332424,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 85.02564102564104
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 20.28985507246377
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 5568,
+      "rate": 55.67999999999999,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.5841025641025643,
+      "minMargin": -0.27852444567098456,
+      "maxMargin": 0.35382750580085576,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 70.1025641025641
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 9.66183574879227
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "good",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 5119,
+      "rate": 51.190000000000005,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.5596659707724427,
+      "minMargin": -0.30296103900110616,
+      "maxMargin": 0.32939091247073415,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 99.65277777777779
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 55.02564102564102
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 2.5120772946859904
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.2067315647172161,
+      "maxMargin": 0.8390835161890564,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.17313607453460556,
+      "maxMargin": 0.8054880260064463,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.14111985953151995,
+      "maxMargin": 0.7734718110033603,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.11057411786886773,
+      "maxMargin": 0.742926069340708,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.36875041110565476,
+      "maxMargin": 1.001102362577495,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.3351549209230442,
+      "maxMargin": 0.967506872394885,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.3031387059199586,
+      "maxMargin": 0.9354906573917989,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.2725929642573064,
+      "maxMargin": 0.9049449157291467,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.5169814634798136,
+      "maxMargin": 1.1493334149516539,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.483385973297203,
+      "maxMargin": 1.1157379247690438,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.4513697582941174,
+      "maxMargin": 1.0837217097659577,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.4208240166314652,
+      "maxMargin": 1.0531759681033055,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.5157399103139015,
+      "minMargin": 0.6531129005403526,
+      "maxMargin": 1.285464852012193,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.4821444201312906,
+      "minMargin": 0.6195174103577421,
+      "maxMargin": 1.2518693618295829,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.4501282051282054,
+      "minMargin": 0.5875011953546565,
+      "maxMargin": 1.2198531468264968,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "normal",
+      "throw": "bad",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.419582463465553,
+      "minMargin": 0.5569554536920043,
+      "maxMargin": 1.1893074051638446,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 3927,
+      "rate": 39.269999999999996,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.3890830840122308,
+      "maxMargin": 0.29359297842578513,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 72.76785714285714
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 24.358974358974358
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 3399,
+      "rate": 33.989999999999995,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.41595947615831896,
+      "maxMargin": 0.2667165862796965,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 98.33753148614609
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 59.077380952380956
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 13.128205128205128
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 2878,
+      "rate": 28.78,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.584102564102564,
+      "minMargin": -0.44157244816078745,
+      "maxMargin": 0.24110361427722804,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 91.58690176322418
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 46.726190476190474
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 6.051282051282051
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 2382,
+      "rate": 23.82,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 1.5596659707724423,
+      "minMargin": -0.46600904149090905,
+      "maxMargin": 0.21666702094710644,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 82.97229219143577
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 34.92063492063492
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 1.5897435897435899
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 7120,
+      "rate": 71.2,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.22706423762379213,
+      "maxMargin": 0.4556118248142238,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 95.28205128205128
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 51.06280193236715
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 10.308236483072259
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 6584,
+      "rate": 65.84,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.2539406297698803,
+      "maxMargin": 0.4287354326681352,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 86.82051282051282
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 39.27536231884058
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 3.890853966649823
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 6061,
+      "rate": 60.61,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.584102564102564,
+      "minMargin": -0.2795536017723488,
+      "maxMargin": 0.4031224606656667,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 76.2051282051282
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 27.43961352657005
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0.30318342597271347
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 5569,
+      "rate": 55.69,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 1.5596659707724423,
+      "minMargin": -0.3039901951024704,
+      "maxMargin": 0.3786858673355451,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 99.55357142857143
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 63.64102564102564
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 16.231884057971012
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 0
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 9562,
+      "rate": 95.62,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": -0.07883318524963334,
+      "maxMargin": 0.6038428771883826,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 77.86760990399192
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 9267,
+      "rate": 92.67,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": -0.10570957739572151,
+      "maxMargin": 0.576966485042294,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 99.27536231884058
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 63.71905002526529
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 8926,
+      "rate": 89.25999999999999,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.584102564102564,
+      "minMargin": -0.13132254939819,
+      "maxMargin": 0.5513535130398255,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 93.42995169082126
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 52.60232440626579
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 8494,
+      "rate": 84.94,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 1.5596659707724423,
+      "minMargin": -0.1557591427283116,
+      "maxMargin": 0.5269169197097039,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 84.97584541062801
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 39.61596766043456
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.636591928251121,
+      "minMargin": 0.057298251810905754,
+      "maxMargin": 0.7399743142489217,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.6097155361050328,
+      "minMargin": 0.030421859664817585,
+      "maxMargin": 0.7130979221028331,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.584102564102564,
+      "minMargin": 0.004808887662349104,
+      "maxMargin": 0.6874849501003646,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "good",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 9952,
+      "rate": 99.52,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 1.5596659707724423,
+      "minMargin": -0.0196277056677725,
+      "maxMargin": 0.663048356770243,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 97.57453259221829
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 7,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.515739910313901,
+      "minMargin": 0.49006489805054976,
+      "maxMargin": 1.1727409604885652,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 7,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.482144420131291,
+      "minMargin": 0.45646940786793877,
+      "maxMargin": 1.1391454703059543,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 7,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.450128205128205,
+      "minMargin": 0.4244531928648536,
+      "maxMargin": 1.107129255302869,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 7,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.6457123335021304,
+      "catcherToBaseSeconds": 2.4195824634655527,
+      "minMargin": 0.3939074512022014,
+      "maxMargin": 1.0765835136402169,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 8,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.515739910313901,
+      "minMargin": 0.6520837444389884,
+      "maxMargin": 1.334759806877004,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 8,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.482144420131291,
+      "minMargin": 0.6184882542563774,
+      "maxMargin": 1.301164316694393,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 8,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.450128205128205,
+      "minMargin": 0.5864720392532923,
+      "maxMargin": 1.2691481016913078,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 8,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.4836934871136918,
+      "catcherToBaseSeconds": 2.4195824634655527,
+      "minMargin": 0.55592629759064,
+      "maxMargin": 1.2386023600286555,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 9,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.515739910313901,
+      "minMargin": 0.8003147968131472,
+      "maxMargin": 1.4829908592511627,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 9,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.482144420131291,
+      "minMargin": 0.7667193066305362,
+      "maxMargin": 1.4493953690685517,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 9,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.450128205128205,
+      "minMargin": 0.7347030916274511,
+      "maxMargin": 1.4173791540654666,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 9,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.335462434739533,
+      "catcherToBaseSeconds": 2.4195824634655527,
+      "minMargin": 0.7041573499647988,
+      "maxMargin": 1.3868334124028143,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 10,
+      "arm": 6,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.515739910313901,
+      "minMargin": 0.9364462338736863,
+      "maxMargin": 1.6191222963117018,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 10,
+      "arm": 7,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.482144420131291,
+      "minMargin": 0.9028507436910753,
+      "maxMargin": 1.5855268061290908,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 10,
+      "arm": 8,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.450128205128205,
+      "minMargin": 0.8708345286879902,
+      "maxMargin": 1.5535105911260056,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    },
+    {
+      "pitch": "slow",
+      "throw": "bad",
+      "run": 10,
+      "arm": 9,
+      "n": 10000,
+      "successes": 10000,
+      "rate": 100,
+      "runnerSeconds": 3.199330997678994,
+      "catcherToBaseSeconds": 2.4195824634655527,
+      "minMargin": 0.8402887870253379,
+      "maxMargin": 1.5229648494633534,
+      "jumpBins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "n": 1985,
+          "rate": 100
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 2016,
+          "rate": 100
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 1950,
+          "rate": 100
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 2070,
+          "rate": 100
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 1979,
+          "rate": 100
+        }
+      ]
+    }
+  ]
+}
