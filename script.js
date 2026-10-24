@@ -1585,6 +1585,7 @@ const gamepadButtons = {
   Y: 0,
   LB: 4,
   RB: 5,
+  PICKOFF: 6,
   INTENTIONAL_WALK: 9,
   PAUSE: 12
 };
@@ -1598,6 +1599,8 @@ let pauseMenuState = {
   selectedBase: null,
   message: ""
 };
+
+let pickoffMode = false;
 
 let ppDetailState = {
   active: false,
@@ -2461,6 +2464,7 @@ function createDefenseState() {
     baseRunners: [],
     throw: null,
     heldBallBase: null,
+    rundown: null,
     errorRecovery: null,
     heldBallSince: null,
     lastManualThrowCommandTime: null,
@@ -5183,6 +5187,7 @@ function scheduleNextPitch(delay = 900) {
 }
 
 function resetBall() {
+  pickoffMode = false;
   ball.x = pitcher.x;
   ball.y = pitcher.y + 18;
   ball.prevX = ball.x;
@@ -5296,7 +5301,7 @@ function declareIntentionalWalk() {
 
 function startPitch(typeKey, options = {}) {
   if (isSwitchBatterChoicePending()) return;
-  if (gamePhase !== "playing" || isInputLocked() || isPitching || pendingPitch || ball.active || (stealState.active && !stealState.resolved)) return;
+  if (gamePhase !== "playing" || isInputLocked() || isPitching || pendingPitch || ball.active || pickoffMode || (stealState.active && (ball.crossedPlate || stealState.decision))) return;
   const pitch = pitchTypes[typeKey];
   if (!pitch) {
     message = "球種は 5/8/2/0 から選んでください";
@@ -7225,6 +7230,11 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   }
 
   if (!options.suppressBattingButtons && gamePhase === "playing" && isPlayerBatting() && team === battingTeam) {
+    if (stealState.active && !stealState.resolved && justPressed(gamepadButtons.B) && directions.size > 0) {
+      returnStealingRunner();
+      gamepadState.previousButtons[team] = pressed;
+      return;
+    }
     if (justPressed(gamepadButtons.A)) {
       swingBat("strong");
     }
@@ -7242,6 +7252,15 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
 
   const pitchingTeam = isBattingPracticeMode() ? "away" : fieldingTeam();
   if (gamePhase === "playing" && isPlayerPitching() && team === pitchingTeam) {
+    pickoffMode = !isPitching && !pendingPitch && !ball.active && !ball.crossedPlate
+      && !stealState.decision && !stealState.pitchResultPending && pressed.has(gamepadButtons.PICKOFF);
+    if (pickoffMode) {
+      const target = directions.size ? getGamepadThrowTarget(directions) : null;
+      message = target ? `牽制モード：${getBaseLabel(target)}（ボタン2で送球）` : "牽制モード：塁を指定してください";
+      if (justPressed(gamepadButtons.A) && target) startPickoff(target);
+      gamepadState.previousButtons[team] = pressed;
+      return;
+    }
     if (justPressed(gamepadButtons.INTENTIONAL_WALK)) {
       if (canDeclareIntentionalWalk()) declareIntentionalWalk();
       gamepadState.previousButtons[team] = pressed;
@@ -7258,13 +7277,14 @@ function handleGamepadButtonPresses(gamepad, team, options = {}) {
   }
   if (gamePhase === "playing" && team === fieldingTeam() && canManualStealCatcherThrow()) {
     const stealThrowTarget = getGamepadThrowTarget(directions);
-    if (justPressed(gamepadButtons.A) && ["second", "third"].includes(stealThrowTarget)) {
+    if (justPressed(gamepadButtons.A) && ["first", "second", "third"].includes(stealThrowTarget)) {
       gamepadState.lastThrowButtonPress[team] = performance.now();
       handleManualStealCatcherThrow(stealThrowTarget, getStealCatcherThrowTimingOptions(team, directions));
     }
   }
   if (gamePhase === "defense" && team === fieldingTeam()) {
     const throwTarget = getGamepadThrowTarget(directions);
+    if (justPressed(gamepadButtons.B)) handleRundownCommand(throwTarget);
     if (justPressed(gamepadButtons.A)) {
       gamepadState.lastThrowButtonPress[team] = performance.now();
       handleDefenseThrowCommand(throwTarget, getDefenseThrowTimingOptions(team, directions));
@@ -7378,22 +7398,65 @@ function getGamepadThrowTarget(directions) {
   return "first";
 }
 
+function returnStealingRunner(now = performance.now()) {
+  if (!stealState.active || stealState.decision || stealState.returning || stealState.throw) return;
+  const destination = getDefenseBasePointByName(stealState.startBase);
+  stealState.route = [{ x: stealState.runner.x, y: stealState.runner.y }, destination];
+  stealState.targetBase = stealState.startBase;
+  stealState.startTime = now;
+  stealState.arrivalTime = getRunnerRouteDistance(stealState.route) / getStealRunnerSpeed(stealState.runner);
+  stealState.returning = true;
+  stealState.throw = null;
+}
+
+function startPickoff(targetBase, now = performance.now()) {
+  if (gamePhase !== "playing" || isPitching || pendingPitch || ball.active || ball.crossedPlate
+    || stealState.decision || stealState.pitchResultPending
+    || !["first", "second", "third", "home"].includes(targetBase)) return false;
+  const attempt = stealState.active ? stealState : null;
+  if (!attempt && !bases[targetBase]) return false;
+  const originalCount = { ...count };
+  defenseState = createDefenseState();
+  defenseState.active = true;
+  defenseState.pickoff = true;
+  defenseState.originalCount = originalCount;
+  defenseState.startTime = now;
+  defenseState.duration = 10000;
+  defenseState.unifiedCircleCatchComplete = true;
+  defenseState.target = { x: field.plateX, y: (defenseField.bases.second.y + defenseField.bases.home.y) / 2 };
+  defenseState.battedBall = { target: defenseState.target, ballTime: 0, power: 0, isGrounder: true, trajectory: "grounder" };
+  defenseState.outcome = { kind: "pickoff", caught: false, needsThrow: true, fieldingTime: 0 };
+  defenseState.chosenFielder = { role: "P", arm: 5, fielding: 5, ...defenseState.target };
+  defenseState.baseRunners = ["first", "second", "third"].filter(base => bases[base]).map(base => {
+    const start = attempt?.startBase === base ? { x: attempt.runner.x, y: attempt.runner.y } : getDefenseBasePointByName(base);
+    const destination = attempt?.startBase === base ? attempt.targetBase : base;
+    const route = [start, getDefenseBasePointByName(destination)];
+    const duration = getRunnerRouteDistance(route) / getRunnerSpeed(bases[base]);
+    return { ...bases[base], startBase: base, originalBase: base, currentBase: base,
+      targetBase: destination, ...start, route, routeStartTime: 0, routeDuration: duration,
+      arrivalTime: duration, speed: getRunnerSpeed(bases[base]), arrived: duration === 0,
+      running: duration > 0, manualControlled: true, forceObligation: false, tagUp: false };
+  });
+  stealState = createStealState();
+  pickoffMode = false;
+  autoPitchTimer = Infinity;
+  gamePhase = "defense";
+  ball.active = true;
+  ball.inPitch = false;
+  defenseState.throw = createThrowState(defenseState.chosenFielder, defenseState.target,
+    defenseState.outcome, null, { targetBase, immediate: true, startTime: 0.28, minStartTime: 0.28,
+      baseRunners: defenseState.baseRunners });
+  message = `${getBaseLabel(targetBase)}へ牽制`;
+  return true;
+}
+
 function tryStartSteal(targetBase, now = performance.now()) {
   if (!stealTuning.enabled || stealState.active) return false;
   if (gamePhase !== "playing" || !isPlayerBatting() || ball.crossedPlate) return false;
   const candidate = getStealCandidate(targetBase);
   if (!candidate) return false;
   if (!isPitching && !pendingPitch) {
-    stealState = {
-      ...createStealState(),
-      earlyRequest: true,
-      targetBase: candidate.targetBase,
-      requestTime: now,
-      pitchType: candidate.pitchType || "normal"
-    };
-    message = "盗塁スタートが早すぎます";
-    showEffect("早すぎるスタート", "#ff8f70");
-    return true;
+    return beginStealAttempt(candidate, now, { earlyRequest: true });
   }
   return beginStealAttempt(candidate, now, { earlyRequest: false });
 }
@@ -7422,7 +7485,7 @@ function beginStealAttempt(candidate, now = performance.now(), options = {}) {
     requestTime: options.requestTime ?? now,
     motionElapsedSeconds,
     jumpLead,
-    arrivalTime: Math.max(0.35, routeDistance / runnerSpeed - lead - jumpLead),
+    arrivalTime: Math.max(0.35, routeDistance / runnerSpeed),
     pitchType: currentPitchType || candidate.pitchType || "normal"
   };
   const start = route[0];
@@ -7433,13 +7496,9 @@ function beginStealAttempt(candidate, now = performance.now(), options = {}) {
   return true;
 }
 
-// 盗塁のときだけ走力差を圧縮した速度を使う。
-// 走力の低い走者を基準に、上位の伸びだけを鈍らせる。
+// 投球前後を問わず、通常の走塁速度を使う。
 function getStealRunnerSpeed(runnerInfo) {
-  const baseSpeed = getRunnerSpeed(runnerInfo) * stealTuning.runSpeedScale;
-  const slowestSpeed = getRunnerSpeed({ run: 1 }) * stealTuning.runSpeedScale;
-  const spreadScale = clamp(stealTuning.runSpeedSpreadScale ?? 1, 0, 1);
-  return slowestSpeed + (baseSpeed - slowestSpeed) * spreadScale;
+  return getRunnerSpeed(runnerInfo);
 }
 
 function getPitchMotionElapsedSeconds(now = performance.now()) {
@@ -7451,24 +7510,10 @@ function getPitchMotionElapsedSeconds(now = performance.now()) {
   return (now - motionStart) / 1000;
 }
 
-// 盗塁のスタート補正。投球動作の開始直後が最良で、遅れるほど小さくなる。
-// フライングは、投球動作の何秒前に仕掛けたかに応じてペナルティを重くする。
+// スタートの有利不利は実際の出発時刻で決める。
 function getStealJumpLead(motionElapsedSeconds = 0, earlyRequest = false) {
-  if (earlyRequest || motionElapsedSeconds < 0) {
-    const earlySeconds = Math.max(0, -(motionElapsedSeconds || 0));
-    const penalty = stealTuning.earlyJumpPenalty + earlySeconds * stealTuning.earlyJumpPenaltyPerSecond;
-    return -Math.min(penalty, stealTuning.maxEarlyJumpPenalty);
-  }
-  if (motionElapsedSeconds <= 0.18) return stealTuning.quickJumpLead;
-  if (motionElapsedSeconds <= 0.45) {
-    const t = (motionElapsedSeconds - 0.18) / 0.27;
-    return stealTuning.quickJumpLead * (1 - t) + 0.06 * t;
-  }
-  if (motionElapsedSeconds <= 0.8) {
-    const t = (motionElapsedSeconds - 0.45) / 0.35;
-    return 0.06 * (1 - t) - stealTuning.lateJumpPenalty * 0.55 * t;
-  }
-  return -stealTuning.lateJumpPenalty;
+  // 出発時刻で有利不利を付け、同じ走者の移動速度は変えない。
+  return 0;
 }
 
 // 走力に応じた盗塁の仕掛け率。minRunRating 未満は 0。
@@ -7534,18 +7579,38 @@ function getStealCandidate(targetBase) {
   if (targetBase === "third" && bases.second && !bases.third) {
     return { runner: bases.second, startBase: "second", targetBase: "third", pitchType };
   }
+  if (targetBase === "home" && bases.third) {
+    return { runner: bases.third, startBase: "third", targetBase: "home", pitchType };
+  }
   return null;
 }
 
 function updateStealState(now = performance.now()) {
   if (!stealState.active || stealState.resolved) return;
+  if (stealState.decision) {
+    if (now >= stealState.decision.until) resolveSteal(stealState.decision.out, true);
+    return;
+  }
   const elapsedSeconds = (now - stealState.startTime) / 1000;
   const progress = stealState.arrivalTime > 0 ? clamp(elapsedSeconds / stealState.arrivalTime, 0, 1) : 1;
   const point = getRunnerRoutePoint(stealState.route, progress);
   stealState.runner.x = point.x;
   stealState.runner.y = point.y;
   stealState.runner.arrived = progress >= 1;
+  if (!isPitching && !pendingPitch && !ball.inPitch && !ball.crossedPlate && !isPlayerPitching()
+    && elapsedSeconds > 0.65 && !stealState.returning) {
+    startPickoff(progress < 0.5 ? stealState.startBase : stealState.targetBase, now);
+    return;
+  }
   stealState.plateReached = stealState.plateReached || ball.crossedPlate || (!ball.inPitch && stealState.pitchResultPending);
+  if (stealState.plateReached && stealState.targetBase === "home" && !stealState.throw) {
+    // 本塁は投球の到達を捕手の捕球として扱い、送球ボタンは不要。
+    const endTime = Math.max(0, ((ball.plateTime || now) - stealState.startTime) / 1000);
+    const home = { ...defenseField.bases.home };
+    stealState.throw = { from: home, to: home, targetBase: "home", startTime: endTime,
+      endTime, throwTime: 0.001, tagTime: Math.max(endTime, stealState.arrivalTime),
+      safe: stealState.arrivalTime <= endTime, completed: false };
+  }
   if (stealState.plateReached && !stealState.throw) {
     if (isManualStealCatcherThrowControl()) {
       prepareManualStealCatcherThrow(elapsedSeconds);
@@ -7557,7 +7622,7 @@ function updateStealState(now = performance.now()) {
   const throwState = stealState.throw;
   if (throwState) {
     throwState.active = elapsedSeconds >= throwState.startTime && elapsedSeconds <= throwState.endTime;
-    if (!throwState.completed && elapsedSeconds >= throwState.endTime) {
+    if (!throwState.completed && elapsedSeconds >= (throwState.tagTime ?? throwState.endTime)) {
       throwState.completed = true;
       if (throwState.targetBase === stealState.targetBase) {
         resolveSteal(!throwState.safe);
@@ -7565,7 +7630,10 @@ function updateStealState(now = performance.now()) {
       }
     }
   }
-  if (stealState.runner.arrived) resolveSteal(false);
+  // 帰塁先と違う塁へ送球した場合も、送球と走塁が終わればプレーを閉じる。
+  // 完了済み送球を残したままだと、次の投球が永久に禁止される。
+  if (stealState.runner.arrived && (!throwState ||
+    (throwState.completed && throwState.targetBase !== stealState.targetBase))) resolveSteal(false);
 }
 
 function isManualStealCatcherThrowControl() {
@@ -7581,7 +7649,7 @@ function prepareManualStealCatcherThrow(elapsedSeconds) {
   stealState.catcherThrowReady = true;
   stealState.catcherThrowReadyTime = elapsedSeconds;
   stealState.manualThrowRequired = true;
-  message = "捕手捕球、二塁/三塁へ送球できます";
+  message = "捕手捕球、一塁/二塁/三塁へ送球できます";
   showEffect("送球可能", "#aee7ff");
 }
 
@@ -7615,7 +7683,7 @@ function handleManualStealCatcherThrow(targetBase, timingOptions = {}, now = per
 
 function handleStealDefenseThrow(targetBase, now = performance.now(), options = {}) {
   if (!stealState.active || stealState.resolved || stealState.throw || !stealState.plateReached) return false;
-  if (!["second", "third"].includes(targetBase)) return false;
+  if (!["first", "second", "third"].includes(targetBase)) return false;
   const elapsedSeconds = (now - stealState.startTime) / 1000;
   const from = { ...defenseField.bases.home };
   const to = { ...getDefenseBasePointByName(targetBase) };
@@ -7644,13 +7712,14 @@ function handleStealDefenseThrow(targetBase, now = performance.now(), options = 
     targetBase,
     startTime,
     endTime,
+    tagTime: Math.max(endTime + 0.12, stealState.arrivalTime - 0.06),
     throwTime,
     arcMultiplier,
     throwSpeedScale,
     manual: Boolean(options.manual),
     timingRank,
     throwTimingLabel: options.throwTimingLabel || "",
-    safe: targetBase !== stealState.targetBase || stealState.arrivalTime <= endTime,
+    safe: targetBase !== stealState.targetBase || stealState.arrivalTime <= endTime + 0.12,
     completed: false,
     baseLabel: getBaseLabel(targetBase)
   };
@@ -7666,8 +7735,16 @@ function getStealThrowBallColor(throwState) {
   return "#fff2a8";
 }
 
-function resolveSteal(isOut) {
+function resolveSteal(isOut, commit = false) {
   if (!stealState.active || stealState.resolved) return;
+  if (!commit) {
+    if (!stealState.decision) {
+      stealState.decision = { out: isOut, until: performance.now() + 900 };
+      message = isOut ? "タッチアウト" : "セーフ";
+      showEffect(message, isOut ? "#ffcf70" : "#aee7ff");
+    }
+    return;
+  }
   const mvpBeforeState = captureMvpGameState();
   const stealBattingTeam = battingTeam;
   // 三振は捕手の送球・タッチより先に成立する。二死なら三振が3アウト目なので、
@@ -7692,13 +7769,18 @@ function resolveSteal(isOut) {
     recordCurrentPitcherOuts(1);
     message = `${getBaseLabel(stealState.targetBase)}盗塁アウト`;
     showEffect("盗塁アウト", "#ffcf70");
+  } else if (stealState.targetBase === "home") {
+    applyRunnerResults(baseNames.filter(base => bases[base]).map(base =>
+      createRunnerResult(bases[base], base, base === stealState.startBase ? "home" : base)));
+    message = "ホームスティール成功";
+    showEffect(message, "#fff2a8");
   } else {
     bases[stealState.startBase] = null;
     bases[stealState.targetBase] = makeBaseRunner(runner);
-    message = `${getBaseLabel(stealState.targetBase)}盗塁成功`;
-    showEffect("盗塁成功", "#fff2a8");
+    message = `${getBaseLabel(stealState.targetBase)}${stealState.returning ? "帰塁セーフ" : "盗塁成功"}`;
+    showEffect(stealState.returning ? "帰塁セーフ" : "盗塁成功", "#fff2a8");
   }
-  recordMvpStealResult(runner, isOut, mvpBeforeState);
+  if (!stealState.returning) recordMvpStealResult(runner, isOut, mvpBeforeState);
   const shouldCheckCount = stealState.pitchResultPending || isOut;
   stealState = createStealState();
   if (shouldCheckCount) {
@@ -10428,6 +10510,7 @@ function refreshDefenseBaseRunnerAnimations(outcome, battedBall, throwState = nu
 // 塁上で止まったままの走者だけが、新しい判断 (タッチアップなど) の対象になる。
 function shouldKeepLiveDefenseBaseRunner(runner) {
   if (!runner || !runner.startBase) return false;
+  if (runner.explicitFlyDeparture || runner.flyReturnRequired) return true;
   if (runner.manualTargetBase) return true;
   if (runner.isOut) return true;
   const startIndex = baseIndexByName[runner.startBase] ?? 0;
@@ -10442,7 +10525,9 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   if (!runnerInfo) return null;
   const startBase = baseIndexByName[baseName];
   const manualBaserunning = isManualBaserunningControl();
-  const tagUp = shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
+  const explicitFlyDeparture = !battedBall.isGrounder && isHitAndRunRunnerForBase(baseName, runnerInfo, hitAndRunState)
+    && hitAndRunState.leadDistance > 0;
+  const tagUp = !explicitFlyDeparture && shouldTagUpFromBase(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
   const groundOutAdvance = shouldAdvanceOnGroundOut(baseName, runnerInfo, outcome, battedBall, fielder, fieldingTarget);
   const automaticAdvanceType = tagUp ? "tagup" : groundOutAdvance ? "groundout" : getDefenseBaseRunnerAdvanceType(outcome, throwState);
   const advanceType = battedBall?.groundRuleDouble
@@ -10452,7 +10537,10 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   const requestedBase = advanceType
     ? Math.min(4, startBase + getBaseAdvanceSteps(advanceType) + (advanceType === "tagup" ? 0 : extraAdvance))
     : startBase;
-  const nextBase = Math.max(startBase, Math.min(requestedBase, maxAdvanceIndex));
+  const squeezeAdvance = baseName === "third" && hitAndRunState?.targetBase === "home"
+    && isHitAndRunRunnerForBase(baseName, runnerInfo, hitAndRunState)
+    && battedBall?.isGrounder && !tagUp;
+  const nextBase = Math.max(startBase, Math.min(squeezeAdvance ? 4 : explicitFlyDeparture ? startBase + 1 : requestedBase, maxAdvanceIndex));
   const route = createBaseRunnerRoute(startBase, nextBase);
   const speed = getDefenseBaseRunnerSpeed(runnerInfo);
   const startLeadDistance = getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState, nextBase, tagUp);
@@ -10463,6 +10551,7 @@ function createDefenseBaseRunner(baseName, runnerInfo, outcome, battedBall, thro
   return {
     ...runnerInfo,
     runnerId: runnerInfo.id || runnerInfo.name || baseName,
+    explicitFlyDeparture,
     startBase: baseName,
     originalBase: baseName,
     currentBase: baseName,
@@ -10583,6 +10672,7 @@ function estimateThirdRunnerHomeArrival(runnerInfo, battedBall) {
 }
 
 function getDefenseRunnerStartLeadDistance(baseName, runnerInfo, battedBall, outcome, hitAndRunState = null, nextBase = null, tagUp = false) {
+  if (tagUp) return 0;
   if (!baseName || !runnerInfo || !battedBall) return 0;
   const startBase = baseIndexByName[baseName];
   if (startBase < 1 || startBase > 3) return 0;
@@ -11937,6 +12027,10 @@ function handleBatterRunnerBaseCommand(targetBase, mode = "advance") {
   if (!mode) return;
   if (!canControlBatterRunner()) return;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
+  if (defenseState.pickoff) {
+    handleManualBaseRunnerCommandToTarget(targetBase, mode, elapsedSeconds);
+    return;
+  }
   updateBatterRunner(elapsedSeconds);
   const runner = defenseState.runner;
   const legalTargetBase = getSequentialBatterRunnerTargetBase(runner, targetBase, mode);
@@ -11977,6 +12071,10 @@ function getManualBaseRunnerForTarget(targetIndex, mode, elapsedSeconds) {
   const startIndex = mode === "return" ? targetIndex : targetIndex - 1;
   const candidates = defenseState.baseRunners.filter((runner) => {
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
+    if (mode === "return" && runner.flyReturnRequired && !runner.isOut) {
+      return baseIndexByName[runner.startBase] === targetIndex;
+    }
+    if (runner.flyReturnRequired) return false;
     if (mode === "return") {
       return isDefenseBaseRunnerReturningToBase(runner, targetIndex);
     }
@@ -12055,6 +12153,10 @@ function returnAllBaseRunnersOneBase(elapsedSeconds) {
   if (!defenseState.baseRunners?.length) return;
   defenseState.baseRunners.forEach((runner) => {
     updateDefenseBaseRunnerPosition(runner, elapsedSeconds);
+    if (runner.flyReturnRequired && !runner.isOut) {
+      setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[runner.startBase], elapsedSeconds);
+      return;
+    }
     const currentIndex = getDefenseBaseRunnerCurrentIndex(runner);
     const targetIndex = getBatterRunnerTargetIndex(runner.targetBase);
     if (currentIndex <= 0) return;
@@ -12111,6 +12213,11 @@ function updateDefenseBaseRunnerPosition(runner, elapsedSeconds) {
 
 function setDefenseBaseRunnerManualDestination(runner, nextBase, elapsedSeconds) {
   if (!runner || runner.isOut) return false;
+  if (runner.flyReturnRequired) return false;
+  if (!defenseState.battedBall?.isGrounder && nextBase > baseIndexByName[runner.startBase]
+    && (!defenseState.unifiedCircleCatchComplete || elapsedSeconds < (defenseState.outcome?.fieldingTime ?? Infinity))) {
+    runner.explicitFlyDeparture = true;
+  }
   if (isCaughtFlyThirdOutPending()) return false;
   const targetBase = nextBase >= 4 ? "home" : baseNameByIndex[nextBase];
   runner.routeStartTime = elapsedSeconds;
@@ -12150,11 +12257,104 @@ function setDefenseBaseRunnerReturnDestination(runner, baseIndex, elapsedSeconds
 
 function canControlBatterRunner() {
   return gamePhase === "defense"
+    && !(defenseState.tagPresentation && !defenseState.tagPresentation.resumed)
+    && !defenseState.resultHoldUntil
     && isPlayerBatting()
     && defenseState.active
     && !defenseState.resolved
-    && defenseState.runner
+    && (defenseState.runner || defenseState.pickoff || defenseState.baseRunners?.length)
     && !defenseState.battedBall?.fenceOver;
+}
+
+function handleRundownCommand(targetBase) {
+  if (!canManualDefenseThrow(targetBase) || defenseState.errorRecovery) return;
+  const elapsed = (performance.now() - defenseState.startTime) / 1000;
+  updateThrowState(elapsed);
+  const previous = defenseState.rundown;
+  const heldBase = defenseState.heldBallBase;
+  if (!previous && !heldBase) return;
+  const from = previous ? { x: previous.x, y: previous.y } : getDefenseBasePointByName(heldBase);
+  defenseState.rundown = {
+    ...from, targetBase, lastTime: elapsed, moving: true, tagCandidate: null, tagSince: null,
+    fielder: previous?.fielder || { role: "SS", name: "持球者", speed: 5, fielding: 5,
+      arm: heldBase === "home" ? getTeamCatcherArm(fieldingTeam()) : 5 }
+  };
+  defenseState.throw = null;
+  defenseState.heldBallBase = null;
+  defenseState.heldBallSince = null;
+  defenseState.lastManualThrowCommandTime = elapsed;
+  message = `${getBaseLabel(targetBase)}へ持球移動（塁指定＋ボタン1で方向転換、ボタン2で送球）`;
+}
+
+function updateRundown(elapsed, previousBatterPoint = null) {
+  const chase = defenseState.rundown;
+  if (!chase) return;
+  const dt = clamp(elapsed - chase.lastTime, 0, 0.08);
+  chase.lastTime = elapsed;
+  const previousPoint = { x: chase.x, y: chase.y };
+  if (chase.moving) {
+    const target = getDefenseBasePointByName(chase.targetBase);
+    const distance = Math.hypot(target.x - chase.x, target.y - chase.y);
+    const step = Math.min(1, getFielderSpeed(chase.fielder) * 3 * dt / Math.max(0.001, distance));
+    chase.x = lerp(chase.x, target.x, step);
+    chase.y = lerp(chase.y, target.y, step);
+    defenseState.lastManualThrowCommandTime = elapsed;
+    if (distance <= 1 || step >= 1) {
+      chase.moving = false;
+      defenseState.heldBallBase = chase.targetBase;
+      defenseState.heldBallSince = elapsed;
+    }
+  }
+  // 塁で待つ持球者は、捕球より後に到着した走者を自動でタッチする。
+  // 塁間の走者や先に帰塁・到達していた走者には適用しない。
+  const arrivingRunner = !chase.moving && defenseState.heldBallBase === chase.targetBase
+    && Number.isFinite(defenseState.heldBallSince)
+    ? [defenseState.runner, ...(defenseState.baseRunners || [])].find(runner => {
+      // scored は本塁へ向かう指示時にも立つため、ここでは除外しない。
+      if (!runner || runner.isOut || !runner.arrived
+        || runner.targetBase !== chase.targetBase || !(runner.route?.length > 1)
+        || !(runner.arrivalTime > defenseState.heldBallSince) || runner.arrivalTime > elapsed) return false;
+      const base = getDefenseBasePointByName(chase.targetBase);
+      return Math.hypot(runner.x - base.x, runner.y - base.y) < 1
+        && Math.hypot(chase.x - base.x, chase.y - base.y) < 1;
+    }) : null;
+  const candidate = arrivingRunner || [defenseState.runner, ...(defenseState.baseRunners || [])]
+    .filter(runner => runner && !runner.isOut && !(runner.scored && runner.arrived))
+    .filter(runner => !["first", "second", "third", "home"].some(base => {
+      const point = getDefenseBasePointByName(base);
+      return Math.hypot(runner.x - point.x, runner.y - point.y) <= 18;
+    }))
+    .find(runner => runner === defenseState.runner
+      ? closestPointOnSegment(0, 0,
+        previousPoint.x - (previousBatterPoint?.x ?? runner.x),
+        previousPoint.y - (previousBatterPoint?.y ?? runner.y),
+        chase.x - runner.x, chase.y - runner.y).distance <= 32
+      : Math.hypot(runner.x - chase.x, runner.y - chase.y) <= 32);
+  if (candidate !== chase.tagCandidate) {
+    chase.tagCandidate = candidate || null;
+    chase.tagSince = elapsed;
+  }
+  if (!candidate || (candidate !== arrivingRunner && candidate !== defenseState.runner && elapsed - chase.tagSince < 0.12)) return;
+  const startBase = candidate === defenseState.runner ? "batter" : candidate.startBase;
+  if (!defenseState.completedThrowOuts.some(entry => entry.startBase === startBase)) {
+    defenseState.completedThrowOuts.push({ runner: candidate, startBase,
+      targetBase: chase.targetBase, outType: "tag", time: elapsed });
+  }
+  candidate.isOut = true;
+  candidate.running = false;
+  if (candidate === arrivingRunner) {
+    defenseState.tagPresentation = { runner: candidate, base: chase.targetBase,
+      startedAt: performance.now(), contactAt: performance.now() + 320, until: performance.now() + 1220 };
+    message = "捕球 → タッチ";
+  } else {
+    showEffect("タッチアウト", "#f9f871");
+    message = "タッチアウト";
+  }
+  const caughtOut = defenseState.outcome?.caught && defenseState.outcome.kind === "out" && !defenseState.outcome.needsThrow ? 1 : 0;
+  if (count.outs + caughtOut + defenseState.completedThrowOuts.length >= 3) {
+    chase.moving = false;
+    finishDefensePlay();
+  }
 }
 
 function handleDefenseThrowCommand(targetBase, options = {}) {
@@ -12165,11 +12365,12 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
   const previousThrow = defenseState.throw;
   const isTagUpThrow = isManualTagUpThrowOpportunity(targetBase, elapsedSeconds);
   const isBaseRelay = previousThrow && Number.isFinite(previousThrow.endTime) && elapsedSeconds >= previousThrow.endTime;
-  const from = isBaseRelay ? previousThrow.to : defenseState.target;
-  const commandStartTime = isBaseRelay
+  const carrier = defenseState.rundown;
+  const from = carrier ? { x: carrier.x, y: carrier.y } : isBaseRelay ? previousThrow.to : defenseState.target;
+  const commandStartTime = isBaseRelay || carrier
     ? elapsedSeconds
     : Math.max(elapsedSeconds, previousThrow?.prepareStartTime ?? elapsedSeconds);
-  const thrower = isBaseRelay
+  const thrower = carrier ? carrier.fielder : isBaseRelay
     ? { ...(defenseState.chosenFielder || {}), arm: previousThrow.targetBase === "home" ? getTeamCatcherArm(fieldingTeam()) : 5, fielding: 5 }
     : defenseState.chosenFielder;
   // 捕球アウト後など needsThrow が立たない場面でも送球状態を作れるようにする
@@ -12199,6 +12400,7 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
     refreshDefenseThrowSafety();
   }
   defenseState.heldBallBase = null;
+  defenseState.rundown = null;
   defenseState.heldBallSince = null;
   defenseState.lastManualThrowCommandTime = elapsedSeconds;
   defenseState.duration = getDefenseDuration(defenseState.battedBall, defenseState.outcome, defenseState.runner, defenseState.throw, defenseState.target);
@@ -12216,6 +12418,8 @@ function handleDefenseThrowCommand(targetBase, options = {}) {
 // 野手がボールを保持していれば、攻撃側が進塁していなくても任意の塁へ投げられる。
 // 送球が飛んでいる間だけは受け付けない (多重送球の防止)。
 function canManualDefenseThrow(targetBase) {
+  if (defenseState.tagPresentation && !defenseState.tagPresentation.resumed) return false;
+  if (defenseState.resultHoldUntil) return false;
   if (gamePhase !== "defense" || !isManualThrowControl() || !defenseState.active || defenseState.resolved) return false;
   if (!targetBase) return false;
   const elapsedSeconds = (performance.now() - defenseState.startTime) / 1000;
@@ -12226,6 +12430,7 @@ function canManualDefenseThrow(targetBase) {
 }
 
 function hasFielderSecuredBall(elapsedSeconds) {
+  if (defenseState.rundown) return true;
   const outcome = defenseState.outcome;
   if (!outcome || outcome.pendingManualFielding) return false;
   if (!defenseState.chosenFielder || !defenseState.target) return false;
@@ -12243,6 +12448,7 @@ function isManualThrowInFlight(elapsedSeconds) {
 // 送球中、または次の送球指示を待っている間は true。
 // この間はプレーを終わらせない。
 function isManualThrowDecisionPending(elapsedSeconds) {
+  if (defenseState.rundown?.moving) return true;
   if (!isManualThrowControl()) return false;
   if (isManualThrowInFlight(elapsedSeconds)) return true;
   const idleDeadline = getManualThrowIdleDeadline();
@@ -12623,6 +12829,7 @@ function getDefenseThrowTargetRunners(targetBase, batterRunner = null, baseRunne
 }
 
 function isForceThrowTargetBase(targetBase, outcome = defenseState.outcome, battedBall = defenseState.battedBall) {
+  if (defenseState.pickoff) return false;
   if (!targetBase) return false;
   if (!isForceEligibleBattedBall(battedBall, outcome)) return false;
   return isForceTargetActive(targetBase);
@@ -15010,14 +15217,79 @@ function resolveDroppedBallOutcome(fielder, battedBall, relation = getBattedBall
   return { kind: "single", label: hitLabels.single, scoreType: "single", caught: false };
 }
 
+function hasPendingFlyReturns() {
+  const caughtOut = defenseState.outcome?.kind === "out" && defenseState.outcome.caught && !defenseState.outcome.needsThrow;
+  if (!caughtOut || count.outs + 1 + (defenseState.completedThrowOuts?.length || 0) >= 3) return false;
+  return (defenseState.baseRunners || []).some(runner => runner.flyReturnRequired && !runner.isOut);
+}
+
+function updateFlyReturnRequirements(elapsed) {
+  const outcome = defenseState.outcome;
+  if (outcome?.kind !== "out" || !outcome.caught || outcome.needsThrow
+    || !defenseState.unifiedCircleCatchComplete || elapsed < outcome.fieldingTime) return;
+  for (const runner of defenseState.baseRunners || []) {
+    if (runner.isOut) continue;
+    const base = getDefenseBasePointByName(runner.startBase);
+    if (!runner.explicitFlyDeparture && !runner.tagUp && !runner.autoFlyReturnHandled) {
+      runner.autoFlyReturnHandled = true;
+      if (Math.hypot(runner.x - base.x, runner.y - base.y) > 1 || runner.targetBase !== runner.startBase) {
+        setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[runner.startBase], elapsed);
+      }
+    }
+    if (runner.explicitFlyDeparture && runner.flyCatchTime == null) {
+      runner.flyCatchTime = outcome.fieldingTime;
+      runner.flyReturnRequired = Math.hypot(runner.x - base.x, runner.y - base.y) > 1;
+      if (!runner.flyReturnRequired) runner.flyRetouchTime = elapsed;
+      else {
+        runner.scored = false;
+        message = "フライ捕球：ボタン0で全走者帰塁、塁指定＋1で個別帰塁";
+        if (!isPlayerBatting()) setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[runner.startBase], elapsed);
+      }
+    }
+    if (runner.flyReturnRequired && runner.arrived && runner.targetBase === runner.startBase) {
+      runner.flyRetouchTime = Math.max(runner.flyCatchTime, runner.arrivalTime);
+      runner.flyReturnRequired = false;
+      runner.currentBase = runner.startBase;
+      runner.tagUp = false;
+    }
+  }
+  if (hasPendingFlyReturns()) retargetCpuDefenseThrowToAdvancingRunner(elapsed);
+}
+
 function updateDefensePlay(now) {
   if (!defenseState.active) return;
+  const tag = defenseState.tagPresentation;
+  if (tag && !tag.resumed) {
+    if (now >= tag.contactAt && !tag.announced) {
+      tag.announced = true;
+      showEffect("タッチアウト", "#f9f871");
+      message = "タッチアウト";
+    }
+    if (now < tag.until) return;
+    // 演出中は走者・送球のシミュレーション時計も止める。
+    defenseState.startTime += Math.max(0, now - tag.startedAt);
+    tag.resumed = true;
+    const caughtOut = defenseState.outcome?.caught && defenseState.outcome.kind === "out" && !defenseState.outcome.needsThrow ? 1 : 0;
+    if (count.outs + caughtOut + defenseState.completedThrowOuts.length >= 3) {
+      finishDefensePlay();
+      return;
+    }
+  }
+  if (defenseState.resultHoldUntil) {
+    finishDefensePlay();
+    return;
+  }
   const progress = clamp((now - defenseState.startTime) / defenseState.duration, 0, 1);
   const eased = 1 - Math.pow(1 - progress, 2);
   const elapsedSeconds = (now - defenseState.startTime) / 1000;
 
+  const previousBatterPoint = defenseState.runner ? { x: defenseState.runner.x, y: defenseState.runner.y } : null;
   updateBatterRunner(elapsedSeconds);
   updateDefenseBaseRunners(elapsedSeconds);
+  updateFlyReturnRequirements(elapsedSeconds);
+  updateRundown(elapsedSeconds, previousBatterPoint);
+  if (defenseState.resolved) return;
+  if (defenseState.tagPresentation && !defenseState.tagPresentation.resumed) return;
   if (defenseState.errorRecovery) {
     updateFieldingErrorRecovery(elapsedSeconds);
     return;
@@ -15025,6 +15297,7 @@ function updateDefensePlay(now) {
   if (defenseState.unifiedCircleCatchComplete || !defenseState.outcome?.caught) {
     updateThrowState(elapsedSeconds);
   }
+  if (defenseState.tagPresentation && !defenseState.tagPresentation.resumed) return;
   refreshDefenseThrowSafety();
   updateHomeRunFireworksSound(elapsedSeconds);
   const ballPoint = getDefenseBallPoint(progress, eased, elapsedSeconds);
@@ -15093,6 +15366,7 @@ function updateDefensePlay(now) {
   defenseState.lastMovementElapsedSeconds = elapsedSeconds;
 
   resolveUnifiedFielderCircleCatch(elapsedSeconds);
+  updateFlyReturnRequirements(elapsedSeconds);
   resolveUnifiedCircleMissAfterArrival(elapsedSeconds);
   updateDefenseLandingMissVisual(elapsedSeconds);
   showImmediateCatchOutCall(elapsedSeconds);
@@ -15800,6 +16074,7 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   const outcome = defenseState.outcome;
   if (!outcome || defenseState.resolved) return false;
   if (outcome.pendingManualFielding) return false;
+  if (hasPendingFlyReturns()) return false;
   refreshDefenseThrowSafety();
 
   if (outcome.kind === "homer" || outcome.scoreType === "homer" || defenseState.battedBall?.fenceOver) {
@@ -15859,7 +16134,7 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
     ...(defenseState.baseRunners || []),
     ...(caughtFly ? [] : [defenseState.runner])
   ]
-    .filter((runner) => runner && !runner.isOut && runner.targetBase && !runner.arrived)
+    .filter((runner) => runner && !runner.isOut && runner.targetBase && (!runner.arrived || runner.flyReturnRequired))
     .sort((a, b) => {
       const baseDifference = getBatterRunnerTargetIndex(b.targetBase) - getBatterRunnerTargetIndex(a.targetBase);
       if (baseDifference !== 0) return baseDifference;
@@ -15867,6 +16142,7 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
     });
   const threatenedRunner = candidates[0];
   if (!threatenedRunner || !defenseState.chosenFielder || !defenseState.target) return false;
+  const throwTargetBase = threatenedRunner.flyReturnRequired ? threatenedRunner.startBase : threatenedRunner.targetBase;
 
   const previousThrow = defenseState.throw;
   // endTime (ボール到着) ではなく startTime (野手が実際に投げた瞬間) を基準に、
@@ -15877,11 +16153,11 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
   // 確定してしまっていた。
   const previousThrowReleased = previousThrow && Number.isFinite(previousThrow.startTime) && elapsedSeconds >= previousThrow.startTime;
   if (previousThrowReleased && Number.isFinite(previousThrow.endTime) && elapsedSeconds < previousThrow.endTime) {
-    return previousThrow.targetBase === threatenedRunner.targetBase;
+    return previousThrow.targetBase === throwTargetBase;
   }
   if (
     previousThrow
-    && previousThrow.targetBase === threatenedRunner.targetBase
+    && previousThrow.targetBase === throwTargetBase
     && Number.isFinite(previousThrow.endTime)
   ) {
     refreshDefenseThrowSafety();
@@ -15907,7 +16183,7 @@ function retargetCpuDefenseThrowToAdvancingRunner(elapsedSeconds = 0) {
     needsThrow: true
   };
   const nextThrow = createThrowState(thrower, from, throwOutcome, threatenedRunner, {
-    targetBase: threatenedRunner.targetBase,
+    targetBase: throwTargetBase,
     immediate: true,
     startTime: Math.max(elapsedSeconds, throwOutcome.fieldingTime ?? 0),
     minStartTime: Math.max(elapsedSeconds, throwOutcome.fieldingTime ?? 0),
@@ -16097,6 +16373,7 @@ function getRunnerRoutePoint(route, progress) {
 }
 
 function updateThrowState(elapsedSeconds) {
+  updateFlyReturnRequirements(elapsedSeconds);
   const throwState = defenseState.throw;
   if (!throwState) return;
   throwState.active = elapsedSeconds >= throwState.startTime && elapsedSeconds <= throwState.endTime;
@@ -16105,7 +16382,13 @@ function updateThrowState(elapsedSeconds) {
     defenseState.heldBallBase = throwState.targetBase || null;
     defenseState.heldBallSince = throwState.endTime;
     refreshDefenseThrowSafety();
-    const retiredRunner = getThrowOutRunner(throwState, true);
+    const retiredRunner = defenseState.pickoff ? null : getThrowOutRunner(throwState, true);
+    if (defenseState.pickoff) {
+      defenseState.rundown = { ...throwState.to, targetBase: throwState.targetBase,
+        moving: false, lastTime: elapsedSeconds, tagCandidate: null, tagSince: null,
+        fielder: { role: "SS", name: "持球者", speed: 5, fielding: 5, arm: 5 } };
+      updateRundown(elapsedSeconds);
+    }
     if (retiredRunner) {
       const force = getForceOutBasesFromThrowState(throwState).length > 0;
       const result = {
@@ -16167,6 +16450,11 @@ function getThrowOutRunner(throwState, includeTagUp = false) {
   if (throwState?.visualOnly) return null;
   if (throwState?.tagUpPlay && !includeTagUp) return null;
   if (!throwState?.targetBase || !Number.isFinite(throwState.endTime)) return null;
+  const appealRunner = (defenseState.baseRunners || []).find(runner => !runner.isOut
+    && runner.flyCatchTime != null && runner.startBase === throwState.targetBase
+    && throwState.endTime >= runner.flyCatchTime
+    && (runner.flyRetouchTime == null || throwState.endTime < runner.flyRetouchTime));
+  if (appealRunner) return appealRunner;
   const forcedRunner = getForcedRunnerForThrowTarget(throwState.targetBase, defenseState.runner, defenseState.baseRunners);
   if (forcedRunner) {
     const judgment = judgeOutPlay(forcedRunner, throwState.targetBase, throwState);
@@ -16221,6 +16509,7 @@ function getDefenseThrowOutResults(throwState) {
 }
 
 function getDefenseBallPoint(progress, eased, elapsedSeconds = 0) {
+  if (defenseState.rundown) return { x: defenseState.rundown.x, y: defenseState.rundown.y };
   if (defenseState.errorRecovery) return getFieldingErrorBallPoint(elapsedSeconds);
   if (defenseState.outcome?.errorRecovered && (!defenseState.throw || elapsedSeconds < defenseState.throw.startTime)) {
     return defenseState.outcome.fieldingPoint;
@@ -16450,7 +16739,32 @@ function handleXStadiumPromptChoice(goToXStadium) {
 }
 
 function finishDefensePlay() {
+  if (hasPendingFlyReturns()) return;
+  if (defenseState.tagPresentation && performance.now() < defenseState.tagPresentation.until) return;
   if (defenseState.resolved || defenseState.errorRecovery) return;
+  const now = performance.now();
+  if ((defenseState.pickoff || defenseState.rundown) && !defenseState.resultHoldUntil) {
+    defenseState.resultHoldUntil = now + 900;
+    return;
+  }
+  if (defenseState.resultHoldUntil && now < defenseState.resultHoldUntil) return;
+  if (defenseState.pickoff) {
+    const results = defenseState.baseRunners.map(runner => createRunnerResult(runner, runner.startBase,
+      runner.arrived ? runner.targetBase : runner.currentBase, { out: runner.isOut, scoreTime: runner.arrivalTime }));
+    const outs = defenseState.baseRunners.filter(runner => runner.isOut).length;
+    const thirdOut = [...defenseState.completedThrowOuts].sort((a, b) => a.time - b.time)[2 - count.outs];
+    applyRunnerResults(results, count.outs + outs >= 3
+      ? { allowRuns: !!thirdOut, scoringDeadline: thirdOut?.time } : {});
+    count.outs = Math.min(3, count.outs + outs);
+    recordCurrentPitcherOuts(outs);
+    defenseState.resolved = true;
+    defenseState.active = false;
+    gamePhase = "playing";
+    resetBall();
+    checkCountEnd();
+    scheduleNextComputerPitchAfterJudgment();
+    return;
+  }
   const outcome = defenseState.outcome;
   if (shouldOfferXStadiumPromptBeforeDefenseFinish(outcome)) {
     showXStadiumPrompt();
@@ -17688,6 +18002,8 @@ function draw() {
   drawReliefCarEntrance();
   drawBatter();
   drawStealPlay();
+  if (stealState.active) drawCloseBasePlay(stealState.runner, stealState.targetBase, stealState.throw,
+    (performance.now() - stealState.startTime) / 1000, stealState.decision ? (stealState.decision.out ? "アウト" : "セーフ") : "");
   drawHbpHitBox();
   drawBallTrail();
   drawBall();
@@ -21532,13 +21848,64 @@ function drawBattedBallGuide(target) {
   drawLine(defenseState.origin.x, defenseState.origin.y, target.x, target.y);
 }
 
+function getFielderArmPose(x, y, isChosen = false) {
+  const elapsed = (performance.now() - defenseState.startTime) / 1000;
+  const tag = defenseState.tagPresentation;
+  if (tag && performance.now() < tag.until) {
+    const base = getDefenseBasePointByName(tag.base);
+    if (Math.hypot(x - base.x, y - base.y) < 2) {
+      return { kind: "catch", dx: tag.runner.x - x - 24, dy: tag.runner.y - y + 18,
+        amount: clamp((performance.now() - tag.startedAt) / 320, 0, 1) };
+    }
+  }
+  const toss = defenseState.throw;
+  if (toss) {
+    if (Math.hypot(x - toss.from.x, y - toss.from.y) < 65
+      && elapsed >= toss.startTime - 0.3 && elapsed <= toss.startTime + 0.24) {
+      return { kind: "throw", dx: toss.to.x - x, dy: toss.to.y - y,
+        amount: clamp((elapsed - toss.startTime + 0.3) / 0.54, 0, 1) };
+    }
+    if (Math.hypot(x - toss.to.x, y - toss.to.y) < 65
+      && elapsed >= toss.endTime - 0.4 && elapsed <= toss.endTime + 0.3) {
+      return { kind: "catch", dx: toss.from.x - x, dy: toss.from.y - y,
+        amount: 1 - clamp((elapsed - toss.endTime) / 0.3, 0, 1) * 0.7 };
+    }
+  }
+  const catchTime = defenseState.outcome?.fieldingTime ?? defenseState.battedBall?.ballTime;
+  if (isChosen && Number.isFinite(catchTime) && elapsed >= catchTime - 0.5 && elapsed <= catchTime + 0.25) {
+    return { kind: "catch", dx: ball.x - x, dy: ball.y - y - 30, amount: 1 };
+  }
+  return null;
+}
+
 function drawDefenseFielders() {
+  const toss = defenseState.throw;
+  if (toss && !defenseState.rundown) {
+    const pose = getFielderArmPose(toss.from.x, toss.from.y);
+    const hasThrower = defenseState.fielders?.some(fielder => {
+      const point = getDefenseFielderDrawPosition(fielder);
+      return Math.hypot(point.x - toss.from.x, point.y - toss.from.y) < 65;
+    });
+    if (pose?.kind === "throw" && !hasThrower) {
+      drawDefenseFielder(toss.from.x, toss.from.y, "SS", "送球", true, 0, pose);
+    }
+  }
+  const receiverBase = defenseState.throw?.targetBase || (!defenseState.rundown ? defenseState.heldBallBase : null);
+  if (receiverBase && !defenseState.rundown) {
+    const receiver = getDefenseBasePointByName(receiverBase);
+    drawDefenseFielder(receiver.x, receiver.y, "SS", "受け手", false, 0, getFielderArmPose(receiver.x, receiver.y));
+  }
+  if (defenseState.rundown) {
+    const carrier = defenseState.rundown;
+    drawDefenseFielder(carrier.x, carrier.y, "SS", "持球者", true,
+      carrier.moving ? (performance.now() / 1000) % 1 : 0, getFielderArmPose(carrier.x, carrier.y));
+  }
   if (!defenseState.active) return;
   const runProgress = clamp((performance.now() - defenseState.startTime) / defenseState.duration, 0, 1);
   defenseState.fielders.forEach((fielder) => {
     const isChosen = fielder.role === defenseState.chosenFielder.role;
     const position = getDefenseFielderDrawPosition(fielder);
-    drawDefenseFielder(position.x, position.y, fielder.role, fielder.name, isChosen, runProgress);
+    drawDefenseFielder(position.x, position.y, fielder.role, fielder.name, isChosen, runProgress, getFielderArmPose(position.x, position.y, isChosen));
   });
 }
 
@@ -21660,6 +22027,52 @@ function drawBatterRunner() {
       label: "PH"
     });
   }
+}
+
+function drawCloseBasePlay(runner, targetBase, throwState, elapsed, result = "") {
+  if (!runner || !targetBase) return;
+  const presentation = defenseState.active && !defenseState.tagPresentation?.resumed && defenseState.tagPresentation?.runner === runner
+    ? defenseState.tagPresentation : null;
+  const tagProgress = presentation ? clamp((performance.now() - presentation.startedAt) / 320, 0, 1) : null;
+  if (presentation) result = tagProgress < 1 ? "タッチ動作中" : "アウト";
+  const base = getDefenseBasePointByName(targetBase);
+  const project = point => ({ x: 202 + clamp((point.x - base.x) * 0.65, -155, 155),
+    y: 325 + clamp((point.y - base.y) * 0.65, -90, 35) });
+  const player = project(runner);
+  ctx.save();
+  ctx.fillStyle = "rgba(18,32,42,0.94)";
+  roundRect(18, 174, 370, 210, 10);
+  ctx.fill();
+  ctx.strokeStyle = "#ffcf70";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#fff2a8";
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(`${getBaseLabel(targetBase)} 接触確認 ${result}`, 32, 199);
+  drawBaseDiamond(202, 325, "", "#fff8df");
+  drawMiniRunner(player.x, player.y - 30, 1, { scale: 0.6 });
+  drawDefenseFielder(222, 295, "SS", "", false, 0);
+  const caught = throwState && elapsed >= throwState.endTime;
+  if (throwState && !caught) {
+    const t = clamp((elapsed - throwState.startTime) / throwState.throwTime, 0, 1);
+    const point = project({ x: lerp(throwState.from.x, throwState.to.x, t), y: lerp(throwState.from.y, throwState.to.y, t) });
+    drawBaseballIcon(point.x, point.y - 20, 6);
+  }
+  if (caught || presentation) {
+    const tag = tagProgress ?? (defenseState.active ? 0 : clamp((elapsed - throwState.endTime) / Math.max(0.12, (throwState.tagTime ?? throwState.endTime + 0.12) - throwState.endTime), 0, 1));
+    const glove = { x: lerp(222, player.x, tag), y: lerp(305, player.y - 15, tag) };
+    ctx.strokeStyle = "#d9ae77";
+    ctx.lineWidth = 6;
+    drawLine(222, 305, glove.x, glove.y);
+    ctx.fillStyle = "#c48d46";
+    ctx.beginPath(); ctx.arc(glove.x, glove.y, 8, 0, Math.PI * 2); ctx.fill();
+    drawBaseballIcon(glove.x, glove.y, 4);
+  }
+  ctx.fillStyle = "#aee7ff";
+  ctx.font = "bold 13px sans-serif";
+  ctx.fillText(`${presentation ? (tagProgress < 1 ? "捕球 → タッチ" : "捕球 → タッチ → アウト") : caught ? "捕球済み" : "送球・走塁中"}  ${runner.arrived ? "塁に到達" : "塁へ接近"}`, 32, 368);
+  ctx.restore();
 }
 
 function drawStealPlay() {
@@ -21857,7 +22270,7 @@ function drawMiniRunner(x, y, runProgress, options = {}) {
   ctx.restore();
 }
 
-function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0) {
+function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose = null) {
   const teamColor = fieldingTeam() === "away" ? "#153f24" : "#b8202d";
   const accentColor = isChosen ? "#ffcf70" : "#ffffff";
   const bob = isChosen ? Math.sin(runProgress * Math.PI * 10) * 3 : 0;
@@ -21922,18 +22335,30 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0) {
 
   ctx.strokeStyle = "#233047";
   ctx.lineWidth = 5;
-  drawLine(-17, 9, -31 - stride * 6, 23);
-  drawLine(17, 9, 31 + stride * 6, 23);
+  const directionLength = armPose ? Math.max(1, Math.hypot(armPose.dx, armPose.dy)) : 1;
+  const reach = armPose ? 25 + 28 * armPose.amount : 0;
+  const swing = armPose?.kind === "throw" ? Math.sin(armPose.amount * Math.PI) * 40 : 0;
+  const leftHand = armPose?.kind === "catch"
+    ? { x: armPose.dx / directionLength * reach, y: 9 + armPose.dy / directionLength * reach }
+    : { x: -33 - stride * 6, y: 25 };
+  const rightHand = armPose?.kind === "throw"
+    ? { x: lerp(-armPose.dx / directionLength * 35, armPose.dx / directionLength * 58, armPose.amount),
+        y: 9 + armPose.dy / directionLength * 30 * armPose.amount - swing }
+    : { x: 33 + stride * 6, y: 25 };
+  drawLine(-17, 9, leftHand.x, leftHand.y);
+  drawLine(17, 9, rightHand.x, rightHand.y);
 
   ctx.fillStyle = "#fff7f0";
   ctx.strokeStyle = "#233047";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(-33 - stride * 6, 25, 7, 0, Math.PI * 2);
+  ctx.arc(leftHand.x, leftHand.y, armPose?.kind === "catch" ? 11 : 7, 0, Math.PI * 2);
+  if (armPose?.kind === "catch") ctx.fillStyle = "#c48d46";
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(33 + stride * 6, 25, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff7f0";
+  ctx.arc(rightHand.x, rightHand.y, 7, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
@@ -22728,6 +23153,7 @@ function drawWallImpactEffect(elapsedSeconds, heightOffset) {
 }
 
 function getDefenseBallHeightAtPoint(progress, elapsedSeconds = 0) {
+  if (defenseState.rundown) return 24;
   if (defenseState.errorRecovery) return getFieldingErrorBallHeight(elapsedSeconds);
   if (defenseState.outcome?.errorRecovered && (!defenseState.throw || elapsedSeconds < defenseState.throw.startTime)) return 0;
   const throwState = defenseState.throw;
@@ -23068,7 +23494,26 @@ function drawHudBaseDiamond(x, y, size, occupied) {
 
 function drawDefenseHud() {
   if (!defenseState.active) return;
+  if (defenseState.pickoff || defenseState.rundown) {
+    const target = defenseState.throw?.targetBase || defenseState.rundown?.targetBase;
+    const runner = (!defenseState.tagPresentation?.resumed && defenseState.tagPresentation?.runner)
+      || defenseState.baseRunners.find(entry => entry.targetBase === target || entry.startBase === target)
+      || defenseState.runner;
+    drawCloseBasePlay(runner, target, defenseState.throw, (performance.now() - defenseState.startTime) / 1000,
+      runner?.isOut ? "アウト" : runner?.arrived ? "セーフ" : "");
+  }
   drawMiniDefenseField(1010, 104, 240, 176);
+  if (isManualThrowControl()) {
+    ctx.save();
+    ctx.fillStyle = "rgba(18,32,42,0.88)";
+    ctx.fillRect(1010, 284, 240, 44);
+    ctx.fillStyle = "#fff2a8";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("塁指定＋1：持球移動・方向転換", 1018, 301);
+    ctx.fillText("塁指定＋2：その場から送球", 1018, 319);
+    ctx.restore();
+  }
 }
 
 function drawMiniDefenseField(x, y, width, height) {

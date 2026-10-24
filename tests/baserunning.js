@@ -259,7 +259,7 @@ const twoOutStrikeoutSteal = JSON.parse(run(`
   stealState.targetBase = "second";
   stealState.runner = { ...makeBaseRunner(bases.first), arrived: false };
   finishPitch("空振り", "strike");
-  resolveSteal(true);
+  resolveSteal(true, true);
   const result = { pitcherOutsRecorded, battingTeam, outs: count.outs };
   recordCurrentPitcherOuts = originalRecordOuts;
   return JSON.stringify(result);
@@ -2010,6 +2010,385 @@ for (const check of pursuitChecks) {
   assert(check.role === check.expected && check.coverDistance > 50,
     `近い両翼が追球し、センターはカバーする: ${JSON.stringify(check)}`);
 }
+
+const rundownChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame();
+  gameMode = "versus";
+  defenseControlMode[fieldingTeam()] = "manual";
+  gamePhase = "defense";
+  defenseState = createDefenseState();
+  defenseState.active = true;
+  defenseState.startTime = performance.now() - 1000;
+  defenseState.battedBall = { isGrounder: true, ballTime: 0.5, power: 0.5, target: getDefenseBasePointByName("first") };
+  defenseState.outcome = { kind: "single", caught: false, needsThrow: true, fieldingTime: 0.5 };
+  defenseState.chosenFielder = { role: "SS", arm: 5, speed: 5 };
+  defenseState.target = getDefenseBasePointByName("first");
+  defenseState.heldBallBase = "first";
+  handleRundownCommand("second");
+  const started = !!defenseState.rundown;
+  updateRundown(1.08);
+  const position = { x: defenseState.rundown.x, y: defenseState.rundown.y };
+  const moved = Math.hypot(position.x - defenseState.target.x, position.y - defenseState.target.y) > 0;
+  const tripleSpeed = Math.abs(Math.hypot(position.x - defenseState.target.x, position.y - defenseState.target.y)
+    - getFielderSpeed(defenseState.rundown.fielder) * 3 * 0.08) < 0.001;
+  handleRundownCommand("first");
+  const continuous = defenseState.rundown.x === position.x && defenseState.rundown.y === position.y;
+  handleDefenseThrowCommand("third");
+  const threwFromPosition = !defenseState.rundown && defenseState.throw.from.x === position.x && defenseState.throw.from.y === position.y;
+  defenseState.throw = null;
+  defenseState.rundown = { x: 640, y: 400, targetBase: "second", moving: false, lastTime: 2, fielder: { speed: 5 } };
+  const runner = { id: "tagged", startBase: "first", x: 642, y: 402, running: true };
+  defenseState.baseRunners = [runner];
+  updateRundown(2);
+  updateRundown(2.2);
+  updateRundown(2.4);
+  const taggedOnce = runner.isOut && defenseState.completedThrowOuts.length === 1;
+  const safe = { id: "safe", startBase: "second", ...getDefenseBasePointByName("second") };
+  defenseState.baseRunners = [safe];
+  Object.assign(defenseState.rundown, getDefenseBasePointByName("second"));
+  updateRundown(3);
+  updateRundown(3.2);
+  defenseState.baseRunners = [];
+  defenseState.rundown = { x: 640, y: 400, targetBase: "second", moving: true, lastTime: 4, fielder: { speed: 5 } };
+  const target = getDefenseBasePointByName("second");
+  const direction = normalize({ x: target.x - 640, y: target.y - 400 });
+  defenseState.runner = { id: "batter", x: 640 + direction.x * 10, y: 400 + direction.y * 10, running: true };
+  updateRundown(4.08);
+  const instantBatterOut = defenseState.runner.isOut && defenseState.completedThrowOuts.some(entry => entry.startBase === "batter");
+  return JSON.stringify({ started, moved, tripleSpeed, continuous, threwFromPosition, taggedOnce, safeOnBase: !safe.isOut, instantBatterOut });
+`));
+assert(Object.values(rundownChecks).every(Boolean), `ランダンの移動・送球・タッチ: ${JSON.stringify(rundownChecks)}`);
+
+const pickoffChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame();
+  gameMode = "versus";
+  defenseControlMode[fieldingTeam()] = "manual";
+  resetBall();
+  count.balls = 2; count.strikes = 1; count.outs = 1;
+  const batterId = activeBatter.id;
+  bases = createEmptyBases();
+  bases.first = makeBaseRunner({ id: "pickoff-runner", name: "runner", run: 7 });
+  const now = performance.now();
+  const early = tryStartSteal("second", now);
+  const normalSpeed = Math.abs(stealState.arrivalTime - getRunnerRouteDistance(stealState.route) / getRunnerSpeed(stealState.runner)) < 0.001;
+  updateStealState(now + 200);
+  const position = { x: stealState.runner.x, y: stealState.runner.y };
+  const started = startPickoff("first", now + 200);
+  draw();
+  const continuous = defenseState.baseRunners[0].x === position.x && defenseState.baseRunners[0].y === position.y;
+  updateThrowState(10);
+  const noRemoteOut = !defenseState.baseRunners[0].isOut;
+  const receiver = !!defenseState.rundown;
+  defenseState.startTime = performance.now() - 10000;
+  handleRundownCommand("second");
+  const canChase = !!defenseState.rundown?.moving;
+  handleDefenseThrowCommand("first");
+  const canRelay = !!defenseState.throw;
+  handleBatterRunnerBaseCommand("third", "advance");
+  const canAdvanceAgain = defenseState.baseRunners[0].targetBase === "third";
+  handleBatterRunnerBaseCommand("second", "return");
+  const canReturn = defenseState.baseRunners[0].targetBase === "second";
+  handleBatterRunnerBaseCommand("first", "return");
+  const cannotSkipBack = defenseState.baseRunners[0].targetBase === "second";
+  updateDefenseBaseRunners(20);
+  finishDefensePlay();
+  const held = defenseState.active && !!defenseState.resultHoldUntil;
+  defenseState.resultHoldUntil = -1;
+  finishDefensePlay();
+  return JSON.stringify({ early, normalSpeed, started, continuous, noRemoteOut, receiver, canChase, canRelay, canAdvanceAgain, canReturn, cannotSkipBack, held,
+    preserved: activeBatter.id === batterId && count.balls === 2 && count.strikes === 1 && count.outs === 1,
+    returned: bases.second?.id === "pickoff-runner" && !bases.first });
+`));
+assert(Object.values(pickoffChecks).every(Boolean), `牽制・帰塁・打席維持: ${JSON.stringify(pickoffChecks)}`);
+
+const returnStealCompletionChecks = JSON.parse(makeRunner(createGameContext(), `
+  const results = [];
+  for (const target of ["first", "second", "third"]) {
+    startGame();
+    gameMode = "versus";
+    defenseControlMode[fieldingTeam()] = "manual";
+    resetBall();
+    count.balls = 1; count.strikes = 0; count.outs = 0;
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner({ id: "return-runner", name: "runner", run: 7 });
+    const now = performance.now();
+    tryStartSteal("second", now);
+    updateStealState(now + 200);
+    returnStealingRunner(now + 200);
+    ball.crossedPlate = true;
+    stealState.plateReached = true;
+    stealState.pitchResultPending = true;
+    prepareManualStealCatcherThrow(0);
+    const sent = handleManualStealCatcherThrow(target, {}, now + 200);
+    const done = stealState.startTime + (Math.max(stealState.arrivalTime, stealState.throw.tagTime) + 1) * 1000;
+    updateStealState(done);
+    const held = !!stealState.decision && !stealState.decision.out;
+    if (stealState.decision) updateStealState(stealState.decision.until + 1);
+    const cleared = !stealState.active && bases.first?.id === "return-runner" && count.outs === 0;
+    startPitch("fast");
+    results.push(sent && held && cleared && !!pendingPitch);
+  }
+  return JSON.stringify(results);
+`));
+assert(returnStealCompletionChecks.every(Boolean), "帰塁先と異なる送球でも処理終了し、次の投球が可能");
+
+const flyReturnChecks = JSON.parse(makeRunner(createGameContext(), `
+  const results = [];
+  for (const base of ["first", "second", "third"]) {
+    for (const outs of [0, 1, 2]) {
+      startGame(); gameMode = "versus"; resetBall(); count.outs = outs;
+      defenseControlMode[fieldingTeam()] = "manual";
+      gamePhase = "defense";
+      defenseState = createDefenseState(); defenseState.active = true;
+      defenseState.startTime = performance.now() - 1000;
+      const start = getDefenseBasePointByName(base);
+      const next = base === "first" ? "second" : base === "second" ? "third" : "home";
+      const end = getDefenseBasePointByName(next);
+      const info = { id: "fly-runner", run: 5 };
+      const batted = { isGrounder: false, isPopupFly: true, ballTime: 1, target: end };
+      const outcome = { kind: "out", caught: true, needsThrow: false, fieldingTime: 1 };
+      defenseState.battedBall = batted; defenseState.outcome = outcome;
+      defenseState.unifiedCircleCatchComplete = true;
+      const lead = { active: true, startBase: base, targetBase: next, runnerId: info.id, leadDistance: 200 };
+      const runner = createDefenseBaseRunner(base, info, outcome, batted, null, null, null, lead);
+      const normal = createDefenseBaseRunner(base, { id: "normal", run: 5 }, outcome, batted);
+      defenseState.baseRunners = [runner];
+      updateDefenseBaseRunners(1); updateFlyReturnRequirements(1);
+      results.push(runner.flyReturnRequired && !normal.explicitFlyDeparture
+        && normal.targetBase === base && hasPendingFlyReturns() === (outs < 2));
+      const earlyThrow = { targetBase: base, startTime: 1, endTime: 1.01, to: start, from: end };
+      results.push(getThrowOutRunner(earlyThrow, true) === runner);
+      if (outs < 2) {
+        finishDefensePlay(); results.push(defenseState.active);
+        if (base === "second") handleAllRunnerBaseCommand("return");
+        else handleManualBaseRunnerCommandToTarget(base, "return", 1);
+        results.push(runner.targetBase === base);
+        updateDefenseBaseRunners(runner.arrivalTime + 0.001);
+        updateFlyReturnRequirements(runner.arrivalTime + 0.001);
+        results.push(!runner.flyReturnRequired && !hasPendingFlyReturns()
+          && getThrowOutRunner({ ...earlyThrow, endTime: runner.flyRetouchTime + 0.1 }, true) !== runner);
+        results.push(getThrowOutRunner(earlyThrow, true) === runner);
+      }
+    }
+  }
+  return JSON.stringify(results);
+`));
+assert(flyReturnChecks.every(Boolean), 'フライ帰塁義務・全員/個別帰塁・到達順: ' + JSON.stringify(flyReturnChecks));
+
+const flyReturnLifecycle = JSON.parse(makeRunner(createGameContext(), `
+  const reports = [];
+  for (const base of ["first", "second", "third"]) for (const outs of [0, 1, 2]) {
+    for (const result of ["appeal", "safe", "noThrow"]) {
+      startGame(); gameMode = "versus"; resetBall();
+      defenseControlMode = { away: "manual", home: "manual" };
+      count.outs = outs; bases = createEmptyBases();
+      bases[base] = makeBaseRunner({ id: "return-check", name: "return-check", run: 5 });
+      const battingBefore = battingTeam;
+      const target = { x: field.plateX + 100, y: field.plateY - 200 };
+      const hit = { target, direction: normalize({ x: 0.2, y: -1 }), ballTime: 1,
+        isGrounder: false, isPopupFly: true, trajectory: "fly", power: 0.3,
+        distance: 300, landingDistance: 300, flightDistance: 300 };
+      const outcome = { kind: "out", label: "フライ", caught: true, needsThrow: false, fieldingTime: 1 };
+      const fielder = { role: "SS", ...target, fielding: 5, speed: 5, arm: 5 };
+      const next = base === "first" ? "second" : base === "second" ? "third" : "home";
+      const lead = { active: true, startBase: base, targetBase: next, runnerId: "return-check", leadDistance: 200 };
+      const runner = createDefenseBaseRunner(base, bases[base], outcome, hit, null, fielder, target, lead);
+      defenseState = { ...createDefenseState(), active: true, startTime: performance.now() - 1000,
+        duration: 30000, outcome, battedBall: hit, target, fielders: [fielder], chosenFielder: fielder,
+        runner: createBatterRunner(activeBatter), baseRunners: [runner], unifiedCircleCatchComplete: true };
+      gamePhase = "defense"; ball.active = true;
+      updateDefenseBaseRunners(1); updateFlyReturnRequirements(1);
+      let elapsed = 1.2;
+      if (result !== "appeal") {
+        setDefenseBaseRunnerReturnDestination(runner, baseIndexByName[base], 1);
+        elapsed = runner.arrivalTime + 0.2;
+        updateDefenseBaseRunners(elapsed); updateFlyReturnRequirements(elapsed);
+      }
+      if (result !== "noThrow") {
+        const endTime = result === "appeal" ? 1.1 : elapsed;
+        defenseState.throw = { targetBase: base, from: target, to: getDefenseBasePointByName(base),
+          startTime: 1, endTime, tagTime: endTime, throwTime: endTime - 1, holdDeadline: elapsed };
+        updateThrowState(elapsed); updateThrowState(elapsed + 0.01);
+      }
+      __advanceTime((elapsed + 10) * 1000);
+      updateDefensePlay(performance.now());
+      const automaticallyFinished = gamePhase === "playing" && !defenseState.active;
+      const snapshot = JSON.stringify({ count, bases, scores, battingTeam });
+      finishDefensePlay();
+      const stable = snapshot === JSON.stringify({ count, bases, scores, battingTeam });
+      const expected = Math.min(3, outs + (result === "appeal" ? 2 : 1));
+      const outsCorrect = count.outs === (expected === 3 ? 0 : expected)
+        && (battingTeam !== battingBefore) === (expected === 3);
+      const baseCorrect = expected === 3 || (result === "appeal" ? !bases[base] : bases[base]?.id === "return-check");
+      __advanceTime(10000);
+      startPitch("fast");
+      reports.push({ base, outs, result, stable, outsCorrect, baseCorrect, automaticallyFinished,
+        canPitch: !!pendingPitch, ledger: defenseState.completedThrowOuts.length <= 1 });
+    }
+  }
+  return JSON.stringify(reports);
+`));
+assert(flyReturnLifecycle.every(row => row.stable && row.outsCorrect && row.baseCorrect && row.canPitch && row.ledger && row.automaticallyFinished),
+  'フライ帰塁プレーの終了・二重計上・次投球: ' + JSON.stringify(flyReturnLifecycle.filter(row => !row.stable || !row.outsCorrect || !row.baseCorrect || !row.canPitch || !row.ledger || !row.automaticallyFinished)));
+
+const manualFlyChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame(); gameMode = "versus"; resetBall(); count.outs = 0;
+  defenseControlMode[fieldingTeam()] = "manual";
+  gamePhase = "defense"; defenseState = createDefenseState(); defenseState.active = true;
+  defenseState.battedBall = { isGrounder: false, ballTime: 1 };
+  defenseState.outcome = { kind: "out", caught: true, needsThrow: false, fieldingTime: 1 };
+  const runner = createDefenseBaseRunner("first", { id: "manual", run: 5 }, defenseState.outcome, defenseState.battedBall);
+  defenseState.baseRunners = [runner];
+  setDefenseBaseRunnerManualDestination(runner, 2, 0);
+  updateDefenseBaseRunners(1);
+  defenseState.unifiedCircleCatchComplete = true;
+  updateFlyReturnRequirements(1);
+  const manualRequired = runner.explicitFlyDeparture && runner.flyReturnRequired;
+  const normal = { ...runner, explicitFlyDeparture: false, tagUp: false, flyReturnRequired: false,
+    flyCatchTime: null, manualTargetBase: null, autoFlyReturnHandled: false };
+  defenseState.baseRunners = [normal];
+  updateFlyReturnRequirements(1);
+  const autoReturn = normal.targetBase === "first" && !normal.flyReturnRequired;
+  defenseState.outcome = { kind: "single", caught: false };
+  const dropped = { ...runner, flyReturnRequired: false, flyCatchTime: null };
+  defenseState.baseRunners = [dropped];
+  updateFlyReturnRequirements(2);
+  return JSON.stringify({ manualRequired, autoReturn, droppedContinues: !dropped.flyReturnRequired });
+`));
+assert(Object.values(manualFlyChecks).every(Boolean), '手動進塁・自動帰塁・落球時の継続: ' + JSON.stringify(manualFlyChecks));
+
+const homeStealChecks = JSON.parse(makeRunner(createGameContext(), `
+  const results = [];
+  for (const ballFirst of [true, false]) {
+    startGame(); gameMode = "versus"; resetBall();
+    count.outs = 0; count.strikes = 0;
+    bases = createEmptyBases();
+    bases.first = makeBaseRunner({ id: "stay", run: 5 });
+    bases.third = makeBaseRunner({ id: "home-stealer", run: 8 });
+    const before = scores[battingTeam];
+    const now = performance.now();
+    results.push(tryStartSteal("home", now));
+    const arrival = stealState.arrivalTime;
+    ball.crossedPlate = true;
+    ball.plateTime = now + (arrival + (ballFirst ? -0.2 : 0.2)) * 1000;
+    stealState.pitchResultPending = true;
+    updateStealState(now + (arrival + 0.3) * 1000);
+    results.push(!!stealState.decision && stealState.decision.out === ballFirst);
+    updateStealState(stealState.decision.until + 1);
+    results.push(!stealState.active && !bases.third && bases.first?.id === "stay"
+      && count.outs === (ballFirst ? 1 : 0) && scores[battingTeam] - before === (ballFirst ? 0 : 1));
+  }
+  startGame(); gameMode = "versus"; resetBall();
+  bases = createEmptyBases();
+  bases.third = makeBaseRunner({ id: "squeeze", run: 8 });
+  const now = performance.now();
+  tryStartSteal("home", now);
+  __advanceTime(stealState.arrivalTime * 500);
+  const lead = getHitAndRunLeadState();
+  const grounder = { isGrounder: true, ballTime: 1, power: 0.3, target: getDefenseBasePointByName("first") };
+  const outcome = { kind: "single", scoreType: "single", caught: false, needsThrow: true, fieldingTime: 1 };
+  const normal = createDefenseBaseRunner("third", bases.third, outcome, grounder);
+  const squeeze = createDefenseBaseRunner("third", bases.third, outcome, grounder, null, null, null, lead);
+  results.push(squeeze.targetBase === "home" && squeeze.arrivalTime < normal.arrivalTime
+    && Math.hypot(squeeze.route[0].x - lead.point.x, squeeze.route[0].y - lead.point.y) < 1);
+  results.push(getDefenseRunnerStartLeadDistance("third", bases.third, { isGrounder: false }, outcome, lead, 4, true) === 0);
+  return JSON.stringify(results);
+`));
+assert(homeStealChecks.every(Boolean), 'ホームスティール・得点・スクイズの先行距離: ' + JSON.stringify(homeStealChecks));
+
+const defenseReviewChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame(); gameMode = "versus"; resetBall();
+  bases.first = makeBaseRunner({ id: "review", run: 5 });
+  const results = [];
+  for (const flag of ["crossedPlate", "active"]) {
+    ball[flag] = true;
+    results.push(!startPickoff("first"));
+    ball[flag] = false;
+  }
+  stealState.pitchResultPending = true;
+  results.push(!startPickoff("first"));
+  stealState.pitchResultPending = false;
+  stealState.decision = { out: false, until: performance.now() + 900 };
+  results.push(!startPickoff("first"));
+  stealState = createStealState();
+  results.push(startPickoff("first"));
+  const oldStart = defenseState.startTime;
+  defenseState.tagPresentation = { startedAt: performance.now(), contactAt: performance.now() + 320,
+    until: performance.now() + 1220 };
+  __advanceTime(500);
+  updateDefensePlay(performance.now());
+  results.push(defenseState.tagPresentation.announced && defenseState.startTime === oldStart);
+  __advanceTime(800);
+  updateDefensePlay(performance.now());
+  results.push(defenseState.tagPresentation.resumed && defenseState.startTime === oldStart + 1300);
+  // 牽制の3アウト目より後・同時の本塁到達は得点にしない。
+  for (const scoreTime of [1, 2, 3]) {
+    startGame(); resetBall(); count.outs = 2;
+    const before = scores[battingTeam];
+    gamePhase = "defense";
+    defenseState = createDefenseState();
+    defenseState.active = true; defenseState.pickoff = true; defenseState.resultHoldUntil = -1;
+    defenseState.baseRunners = [
+      { id: "out", startBase: "first", targetBase: "second", currentBase: "first", arrived: true, isOut: true },
+      { id: "score", startBase: "third", targetBase: "home", currentBase: "home", arrived: true, arrivalTime: scoreTime }
+    ];
+    defenseState.completedThrowOuts = [{ startBase: "first", time: 2 }];
+    const team = battingTeam;
+    finishDefensePlay();
+    results.push(scores[team] - before === (scoreTime < 2 ? 1 : 0));
+  }
+  return JSON.stringify(results);
+`));
+assert(defenseReviewChecks.every(Boolean), '牽制開始制限・演出中の時計停止・3アウト時の得点順序: ' + JSON.stringify(defenseReviewChecks));
+
+const waitingTagChecks = JSON.parse(makeRunner(createGameContext(), `
+  startGame();
+  const results = [];
+  for (const target of ["first", "second", "third", "home"]) {
+    for (const returning of [false, true]) {
+      if (returning && target === "home") continue;
+    for (const outs of [0, 1, 2]) {
+      for (const timing of ["late", "early", "tie", "between"]) {
+        gamePhase = "defense";
+        count.outs = outs;
+        defenseState = createDefenseState();
+        defenseState.active = true;
+        defenseState.pickoff = true;
+        defenseState.outcome = { kind: "pickoff" };
+        const base = getDefenseBasePointByName(target);
+        const runner = { startBase: returning ? target : "third", targetBase: target,
+          scored: target === "home", returning,
+          x: base.x + (timing === "between" ? 100 : 0), y: base.y,
+          arrived: timing !== "between", arrivalTime: timing === "early" ? 1 : timing === "tie" ? 2 : 3,
+          route: [{ x: base.x + 200, y: base.y }, base] };
+        defenseState.baseRunners = [runner];
+        defenseState.heldBallBase = target;
+        defenseState.heldBallSince = 2;
+        defenseState.rundown = { ...base, targetBase: target, moving: false, lastTime: 3,
+          fielder: { speed: 5 }, tagCandidate: null };
+        updateRundown(3);
+        updateRundown(3.2);
+        results.push(Boolean(runner.isOut) === (timing === "late")
+          && defenseState.completedThrowOuts.length === (timing === "late" ? 1 : 0));
+        if (timing === "late") {
+          const presentation = defenseState.tagPresentation;
+          results.push(!!presentation && !presentation.announced && !canManualDefenseThrow(target));
+          drawCloseBasePlay(runner, target, null, 3, "アウト");
+          drawDefenseFielder(base.x, base.y, "SS", "", true, 0,
+            { kind: "throw", dx: 100, dy: -80, amount: 0.5 });
+          drawDefenseFielder(base.x, base.y, "CF", "", true, 0,
+            { kind: "catch", dx: -100, dy: -80, amount: 1 });
+          updateDefensePlay(presentation.contactAt);
+          results.push(presentation.announced && defenseState.active
+            && presentation.until - presentation.contactAt >= 899);
+        }
+      }
+    }
+    }
+  }
+  return JSON.stringify(results);
+`));
+assert(waitingTagChecks.every(Boolean), "待ち受け自動タッチ：各塁・各アウト数・到達順・二重アウト防止");
 
 process.stdout.write(`${JSON.stringify(integrationReport)}\n`);
 process.stdout.write("Baserunning check passed\n");

@@ -194,7 +194,7 @@ const defenseGamepadInputStart = script.indexOf('if (gamePhase === "defense" && 
 const defenseGamepadInputEnd = script.indexOf('if (gamePhase === "defense" && team === battingTeam)', defenseGamepadInputStart);
 const defenseGamepadInputSection = script.slice(defenseGamepadInputStart, defenseGamepadInputEnd);
 assert(defenseGamepadInputSection.includes("justPressed(gamepadButtons.A)"), "screen BTN 2 should be the defense throw button");
-assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.B)"), "screen BTN 1 should not throw");
+assert(defenseGamepadInputSection.includes("if (justPressed(gamepadButtons.B)) handleRundownCommand(throwTarget);"), "screen BTN 1 should run with the ball instead of throwing");
 assert(!defenseGamepadInputSection.includes("justPressed(gamepadButtons.X)"), "screen BTN 3 should not throw");
 const batterRunnerTargetSection = script.slice(
   script.indexOf("function getBatterRunnerTargetBase"),

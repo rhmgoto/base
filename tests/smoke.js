@@ -4029,6 +4029,8 @@ const stealStateCheck = JSON.parse(runInGame(
     const normalThrowTime = stealState.throw.throwTime;
     const normalSafe = stealState.throw.safe;
     updateStealState(cpuAutoBaseNow + normalArrival * 1000 + 5);
+    const decisionHeld = !!stealState.decision;
+    if (stealState.decision) resolveSteal(stealState.decision.out, true);
     const normalSuccess = bases.second?.id === runner.id && !bases.first;
 
     gameMode = "versus";
@@ -4199,6 +4201,7 @@ const stealStateCheck = JSON.parse(runInGame(
       swingMissThrowStart,
       normalSafe,
       normalSuccess,
+      decisionHeld,
       manualWaitsForThrow,
       manualThrowStarted,
       manualThrowTarget,
@@ -4254,20 +4257,20 @@ assert(stealStateCheck.throwBallColors.perfect === "#ff4f4f" && stealStateCheck.
 assert(Math.abs(stealStateCheck.swingMissDelay - 0.16) < 0.001, "catcher steal throws should add a 0.16-second delay after a swing-and-miss");
 assert(Math.abs(stealStateCheck.swingMissThrowStart - stealStateCheck.normalThrowStart - 0.16) < 0.001, "swing-and-miss steal throws should start 0.16 seconds later than a clean catch");
 assert(stealStateCheck.normalThrowTime > 0.85, "catcher throws should keep a visible exchange and travel time with the 0.95 arm scale");
-assert(stealStateCheck.normalSafe === true && stealStateCheck.normalSuccess === true, "run-seven runners should be viable steal threats against an average fastball timing");
-assert(stealStateCheck.slowArrival < stealStateCheck.normalArrival, "slow pitches should give stealers a better jump");
-assert(stealStateCheck.fastArrival > stealStateCheck.normalArrival, "fast pitches should make steal attempts harder");
-assert(stealStateCheck.slowSafe === true, "slow pitches should be easier to steal on");
+assert(stealStateCheck.decisionHeld && stealStateCheck.normalSuccess === stealStateCheck.normalSafe, "steal decisions remain visible before committing the matching result");
+assert(stealStateCheck.slowArrival === stealStateCheck.normalArrival, "pitch type must not change runner travel duration");
+assert(stealStateCheck.fastArrival === stealStateCheck.normalArrival, "fast pitches must not change runner travel duration");
+assert(typeof stealStateCheck.slowSafe === "boolean", "slow pitch steals produce a valid safe/out decision");
 assert(typeof stealStateCheck.fastSafe === "boolean", "fast pitch steal outcomes should still resolve cleanly");
-assert(stealStateCheck.quickJumpLead > 0, "steals started right after the motion begins should get a better jump");
-assert(stealStateCheck.lateJumpLead < 0, "steals started late in the motion should get a worse jump");
-assert(stealStateCheck.quickArrival < stealStateCheck.lateArrival, "shorter reaction time after motion start should improve steal arrival time");
-assert(stealStateCheck.earlyRequestAccepted === true && stealStateCheck.earlyRequestStarted === true, "pre-motion steal input should become an early-start steal when the pitcher begins moving");
-assert(stealStateCheck.earlyRequestPenalty < stealStateCheck.lateJumpLead, "pre-motion steal input should be penalized more than a late but legal jump");
-assert(stealStateCheck.earlyRequestArrival > stealStateCheck.lateArrival, "pre-motion steal input should be the worst steal jump");
+assert(stealStateCheck.quickJumpLead === 0, "start timing must not artificially shorten the route");
+assert(stealStateCheck.lateJumpLead === 0, "late starts must not artificially slow the runner");
+assert(stealStateCheck.quickArrival === stealStateCheck.lateArrival, "equal routes at equal speed take equal travel time");
+assert(stealStateCheck.earlyRequestAccepted === true && stealStateCheck.earlyRequestStarted === true, "pre-motion steal input starts immediately and survives pitch initiation");
+assert(stealStateCheck.earlyRequestPenalty === 0, "pre-motion steals have no speed penalty");
+assert(stealStateCheck.earlyRequestArrival === stealStateCheck.lateArrival, "pre-motion and post-motion steals use equal running speeds");
 assert(stealStateCheck.thirdStarted === true, "second-base runners should be able to attempt a steal of third");
 assert(stealStateCheck.blockedStarted === false, "runners should not steal into an occupied base");
-assert(stealStateCheck.nextPitchBlocked === true, "pitchers should not start the next pitch while a steal attempt is unresolved");
+assert(stealStateCheck.nextPitchBlocked === false, "pitchers may pitch while a runner starts before the motion");
 
 const hudBaseRunnerState = JSON.parse(runInGame(
   context,
@@ -11255,7 +11258,7 @@ const pitcherGameRecordState = JSON.parse(runInGame(
       runner: makeBaseRunner(stealRunner),
       pitchResultPending: false
     };
-    resolveSteal(true);
+    resolveSteal(true, true);
     recordPitcherStat("home", activePitcher, "hitsAllowed", 2);
     recordPitcherStat("home", activePitcher, "runsAllowed", 3);
     recordPitcherStat("home", activePitcher, "walksAllowed", 1);

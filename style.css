@@ -2999,3 +2999,9 @@ button:focus-visible, select:focus-visible {
   .menu-button, .audio-toggle, .pitcher-change-button,
   .menu-back-button, .team-auto-button { transition: none; }
 }
+.touch-button-pickoff {
+  position: absolute;
+  right: 0;
+  bottom: 154px;
+  font-size: 16px !important;
+}
