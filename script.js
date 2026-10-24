@@ -1050,12 +1050,12 @@ const defenseRollTuning = {
   hardEndSpeedRatio: 0.24,
   slowRollTimeScale: 1.18,
   hardRollTimeScale: 0.94,
-  frontDropRollMin: 115,
-  frontDropRollMax: 260,
-  frontFlyDropRollMin: 135,
-  frontFlyDropRollMax: 310,
-  lineDropRollMin: 160,
-  lineDropRollMax: 360
+  frontDropRollMin: 240,
+  frontDropRollMax: 520,
+  frontFlyDropRollMin: 260,
+  frontFlyDropRollMax: 580,
+  lineDropRollMin: 360,
+  lineDropRollMax: 760
 };
 const outfieldFenceFieldingInset = 36;
 
@@ -5599,6 +5599,8 @@ function getPitchControlMiss(controlProfile, intendedX, intendedY) {
 
 function releasePendingPitch() {
   if (!pendingPitch || performance.now() < pendingPitch.releaseTime) return;
+  // Warm-up swings must not consume the incoming pitch. Keep a held bunt stance.
+  if (!isBuntStanceActive()) resetSwing();
   ball.x = pendingPitch.startX;
   ball.y = pendingPitch.startY;
   ball.prevX = ball.x;
@@ -6221,7 +6223,7 @@ function swingBat(type = "strong") {
 }
 
 function startSwing(now = performance.now(), type = "strong") {
-  if (ball.crossedPlate && !ball.inPitch) return;
+  if (ball.crossedPlate && (isPitching || ball.inPitch || ball.active)) return;
   if (swingState.didSwingThisPitch && (isPitching || pendingPitch || ball.inPitch)) return;
   if (now < swingState.cooldownUntil || swingState.isSwinging) return;
   swingState.isSwinging = true;
@@ -13057,7 +13059,8 @@ function getOutfieldFrontDropRollTarget(battedBall) {
   const minRoll = isLineStyle ? defenseRollTuning.lineDropRollMin : isFrontFlyDrop ? defenseRollTuning.frontFlyDropRollMin : defenseRollTuning.frontDropRollMin;
   const maxRoll = isLineStyle ? defenseRollTuning.lineDropRollMax : isFrontFlyDrop ? defenseRollTuning.frontFlyDropRollMax : defenseRollTuning.frontDropRollMax;
   const powerRoll = clamp((battedBall.power ?? 0.6) - 0.5, 0, 0.35) * (isLineStyle ? 210 : 150);
-  const rollDistance = clamp(randomBetween(minRoll, maxRoll) + powerRoll, minRoll, maxRoll + 90);
+  // 同じ打球の到達点を再計算してもぶれないよう、打球速度から決める。
+  const rollDistance = clamp(lerp(minRoll, maxRoll, getBattedBallRollSpeedRatio(battedBall)) + powerRoll, minRoll, maxRoll + 90);
   const projectedTarget = {
     x: battedBall.target.x + battedBall.direction.x * rollDistance,
     y: battedBall.target.y + battedBall.direction.y * rollDistance
@@ -16315,7 +16318,7 @@ function getRollingEaseProgress(progress, battedBall = defenseState.battedBall) 
 
 function getSoftOutfieldDropRollProgress(progress, battedBall = defenseState.battedBall) {
   const t = clamp(progress, 0, 1);
-  return getNaturalRollingProgress(Math.pow(t, 1.08), battedBall, 0.08);
+  return getNaturalRollingProgress(t, battedBall, 0.24);
 }
 
 function getBattedBallRollSpeedRatio(battedBall) {
@@ -16353,12 +16356,12 @@ function getDefenseRollDuration(battedBall, landing, target) {
   const baseSpeed = isDeepDriveFrontLandingBall(battedBall)
     ? 440
     : isOutfieldFrontLandingBall(battedBall)
-    ? 210
+    ? 330
     : isHardGrounder(battedBall) ? hardGrounderTuning.rollBaseSpeed : trajectory === "grounder" ? 430 : trajectory === "liner" ? 390 : 350;
   const powerFactor = isDeepDriveFrontLandingBall(battedBall)
     ? clamp(0.82 + (battedBall?.power ?? 1.1) * 0.14, 0.92, 1.18)
     : isOutfieldFrontLandingBall(battedBall)
-    ? clamp(0.68 + (battedBall?.power ?? 0.6) * 0.14, 0.68, 0.86)
+    ? lerp(0.82, 1.08, getBattedBallRollSpeedRatio(battedBall))
     : lerp(0.72, 1.04, getBattedBallRollSpeedRatio(battedBall));
   const timeScale = lerp(defenseRollTuning.slowRollTimeScale, defenseRollTuning.hardRollTimeScale, getBattedBallRollSpeedRatio(battedBall));
   const minSeconds = isDeepDriveFrontLandingBall(battedBall) ? 1.25 : isOutfieldFrontLandingBall(battedBall) ? 1.35 : 1.15;
@@ -18174,6 +18177,8 @@ function drawRealisticFieldDetails(stadium, centerX, centerY) {
   ctx.arc(centerX, centerY, tuning.infieldArcRadius, Math.PI, Math.PI * 2);
   ctx.closePath();
   ctx.fill();
+  drawSurfaceFinish(centerX - tuning.infieldArcRadius, centerY - tuning.infieldArcRadius,
+    tuning.infieldArcRadius * 2, tuning.infieldArcRadius, "dirt");
 
   // 内野の芝ダイヤ。各塁をベースパス幅の半分だけ内側へ寄せた四角形。
   const diamondCenter = {
@@ -18210,6 +18215,37 @@ function drawRealisticFieldDetails(stadium, centerX, centerY) {
   ctx.beginPath();
   ctx.arc(centerX, centerY, tuning.homeCircleRadius, 0, Math.PI * 2);
   ctx.fill();
+}
+
+// 固定した模様をまとめて描く。描画でゲーム用の乱数を消費しない。
+function drawSurfaceFinish(left, top, width, height, material = "grass") {
+  ctx.save();
+  ctx.clip();
+  const light = ctx.createLinearGradient(left, top, left + width, top + height);
+  if (light?.addColorStop) {
+    light.addColorStop(0, "rgba(255,244,202,0.08)");
+    light.addColorStop(0.55, "rgba(255,255,255,0)");
+    light.addColorStop(1, "rgba(16,35,33,0.09)");
+    ctx.fillStyle = light;
+    ctx.fillRect(left, top, width, height);
+  }
+  if (material === "grass") {
+    ctx.fillStyle = "rgba(235,255,218,0.035)";
+    for (let row = 0; row < height; row += 96) ctx.fillRect(left, top + row, width, 48);
+  }
+  for (let pass = 0; pass < 2; pass += 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = pass ? "rgba(255,242,210,0.12)" : "rgba(35,48,30,0.10)";
+    ctx.lineWidth = material === "grass" ? 1 : 1.5;
+    for (let i = 0; i < 260; i += 1) {
+      const x = left + ((i * 137 + pass * 61) % 997) / 997 * width;
+      const y = top + ((i * 233 + pass * 103) % 991) / 991 * height;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (material === "grass" ? 2 : 1.5), y - (material === "grass" ? 3 + i % 4 : 0));
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawStadiumTurfPattern(stadium = getCurrentStadium()) {
@@ -19901,6 +19937,9 @@ function drawField() {
   ctx.beginPath();
   ctx.arc(field.centerX, 754, 405, Math.PI, Math.PI * 2);
   ctx.fill();
+  if (!["obsidian", "spaceGlow"].includes(stadium.surface)) {
+    drawSurfaceFinish(field.centerX - 405, 349, 810, 405, stadium.surface === "dirt" ? "dirt" : "grass");
+  }
   drawAmericanRoyalGrassDetails(field.centerX, 754, 405);
   drawSpaceStadiumFieldLights(field.centerX, 754, 405);
   ctx.strokeStyle = "rgba(255,255,255,0.76)";
@@ -19920,6 +19959,9 @@ function drawField() {
   ctx.beginPath();
   ctx.ellipse(pitcher.x, pitcher.y + 18, 68, 30, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (!["obsidian", "spaceGlow", "seaBreezeGrass"].includes(stadium.surface)) {
+    drawSurfaceFinish(pitcher.x - 68, pitcher.y - 12, 136, 60, "dirt");
+  }
   ctx.fillStyle = "#f8f3d8";
   ctx.fillRect(field.centerX - 96, pitcher.y + 13, 192, 8);
   ctx.fillStyle = "#233047";
@@ -20057,6 +20099,10 @@ function drawDefenseView() {
     ctx.beginPath();
     ctx.arc(field.plateX, field.plateY + 42, defenseField.grassRadius, Math.PI, Math.PI * 2);
     ctx.fill();
+    if (!["obsidian", "spaceGlow"].includes(stadium.surface)) {
+      drawSurfaceFinish(field.plateX - defenseField.grassRadius, field.plateY + 42 - defenseField.grassRadius,
+        defenseField.grassRadius * 2, defenseField.grassRadius, stadium.surface === "dirt" ? "dirt" : "grass");
+    }
     drawRealisticFieldDetails(stadium, field.plateX, field.plateY + 42);
     drawAmericanRoyalGrassDetails(field.plateX, field.plateY + 42, defenseField.grassRadius);
     drawSpaceStadiumFieldLights(field.plateX, field.plateY + 42, defenseField.grassRadius);
@@ -20904,6 +20950,12 @@ function drawSpaceBaseDiamond(x, y, label, index) {
 
 function drawBaseDiamond(x, y, label, color) {
   ctx.save();
+  ctx.fillStyle = "rgba(32,30,24,0.20)";
+  ctx.beginPath();
+  ctx.ellipse(x + 3, y + 7, 23, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.PI / 4);
   ctx.fillStyle = color;
@@ -20911,6 +20963,11 @@ function drawBaseDiamond(x, y, label, color) {
   ctx.lineWidth = 3;
   ctx.fillRect(-13, -13, 26, 26);
   ctx.strokeRect(-13, -13, 26, 26);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillRect(-11, -11, 22, 2);
+  ctx.fillRect(-11, -9, 2, 19);
+  ctx.fillStyle = "rgba(58,48,30,0.20)";
+  ctx.fillRect(-10, 9, 21, 3);
   ctx.restore();
 
   ctx.fillStyle = "#233047";
@@ -20927,6 +20984,7 @@ function drawOutfieldWall() {
   const lowFence = stadium.id === "aozora" || stadium.id === "riverside";
   const royalWall = stadium.royalEnclosed === true;
   const spaceWall = stadium.hasSpaceStadium === true;
+  if (!lowFence && !spaceWall) drawBallparkSeating(homeY, wallHeight);
   ctx.save();
 
   ctx.strokeStyle = royalWall ? "rgba(5, 14, 20, 0.58)" : spaceWall ? "rgba(1, 8, 20, 0.72)" : "rgba(18, 34, 47, 0.32)";
@@ -20978,6 +21036,17 @@ function drawOutfieldWall() {
   ctx.arc(field.plateX, homeY - wallHeight - 10, defenseField.fenceDistance - 2, Math.PI, Math.PI * 2);
   ctx.stroke();
 
+  // パッドの継ぎ目とリベットは既存のフェンス色に重ねる。
+  for (let angle = 183; angle <= 357; angle += 5) {
+    const rad = degreesToRadians(angle);
+    const x = field.plateX + Math.cos(rad) * defenseField.fenceDistance;
+    const y = homeY + Math.sin(rad) * defenseField.fenceDistance;
+    ctx.strokeStyle = "rgba(7,24,30,0.22)";
+    ctx.lineWidth = 2;
+    drawLine(x, y - wallHeight + 8, x, y + 10);
+    ctx.fillStyle = "rgba(238,240,202,0.45)";
+    ctx.fillRect(x - 1, y - wallHeight + 12, 2, 2);
+  }
   for (let angle = 185; angle <= 355; angle += 17) {
     const rad = degreesToRadians(angle);
     const x = field.plateX + Math.cos(rad) * defenseField.fenceDistance;
@@ -20988,6 +21057,38 @@ function drawOutfieldWall() {
     ctx.strokeStyle = "rgba(255, 240, 184, 0.55)";
     ctx.lineWidth = 2;
     drawLine(x - 3, y - wallHeight - 8, x - 3, y + 18);
+  }
+  ctx.restore();
+}
+
+function drawBallparkSeating(homeY, wallHeight) {
+  ctx.save();
+  const colors = ["#bb6858", "#8fb7ab", "#d8bd78", "#526b80", "#e3d8b3"];
+  const time = performance.now() / 1000;
+  for (let row = 3; row >= 0; row -= 1) {
+    const radius = defenseField.fenceDistance + 26 + row * 22;
+    const baseline = homeY - wallHeight - 12;
+    ctx.strokeStyle = row % 2 ? "#526568" : "#647777";
+    ctx.lineWidth = 20;
+    ctx.beginPath();
+    ctx.arc(field.plateX, baseline, radius, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(235,239,213,0.24)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    for (let seat = 0; seat < 100; seat += 1) {
+      if (seat % 20 < 2) continue; // 通路
+      const angle = Math.PI + (seat + 0.5) / 100 * Math.PI;
+      const x = field.plateX + Math.cos(angle) * radius;
+      const y = baseline + Math.sin(angle) * radius;
+      const wave = seat % 7 === 0 ? Math.sin(time * 1.8 + seat + row) * 1.5 : 0;
+      ctx.fillStyle = colors[(seat * 3 + row) % colors.length];
+      ctx.fillRect(x - 3, y - 5 + wave, 6, 7);
+      ctx.fillStyle = (seat + row) % 3 ? "#d8b894" : "#a5795d";
+      ctx.beginPath();
+      ctx.arc(x, y - 7 + wave, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -21715,6 +21816,10 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0) {
   ctx.beginPath();
   ctx.ellipse(x, groundY, isChosen ? 30 : 24, 7, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = "rgba(18,31,28,0.12)";
+  ctx.beginPath();
+  ctx.ellipse(x + 9, groundY + 2, isChosen ? 38 : 31, 10, 0.12, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
   ctx.save();
@@ -21746,6 +21851,17 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0) {
   roundRect(-18, 0, 36, 32, 10);
   ctx.fill();
   ctx.stroke();
+  ctx.save();
+  ctx.clip();
+  const fabric = ctx.createLinearGradient(-18, 0, 18, 32);
+  if (fabric?.addColorStop) {
+    fabric.addColorStop(0, "rgba(255,255,255,0.22)");
+    fabric.addColorStop(0.45, "rgba(255,255,255,0)");
+    fabric.addColorStop(1, "rgba(10,20,30,0.26)");
+    ctx.fillStyle = fabric;
+    ctx.fillRect(-18, 0, 36, 32);
+  }
+  ctx.restore();
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(-4, 4, 8, 28);

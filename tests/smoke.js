@@ -12229,3 +12229,27 @@ assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordSt
 assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.firstRunnerName), "a pinch runner on first should appear in the game result batting table even with no plate appearance");
 assert(battingSubstitutionRecordState.names.includes(battingSubstitutionRecordState.secondRunnerName), "a pinch runner on second should appear in the game result batting table even with no plate appearance");
 console.log("Smoke check passed");
+
+
+const swingLifecycleRegression = JSON.parse(runInGame(context, `(() => {
+ gameMode = "practice"; showMenu(); startGame(); resetSwing();
+ startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ __advanceTime(10); startSwing();
+ const warmupStarted = swingState.isSwinging;
+ __advanceTime(1000); releasePendingPitch();
+ const clearedOnRelease = !swingState.didSwingThisPitch && !swingState.isSwinging;
+ startSwing(); const liveStart = swingState.startTime;
+ __advanceTime(1000); swingState.isSwinging = false; startSwing();
+ const liveDoubleSwingBlocked = swingState.startTime === liveStart;
+ finishPitch("空振り", "strike"); __advanceTime(1000); swingState.isSwinging = false;
+ startSwing(); const idleSwingAllowed = swingState.startTime > liveStart;
+ startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ __advanceTime(1000); releasePendingPitch(); startSwing();
+ const nextPitchAllowed = swingState.didSwingThisPitch && swingState.isSwinging;
+ finishPitch("空振り", "strike");
+ startPitch("normal", { targetX: field.plateX, targetY: field.plateY });
+ startBuntStance(); __advanceTime(1000); releasePendingPitch();
+ return JSON.stringify({warmupStarted,clearedOnRelease,liveDoubleSwingBlocked,idleSwingAllowed,nextPitchAllowed,buntPreserved:isBuntStanceActive()});
+})()`));
+for (const [name, passed] of Object.entries(swingLifecycleRegression)) assert(passed, 'swing lifecycle: ' + name);
+console.log('Swing lifecycle regression passed', swingLifecycleRegression);

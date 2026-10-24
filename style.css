@@ -2959,3 +2959,43 @@ button {
     background: rgba(255, 232, 129, 0.96);
   }
 }
+
+/* 配色と輪郭を保ち、表面の光と操作時の手応えを足す。 */
+.info-card,
+.menu-card {
+  background-image: linear-gradient(145deg, rgba(255,255,255,.23), transparent 42%, rgba(145,102,43,.05));
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(92,65,29,.10), 6px 6px 0 rgba(0,0,0,.24), 0 12px 28px rgba(12,25,35,.13);
+}
+.team-panel,
+.ability-panel {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 2px 5px rgba(24,43,48,.08);
+}
+.menu-button,
+.audio-toggle,
+.pitcher-change-button,
+.menu-back-button,
+.team-auto-button {
+  background-image: linear-gradient(180deg, rgba(255,255,255,.18), transparent 60%, rgba(0,0,0,.06));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 2px 0 rgba(17,36,46,.22);
+  transition: filter 120ms ease, box-shadow 120ms ease;
+}
+.menu-button:hover,
+.audio-toggle:hover,
+.pitcher-change-button:hover,
+.menu-back-button:hover,
+.team-auto-button:hover { filter: brightness(1.06); }
+.menu-button:active,
+.audio-toggle:active,
+.pitcher-change-button:active,
+.menu-back-button:active,
+.team-auto-button:active {
+  box-shadow: inset 0 2px 4px rgba(17,36,46,.22);
+}
+button:focus-visible, select:focus-visible {
+  outline: 3px solid #aee7ff;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-button, .audio-toggle, .pitcher-change-button,
+  .menu-back-button, .team-auto-button { transition: none; }
+}
