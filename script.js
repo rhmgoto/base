@@ -11685,7 +11685,20 @@ function getDefenseDuration(battedBall, outcome, runner, throwState, fieldingTar
     : 0;
   const maxDuration = throwState?.manualWait ? 16000 : 12500;
   const duration = clamp(Math.max(fieldingSeconds, runnerSeconds, throwSeconds, rollSeconds) * 1000, 1900, maxDuration);
+  if (battedBall.isFoulBall) return Math.max(duration, (getFoulBallTravelEndSeconds(battedBall, fieldingTarget) + 1.2) * 1000);
   return isHomeRunVisionField() ? Math.max(6400, duration) : duration;
+}
+
+function getFoulBallTravelEndSeconds(hit = defenseState.battedBall, target = defenseState.target) {
+  const landing = hit.target;
+  if (hit.isGrounder) return getGrounderContinuousRollDuration(hit, landing, target || landing);
+  const rollDistance = Math.hypot((target || landing).x - landing.x, (target || landing).y - landing.y);
+  return (hit.ballTime ?? 1) + (rollDistance > 1 ? getDefenseRollDuration(hit, landing, target) : 0);
+}
+
+function hasDefenseCatchVisual(elapsedSeconds) {
+  return !!defenseState.catchVisual && elapsedSeconds >= defenseState.catchVisual.startTime
+    && (defenseState.outcome?.caught || (defenseState.foulPlay && defenseState.unifiedCircleCatchComplete));
 }
 
 function alignFieldingTimeWithBallArrival(battedBall, outcome, fieldingTarget, fielder = null) {
@@ -12564,6 +12577,10 @@ function hasFielderSecuredBall(elapsedSeconds) {
   if (defenseState.rundown) return true;
   const outcome = defenseState.outcome;
   if (!outcome || outcome.pendingManualFielding) return false;
+  if (!outcome.caught && !outcome.errorRecovered && !defenseState.pickoff && !defenseState.heldBallBase
+    && !(defenseState.foulPlay && defenseState.unifiedCircleCatchComplete)) return false;
+  // ファウルの予定処理時刻だけでは捕球済みにしない。
+  if (defenseState.battedBall?.isFoulBall && !defenseState.unifiedCircleCatchComplete) return false;
   if (!defenseState.chosenFielder || !defenseState.target) return false;
   const secureTime = outcome.fieldingTime ?? defenseState.battedBall?.ballTime;
   return Number.isFinite(secureTime) && elapsedSeconds >= secureTime;
@@ -15624,6 +15641,8 @@ function startDefenseCatchVisual(fielder, fieldingPoint, elapsedSeconds, caughtI
     fromY: ball.y - visualHeight,
     shadowX: ball.x,
     shadowY: ball.y,
+    heightAtContact: height,
+    catchStyle: getDefenseCatchStyle(catchDistance / Math.max(1, catchRadius), height, caughtInAir),
     toX: fieldingPoint.x,
     toY: fieldingPoint.y - 32,
     point: { x: fieldingPoint.x, y: fieldingPoint.y },
@@ -16224,6 +16243,13 @@ function shouldResolveDefensePlayNow(elapsedSeconds) {
   if (!outcome || defenseState.resolved) return false;
   if (outcome.pendingManualFielding) return false;
   if (hasPendingFlyReturns()) return false;
+  if (defenseState.foulPlay) {
+    if (defenseState.errorRecovery) return false;
+    const endTime = hasDefenseCatchVisual(elapsedSeconds)
+      ? defenseState.catchVisual.startTime + defenseState.catchVisual.duration
+      : getFoulBallTravelEndSeconds();
+    return elapsedSeconds >= endTime + 1.2;
+  }
   refreshDefenseThrowSafety();
 
   if (outcome.kind === "homer" || outcome.scoreType === "homer" || defenseState.battedBall?.fenceOver) {
@@ -16676,7 +16702,7 @@ function getDefenseBallPoint(progress, eased, elapsedSeconds = 0) {
   // 捕球で target を変更しても、それまでの打球を再計算しない。
   // 実際の接触位置からグラブへつなぎ、送球まではそこで保持する。
   const catchVisual = defenseState.catchVisual;
-  if (catchVisual && defenseState.outcome?.caught && elapsedSeconds >= catchVisual.startTime) {
+  if (hasDefenseCatchVisual(elapsedSeconds)) {
     const t = clamp((elapsedSeconds - catchVisual.startTime) / catchVisual.duration, 0, 1);
     const easedCatch = 1 - Math.pow(1 - t, 3);
     return {
@@ -21146,6 +21172,8 @@ function drawDefenseCatchEffect() {
   if (!point) return;
   const progress = clamp(age / duration, 0, 1);
   const alpha = Math.pow(1 - progress, 1.35);
+  const holder = defenseState.chosenFielder && getDefenseFielderDrawPosition(defenseState.chosenFielder);
+  const catchMotion = holder && getDefenseCatchMotion(holder.x, holder.y, elapsedSeconds);
   if (noBounceCatch && catchVisual?.catchRadius > 0) {
     const circleAlpha = clamp(1 - age / 0.18, 0, 1);
     if (circleAlpha > 0) {
@@ -21159,10 +21187,10 @@ function drawDefenseCatchEffect() {
     }
   }
   if (!noBounceCatch) {
-    drawSimpleDefensePickupEffect(point, progress, alpha);
+    drawSimpleDefensePickupEffect(catchMotion?.gloveWorld || point, progress, alpha);
     return;
   }
-  const effectPoint = {
+  const effectPoint = catchMotion?.gloveWorld || {
     x: catchVisual?.toX ?? point.x,
     y: catchVisual?.toY ?? point.y - 32
   };
@@ -21736,6 +21764,7 @@ function isInfieldOverviewActive() {
   if (defenseState.pickoff || defenseState.infieldOverview || defenseState.rundown) return true;
   const hit = defenseState.battedBall;
   if (!hit || hit.fenceOver) return false;
+  if (hit.isFoulBall) return true;
   const { first, second, third, home } = defenseField.bases;
   const inside = p => p && p.x >= third.x - 90 && p.x <= first.x + 90
     && p.y >= second.y - 130 && p.y <= home.y + 100;
@@ -21949,6 +21978,13 @@ function drawInfieldSurfaceDetails() {
 
 function getInfieldOverviewCamera() {
   const points = Object.values(defenseField.bases);
+  const hit = defenseState.battedBall;
+  if (gamePhase === "defense" && hit?.isFoulBall) {
+    // ファウル側の飛行・転がりの終点まで含め、途中で画角を切り替えない。
+    for (const p of [defenseState.origin, defenseState.landingTarget, getFoulBallFieldingTarget(hit)]) {
+      if (p) points.push(p, { x: p.x, y: p.y - getInfieldBallDisplayHeight(hit.maxHeight ?? 0, hit) });
+    }
+  }
   const minX = Math.min(...points.map(point => point.x)) - 100;
   const maxX = Math.max(...points.map(point => point.x)) + 100;
   const minY = Math.min(...points.map(point => point.y)) - 125;
@@ -22284,6 +22320,45 @@ function drawBattedBallGuide(target) {
   drawLine(defenseState.origin.x, defenseState.origin.y, target.x, target.y);
 }
 
+function getDefenseCatchStyle(edgeRatio, height, caughtInAir) {
+  if (caughtInAir && height >= getLiveCircleCatchReachHeight() * 0.8) return "jump";
+  if (edgeRatio < 0.68) return "normal";
+  return caughtInAir ? "stretch" : "scoop";
+}
+
+// 見た目だけの捕球動作。守備力・捕球円・走る位置・捕球時刻は変更しない。
+function getDefenseCatchMotion(x, y, elapsed, overview = isInfieldOverviewActive(), anticipation = null) {
+  const visual = anticipation || defenseState.catchVisual;
+  if (!visual || (!anticipation && !hasDefenseCatchVisual(elapsed))) return null;
+  const age = elapsed - visual.startTime;
+  if (age < 0) return null;
+  const recovery = clamp((age - 0.1) / 0.45, 0, 1);
+  const amount = anticipation ? anticipation.amount : 1 - recovery * recovery * (3 - 2 * recovery);
+  const style = visual.catchStyle || "normal";
+  const scale = 1.08 * (overview ? 1.28 : 1);
+  const side = Math.sign(visual.fromX - visual.point.x) || -1;
+  const leanX = style === "stretch" || style === "scoop" ? side * 13 * amount : 0;
+  const lift = style === "jump" ? (overview ? 14 : 8) * amount : 0;
+  const drop = style === "scoop" ? 6 * amount : 0;
+  const rotation = style === "stretch" ? side * 0.16 * amount : style === "scoop" ? side * 0.08 * amount : 0;
+  const bodyScaleY = style === "scoop" ? 1 - 0.14 * amount : 1;
+  const contactY = overview
+    ? visual.shadowY - getInfieldBallDisplayHeight(visual.heightAtContact ?? visual.shadowY - visual.fromY)
+    : visual.fromY;
+  const gloveWorld = {
+    x: lerp(x - 33 * scale, visual.fromX, amount),
+    y: lerp(y + 25 * scale, contactY, amount)
+  };
+  // 体の傾き・ジャンプを逆変換し、グラブとボールが同じ位置に重なるようにする。
+  const gx = (gloveWorld.x - x) / scale - leanX;
+  const gy = (gloveWorld.y - y) / scale + lift - drop;
+  const glove = {
+    x: gx * Math.cos(rotation) + gy * Math.sin(rotation),
+    y: (-gx * Math.sin(rotation) + gy * Math.cos(rotation)) / bodyScaleY
+  };
+  return { style, amount, leanX, lift, drop, rotation, bodyScaleY, glove, gloveWorld };
+}
+
 function getFielderArmPose(x, y, isChosen = false) {
   const elapsed = (performance.now() - defenseState.startTime) / 1000;
   const tag = defenseState.tagPresentation;
@@ -22295,6 +22370,10 @@ function getFielderArmPose(x, y, isChosen = false) {
     }
   }
   const toss = defenseState.throw;
+  if (isChosen && (!toss || elapsed < toss.startTime)) {
+    const motion = getDefenseCatchMotion(x, y, elapsed);
+    if (motion?.amount > 0.01) return { kind: "catch", dx: ball.x - x, dy: ball.y - y, amount: motion.amount, motion };
+  }
   if (toss) {
     if (Math.hypot(x - toss.from.x, y - toss.from.y) < 65
       && elapsed >= toss.startTime - 0.3 && elapsed <= toss.startTime + 0.24) {
@@ -22306,6 +22385,27 @@ function getFielderArmPose(x, y, isChosen = false) {
       return { kind: "catch", dx: toss.from.x - x, dy: toss.from.y - y,
         amount: 1 - clamp((elapsed - toss.endTime) / 0.3, 0, 1) * 0.7 };
     }
+  }
+  if (isChosen) {
+    let motion = getDefenseCatchMotion(x, y, elapsed);
+    if (!motion && !defenseState.unifiedCircleCatchComplete && !defenseState.errorRecovery) {
+      const hit = defenseState.battedBall;
+      const fielder = defenseState.chosenFielder;
+      if (hit && fielder && !hit.fenceOver && !hit.wallHit) {
+        const radius = getFielderCatchRangeRadius(fielder, hit);
+        const distance = Math.hypot(ball.x - x, ball.y - y);
+        const height = getDefenseBallHeightAtPoint(0, elapsed);
+        if (distance < radius * 1.45 && height <= getLiveCircleCatchReachHeight() * 1.6) {
+          const amount = clamp((radius * 1.45 - distance) / Math.max(1, radius * 0.45), 0, 1);
+          motion = getDefenseCatchMotion(x, y, elapsed, isInfieldOverviewActive(), {
+            startTime: elapsed, point: { x, y }, fromX: ball.x, shadowY: ball.y,
+            fromY: ball.y - getDefenseBallVisualHeightOffset(height, hit), heightAtContact: height,
+            catchStyle: getDefenseCatchStyle(distance / Math.max(1, radius), height, !hit.isGrounder), amount
+          });
+        }
+      }
+    }
+    if (motion) return { kind: "catch", dx: ball.x - x, dy: ball.y - y, amount: motion.amount, motion };
   }
   const catchTime = defenseState.outcome?.fieldingTime ?? defenseState.battedBall?.ballTime;
   if (isChosen && Number.isFinite(catchTime) && elapsed >= catchTime - 0.5 && elapsed <= catchTime + 0.25) {
@@ -22714,13 +22814,14 @@ function drawMiniRunner(x, y, runProgress, options = {}) {
 function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose = null) {
   const teamColor = fieldingTeam() === "away" ? "#153f24" : "#b8202d";
   const accentColor = isChosen ? "#ffcf70" : "#ffffff";
-  const bob = isChosen ? Math.sin(runProgress * Math.PI * 10) * 3 : 0;
-  const stride = isChosen ? Math.sin(runProgress * Math.PI * 12) : 0;
+  const motion = armPose?.motion;
+  const bob = isChosen && !motion ? Math.sin(runProgress * Math.PI * 10) * 3 : 0;
+  const stride = isChosen && !motion ? Math.sin(runProgress * Math.PI * 12) : 0;
   const scale = (isChosen ? 1.08 : 0.96) * (isInfieldOverviewActive() ? 1.28 : 1);
   const groundY = y + 34 * scale;
 
   ctx.save();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.fillStyle = motion?.lift > 0 ? "rgba(0, 0, 0, 0.12)" : "rgba(0, 0, 0, 0.18)";
   ctx.beginPath();
   ctx.ellipse(x, groundY, isChosen ? 30 : 24, 7, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -22733,6 +22834,11 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose
   ctx.save();
   ctx.translate(x, y + bob);
   ctx.scale(scale, scale);
+  if (motion) {
+    ctx.translate(motion.leanX, motion.drop - motion.lift);
+    ctx.rotate(motion.rotation);
+    ctx.scale(1, motion.bodyScaleY);
+  }
 
   ctx.strokeStyle = "rgba(35, 48, 71, 0.35)";
   ctx.lineWidth = 5;
@@ -22779,14 +22885,20 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose
   const directionLength = armPose ? Math.max(1, Math.hypot(armPose.dx, armPose.dy)) : 1;
   const reach = armPose ? 25 + 28 * armPose.amount : 0;
   const swing = armPose?.kind === "throw" ? Math.sin(armPose.amount * Math.PI) * 40 : 0;
-  const leftHand = armPose?.kind === "catch"
+  const leftHand = motion ? motion.glove : armPose?.kind === "catch"
     ? { x: armPose.dx / directionLength * reach, y: 9 + armPose.dy / directionLength * reach }
     : { x: -33 - stride * 6, y: 25 };
   const rightHand = armPose?.kind === "throw"
     ? { x: lerp(-armPose.dx / directionLength * 35, armPose.dx / directionLength * 58, armPose.amount),
         y: 9 + armPose.dy / directionLength * 30 * armPose.amount - swing }
     : { x: 33 + stride * 6, y: 25 };
-  drawLine(-17, 9, leftHand.x, leftHand.y);
+  const catchElbow = motion?.style === "jump"
+    ? { x: lerp(-25, -36, motion.amount), y: lerp(17, -18, motion.amount) }
+    : { x: lerp(-17, leftHand.x, 0.48), y: lerp(9, leftHand.y, 0.48) + 6 };
+  if (motion) {
+    drawLine(-17, 9, catchElbow.x, catchElbow.y);
+    drawLine(catchElbow.x, catchElbow.y, leftHand.x, leftHand.y);
+  } else drawLine(-17, 9, leftHand.x, leftHand.y);
   drawLine(17, 9, rightHand.x, rightHand.y);
 
   ctx.fillStyle = "#fff7f0";
@@ -22843,8 +22955,25 @@ function drawDefenseFielder(x, y, role, name, isChosen, runProgress = 0, armPose
   ctx.arc(0, -18, 7, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.stroke();
 
+  // 伸ばしたグラブは顔より前へ。革の縫い目とポケットで捕球位置を見せる。
+  if (motion) {
+    if (motion.style === "jump" && motion.amount > 0.05) {
+      ctx.strokeStyle = "#233047"; ctx.lineWidth = 5;
+      drawLine(-17, 9, catchElbow.x, catchElbow.y);
+      drawLine(catchElbow.x, catchElbow.y, leftHand.x, leftHand.y);
+    }
+    ctx.fillStyle = "#c48d46"; ctx.strokeStyle = "#52341f"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(leftHand.x, leftHand.y, 12, 14, -0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#f6d18c"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(leftHand.x, leftHand.y + 1, 7, 0.1, Math.PI * 1.8); ctx.stroke();
+    for (let i = -1; i <= 1; i++) drawLine(leftHand.x + i * 4, leftHand.y - 11, leftHand.x + i * 4 + 1, leftHand.y - 5);
+  }
+
   ctx.restore();
+  ctx.save();
+  if (motion && motion.style !== "normal") ctx.globalAlpha *= 1 - motion.amount;
   drawDefenseFielderNameLabel(x, y + bob, name || role, role, isChosen);
+  ctx.restore();
 }
 
 function drawDefenseFielderNameLabel(x, y, name, role, isChosen) {
@@ -23465,6 +23594,12 @@ function drawBaseballStitches(x, y, width, height, direction, radius) {
   }
 }
 
+function getInfieldBallDisplayHeight(height, hit = defenseState.battedBall) {
+  if (hit?.isGrounder) return height * 0.6;
+  // 捕球できる頭上の高さでも、ミニ画面の選手の帽子より上に見えるよう強調する。
+  return height * 3 / (1 + height / 260);
+}
+
 function drawDefenseBall() {
   if (isInfieldOverviewActive()) {
     const elapsed = (performance.now() - defenseState.startTime) / 1000;
@@ -23474,8 +23609,11 @@ function drawDefenseBall() {
     const held = hasFielderSecuredBall(elapsed) && !isManualThrowInFlight(elapsed);
     const receiver = !defenseState.rundown && held && defenseState.heldBallBase;
     const carrier = defenseState.rundown || (receiver ? getDefenseBasePointByName(receiver) : null);
+    const throwing = defenseState.throw && elapsed >= defenseState.throw.startTime;
+    const height = getDefenseBallHeightAtPoint(0, elapsed);
+    const visualHeight = throwing ? height * 0.35 : getInfieldBallDisplayHeight(height);
     let x = point.x;
-    let y = point.y - Math.min(180, getDefenseBallHeightAtPoint(0, elapsed) * 0.35);
+    let y = point.y - visualHeight;
     if (carrier) {
       const pose = getFielderArmPose(carrier.x, carrier.y);
       const length = Math.max(1, Math.hypot(pose?.dx || 0, pose?.dy || 0));
@@ -23493,8 +23631,29 @@ function drawDefenseBall() {
     }
     ctx.save();
     if (!held) {
-      ctx.fillStyle = "rgba(15,30,18,0.35)";
-      ctx.beginPath(); ctx.ellipse(point.x, point.y, 10 / scale, 4 / scale, 0, 0, Math.PI * 2); ctx.fill();
+      const airborne = !throwing && !defenseState.battedBall?.isGrounder && height > 20;
+      ctx.fillStyle = airborne ? "rgba(15,30,18,0.24)" : "rgba(15,30,18,0.4)";
+      ctx.beginPath(); ctx.ellipse(point.x, point.y, (airborne ? 15 : 8) / scale, 4 / scale, 0, 0, Math.PI * 2); ctx.fill();
+      if (airborne) {
+        ctx.strokeStyle = "rgba(190,238,255,0.6)";
+        ctx.lineWidth = 1.5 / scale;
+        ctx.setLineDash([5 / scale, 6 / scale]);
+        drawLine(point.x, point.y - 4 / scale, x, y + 12 / scale);
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "rgba(190,238,255,0.65)";
+        ctx.beginPath(); ctx.arc(x, y, 13 / scale, 0, Math.PI * 2); ctx.stroke();
+      }
+      // フライは空中の短い軌跡、ゴロは地面近くの土色の軌跡。
+      if (!throwing) {
+        const trail = ball.trail.slice(-9);
+        trail.forEach((p, index) => {
+          const h = getInfieldBallDisplayHeight(p.heightOffset ?? 0);
+          ctx.fillStyle = defenseState.battedBall?.isGrounder
+            ? `rgba(184,118,49,${index / Math.max(1, trail.length) * 0.4})`
+            : `rgba(210,245,255,${index / Math.max(1, trail.length) * 0.5})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y - h, 2.5 / scale, 0, Math.PI * 2); ctx.fill();
+        });
+      }
     }
     ctx.strokeStyle = "#163047"; ctx.lineWidth = 3 / scale;
     ctx.beginPath(); ctx.arc(x, y, 9 / scale, 0, Math.PI * 2); ctx.stroke();
@@ -23573,17 +23732,28 @@ function drawDefenseBall() {
 
 function drawDefenseCatchBallTransition(elapsedSeconds, radius, heightScale = 1) {
   const visual = defenseState.catchVisual;
-  if (!visual || !defenseState.outcome?.caught) return false;
+  if (!hasDefenseCatchVisual(elapsedSeconds)) return false;
   const age = elapsedSeconds - visual.startTime;
   if (age < 0) return false;
+  const released = defenseState.throw && elapsedSeconds >= defenseState.throw.startTime;
+  if (released) return false;
+  if (defenseState.chosenFielder) {
+    const holder = getDefenseFielderDrawPosition(defenseState.chosenFielder);
+    const motion = getDefenseCatchMotion(holder.x, holder.y, elapsedSeconds, heightScale !== 1);
+    if (motion) {
+      drawBaseballIcon(motion.gloveWorld.x, motion.gloveWorld.y, Math.max(4, radius * 0.78));
+      return true;
+    }
+  }
   if (age <= visual.duration) {
     const progress = clamp(age / Math.max(0.01, visual.duration), 0, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
     const arc = Math.sin(progress * Math.PI) * 10;
     const x = visual.fromX + (visual.toX - visual.fromX) * eased;
-    const groundY = lerp(visual.shadowY, visual.point.y, eased);
-    const fullHeightY = visual.fromY + (visual.toY - visual.fromY) * eased - arc;
-    const y = groundY - (groundY - fullHeightY) * heightScale;
+    const fromY = heightScale === 1 ? visual.fromY
+      : visual.shadowY - getInfieldBallDisplayHeight(visual.heightAtContact ?? visual.shadowY - visual.fromY);
+    const toY = visual.point.y - (visual.point.y - visual.toY) * heightScale;
+    const y = lerp(fromY, toY, eased) - arc * heightScale;
     const shadowAlpha = 0.24 * (1 - progress);
     ctx.save();
     ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
@@ -23603,7 +23773,10 @@ function drawDefenseCatchBallTransition(elapsedSeconds, radius, heightScale = 1)
   const throwStarted = throwState?.active
     && Number.isFinite(throwState.startTime)
     && elapsedSeconds >= throwState.startTime;
-  return !throwStarted;
+  if (throwStarted) return false;
+  // 捕球後もグラブ内のボールを残し、次の送球まで途切れさせない。
+  drawBaseballIcon(visual.toX, visual.point.y - (visual.point.y - visual.toY) * heightScale, Math.max(4, radius * 0.72));
+  return true;
 }
 
 function getHighFlyVisualAmount(battedBall, heightOffset) {
@@ -23657,7 +23830,7 @@ function getDefenseBallHeightAtPoint(progress, elapsedSeconds = 0) {
   const trajectory = defenseState.battedBall?.trajectory;
   const battedBall = defenseState.battedBall;
   const visual = defenseState.catchVisual;
-  if (visual && defenseState.outcome?.caught && elapsedSeconds >= visual.startTime) {
+  if (hasDefenseCatchVisual(elapsedSeconds)) {
     const t = clamp((elapsedSeconds - visual.startTime) / visual.duration, 0, 1);
     const eased = 1 - Math.pow(1 - t, 3);
     const point = getDefenseBallPoint(progress, progress, elapsedSeconds);
