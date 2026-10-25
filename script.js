@@ -7469,7 +7469,7 @@ function startPickoff(targetBase, now = performance.now(), stealTransfer = false
     || stealState.decision
     || !["first", "second", "third", "home"].includes(targetBase)) return false;
   const attempt = stealState.active ? stealState : null;
-  if (!attempt && !bases[targetBase]) return false;
+  // 盗塁の開始前も、走者の有無にかかわらず指定した塁へ牽制できる。
   const originalCount = { ...count };
   defenseState = createDefenseState();
   defenseState.active = true;

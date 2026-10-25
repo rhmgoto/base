@@ -2103,6 +2103,38 @@ const pickoffChecks = JSON.parse(makeRunner(createGameContext(), `
 `));
 assert(Object.values(pickoffChecks).every(Boolean), `牽制・帰塁・打席維持: ${JSON.stringify(pickoffChecks)}`);
 
+const allBasePickoffChecks = JSON.parse(makeRunner(createGameContext(), `
+  const checks = [];
+  for (const occupied of [false, true]) {
+    for (const target of ["first", "second", "third", "home"]) {
+      startGame(); gameMode = "versus"; resetBall();
+      defenseControlMode[fieldingTeam()] = "manual";
+      bases = createEmptyBases();
+      if (occupied) bases.first = makeBaseRunner({ id: "all-base-pickoff", name: "runner", run: 7 });
+      count.balls = 2; count.strikes = 1; count.outs = 1;
+      const batterId = activeBatter.id;
+      pitcherReady = true;
+      const started = startPickoff(target);
+      const toss = defenseState.throw;
+      const base = getDefenseBasePointByName(target);
+      const correctTarget = toss?.targetBase === target && toss.to.x === base.x && toss.to.y === base.y;
+      updateThrowState(toss.endTime + 0.01);
+      const received = defenseState.heldBallBase === target && !defenseState.baseRunners.some(r => r.isOut);
+      draw();
+      defenseState.resultHoldUntil = -1;
+      finishDefensePlay();
+      const preserved = gamePhase === "playing" && activeBatter.id === batterId
+        && count.balls === 2 && count.strikes === 1 && count.outs === 1
+        && (occupied ? bases.first?.id === "all-base-pickoff" : !bases.first)
+        && !bases.second && !bases.third;
+      checks.push({ occupied, target, started, correctTarget, received, preserved });
+    }
+  }
+  return JSON.stringify(checks);
+`));
+assert(allBasePickoffChecks.every(check => check.started && check.correctTarget && check.received && check.preserved),
+  `全塁への牽制・空塁送球・走者とカウント維持: ${JSON.stringify(allBasePickoffChecks)}`);
+
 const returnStealCompletionChecks = JSON.parse(makeRunner(createGameContext(), `
   const results = [];
   for (const target of ["first", "second", "third"]) {
